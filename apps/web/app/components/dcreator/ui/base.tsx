@@ -42,6 +42,6 @@ export function ActionToast({ message }: { message: string }) {
   return <div className="fixed bottom-20 right-4 z-50 rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white shadow-xl">{message}</div>;
 }
 
-export function FormField({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
+export function FormField({ label, error, children }: { label: ReactNode; error?: string; children: ReactNode }) {
   return <label className="grid gap-1.5 text-sm font-medium text-zinc-700"><span>{label}</span>{children}{error ? <span className="text-xs text-red-600">{error}</span> : null}</label>;
 }

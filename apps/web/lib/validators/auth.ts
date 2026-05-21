@@ -17,8 +17,8 @@ export const creatorRoleRequestSchema = z.object({
 
 export const brandRoleRequestSchema = z.object({
   brandName: z.string().trim().min(2).max(120),
-  brandWebsite: z.url().trim().max(200).optional(),
-  note: z.string().trim().max(500).optional()
+  brandWebsite: z.url().trim().max(200),
+  note: z.string().trim().max(1200).optional()
 });
 
 export const adminApproveRoleSchema = z.object({

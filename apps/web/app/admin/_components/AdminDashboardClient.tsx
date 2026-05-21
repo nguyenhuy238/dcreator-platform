@@ -17,6 +17,18 @@ function maskEmail(email: string) {
   return `${name.slice(0, 2)}***@${domain}`;
 }
 
+function extractKycImages(note: string | null) {
+  if (!note) return { front: "", back: "", portrait: "" };
+  const lines = note.split("\n");
+  const front =
+    lines.find((line) => line.startsWith("KYC CCCD mặt trước:"))?.replace("KYC CCCD mặt trước:", "").trim() ??
+    lines.find((line) => line.startsWith("KYC CCCD:"))?.replace("KYC CCCD:", "").trim() ??
+    "";
+  const back = lines.find((line) => line.startsWith("KYC CCCD mặt sau:"))?.replace("KYC CCCD mặt sau:", "").trim() ?? "";
+  const portrait = lines.find((line) => line.startsWith("KYC chân dung:"))?.replace("KYC chân dung:", "").trim() ?? "";
+  return { front, back, portrait };
+}
+
 export function AdminDashboardClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -72,8 +84,8 @@ export function AdminDashboardClient() {
 
   const overview = data.overview as { totalUsers: number; totalCreators: number; totalBrands: number; activeCampaigns: number; pendingReviews: number; totalContributions: number; fraudAlerts: number };
   const users = data.users as { items: Array<{ id: string; displayName: string; email: string; role: string; isActive: boolean; wallet?: { pointsBalance: number; cashBalanceVnd: number } }> };
-  const creatorVerifications = data.creatorVerifications as Array<{ id: string; account: { displayName: string; email: string } }>;
-  const brandVerifications = data.brandVerifications as Array<{ id: string; account: { displayName: string; email: string } }>;
+  const creatorVerifications = data.creatorVerifications as Array<{ id: string; note: string | null; account: { displayName: string; email: string } }>;
+  const brandVerifications = data.brandVerifications as Array<{ id: string; note: string | null; account: { displayName: string; email: string } }>;
   const campaignReviews = data.campaignReviews as Array<{ id: string; title: string; status: string }>;
   const proofs = data.proofs as Array<{ id: string; account: { displayName: string }; mission: { title: string; campaign: { title: string } } }>;
   const vouchers = data.vouchers as { items: Array<{ id: string; voucherCode: string; status: string; account: { email: string } }> ; logs: Array<{ id: string; action: string; createdAt: string }> };
@@ -127,11 +139,22 @@ export function AdminDashboardClient() {
       </section>
 
       <section><h2>Creator Verification</h2>
-        {creatorVerifications.length === 0 ? <p>Empty.</p> : creatorVerifications.map((r) => <p key={r.id}>{r.account.displayName} ({maskEmail(r.account.email)}) <button onClick={() => post(`/api/admin/dashboard/creator-verifications/${r.id}/approve`, {})}>Approve</button> <button onClick={() => post(`/api/admin/dashboard/creator-verifications/${r.id}/reject`, { reason: "Not enough evidence" })}>Reject</button></p>)}
+        {creatorVerifications.length === 0 ? <p>Empty.</p> : creatorVerifications.map((r) => {
+            const images = extractKycImages(r.note);
+            return <div key={r.id} className="mb-4">
+              <p>{r.account.displayName} ({maskEmail(r.account.email)}) <button onClick={() => post(`/api/admin/dashboard/creator-verifications/${r.id}/approve`, {})}>Approve</button> <button onClick={() => post(`/api/admin/dashboard/creator-verifications/${r.id}/reject`, { reason: "Not enough evidence" })}>Reject</button></p>
+              <pre>{r.note ?? "No note"}</pre>
+              <div className="flex gap-3">
+                {images.front ? <img src={images.front} alt="CCCD front" style={{ width: 160, borderRadius: 12 }} /> : null}
+                {images.back ? <img src={images.back} alt="CCCD back" style={{ width: 160, borderRadius: 12 }} /> : null}
+                {images.portrait ? <img src={images.portrait} alt="Portrait" style={{ width: 160, borderRadius: 12 }} /> : null}
+              </div>
+            </div>;
+        })}
       </section>
 
       <section><h2>Brand Verification</h2>
-        {brandVerifications.length === 0 ? <p>Empty.</p> : brandVerifications.map((r) => <p key={r.id}>{r.account.displayName} ({maskEmail(r.account.email)}) <button onClick={() => post(`/api/admin/dashboard/brand-verifications/${r.id}/approve`, {})}>Approve</button> <button onClick={() => post(`/api/admin/dashboard/brand-verifications/${r.id}/reject`, { reason: "Invalid business info" })}>Reject</button></p>)}
+        {brandVerifications.length === 0 ? <p>Empty.</p> : brandVerifications.map((r) => <div key={r.id}><p>{r.account.displayName} ({maskEmail(r.account.email)}) <button onClick={() => post(`/api/admin/dashboard/brand-verifications/${r.id}/approve`, {})}>Approve</button> <button onClick={() => post(`/api/admin/dashboard/brand-verifications/${r.id}/reject`, { reason: "Invalid business info" })}>Reject</button></p><pre>{r.note ?? "No note"}</pre></div>)}
       </section>
 
       <section><h2>Campaign Review</h2>
