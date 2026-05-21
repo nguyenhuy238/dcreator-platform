@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { ok } from "@/lib/api-response";
+import { assertApiRateLimit, parseJsonWithSchema } from "@/lib/api/middleware";
 import { assertSameOrigin } from "@/lib/auth/csrf";
-import { assertLoginRateLimit } from "@/lib/auth/rate-limit";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { verifyPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/db";
@@ -12,10 +12,8 @@ export async function POST(request: NextRequest) {
   try {
     assertSameOrigin(request);
     const body = await request.json();
-    const input = loginSchema.parse(body);
-
-    const ip = request.headers.get("x-forwarded-for") ?? "local";
-    assertLoginRateLimit(`${ip}:${input.email}`);
+    const input = parseJsonWithSchema(loginSchema, body);
+    assertApiRateLimit(request, "login", input.email);
 
     const account = await prisma.account.findUnique({
       where: { email: input.email },

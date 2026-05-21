@@ -4,6 +4,7 @@ import type { z } from "zod";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { shouldProcessPaymentWebhook } from "@/lib/payments/idempotency";
+import { flagDuplicateWebhook, flagMultipleFailedPayments } from "@/lib/services/fraud-flag.service";
 import { calculateTopupPoints } from "@/lib/services/wallet.service";
 import {
   adminPaymentQuerySchema,
@@ -270,6 +271,7 @@ export async function handlePayosWebhook(payload: PayosWebhookInput, rawPayload:
 
   return prisma.$transaction(async (tx) => {
     if (!shouldProcessPaymentWebhook(payment.status)) {
+      await flagDuplicateWebhook(payload.orderCode, payload.idempotencyKey);
       return { paymentId: payment.id, status: payment.status, idempotent: true };
     }
 
@@ -284,6 +286,9 @@ export async function handlePayosWebhook(payload: PayosWebhookInput, rawPayload:
     }
 
     await finalizePaymentByIntent(tx, payment.id, nextStatus);
+    if (nextStatus === "FAILED") {
+      await flagMultipleFailedPayments(payment.accountId);
+    }
 
     await tx.auditLog.create({
       data: {
@@ -292,6 +297,16 @@ export async function handlePayosWebhook(payload: PayosWebhookInput, rawPayload:
         targetType: "PaymentTransaction",
         targetId: payment.id,
         metadata: { webhookStatus: payload.status, finalStatus: nextStatus, transactionId: payload.transactionId }
+      }
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorId: null,
+        action: "PAYMENT_STATUS_CHANGED",
+        targetType: "PaymentTransaction",
+        targetId: payment.id,
+        metadata: { from: "PENDING", to: nextStatus }
       }
     });
 

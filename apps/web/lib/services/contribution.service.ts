@@ -8,6 +8,7 @@ import {
   contributionCreateSchema,
   contributionPayosWebhookSchema
 } from "@/lib/validators/contribution";
+import { flagContributionSpam, flagDuplicateWebhook } from "@/lib/services/fraud-flag.service";
 import { assertNonNegativeBalance } from "./wallet.service";
 
 type CreateContributionInput = z.infer<typeof contributionCreateSchema>;
@@ -50,6 +51,7 @@ export async function createCampaignContribution(
   supporterId: string,
   input: CreateContributionInput
 ): Promise<ContributionResultDTO> {
+  await flagContributionSpam(supporterId, campaignId);
   const supporter = await prisma.account.findUnique({
     where: { id: supporterId },
     select: { id: true, isActive: true, riskFlags: { select: { id: true, score: true } } }
@@ -319,6 +321,7 @@ export async function handleContributionPayosWebhook(payload: ContributionWebhoo
     if (!contribution) throw new AppError("Contribution not found", 404, "CONTRIBUTION_NOT_FOUND");
 
     if (contribution.status !== "PENDING") {
+      await flagDuplicateWebhook(payload.orderCode, payload.idempotencyKey);
       return { contributionId: contribution.id, status: contribution.status, idempotent: true };
     }
 

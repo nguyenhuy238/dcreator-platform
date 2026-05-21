@@ -1,6 +1,7 @@
 import type { MissionAudience, Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
+import { flagDuplicateProofUrl, flagProofSpam } from "@/lib/services/fraud-flag.service";
 import { ensureWalletByAccountId } from "@/lib/services/wallet.service";
 
 function isPast(date?: Date | null) {
@@ -205,6 +206,12 @@ export async function submitMissionProof(
       creatorId: accountId
     }
   });
+
+  const proofUrls = [payload.videoUrl, payload.socialPostUrl, payload.imageUrl].filter(Boolean) as string[];
+  await Promise.all([
+    flagProofSpam(accountId),
+    ...proofUrls.map((url) => flagDuplicateProofUrl(accountId, url, updated.id))
+  ]);
 
   return updated;
 }

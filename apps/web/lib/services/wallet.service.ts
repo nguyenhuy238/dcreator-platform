@@ -158,6 +158,16 @@ export async function confirmTopupPayment(payload: ConfirmPayload, rawPayload: u
       }
     });
 
+    await tx.auditLog.create({
+      data: {
+        actorId: payment.accountId,
+        action: "WALLET_BALANCE_CHANGED",
+        targetType: "Wallet",
+        targetId: wallet.id,
+        metadata: { pointsDelta: payment.creditedPoints, cashDeltaVnd: 0, source: "TOPUP_CONFIRM" }
+      }
+    });
+
     return { status: "SUCCESS" as const, idempotent: false as const };
   });
 }
@@ -206,6 +216,16 @@ export async function createCreatorPayoutRequest(accountId: string, amountVnd: n
         referenceType: "PAYOUT_REQUEST",
         referenceId: payoutRequest.id,
         idempotencyKey
+      }
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorId: accountId,
+        action: "WALLET_BALANCE_CHANGED",
+        targetType: "Wallet",
+        targetId: wallet.id,
+        metadata: { pointsDelta: 0, cashDeltaVnd: -amountVnd, source: "PAYOUT_REQUEST_CREATE" }
       }
     });
 

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
+import { flagVoucherMultipleRedeem } from "@/lib/services/fraud-flag.service";
 
 export async function getMyVouchers(accountId: string) {
   return prisma.rewardClaim.findMany({
@@ -39,7 +40,10 @@ export async function redeemVoucher(code: string, accountId: string, redemptionN
     });
     if (!voucher) throw new AppError("Voucher not found", 404, "VOUCHER_NOT_FOUND");
     if (voucher.accountId !== accountId) throw new AppError("Forbidden", 403, "FORBIDDEN");
-    if (voucher.status === "USED") throw new AppError("Voucher already used", 409, "VOUCHER_ALREADY_USED");
+    if (voucher.status === "USED") {
+      await flagVoucherMultipleRedeem(code, accountId);
+      throw new AppError("Voucher already used", 409, "VOUCHER_ALREADY_USED");
+    }
     if (voucher.status === "CANCELLED") throw new AppError("Voucher cancelled", 409, "VOUCHER_CANCELLED");
     if (voucher.expiryAt && voucher.expiryAt.getTime() <= Date.now()) {
       await tx.rewardClaim.update({ where: { id: voucher.id }, data: { status: "EXPIRED" } });
@@ -77,6 +81,8 @@ export async function redeemVoucher(code: string, accountId: string, redemptionN
         brandId: voucher.reward.campaign.brandId
       }
     });
+
+    await flagVoucherMultipleRedeem(code, accountId);
 
     return updated;
   });

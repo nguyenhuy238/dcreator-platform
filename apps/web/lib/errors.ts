@@ -25,6 +25,5 @@ export function toErrorResponse(error: unknown): NextResponse {
     return fail("Validation failed", 422, "VALIDATION_ERROR", error.flatten());
   }
 
-  const message = error instanceof Error ? error.message : "Internal server error";
-  return fail(message, 500, "INTERNAL_ERROR");
+  return fail("Internal server error", 500, "INTERNAL_ERROR");
 }
