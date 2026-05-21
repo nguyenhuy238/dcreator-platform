@@ -1,0 +1,51 @@
+.layout {
+  display: grid;
+  gap: 16px;
+}
+
+.balanceGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.balanceCard {
+  background: #ffffff;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.title {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: #334155;
+}
+
+.amount {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.pending {
+  color: #92400e;
+}
+
+.success {
+  color: #166534;
+}
+
+.fail {
+  color: #b91c1c;
+}
+
+@media (min-width: 900px) {
+  .layout {
+    grid-template-columns: 1.2fr 1fr;
+    align-items: start;
+  }
+
+  .balanceGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

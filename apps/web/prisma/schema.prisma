@@ -73,6 +73,28 @@ enum TransactionStatus {
   CANCELLED
 }
 
+enum WalletTransactionType {
+  TOPUP
+  SUPPORT
+  REWARD_REDEEM
+  COMMISSION_CREDIT
+  COMMISSION_PAYOUT
+  ADJUSTMENT
+}
+
+enum PaymentTransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum PayoutRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
 enum NotificationChannel {
   IN_APP
   EMAIL
@@ -109,6 +131,9 @@ model Account {
   sessions       AuthSession[]
   roleRequests   RoleRequest[]      @relation("RoleRequestApplicant")
   reviewedRoleRequests RoleRequest[] @relation("RoleRequestReviewer")
+  walletTransactions WalletTransaction[]
+  paymentTransactions PaymentTransaction[]
+  payoutRequests   PayoutRequest[]
 }
 
 model AuthSession {
@@ -249,6 +274,74 @@ model Wallet {
 
   user           Account             @relation(fields: [userId], references: [id])
   ledgerEntries  WalletLedger[]
+  transactions   WalletTransaction[]
+  paymentTransactions PaymentTransaction[]
+  payoutRequests PayoutRequest[]
+}
+
+model WalletTransaction {
+  id             String                @id @default(cuid())
+  walletId       String
+  accountId      String
+  type           WalletTransactionType
+  pointsDelta    Int                   @default(0)
+  cashDeltaVnd   Int                   @default(0)
+  balanceAfterPoints Int
+  balanceAfterCashVnd Int
+  referenceType  String?
+  referenceId    String?
+  idempotencyKey String?
+  createdAt      DateTime              @default(now())
+
+  wallet         Wallet                @relation(fields: [walletId], references: [id])
+  account        Account               @relation(fields: [accountId], references: [id])
+
+  @@index([walletId, createdAt])
+  @@index([accountId, createdAt])
+  @@unique([walletId, idempotencyKey])
+}
+
+model PaymentTransaction {
+  id                 String                    @id @default(cuid())
+  walletId           String
+  accountId          String
+  provider           String
+  idempotencyKey     String
+  orderCode          String                    @unique
+  requestedAmountVnd Int
+  creditedPoints     Int
+  gatewayTransactionId String?
+  status             PaymentTransactionStatus  @default(PENDING)
+  rawPayload         Json?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  wallet             Wallet                    @relation(fields: [walletId], references: [id])
+  account            Account                   @relation(fields: [accountId], references: [id])
+
+  @@unique([accountId, idempotencyKey])
+  @@index([walletId, status, createdAt])
+}
+
+model PayoutRequest {
+  id                 String               @id @default(cuid())
+  accountId          String
+  walletId           String
+  amountVnd          Int
+  status             PayoutRequestStatus  @default(PENDING)
+  note               String?
+  reviewedById       String?
+  reviewedAt         DateTime?
+  paidAt             DateTime?
+  idempotencyKey     String
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  account            Account              @relation(fields: [accountId], references: [id])
+  wallet             Wallet               @relation(fields: [walletId], references: [id])
+
+  @@unique([accountId, idempotencyKey])
+  @@index([accountId, status, createdAt])
 }
 
 model WalletLedger {
