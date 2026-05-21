@@ -1,6 +1,17 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import Image from "next/image";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ActionToast,
+  EmptyState,
+  ErrorState,
+  LoadingSkeleton,
+  PageHeader,
+  SectionHeader,
+  StatsCard,
+  StatusBadge
+} from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
 
@@ -11,10 +22,26 @@ async function getData<T>(url: string) {
   return body.data;
 }
 
+function withQuery(path: string, params: Record<string, string | number | undefined>) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined) return;
+    const normalized = typeof value === "string" ? value.trim() : String(value);
+    if (!normalized) return;
+    query.set(key, normalized);
+  });
+  const queryString = query.toString();
+  return queryString ? `${path}?${queryString}` : path;
+}
+
 function maskEmail(email: string) {
   const [name, domain] = email.split("@");
   if (!name || !domain) return "***";
   return `${name.slice(0, 2)}***@${domain}`;
+}
+
+function formatVnd(value: number) {
+  return `${value.toLocaleString("vi-VN")} VND`;
 }
 
 function extractKycImages(note: string | null) {
@@ -29,33 +56,96 @@ function extractKycImages(note: string | null) {
   return { front, back, portrait };
 }
 
+type Overview = {
+  totalUsers: number;
+  totalCreators: number;
+  totalBrands: number;
+  activeCampaigns: number;
+  pendingReviews: number;
+  totalContributions: number;
+  fraudAlerts: number;
+};
+
+type UsersData = {
+  items: Array<{
+    id: string;
+    displayName: string;
+    email: string;
+    role: string;
+    isActive: boolean;
+    wallet?: { pointsBalance: number; cashBalanceVnd: number };
+  }>;
+};
+
+type RoleRequest = { id: string; note: string | null; account: { displayName: string; email: string } };
+type CampaignReview = { id: string; title: string; status: string };
+type ProofItem = { id: string; account: { displayName: string }; mission: { title: string; campaign: { title: string } } };
+type VouchersData = {
+  items: Array<{ id: string; voucherCode: string; status: string; account: { email: string }; reward?: { campaign?: { title?: string } } }>;
+  logs: Array<{ id: string; action: string; createdAt: string }>;
+};
+type FinanceData = {
+  paymentTransactions: Array<{ id: string; provider: string; requestedAmountVnd: number; status: string }>;
+  walletTransactions: Array<{ id: string; type: string; pointsDelta: number; cashDeltaVnd: number }>;
+  payoutRequests: Array<{ id: string; amountVnd: number; status: string }>;
+  brandPrepaidFunds: Array<{ userId: string; pointsBalance: number; cashBalanceVnd?: number }>;
+};
+type FraudData = {
+  suspiciousContributions: Array<{ id: string; amountVnd: number }>;
+  duplicatePayments: Array<{ idempotencyKey: string; _count: { _all: number } }>;
+  spamProofs: Array<{ accountId: string; _count: { _all: number } }>;
+  flaggedAccounts: Array<{ id: string; reason: string; score: number }>;
+};
+type AuditData = {
+  items: Array<{ id: string; action: string; targetType: string; targetId: string; createdAt: string; metadata?: unknown }>;
+};
+type Analytics = { activeCampaigns: number; totalContributionVnd: number; failedPayment: number; fraudAlerts: number; pendingReviews: number };
+
 export function AdminDashboardClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  const [toast, setToast] = useState("");
   const [data, setData] = useState<Record<string, unknown>>({});
+
   const [userQuery, setUserQuery] = useState("");
   const [voucherCode, setVoucherCode] = useState("");
   const [auditAction, setAuditAction] = useState("");
+
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    setTimeout(() => setToast(""), 2200);
+  }, []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const [overview, users, creatorVerifications, brandVerifications, campaignReviews, proofs, vouchers, finance, fraudRisk, auditLogs, analytics] = await Promise.all([
-        getData("/api/admin/dashboard/overview"),
-        getData(`/api/admin/dashboard/users?query=${encodeURIComponent(userQuery)}&page=1&limit=20`),
-        getData("/api/admin/dashboard/creator-verifications"),
-        getData("/api/admin/dashboard/brand-verifications"),
-        getData("/api/admin/dashboard/campaign-reviews"),
-        getData("/api/admin/dashboard/proofs"),
-        getData(`/api/admin/dashboard/vouchers?code=${encodeURIComponent(voucherCode)}&page=1&limit=20`),
-        getData("/api/admin/dashboard/finance"),
-        getData("/api/admin/dashboard/fraud-risk"),
-        getData(`/api/admin/dashboard/audit-logs?action=${encodeURIComponent(auditAction)}&page=1&limit=30`),
-        getData("/api/admin/dashboard/analytics")
+        getData<Overview>("/api/admin/dashboard/overview"),
+        getData<UsersData>(withQuery("/api/admin/dashboard/users", { query: userQuery, page: 1, limit: 20 })),
+        getData<RoleRequest[]>("/api/admin/dashboard/creator-verifications"),
+        getData<RoleRequest[]>("/api/admin/dashboard/brand-verifications"),
+        getData<CampaignReview[]>("/api/admin/dashboard/campaign-reviews"),
+        getData<ProofItem[]>("/api/admin/dashboard/proofs"),
+        getData<VouchersData>(withQuery("/api/admin/dashboard/vouchers", { code: voucherCode, page: 1, limit: 20 })),
+        getData<FinanceData>("/api/admin/dashboard/finance"),
+        getData<FraudData>("/api/admin/dashboard/fraud-risk"),
+        getData<AuditData>(withQuery("/api/admin/dashboard/audit-logs", { action: auditAction, page: 1, limit: 30 })),
+        getData<Analytics>("/api/admin/dashboard/analytics")
       ]);
-      setData({ overview, users, creatorVerifications, brandVerifications, campaignReviews, proofs, vouchers, finance, fraudRisk, auditLogs, analytics });
+      setData({
+        overview,
+        users,
+        creatorVerifications,
+        brandVerifications,
+        campaignReviews,
+        proofs,
+        vouchers,
+        finance,
+        fraudRisk,
+        auditLogs,
+        analytics
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
     } finally {
@@ -64,14 +154,22 @@ export function AdminDashboardClient() {
   }, [auditAction, userQuery, voucherCode]);
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, [refresh]);
 
-  async function post(url: string, payload: unknown) {
-    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  async function post(url: string, payload: unknown, successMessage: string) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
     const body = (await res.json()) as ApiResult<unknown>;
-    setMessage(res.ok && body.success ? "Action completed" : body.error ?? "Action failed");
-    if (res.ok && body.success) await refresh();
+    if (!res.ok || !body.success) {
+      setError(body.error ?? "Action failed");
+      return;
+    }
+    showToast(successMessage);
+    await refresh();
   }
 
   async function onFilter(e: FormEvent) {
@@ -79,114 +177,327 @@ export function AdminDashboardClient() {
     await refresh();
   }
 
-  if (loading) return <main className="container"><h1>Admin/Ops Dashboard</h1><p>Loading...</p></main>;
-  if (error) return <main className="container"><h1>Admin/Ops Dashboard</h1><p className="error">{error}</p></main>;
+  const overview = (data.overview as Overview | undefined) ?? null;
+  const users = (data.users as UsersData | undefined) ?? { items: [] };
+  const creatorVerifications = (data.creatorVerifications as RoleRequest[] | undefined) ?? [];
+  const brandVerifications = (data.brandVerifications as RoleRequest[] | undefined) ?? [];
+  const campaignReviews = (data.campaignReviews as CampaignReview[] | undefined) ?? [];
+  const proofs = (data.proofs as ProofItem[] | undefined) ?? [];
+  const vouchers = (data.vouchers as VouchersData | undefined) ?? { items: [], logs: [] };
+  const finance = (data.finance as FinanceData | undefined) ?? {
+    paymentTransactions: [],
+    walletTransactions: [],
+    payoutRequests: [],
+    brandPrepaidFunds: []
+  };
+  const fraud = (data.fraudRisk as FraudData | undefined) ?? {
+    suspiciousContributions: [],
+    duplicatePayments: [],
+    spamProofs: [],
+    flaggedAccounts: []
+  };
+  const audit = (data.auditLogs as AuditData | undefined) ?? { items: [] };
+  const analytics = (data.analytics as Analytics | undefined) ?? {
+    activeCampaigns: 0,
+    totalContributionVnd: 0,
+    failedPayment: 0,
+    fraudAlerts: 0,
+    pendingReviews: 0
+  };
 
-  const overview = data.overview as { totalUsers: number; totalCreators: number; totalBrands: number; activeCampaigns: number; pendingReviews: number; totalContributions: number; fraudAlerts: number };
-  const users = data.users as { items: Array<{ id: string; displayName: string; email: string; role: string; isActive: boolean; wallet?: { pointsBalance: number; cashBalanceVnd: number } }> };
-  const creatorVerifications = data.creatorVerifications as Array<{ id: string; note: string | null; account: { displayName: string; email: string } }>;
-  const brandVerifications = data.brandVerifications as Array<{ id: string; note: string | null; account: { displayName: string; email: string } }>;
-  const campaignReviews = data.campaignReviews as Array<{ id: string; title: string; status: string }>;
-  const proofs = data.proofs as Array<{ id: string; account: { displayName: string }; mission: { title: string; campaign: { title: string } } }>;
-  const vouchers = data.vouchers as { items: Array<{ id: string; voucherCode: string; status: string; account: { email: string } }> ; logs: Array<{ id: string; action: string; createdAt: string }> };
-  const finance = data.finance as { paymentTransactions: Array<{ id: string; provider: string; requestedAmountVnd: number; status: string }>; walletTransactions: Array<{ id: string; type: string; pointsDelta: number; cashDeltaVnd: number }>; payoutRequests: Array<{ id: string; amountVnd: number; status: string }>; brandPrepaidFunds: Array<{ userId: string; pointsBalance: number }> };
-  const fraud = data.fraudRisk as { suspiciousContributions: Array<{ id: string; amountVnd: number }>; duplicatePayments: Array<{ idempotencyKey: string; _count: { _all: number } }>; spamProofs: Array<{ accountId: string; _count: { _all: number } }>; flaggedAccounts: Array<{ id: string; reason: string; score: number }> };
-  const audit = data.auditLogs as { items: Array<{ id: string; action: string; targetType: string; targetId: string; createdAt: string; metadata?: unknown }> };
-  const analytics = data.analytics as { activeCampaigns: number; totalContributionVnd: number; failedPayment: number; fraudAlerts: number; pendingReviews: number };
+  const totalBrandFund = useMemo(
+    () => finance.brandPrepaidFunds.reduce((sum, item) => sum + (item.cashBalanceVnd ?? 0), 0),
+    [finance.brandPrepaidFunds]
+  );
+
+  if (loading) {
+    return (
+      <>
+        <PageHeader title="Admin/Ops Dashboard" subtitle="Giám sát vận hành, rủi ro và kiểm duyệt toàn hệ thống." />
+        <LoadingSkeleton rows={8} />
+      </>
+    );
+  }
+
+  if (error && !overview) {
+    return <ErrorState title="Không tải được dashboard admin" description={error} onRetry={() => void refresh()} />;
+  }
 
   return (
-    <main className="container">
-      <h1>Admin/Ops Dashboard</h1>
-      {message ? <p>{message}</p> : null}
+    <>
+      <PageHeader
+        title="Admin/Ops Dashboard"
+        subtitle="Giám sát review, fraud risk, payment, audit log và duyệt role request."
+        action={<button className="dc-btn-secondary" onClick={() => void refresh()}>Làm mới</button>}
+      />
 
-      <section>
-        <h2>Dashboard Overview</h2>
-        <table><tbody>
-          <tr><td>Total users</td><td>{overview.totalUsers}</td></tr>
-          <tr><td>Total creators</td><td>{overview.totalCreators}</td></tr>
-          <tr><td>Total brands</td><td>{overview.totalBrands}</td></tr>
-          <tr><td>Active campaigns</td><td>{overview.activeCampaigns}</td></tr>
-          <tr><td>Pending reviews</td><td>{overview.pendingReviews}</td></tr>
-          <tr><td>Total contributions</td><td>{overview.totalContributions.toLocaleString("vi-VN")}</td></tr>
-          <tr><td>Fraud alerts</td><td>{overview.fraudAlerts}</td></tr>
-        </tbody></table>
+      {error ? <div className="mb-4"><ErrorState title="Có lỗi thao tác" description={error} onRetry={() => void refresh()} /></div> : null}
+
+      <section className="dc-grid-dashboard">
+        <StatsCard title="Total users" value={`${overview?.totalUsers ?? 0}`} />
+        <StatsCard title="Pending reviews" value={`${overview?.pendingReviews ?? 0}`} hint={`Fraud alerts: ${overview?.fraudAlerts ?? 0}`} />
+        <StatsCard title="Total contribution" value={formatVnd(overview?.totalContributions ?? 0)} />
+        <StatsCard title="Brand prepaid" value={formatVnd(totalBrandFund)} />
       </section>
 
-      <section>
-        <h2>Analytics KPI</h2>
-        <p>Active campaigns: {analytics?.activeCampaigns ?? 0}</p>
-        <p>Total contribution: {(analytics?.totalContributionVnd ?? 0).toLocaleString("vi-VN")} VND</p>
-        <p>Failed payment: {analytics?.failedPayment ?? 0}</p>
-        <p>Fraud alerts: {analytics?.fraudAlerts ?? 0}</p>
-        <p>Pending reviews: {analytics?.pendingReviews ?? 0}</p>
-      </section>
-
-      <section>
-        <h2>Filters</h2>
-        <form onSubmit={onFilter}>
-          <input placeholder="User query" value={userQuery} onChange={(e) => setUserQuery(e.target.value)} />
-          <input placeholder="Voucher code" value={voucherCode} onChange={(e) => setVoucherCode(e.target.value)} />
-          <input placeholder="Audit action" value={auditAction} onChange={(e) => setAuditAction(e.target.value)} />
-          <button type="submit">Apply</button>
+      <section className="mt-8 dc-card p-4">
+        <SectionHeader title="Bộ lọc nhanh" subtitle="Lọc user, voucher và audit logs." />
+        <form onSubmit={onFilter} className="grid gap-3 md:grid-cols-4">
+          <input className="dc-input" placeholder="User query" value={userQuery} onChange={(e) => setUserQuery(e.target.value)} />
+          <input className="dc-input" placeholder="Voucher code" value={voucherCode} onChange={(e) => setVoucherCode(e.target.value)} />
+          <input className="dc-input" placeholder="Audit action" value={auditAction} onChange={(e) => setAuditAction(e.target.value)} />
+          <button className="dc-btn-primary" type="submit">Apply</button>
         </form>
       </section>
 
-      <section>
-        <h2>User Management</h2>
-        {users.items.length === 0 ? <p>Empty users.</p> : <table><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Wallet</th><th>Action</th></tr></thead><tbody>
-          {users.items.map((u) => <tr key={u.id}><td>{u.displayName}</td><td>{maskEmail(u.email)}</td><td>{u.role}</td><td>{u.isActive ? "Active" : "Locked"}</td><td>{u.wallet?.pointsBalance ?? 0}/{u.wallet?.cashBalanceVnd ?? 0}</td><td>{u.isActive ? <button onClick={() => post(`/api/admin/dashboard/users/${u.id}/lock`, {})}>Lock</button> : <button onClick={() => post(`/api/admin/dashboard/users/${u.id}/unlock`, {})}>Unlock</button>}</td></tr>)}
-        </tbody></table>}
+      <section className="mt-8">
+        <SectionHeader title="User Management" subtitle="Khóa/mở tài khoản và theo dõi ví người dùng." />
+        <div className="dc-card overflow-auto">
+          {users.items.length === 0 ? (
+            <div className="p-6"><EmptyState title="Không có user" description="Không tìm thấy dữ liệu phù hợp." /></div>
+          ) : (
+            <table className="w-full min-w-[780px] text-left text-sm">
+              <thead className="bg-zinc-50 text-zinc-600">
+                <tr>
+                  <th className="px-4 py-3">User</th>
+                  <th className="px-4 py-3">Role</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Wallet</th>
+                  <th className="px-4 py-3">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.items.map((u) => (
+                  <tr key={u.id} className="border-t border-zinc-100">
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-zinc-900">{u.displayName}</p>
+                      <p className="text-xs text-zinc-500">{maskEmail(u.email)}</p>
+                    </td>
+                    <td className="px-4 py-3"><StatusBadge status={u.role.toLowerCase().includes("admin") ? "review" : "active"} /></td>
+                    <td className="px-4 py-3">{u.isActive ? <StatusBadge status="active" /> : <StatusBadge status="rejected" />}</td>
+                    <td className="px-4 py-3 text-xs text-zinc-600">
+                      P: {(u.wallet?.pointsBalance ?? 0).toLocaleString("vi-VN")}<br />
+                      C: {formatVnd(u.wallet?.cashBalanceVnd ?? 0)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {u.isActive ? (
+                        <button className="dc-btn-secondary" onClick={() => void post(`/api/admin/dashboard/users/${u.id}/lock`, {}, "Đã khóa user")}>Lock</button>
+                      ) : (
+                        <button className="dc-btn-primary" onClick={() => void post(`/api/admin/dashboard/users/${u.id}/unlock`, {}, "Đã mở khóa user")}>Unlock</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </section>
 
-      <section><h2>Creator Verification</h2>
-        {creatorVerifications.length === 0 ? <p>Empty.</p> : creatorVerifications.map((r) => {
-            const images = extractKycImages(r.note);
-            return <div key={r.id} className="mb-4">
-              <p>{r.account.displayName} ({maskEmail(r.account.email)}) <button onClick={() => post(`/api/admin/dashboard/creator-verifications/${r.id}/approve`, {})}>Approve</button> <button onClick={() => post(`/api/admin/dashboard/creator-verifications/${r.id}/reject`, { reason: "Not enough evidence" })}>Reject</button></p>
-              <pre>{r.note ?? "No note"}</pre>
-              <div className="flex gap-3">
-                {images.front ? <img src={images.front} alt="CCCD front" style={{ width: 160, borderRadius: 12 }} /> : null}
-                {images.back ? <img src={images.back} alt="CCCD back" style={{ width: 160, borderRadius: 12 }} /> : null}
-                {images.portrait ? <img src={images.portrait} alt="Portrait" style={{ width: 160, borderRadius: 12 }} /> : null}
-              </div>
-            </div>;
-        })}
+      <section className="mt-8 grid gap-4 xl:grid-cols-2">
+        <div className="dc-card p-4">
+          <SectionHeader title="Creator Verification" subtitle={`Pending: ${creatorVerifications.length}`} />
+          {creatorVerifications.length === 0 ? <p className="text-sm text-zinc-600">Không có request.</p> : (
+            <div className="grid gap-4">
+              {creatorVerifications.map((r) => {
+                const images = extractKycImages(r.note);
+                return (
+                  <article key={r.id} className="rounded-2xl border border-zinc-200 p-3">
+                    <p className="font-semibold">{r.account.displayName}</p>
+                    <p className="text-xs text-zinc-500">{maskEmail(r.account.email)}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button className="dc-btn-primary" onClick={() => void post(`/api/admin/dashboard/creator-verifications/${r.id}/approve`, {}, "Đã duyệt Creator")}>Approve</button>
+                      <button
+                        className="dc-btn-secondary"
+                        onClick={() => {
+                          const reason = window.prompt("Lý do từ chối:", "Thiếu minh chứng KYC")?.trim();
+                          if (!reason) return;
+                          void post(`/api/admin/dashboard/creator-verifications/${r.id}/reject`, { reason }, "Đã từ chối Creator");
+                        }}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                    <p className="mt-2 text-xs text-zinc-600 whitespace-pre-wrap">{r.note ?? "No note"}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {images.front ? <Image src={images.front} alt="CCCD front" width={140} height={90} className="rounded-xl border border-zinc-200" /> : null}
+                      {images.back ? <Image src={images.back} alt="CCCD back" width={140} height={90} className="rounded-xl border border-zinc-200" /> : null}
+                      {images.portrait ? <Image src={images.portrait} alt="Portrait" width={140} height={90} className="rounded-xl border border-zinc-200" /> : null}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="dc-card p-4">
+          <SectionHeader title="Brand Verification" subtitle={`Pending: ${brandVerifications.length}`} />
+          {brandVerifications.length === 0 ? <p className="text-sm text-zinc-600">Không có request.</p> : (
+            <div className="grid gap-4">
+              {brandVerifications.map((r) => (
+                <article key={r.id} className="rounded-2xl border border-zinc-200 p-3">
+                  <p className="font-semibold">{r.account.displayName}</p>
+                  <p className="text-xs text-zinc-500">{maskEmail(r.account.email)}</p>
+                  <p className="mt-2 text-xs text-zinc-600 whitespace-pre-wrap">{r.note ?? "No note"}</p>
+                  <div className="mt-2 flex gap-2">
+                    <button className="dc-btn-primary" onClick={() => void post(`/api/admin/dashboard/brand-verifications/${r.id}/approve`, {}, "Đã duyệt Brand")}>Approve</button>
+                    <button
+                      className="dc-btn-secondary"
+                      onClick={() => {
+                        const reason = window.prompt("Lý do từ chối:", "Thông tin doanh nghiệp chưa hợp lệ")?.trim();
+                        if (!reason) return;
+                        void post(`/api/admin/dashboard/brand-verifications/${r.id}/reject`, { reason }, "Đã từ chối Brand");
+                      }}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
-      <section><h2>Brand Verification</h2>
-        {brandVerifications.length === 0 ? <p>Empty.</p> : brandVerifications.map((r) => <div key={r.id}><p>{r.account.displayName} ({maskEmail(r.account.email)}) <button onClick={() => post(`/api/admin/dashboard/brand-verifications/${r.id}/approve`, {})}>Approve</button> <button onClick={() => post(`/api/admin/dashboard/brand-verifications/${r.id}/reject`, { reason: "Invalid business info" })}>Reject</button></p><pre>{r.note ?? "No note"}</pre></div>)}
+      <section className="mt-8 grid gap-4 xl:grid-cols-2">
+        <div className="dc-card p-4">
+          <SectionHeader title="Campaign Review" subtitle={`Pending: ${campaignReviews.length}`} />
+          {campaignReviews.length === 0 ? <p className="text-sm text-zinc-600">Không có campaign chờ duyệt.</p> : (
+            <div className="grid gap-3">
+              {campaignReviews.map((c) => (
+                <article key={c.id} className="rounded-2xl border border-zinc-200 p-3">
+                  <p className="font-semibold">{c.title}</p>
+                  <p className="mt-1 text-xs text-zinc-500">Status: {c.status}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button className="dc-btn-primary" onClick={() => void post(`/api/admin/dashboard/campaign-reviews/${c.id}/decision`, { decision: "APPROVED" }, "Campaign đã được duyệt")}>Approve</button>
+                    <button
+                      className="dc-btn-secondary"
+                      onClick={() => {
+                        const reason = window.prompt("Lý do từ chối:", "Không phù hợp policy")?.trim();
+                        if (!reason) return;
+                        void post(`/api/admin/dashboard/campaign-reviews/${c.id}/decision`, { decision: "REJECTED", reason }, "Campaign đã bị từ chối");
+                      }}
+                    >
+                      Reject
+                    </button>
+                    <button
+                      className="dc-btn-secondary"
+                      onClick={() => {
+                        const reason = window.prompt("Yêu cầu chỉnh sửa:", "Cần cập nhật nội dung brief")?.trim();
+                        if (!reason) return;
+                        void post(`/api/admin/dashboard/campaign-reviews/${c.id}/decision`, { decision: "CHANGES_REQUESTED", reason }, "Đã yêu cầu chỉnh sửa campaign");
+                      }}
+                    >
+                      Request changes
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="dc-card p-4">
+          <SectionHeader title="Proof Review" subtitle={`Queue: ${proofs.length}`} />
+          {proofs.length === 0 ? <p className="text-sm text-zinc-600">Không có proof pending.</p> : (
+            <div className="grid gap-3">
+              {proofs.map((p) => (
+                <article key={p.id} className="rounded-2xl border border-zinc-200 p-3">
+                  <p className="font-semibold">{p.mission.title}</p>
+                  <p className="text-xs text-zinc-500">Campaign: {p.mission.campaign.title} • Creator: {p.account.displayName}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button className="dc-btn-primary" onClick={() => void post(`/api/admin/dashboard/proofs/${p.id}/decision`, { decision: "APPROVED" }, "Đã duyệt proof")}>Approve</button>
+                    <button
+                      className="dc-btn-secondary"
+                      onClick={() => {
+                        const reason = window.prompt("Lý do reject proof:", "Proof không hợp lệ")?.trim();
+                        if (!reason) return;
+                        void post(`/api/admin/dashboard/proofs/${p.id}/decision`, { decision: "REJECTED", reason }, "Đã reject proof");
+                      }}
+                    >
+                      Reject
+                    </button>
+                    <button className="dc-btn-secondary" onClick={() => void post(`/api/admin/dashboard/proofs/${p.id}/decision`, { decision: "OVERRIDE_APPROVE", note: "Admin override" }, "Đã override approve")}>Override approve</button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
-      <section><h2>Campaign Review</h2>
-        {campaignReviews.length === 0 ? <p>No pending campaigns.</p> : campaignReviews.map((c) => <p key={c.id}>{c.title} <button onClick={() => post(`/api/admin/dashboard/campaign-reviews/${c.id}/decision`, { decision: "APPROVED" })}>Approve</button> <button onClick={() => post(`/api/admin/dashboard/campaign-reviews/${c.id}/decision`, { decision: "REJECTED", reason: "Policy mismatch" })}>Reject</button> <button onClick={() => post(`/api/admin/dashboard/campaign-reviews/${c.id}/decision`, { decision: "CHANGES_REQUESTED", reason: "Need brief update" })}>Request changes</button></p>)}
+      <section className="mt-8 grid gap-4 xl:grid-cols-2">
+        <div className="dc-card p-4">
+          <SectionHeader title="Voucher Management" subtitle={`Records: ${vouchers.items.length}`} />
+          {vouchers.items.length === 0 ? <p className="text-sm text-zinc-600">Không có voucher.</p> : (
+            <div className="grid gap-3">
+              {vouchers.items.map((v) => (
+                <article key={v.id} className="rounded-2xl border border-zinc-200 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="font-semibold">{v.voucherCode}</p>
+                      <p className="text-xs text-zinc-500">{maskEmail(v.account.email)}</p>
+                    </div>
+                    <StatusBadge status={v.status.toLowerCase()} />
+                  </div>
+                  <button
+                    className="dc-btn-secondary mt-2"
+                    disabled={v.status === "USED" || v.status === "CANCELLED"}
+                    onClick={() => {
+                      const reason = window.prompt("Lý do hủy voucher:", "Fraud detected")?.trim();
+                      if (!reason) return;
+                      void post(`/api/admin/vouchers/${v.id}/cancel`, { reason }, "Đã hủy voucher");
+                    }}
+                  >
+                    Cancel voucher
+                  </button>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="dc-card p-4">
+          <SectionHeader title="Audit Logs" subtitle={`Rows: ${audit.items.length}`} />
+          <div className="max-h-[440px] overflow-auto">
+            {audit.items.length === 0 ? <p className="text-sm text-zinc-600">Không có audit log.</p> : (
+              <table className="w-full min-w-[640px] text-left text-sm">
+                <thead className="bg-zinc-50 text-zinc-600">
+                  <tr>
+                    <th className="px-3 py-2">Action</th>
+                    <th className="px-3 py-2">Target</th>
+                    <th className="px-3 py-2">When</th>
+                    <th className="px-3 py-2">Metadata</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {audit.items.map((a) => (
+                    <tr key={a.id} className="border-t border-zinc-100 align-top">
+                      <td className="px-3 py-2 font-medium">{a.action}</td>
+                      <td className="px-3 py-2 text-zinc-600">{a.targetType} · {a.targetId.slice(0, 8)}***</td>
+                      <td className="px-3 py-2 text-zinc-600">{new Date(a.createdAt).toLocaleString("vi-VN")}</td>
+                      <td className="px-3 py-2 text-xs text-zinc-500">{a.metadata ? JSON.stringify(a.metadata).slice(0, 120) : "N/A"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
       </section>
 
-      <section><h2>Proof Review</h2>
-        {proofs.length === 0 ? <p>No pending proofs.</p> : proofs.map((p) => <p key={p.id}>{p.mission.campaign.title} - {p.mission.title} - {p.account.displayName} <button onClick={() => post(`/api/admin/dashboard/proofs/${p.id}/decision`, { decision: "APPROVED" })}>Approve</button> <button onClick={() => post(`/api/admin/dashboard/proofs/${p.id}/decision`, { decision: "REJECTED", reason: "Invalid proof" })}>Reject</button> <button onClick={() => post(`/api/admin/dashboard/proofs/${p.id}/decision`, { decision: "OVERRIDE_APPROVE", note: "Override brand decision" })}>Override approve</button></p>)}
+      <section className="mt-8 dc-card p-4">
+        <SectionHeader title="Finance & Fraud Snapshot" subtitle="Theo dõi nhanh tài chính và rủi ro." />
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <StatsCard title="Payment tx" value={`${finance.paymentTransactions.length}`} hint={`Failed: ${analytics.failedPayment}`} />
+          <StatsCard title="Payout requests" value={`${finance.payoutRequests.length}`} />
+          <StatsCard title="Fraud alerts" value={`${fraud.flaggedAccounts.length}`} hint={`Duplicate payments: ${fraud.duplicatePayments.length}`} />
+          <StatsCard title="Spam proofs" value={`${fraud.spamProofs.length}`} hint={`Suspicious contributions: ${fraud.suspiciousContributions.length}`} />
+        </div>
       </section>
 
-      <section><h2>Voucher Management</h2>
-        {vouchers.items.length === 0 ? <p>Empty vouchers.</p> : vouchers.items.map((v) => <p key={v.id}>{v.voucherCode} - {v.status} - {maskEmail(v.account.email)}</p>)}
-        <h3>Redemption Logs</h3>
-        {vouchers.logs.length === 0 ? <p>Empty logs.</p> : vouchers.logs.map((l) => <p key={l.id}>{l.action} - {new Date(l.createdAt).toLocaleString("vi-VN")}</p>)}
-      </section>
-
-      <section><h2>Finance</h2>
-        <p>Payment tx: {finance.paymentTransactions.length} | Wallet tx: {finance.walletTransactions.length} | Payout requests: {finance.payoutRequests.length} | Brand prepaid funds: {finance.brandPrepaidFunds.length}</p>
-      </section>
-
-      <section><h2>Fraud/Risk</h2>
-        <p>Suspicious contributions: {fraud.suspiciousContributions.length}</p>
-        <p>Duplicate payments: {fraud.duplicatePayments.length}</p>
-        <p>Spam proof submissions: {fraud.spamProofs.length}</p>
-        <p>Flagged accounts: {fraud.flaggedAccounts.length}</p>
-      </section>
-
-      <section><h2>Audit Logs</h2>
-        {audit.items.length === 0 ? <p>Empty audit logs.</p> : <table><thead><tr><th>Action</th><th>Entity</th><th>Target</th><th>When</th><th>Before/After</th></tr></thead><tbody>
-          {audit.items.map((a) => <tr key={a.id}><td>{a.action}</td><td>{a.targetType}</td><td>{a.targetId.slice(0, 8)}***</td><td>{new Date(a.createdAt).toLocaleString("vi-VN")}</td><td>{a.metadata ? JSON.stringify(a.metadata).slice(0, 80) : "N/A"}</td></tr>)}
-        </tbody></table>}
-      </section>
-    </main>
+      {toast ? <ActionToast message={toast} /> : null}
+    </>
   );
 }

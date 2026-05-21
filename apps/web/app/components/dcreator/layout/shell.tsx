@@ -68,6 +68,8 @@ export function PublicHeader() {
     }
   }
 
+  const canAccessAdmin = currentUser?.role === "ADMIN" || currentUser?.role === "OPS";
+
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/70 bg-white/90 backdrop-blur">
       <div className="mx-auto grid w-full max-w-7xl grid-cols-[auto_1fr_auto] items-center px-4 py-3 md:px-6">
@@ -95,6 +97,15 @@ export function PublicHeader() {
             <div className="h-10 w-44 animate-pulse rounded-full bg-zinc-200" />
           ) : currentUser ? (
             <>
+              {canAccessAdmin ? (
+                <>
+                  <Link href="/admin" className="dc-btn-secondary hidden md:inline-flex">Admin</Link>
+                  <Link href="/admin/users" className="dc-btn-secondary hidden md:inline-flex">Users</Link>
+                  <Link href="/admin/campaigns" className="dc-btn-secondary hidden md:inline-flex">Campaigns</Link>
+                  <Link href="/admin/proofs" className="dc-btn-secondary hidden md:inline-flex">Proofs</Link>
+                  <Link href="/admin/vouchers" className="dc-btn-secondary hidden md:inline-flex">Vouchers</Link>
+                </>
+              ) : null}
               <Link href="/dashboard/user" className="dc-focus inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100">
                 <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">
                   {initials}
