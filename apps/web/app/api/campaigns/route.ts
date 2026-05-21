@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { ok } from "@/lib/api-response";
 import { toErrorResponse } from "@/lib/errors";
-import { campaignQuerySchema } from "@/lib/validation";
+import { campaignQuerySchema } from "@/lib/validators";
 import { listCampaigns } from "@/lib/services/campaign.service";
 
 export async function GET(request: NextRequest) {
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
     });
 
     const data = await listCampaigns(parsed);
-    return NextResponse.json({ success: true, data });
+    return ok(data);
   } catch (error) {
     return toErrorResponse(error);
   }

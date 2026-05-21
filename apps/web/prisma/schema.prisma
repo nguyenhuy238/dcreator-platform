@@ -19,6 +19,7 @@ enum CampaignStatus {
   ACTIVE
   PAUSED
   COMPLETED
+  ARCHIVED
 }
 
 enum MissionStatus {
@@ -28,97 +29,226 @@ enum MissionStatus {
   REJECTED
 }
 
-model Account {
-  id          String   @id @default(cuid())
-  email       String   @unique
-  displayName String
-  role        Role
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+enum TransactionType {
+  TOPUP
+  SUPPORT
+  REWARD_REDEEM
+  PAYOUT
+  ADJUSTMENT
+}
 
-  campaigns   Campaign[]
-  wallet      Wallet?
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  FAILED
+  READ
+}
+
+model Account {
+  id             String             @id @default(cuid())
+  email          String             @unique
+  passwordHash   String?
+  displayName    String
+  avatarUrl      String?
+  role           Role
+  isActive       Boolean            @default(true)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  campaigns      Campaign[]         @relation("CampaignBrand")
+  wallet         Wallet?
+  profile        Profile?
+  submissions    MissionSubmission[]
+  supports       Contribution[]
+  auditLogs      AuditLog[]
+  notifications  Notification[]
+  riskFlags      RiskFlag[]         @relation("RiskFlagAccount")
+}
+
+model Profile {
+  id             String   @id @default(cuid())
+  accountId      String   @unique
+  bio            String?
+  phone          String?
+  socialLinks    Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  account        Account  @relation(fields: [accountId], references: [id])
 }
 
 model Campaign {
-  id           String         @id @default(cuid())
-  brandId      String
-  title        String
-  brief        String
-  budgetVnd    Int
-  status       CampaignStatus @default(DRAFT)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id             String           @id @default(cuid())
+  brandId        String
+  slug           String           @unique
+  title          String
+  brief          String
+  budgetVnd      Int
+  status         CampaignStatus   @default(DRAFT)
+  startsAt       DateTime?
+  endsAt         DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
-  brand        Account        @relation(fields: [brandId], references: [id])
-  missions     Mission[]
-  rewards      Reward[]
+  brand          Account          @relation("CampaignBrand", fields: [brandId], references: [id])
+  missions       Mission[]
+  rewards        Reward[]
+  contributions  Contribution[]
+  paymentOrders  PaymentOrder[]
+  analytics      AnalyticsDaily[]
 }
 
 model Mission {
-  id           String        @id @default(cuid())
-  campaignId   String
-  title        String
-  description  String
-  rewardPoints Int
-  status       MissionStatus @default(OPEN)
-  createdAt    DateTime      @default(now())
+  id             String              @id @default(cuid())
+  campaignId     String
+  title          String
+  description    String
+  rewardPoints   Int
+  status         MissionStatus       @default(OPEN)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 
-  campaign     Campaign      @relation(fields: [campaignId], references: [id])
+  campaign       Campaign            @relation(fields: [campaignId], references: [id])
+  submissions    MissionSubmission[]
+}
+
+model MissionSubmission {
+  id             String        @id @default(cuid())
+  missionId      String
+  creatorId      String
+  proofUrl       String
+  note           String?
+  status         MissionStatus @default(SUBMITTED)
+  reviewedById   String?
+  reviewedAt     DateTime?
+  createdAt      DateTime      @default(now())
+
+  mission        Mission       @relation(fields: [missionId], references: [id])
+  creator        Account       @relation(fields: [creatorId], references: [id])
+}
+
+model Contribution {
+  id             String            @id @default(cuid())
+  campaignId     String
+  supporterId    String
+  amountVnd      Int
+  note           String?
+  createdAt      DateTime          @default(now())
+
+  campaign       Campaign          @relation(fields: [campaignId], references: [id])
+  supporter      Account           @relation(fields: [supporterId], references: [id])
+}
+
+model Reward {
+  id             String   @id @default(cuid())
+  campaignId     String
+  title          String
+  pointsCost     Int
+  voucherCode    String?
+  stock          Int
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  campaign       Campaign @relation(fields: [campaignId], references: [id])
 }
 
 model Wallet {
-  id            String        @id @default(cuid())
-  userId         String        @unique
-  pointsBalance  Int           @default(0)
-  cashBalanceVnd Int           @default(0)
-  updatedAt      DateTime      @updatedAt
+  id             String              @id @default(cuid())
+  userId         String              @unique
+  pointsBalance  Int                 @default(0)
+  cashBalanceVnd Int                 @default(0)
+  updatedAt      DateTime            @updatedAt
 
-  user           Account       @relation(fields: [userId], references: [id])
+  user           Account             @relation(fields: [userId], references: [id])
   ledgerEntries  WalletLedger[]
 }
 
 model WalletLedger {
-  id           String   @id @default(cuid())
-  walletId      String
-  entryType     String
-  pointsDelta   Int
-  cashDeltaVnd  Int
-  description   String
-  createdAt     DateTime @default(now())
+  id             String            @id @default(cuid())
+  walletId       String
+  entryType      TransactionType
+  pointsDelta    Int
+  cashDeltaVnd   Int
+  description    String
+  createdAt      DateTime          @default(now())
 
-  wallet        Wallet   @relation(fields: [walletId], references: [id])
-}
-
-model Reward {
-  id            String   @id @default(cuid())
-  campaignId    String
-  title         String
-  pointsCost    Int
-  voucherCode   String?
-  stock         Int
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-
-  campaign      Campaign @relation(fields: [campaignId], references: [id])
+  wallet         Wallet            @relation(fields: [walletId], references: [id])
 }
 
 model PaymentOrder {
-  id           String   @id @default(cuid())
-  campaignId   String
-  orderCode    String   @unique
-  amountVnd    Int
-  provider     String
-  status       String
-  createdAt    DateTime @default(now())
+  id             String            @id @default(cuid())
+  campaignId     String
+  orderCode      String            @unique
+  amountVnd      Int
+  provider       String
+  status         TransactionStatus @default(PENDING)
+  createdAt      DateTime          @default(now())
+
+  campaign       Campaign          @relation(fields: [campaignId], references: [id])
+}
+
+model Notification {
+  id             String              @id @default(cuid())
+  accountId      String
+  channel        NotificationChannel
+  title          String
+  content        String
+  status         NotificationStatus  @default(QUEUED)
+  sentAt         DateTime?
+  createdAt      DateTime            @default(now())
+
+  account        Account             @relation(fields: [accountId], references: [id])
+}
+
+model AnalyticsDaily {
+  id             String   @id @default(cuid())
+  date           DateTime
+  campaignId     String
+  impressions    Int      @default(0)
+  clicks         Int      @default(0)
+  supports       Int      @default(0)
+  supportVnd     Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  campaign       Campaign @relation(fields: [campaignId], references: [id])
+
+  @@unique([date, campaignId])
 }
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  actorId     String?
-  action      String
-  targetType  String
-  targetId    String
-  metadata    Json?
-  createdAt   DateTime @default(now())
+  id             String   @id @default(cuid())
+  actorId        String?
+  action         String
+  targetType     String
+  targetId       String
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  actor          Account? @relation(fields: [actorId], references: [id])
+}
+
+model RiskFlag {
+  id             String   @id @default(cuid())
+  accountId      String?
+  targetType     String
+  targetId       String
+  reason         String
+  score          Int      @default(0)
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  account        Account? @relation("RiskFlagAccount", fields: [accountId], references: [id])
 }

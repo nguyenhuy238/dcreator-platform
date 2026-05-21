@@ -3,9 +3,9 @@ export default function AdminPage() {
     <main className="container">
       <h1>Admin/Ops Dashboard</h1>
       <ul>
-        <li>Audit log: đang triển khai API ghi sự kiện</li>
-        <li>Fraud rules: rate-limit + anomaly detection hooks</li>
-        <li>Settlement queue: đối soát payout Creator</li>
+        <li>Audit log timeline</li>
+        <li>Fraud/Risk flag management</li>
+        <li>Payment reconciliation and incident handling</li>
       </ul>
     </main>
   );

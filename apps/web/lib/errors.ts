@@ -1,20 +1,30 @@
 import { NextResponse } from "next/server";
+import { ZodError } from "zod";
+import { fail } from "@/lib/api-response";
 
 export class AppError extends Error {
   statusCode: number;
+  code?: string;
+  details?: unknown;
 
-  constructor(message: string, statusCode = 400) {
+  constructor(message: string, statusCode = 400, code?: string, details?: unknown) {
     super(message);
     this.name = "AppError";
     this.statusCode = statusCode;
+    this.code = code;
+    this.details = details;
   }
 }
 
-export function toErrorResponse(error: unknown) {
+export function toErrorResponse(error: unknown): NextResponse {
   if (error instanceof AppError) {
-    return NextResponse.json({ success: false, error: error.message }, { status: error.statusCode });
+    return fail(error.message, error.statusCode, error.code, error.details);
+  }
+
+  if (error instanceof ZodError) {
+    return fail("Validation failed", 422, "VALIDATION_ERROR", error.flatten());
   }
 
   const message = error instanceof Error ? error.message : "Internal server error";
-  return NextResponse.json({ success: false, error: message }, { status: 500 });
+  return fail(message, 500, "INTERNAL_ERROR");
 }
