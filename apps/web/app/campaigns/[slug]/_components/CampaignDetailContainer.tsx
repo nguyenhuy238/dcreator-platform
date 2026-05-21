@@ -1,0 +1,147 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import type { CampaignDetailDTO } from "@/lib/dto/campaign-detail";
+import styles from "../campaign-detail.module.css";
+import {
+  BackersSection,
+  FaqPolicySection,
+  FundingSection,
+  HeroSection,
+  MissionsSection,
+  RewardsSection,
+  TimelineSection
+} from "./CampaignDetailSections";
+
+type Props = { slug: string };
+
+type ApiResponse = {
+  success: boolean;
+  data?: CampaignDetailDTO;
+  error?: string;
+  code?: string;
+};
+
+function getCampaignCTA(data: CampaignDetailDTO, selectedRewardId: string | null) {
+  if (data.viewer.hasSupported) {
+    return { label: "Xem voucher cua toi", disabled: false };
+  }
+  if (data.funding.isEnded) {
+    return { label: "Campaign da ket thuc", disabled: true };
+  }
+  if (!selectedRewardId) {
+    return data.viewer.isLoggedIn
+      ? { label: "Ung ho ngay", disabled: true }
+      : { label: "Dang nhap de ung ho", disabled: false };
+  }
+  const selectedReward = data.rewards.find((reward) => reward.id === selectedRewardId);
+  if (!selectedReward || selectedReward.isOutOfStock) {
+    return { label: "Het luot", disabled: true };
+  }
+  if (!data.viewer.isLoggedIn) {
+    return { label: "Dang nhap de ung ho", disabled: false };
+  }
+  return { label: "Ung ho ngay", disabled: false };
+}
+
+export function CampaignDetailContainer({ slug }: Props) {
+  const [data, setData] = useState<CampaignDetailDTO | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isNotFound, setIsNotFound] = useState(false);
+  const [selectedRewardId, setSelectedRewardId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      setIsNotFound(false);
+      try {
+        const response = await fetch(`/api/campaigns/${slug}`, { cache: "no-store" });
+        const body = (await response.json()) as ApiResponse;
+        if (!active) return;
+
+        if (!response.ok) {
+          if (response.status === 404 || body.code === "CAMPAIGN_NOT_FOUND") {
+            setIsNotFound(true);
+            return;
+          }
+          throw new Error(body.error ?? "Load campaign detail failed");
+        }
+
+        if (!body.success || !body.data) {
+          throw new Error(body.error ?? "Unexpected response");
+        }
+
+        setData(body.data);
+      } catch (err) {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : "Cannot load campaign detail");
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void run();
+    return () => {
+      active = false;
+    };
+  }, [slug]);
+
+  const cta = useMemo(
+    () => (data ? getCampaignCTA(data, selectedRewardId) : { label: "Ung ho ngay", disabled: true }),
+    [data, selectedRewardId]
+  );
+
+  if (loading) {
+    return (
+      <main className={`container ${styles.page}`}>
+        <div className={styles.skeleton} />
+        <div className={styles.skeleton} />
+        <div className={styles.skeleton} />
+      </main>
+    );
+  }
+
+  if (isNotFound) {
+    return (
+      <main className="container">
+        <h1>Campaign khong ton tai</h1>
+        <p>Campaign co the chua public hoac da bi go.</p>
+      </main>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <main className="container">
+        <h1>Loi tai campaign detail</h1>
+        <p className="error">{error ?? "Khong the tai du lieu."}</p>
+      </main>
+    );
+  }
+
+  return (
+    <main className={`container ${styles.page}`}>
+      <div>
+        <HeroSection hero={data.hero} />
+        <div className={styles.full}>
+          <MissionsSection missions={data.missions} />
+          <TimelineSection timeline={data.timeline} />
+          <BackersSection socialProof={data.socialProof} />
+          <FaqPolicySection faqPolicy={data.faqPolicy} />
+        </div>
+      </div>
+      <div>
+        <FundingSection funding={data.funding} />
+        <RewardsSection
+          rewards={data.rewards}
+          selectedRewardId={selectedRewardId}
+          onSelect={setSelectedRewardId}
+          cta={cta}
+        />
+      </div>
+    </main>
+  );
+}
