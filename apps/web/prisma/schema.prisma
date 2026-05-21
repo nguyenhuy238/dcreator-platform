@@ -58,6 +58,29 @@ enum MissionStatus {
   REJECTED
 }
 
+enum MissionAudience {
+  USER
+  CREATOR
+}
+
+enum MissionLifecycleStatus {
+  OPEN
+  ACCEPTED
+  DOING
+  SUBMITTED
+  PENDING_REVIEW
+  APPROVED
+  DONE
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+enum ReviewDecision {
+  APPROVED
+  REJECTED
+}
+
 enum TransactionType {
   TOPUP
   SUPPORT
@@ -156,6 +179,7 @@ model Account {
   wallet         Wallet?
   profile        Profile?
   submissions    MissionSubmission[]
+  proofReviews   ProofReview[]
   supports       Contribution[]
   auditLogs      AuditLog[]
   notifications  Notification[]
@@ -251,27 +275,64 @@ model Mission {
   title          String
   description    String
   rewardPoints   Int
+  rewardCommissionVnd Int            @default(0)
+  audience       MissionAudience     @default(USER)
+  allowRepeat    Boolean             @default(false)
+  deadlineAt     DateTime?
   status         MissionStatus       @default(OPEN)
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
   campaign       Campaign            @relation(fields: [campaignId], references: [id])
+  proofReviews   ProofReview[]
   submissions    MissionSubmission[]
 }
 
 model MissionSubmission {
   id             String        @id @default(cuid())
   missionId      String
-  creatorId      String
-  proofUrl       String
+  accountId      String
+  lifecycleStatus MissionLifecycleStatus @default(ACCEPTED)
+  videoUrl       String?
+  imageUrl       String?
+  socialPostUrl  String?
+  screenshotUrl  String?
+  fileUploadUrl  String?
+  proofTextNote  String?
   note           String?
+  rejectReason   String?
+  approvedAt     DateTime?
+  rewardGrantedAt DateTime?
   status         MissionStatus @default(SUBMITTED)
   reviewedById   String?
   reviewedAt     DateTime?
   createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   mission        Mission       @relation(fields: [missionId], references: [id])
-  creator        Account       @relation(fields: [creatorId], references: [id])
+  account        Account       @relation(fields: [accountId], references: [id])
+  reviews        ProofReview[]
+
+  @@unique([missionId, accountId])
+  @@index([accountId, lifecycleStatus, createdAt])
+}
+
+model ProofReview {
+  id               String         @id @default(cuid())
+  submissionId     String
+  missionId        String
+  reviewerId       String
+  reviewerRole     Role
+  decision         ReviewDecision
+  rejectReason     String?
+  note             String?
+  createdAt        DateTime       @default(now())
+
+  submission       MissionSubmission @relation(fields: [submissionId], references: [id])
+  mission          Mission        @relation(fields: [missionId], references: [id])
+  reviewer         Account        @relation(fields: [reviewerId], references: [id])
+
+  @@index([submissionId, createdAt])
 }
 
 model Contribution {

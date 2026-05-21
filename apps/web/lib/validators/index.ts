@@ -5,3 +5,4 @@ export * from "./common";
 export * from "./wallet";
 export * from "./contribution";
 export * from "./voucher";
+export * from "./mission";
