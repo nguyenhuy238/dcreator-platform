@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  CREATOR
+  BRAND
+  ADMIN
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum MissionStatus {
+  OPEN
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+model Account {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  displayName String
+  role        Role
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  campaigns   Campaign[]
+  wallet      Wallet?
+}
+
+model Campaign {
+  id           String         @id @default(cuid())
+  brandId      String
+  title        String
+  brief        String
+  budgetVnd    Int
+  status       CampaignStatus @default(DRAFT)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  brand        Account        @relation(fields: [brandId], references: [id])
+  missions     Mission[]
+  rewards      Reward[]
+}
+
+model Mission {
+  id           String        @id @default(cuid())
+  campaignId   String
+  title        String
+  description  String
+  rewardPoints Int
+  status       MissionStatus @default(OPEN)
+  createdAt    DateTime      @default(now())
+
+  campaign     Campaign      @relation(fields: [campaignId], references: [id])
+}
+
+model Wallet {
+  id            String        @id @default(cuid())
+  userId         String        @unique
+  pointsBalance  Int           @default(0)
+  cashBalanceVnd Int           @default(0)
+  updatedAt      DateTime      @updatedAt
+
+  user           Account       @relation(fields: [userId], references: [id])
+  ledgerEntries  WalletLedger[]
+}
+
+model WalletLedger {
+  id           String   @id @default(cuid())
+  walletId      String
+  entryType     String
+  pointsDelta   Int
+  cashDeltaVnd  Int
+  description   String
+  createdAt     DateTime @default(now())
+
+  wallet        Wallet   @relation(fields: [walletId], references: [id])
+}
+
+model Reward {
+  id            String   @id @default(cuid())
+  campaignId    String
+  title         String
+  pointsCost    Int
+  voucherCode   String?
+  stock         Int
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  campaign      Campaign @relation(fields: [campaignId], references: [id])
+}
+
+model PaymentOrder {
+  id           String   @id @default(cuid())
+  campaignId   String
+  orderCode    String   @unique
+  amountVnd    Int
+  provider     String
+  status       String
+  createdAt    DateTime @default(now())
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorId     String?
+  action      String
+  targetType  String
+  targetId    String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+}

@@ -1,159 +1,54 @@
-# Turborepo starter
+# dCreator Platform
 
-This Turborepo starter is maintained by the Turborepo core team.
+Nền tảng độc lập 100% cho Creator Economy + Social Commerce + Crowd-sponsorship + Reward/Voucher.
 
-## Using this example
+## Kiến trúc
 
-Run the following command:
+- `apps/web`: Next.js App Router, gồm Web User + Creator Dashboard + Brand Dashboard + Admin/Ops Dashboard + API routes.
+- `apps/web/prisma`: Schema PostgreSQL độc lập cho auth/account, campaign, mission, wallet, reward, payment, audit.
+- `packages/*`: shared config/ui cho monorepo.
 
-```sh
-npx create-turbo@latest
+## Module đã khởi tạo
+
+- Campaign Engine (`/api/campaigns`)
+- Mission/Proof Engine (`/api/missions`)
+- Wallet/N-Points Engine (`/api/wallet`)
+- Reward/Voucher Engine (`/api/rewards`)
+- Payment Integration (PayOS init endpoint: `/api/payments/payos`)
+- Health check (`/api/health`)
+
+## Chuẩn bị môi trường
+
+1. Tạo file env:
+```bash
+cp apps/web/.env.example apps/web/.env
+```
+2. Cấu hình PostgreSQL trong `DATABASE_URL`.
+3. Cài dependencies:
+```bash
+npm install
+```
+4. Tạo Prisma client + migrate + seed:
+```bash
+npm run db:generate --workspace=web
+npm run db:migrate --workspace=web
+npm run db:seed --workspace=web
+```
+5. Chạy local:
+```bash
+npm run dev
 ```
 
-## What's inside?
+## Security baseline
 
-This Turborepo includes the following packages/apps:
+- API payment có `INTERNAL_API_KEY` guard.
+- Validation request bằng `zod`.
+- Chuẩn hóa JSON error response + HTTP status code.
 
-### Apps and Packages
+## Giai đoạn tiếp theo
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo build
-npm dlx turbo build
-npm exec turbo build
-```
-
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo build --filter=docs
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo build --filter=docs
-npm exec turbo build --filter=docs
-npm exec turbo build --filter=docs
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo dev
-npm exec turbo dev
-npm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-npm exec turbo dev --filter=web
-npm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-npm exec turbo login
-npm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-npm exec turbo link
-npm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+- Auth production (Auth.js/custom JWT + RBAC + session strategy).
+- Proof submission workflow + moderation queue.
+- Settlement & payout pipeline cho Creator.
+- Notification service (email/push/realtime) + audit logging đầy đủ.
+- CI/CD, monitoring, rate-limit, fraud scoring.
