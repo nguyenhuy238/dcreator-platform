@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import styles from "../wallet.module.css";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AppShell, PublicHeader } from "@/app/components/dcreator/layout/shell";
+import { EmptyState, ErrorState, PageHeader, SectionHeader, StatsCard, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type WalletResponse = {
   success: boolean;
@@ -13,38 +14,55 @@ type WalletResponse = {
       pointsDelta: number;
       cashDeltaVnd: number;
       createdAt: string;
+      referenceType: string | null;
     }>;
     pendingPayments: Array<{ id: string; orderCode: string; requestedAmountVnd: number; status: string }>;
+    payouts: Array<{ id: string; amountVnd: number; status: string; createdAt: string }>;
   };
   error?: string;
 };
+
+const nav = [
+  { href: "/dashboard/user", label: "Tổng quan" },
+  { href: "/campaigns", label: "Campaign" },
+  { href: "/wallet", label: "Wallet" },
+  { href: "/vouchers", label: "Voucher" }
+];
 
 function formatVnd(value: number) {
   return `${value.toLocaleString("vi-VN")} VND`;
 }
 
+function statusTone(text: string) {
+  if (text.toLowerCase().includes("thành công") || text.toLowerCase().includes("success")) return "text-emerald-700";
+  if (text.toLowerCase().includes("thất bại") || text.toLowerCase().includes("failed") || text.toLowerCase().includes("lỗi")) return "text-red-700";
+  return "text-amber-700";
+}
+
 export function WalletPageClient() {
   const [data, setData] = useState<WalletResponse["data"] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [statusText, setStatusText] = useState("");
   const [amountVnd, setAmountVnd] = useState(100000);
   const [idempotencyKey, setIdempotencyKey] = useState(`topup-${Date.now()}`);
 
   const load = async () => {
+    setError(null);
     const response = await fetch("/api/wallet/me", { cache: "no-store" });
     const body = (await response.json()) as WalletResponse;
     if (!response.ok || !body.success || !body.data) {
-      throw new Error(body.error ?? "Cannot load wallet");
+      throw new Error(body.error ?? "Không tải được ví");
     }
     setData(body.data);
   };
 
   useEffect(() => {
-    load().catch((error) => setStatusText(error.message));
+    load().catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Không tải được ví"));
   }, []);
 
   const handleTopup = async (event: FormEvent) => {
     event.preventDefault();
-    setStatusText("Dang tao payment...");
+    setStatusText("Đang tạo payment...");
     try {
       const response = await fetch("/api/wallet/topup/create-payment", {
         method: "POST",
@@ -57,17 +75,19 @@ export function WalletPageClient() {
         error?: string;
       };
       if (!response.ok || !body.success || !body.data) {
-        throw new Error(body.error ?? "Create payment failed");
+        throw new Error(body.error ?? "Tạo payment thất bại");
       }
       setStatusText(`Payment pending: ${body.data.status}`);
+      setIdempotencyKey(`topup-${Date.now()}`);
       window.open(body.data.paymentUrl, "_blank", "noopener,noreferrer");
-    } catch (error) {
-      setStatusText(error instanceof Error ? error.message : "Top-up failed");
+      await load();
+    } catch (submitError) {
+      setStatusText(submitError instanceof Error ? submitError.message : "Top-up thất bại");
     }
   };
 
   const handlePayoutRequest = async () => {
-    setStatusText("Dang tao payout request...");
+    setStatusText("Đang tạo payout request...");
     const response = await fetch("/api/creator/payout-request", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -79,91 +99,107 @@ export function WalletPageClient() {
     });
     const body = (await response.json()) as { success: boolean; error?: string };
     if (!response.ok || !body.success) {
-      setStatusText(body.error ?? "Payout request failed");
+      setStatusText(body.error ?? "Tạo payout request thất bại");
       return;
     }
-    setStatusText("Payment success: payout request created");
+    setStatusText("Tạo payout request thành công");
     await load();
   };
 
-  if (!data) {
-    return (
-      <main className="container">
-        <h1>Wallet</h1>
-        <p>{statusText || "Loading..."}</p>
-      </main>
-    );
-  }
+  const topupPointEstimate = useMemo(() => Math.floor(amountVnd / 100), [amountVnd]);
 
   return (
-    <main className={`container ${styles.layout}`}>
-      <section className="card">
-        <h1>Wallet / N-Points</h1>
-        <div className={styles.balanceGrid}>
-          <article className={styles.balanceCard}>
-            <p className={styles.title}>N-Points balance</p>
-            <p className={styles.amount}>{data.wallet.pointsBalance.toLocaleString("vi-VN")} points</p>
-          </article>
-          <article className={styles.balanceCard}>
-            <p className={styles.title}>Creator commission wallet</p>
-            <p className={styles.amount}>{formatVnd(data.wallet.cashBalanceVnd)}</p>
-            <button type="button" onClick={handlePayoutRequest}>
-              Tao payout request
-            </button>
-          </article>
-        </div>
-        <p
-          className={
-            statusText.includes("success") ? styles.success : statusText.includes("failed") ? styles.fail : styles.pending
-          }
-        >
-          {statusText || "Payment pending state se hien thi tai day."}
-        </p>
-      </section>
+    <>
+      <PublicHeader />
+      <AppShell sidebarItems={nav}>
+        <PageHeader title="Wallet / N-Points" subtitle="Quản lý số dư N-Points, hoa hồng creator và lịch sử giao dịch." />
 
-      <section className="card">
-        <h2>Top-up</h2>
-        <form onSubmit={handleTopup}>
-          <label>
-            So tien nap (VND)
-            <input
-              type="number"
-              min={1000}
-              value={amountVnd}
-              onChange={(event) => setAmountVnd(Number(event.target.value))}
-            />
-          </label>
-          <label>
-            Idempotency key
-            <input value={idempotencyKey} onChange={(event) => setIdempotencyKey(event.target.value)} />
-          </label>
-          <button type="submit">Tao payment</button>
-        </form>
-        <h3>Payment pending</h3>
-        {data.pendingPayments.length === 0 ? (
-          <p>Khong co giao dich pending.</p>
-        ) : (
-          data.pendingPayments.map((payment) => (
-            <article key={payment.id} className={styles.balanceCard}>
-              <p>{payment.orderCode}</p>
-              <p>{formatVnd(payment.requestedAmountVnd)}</p>
-              <p>{payment.status}</p>
-            </article>
-          ))
-        )}
-      </section>
+        {error ? <ErrorState title="Không thể tải dữ liệu ví" description={error} onRetry={() => void load()} /> : null}
 
-      <section className="card">
-        <h2>Transaction history</h2>
-        {data.transactions.map((transaction) => (
-          <article key={transaction.id} className={styles.balanceCard}>
-            <strong>{transaction.type}</strong>
-            <p>Points: {transaction.pointsDelta > 0 ? "+" : ""}{transaction.pointsDelta}</p>
-            <p>Cash: {transaction.cashDeltaVnd > 0 ? "+" : ""}{formatVnd(transaction.cashDeltaVnd)}</p>
-            <p>{new Date(transaction.createdAt).toLocaleString("vi-VN")}</p>
-          </article>
-        ))}
-      </section>
-    </main>
+        {!data && !error ? <div className="h-56 animate-pulse rounded-3xl bg-zinc-100" /> : null}
+
+        {data ? (
+          <>
+            <section className="dc-grid-dashboard">
+              <StatsCard title="N-Points balance" value={`${data.wallet.pointsBalance.toLocaleString("vi-VN")} points`} />
+              <StatsCard title="Commission wallet" value={formatVnd(data.wallet.cashBalanceVnd)} />
+              <StatsCard title="Payment pending" value={`${data.pendingPayments.length}`} />
+              <StatsCard title="Payout requests" value={`${data.payouts.length}`} />
+            </section>
+
+            <section className="mt-8 grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+              <article className="dc-card p-5">
+                <SectionHeader title="Top-up" subtitle="Tạo giao dịch nạp tiền qua PayOS" />
+                <form onSubmit={handleTopup} className="grid gap-3">
+                  <label className="grid gap-1 text-sm font-medium text-zinc-700">
+                    <span>Số tiền nạp (VND)</span>
+                    <input
+                      className="dc-input"
+                      type="number"
+                      min={1000}
+                      step={1000}
+                      value={amountVnd}
+                      onChange={(event) => setAmountVnd(Number(event.target.value))}
+                    />
+                  </label>
+                  <label className="grid gap-1 text-sm font-medium text-zinc-700">
+                    <span>Idempotency key</span>
+                    <input className="dc-input" value={idempotencyKey} onChange={(event) => setIdempotencyKey(event.target.value)} />
+                  </label>
+                  <p className="text-sm text-zinc-600">Ước tính nhận: {topupPointEstimate.toLocaleString("vi-VN")} N-Points</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="submit" className="dc-btn-primary">Tạo payment</button>
+                    <button type="button" className="dc-btn-secondary" onClick={handlePayoutRequest}>Tạo payout request 50,000 VND</button>
+                  </div>
+                </form>
+                <p className={`mt-3 text-sm font-medium ${statusText ? statusTone(statusText) : "text-zinc-500"}`}>
+                  {statusText || "Trạng thái thanh toán sẽ hiển thị tại đây."}
+                </p>
+              </article>
+
+              <article className="dc-card p-5">
+                <SectionHeader title="Payment Pending" subtitle="Các giao dịch nạp đang chờ xác nhận" />
+                {data.pendingPayments.length === 0 ? (
+                  <EmptyState title="Không có giao dịch pending" description="Sau khi tạo payment, trạng thái đang chờ sẽ xuất hiện ở đây." />
+                ) : (
+                  <div className="grid gap-3">
+                    {data.pendingPayments.map((payment) => (
+                      <div key={payment.id} className="rounded-2xl border border-zinc-200 p-3">
+                        <p className="font-semibold text-zinc-900">{payment.orderCode}</p>
+                        <p className="text-sm text-zinc-600">{formatVnd(payment.requestedAmountVnd)}</p>
+                        <div className="mt-2"><StatusBadge status={payment.status.toLowerCase()} /></div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </article>
+            </section>
+
+            <section className="mt-8">
+              <SectionHeader title="Transaction History" subtitle="20 giao dịch gần nhất" />
+              {data.transactions.length === 0 ? (
+                <EmptyState title="Chưa có giao dịch" description="Lịch sử giao dịch sẽ xuất hiện khi bạn nạp tiền hoặc sử dụng điểm." />
+              ) : (
+                <div className="grid gap-3">
+                  {data.transactions.map((transaction) => (
+                    <article key={transaction.id} className="dc-card p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-semibold text-zinc-900">{transaction.type}</p>
+                        <p className="text-xs text-zinc-500">{new Date(transaction.createdAt).toLocaleString("vi-VN")}</p>
+                      </div>
+                      <div className="mt-2 grid gap-1 text-sm text-zinc-600 sm:grid-cols-3">
+                        <p>Points: {transaction.pointsDelta > 0 ? "+" : ""}{transaction.pointsDelta.toLocaleString("vi-VN")}</p>
+                        <p>Cash: {transaction.cashDeltaVnd > 0 ? "+" : ""}{formatVnd(transaction.cashDeltaVnd)}</p>
+                        <p>Ref: {transaction.referenceType ?? "N/A"}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          </>
+        ) : null}
+      </AppShell>
+    </>
   );
 }
