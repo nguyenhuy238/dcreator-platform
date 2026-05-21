@@ -1,0 +1,688 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  FAN
+  BACKER
+  CREATOR
+  BRAND
+  ADMIN
+  OPS
+}
+
+enum CampaignStatus {
+  DRAFT
+  PENDING_REVIEW
+  SCHEDULED
+  LIVE
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum CampaignType {
+  DONATION
+  PREORDER
+  MISSION_BASED
+  SUBSCRIPTION
+}
+
+enum MissionStatus {
+  OPEN
+  ACCEPTED
+  DOING
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CLOSED
+}
+
+enum ProofStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum ContributionStatus {
+  INITIATED
+  PAYMENT_PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  CREATED
+  PENDING
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum VoucherStatus {
+  ISSUED
+  LOCKED
+  REDEEMED
+  EXPIRED
+  VOIDED
+}
+
+enum WalletTransactionType {
+  CREDIT
+  DEBIT
+  HOLD
+  RELEASE
+  REFUND
+  ADJUSTMENT
+  PAYOUT
+  TOPUP
+}
+
+enum PayoutStatus {
+  REQUESTED
+  UNDER_REVIEW
+  APPROVED
+  PROCESSING
+  PAID
+  REJECTED
+  CANCELLED
+}
+
+enum NotificationType {
+  SYSTEM
+  CAMPAIGN
+  MISSION
+  CONTRIBUTION
+  PAYMENT
+  PAYOUT
+  FRAUD
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  phone           String?   @unique
+  passwordHash    String
+  status          String    @default("active")
+  primaryRole     UserRole  @default(USER)
+  displayName     String?
+  avatarUrl       String?
+  isEmailVerified Boolean   @default(false)
+  isPhoneVerified Boolean   @default(false)
+  lastLoginAt     DateTime?
+  lastLoginIp     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  profile              Profile?
+  creatorProfile       CreatorProfile?
+  brandMembers         BrandMember[]
+  campaignParticipants CampaignParticipant[]
+  contributions        CampaignContribution[] @relation("ContributionBacker")
+  userMissions         UserMission[]
+  proofSubmissions     ProofSubmission[]      @relation("ProofSubmitter")
+  proofReviews         ProofSubmission[]      @relation("ProofReviewer")
+  wallets              Wallet[]
+  walletTransactions   WalletTransaction[]
+  voucherRedemptions   VoucherRedemption[]
+  notifications        Notification[]
+  analyticsEvents      AnalyticsEvent[]
+  auditLogs            AuditLog[]             @relation("AuditActor")
+  fraudFlagsCreated    FraudFlag[]            @relation("FraudCreatedBy")
+  payoutRequests       PayoutRequest[]        @relation("PayoutRequester")
+  payoutApprovals      PayoutRequest[]        @relation("PayoutApprover")
+  brandsOwned          Brand[]                @relation("BrandOwner")
+  campaignsCreated     Campaign[]             @relation("CampaignCreatorUser")
+  vouchers             Voucher[]
+  fraudFlags           FraudFlag[]
+
+  @@index([primaryRole, status])
+  @@index([createdAt])
+}
+
+model Profile {
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  fullName           String?
+  bio                String?
+  dateOfBirth        DateTime?
+  countryCode        String?   @db.VarChar(2)
+  timezone           String?
+  preferredLanguage  String?   @db.VarChar(10)
+  kycStatus          String    @default("pending")
+  kycVerifiedAt      DateTime?
+  taxIdMasked        String?
+  consentMarketingAt DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Brand {
+  id           String    @id @default(cuid())
+  ownerUserId  String
+  name         String
+  slug         String    @unique
+  legalName    String?
+  taxCode      String?
+  status       String    @default("active")
+  contactEmail String?
+  contactPhone String?
+  verifiedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  owner     User          @relation("BrandOwner", fields: [ownerUserId], references: [id])
+  members   BrandMember[]
+  products  Product[]
+  campaigns Campaign[]
+
+  @@index([ownerUserId, status])
+}
+
+model BrandMember {
+  id              String   @id @default(cuid())
+  brandId         String
+  userId          String
+  role            UserRole @default(BRAND)
+  isActive        Boolean  @default(true)
+  joinedAt        DateTime @default(now())
+  invitedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([brandId, userId])
+  @@index([userId, role])
+}
+
+model CreatorProfile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  handle         String   @unique
+  headline       String?
+  bio            String?
+  category       String?
+  kycStatus      String   @default("pending")
+  payoutEligible Boolean  @default(false)
+  ratingAvg      Decimal? @db.Decimal(4, 2)
+  totalBackers   Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channels       CreatorChannel[]
+  campaigns      Campaign[]
+  payoutRequests PayoutRequest[]
+  products       Product[]
+
+  @@index([category])
+}
+
+model CreatorChannel {
+  id               String   @id @default(cuid())
+  creatorProfileId String
+  platform         String
+  channelHandle    String
+  channelUrl       String
+  followersCount   Int?
+  isVerified       Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  creatorProfile CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([platform, channelHandle])
+  @@index([creatorProfileId, platform])
+}
+
+model Product {
+  id               String   @id @default(cuid())
+  brandId          String
+  creatorProfileId String?
+  name             String
+  sku              String   @unique
+  description      String?
+  unitPrice        Decimal  @db.Decimal(18, 2)
+  currency         String   @db.VarChar(3)
+  stockTotal       Int      @default(0)
+  stockRemaining   Int      @default(0)
+  isActive         Boolean  @default(true)
+  metadata         Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  brand              Brand               @relation(fields: [brandId], references: [id])
+  creatorProfile     CreatorProfile?     @relation(fields: [creatorProfileId], references: [id])
+  campaigns          Campaign[]
+  voucherRedemptions VoucherRedemption[]
+
+  @@index([brandId, isActive])
+  @@index([creatorProfileId])
+}
+
+model Campaign {
+  id               String         @id @default(cuid())
+  brandId          String?
+  creatorProfileId String
+  createdByUserId  String
+  productId        String?
+  title            String
+  slug             String         @unique
+  description      String?
+  campaignType     CampaignType
+  status           CampaignStatus @default(DRAFT)
+  goalAmount       Decimal        @db.Decimal(18, 2)
+  raisedAmount     Decimal        @default(0) @db.Decimal(18, 2)
+  currency         String         @db.VarChar(3)
+  startsAt         DateTime?
+  endsAt           DateTime?
+  publishedAt      DateTime?
+  completedAt      DateTime?
+  cancelReason     String?
+  termsVersion     String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  brand          Brand?                 @relation(fields: [brandId], references: [id])
+  creatorProfile CreatorProfile         @relation(fields: [creatorProfileId], references: [id])
+  createdBy      User                   @relation("CampaignCreatorUser", fields: [createdByUserId], references: [id])
+  product        Product?               @relation(fields: [productId], references: [id])
+  rewards        CampaignReward[]
+  missions       CampaignMission[]
+  participants   CampaignParticipant[]
+  contributions  CampaignContribution[]
+  vouchers       Voucher[]
+  fraudFlags     FraudFlag[]
+
+  @@index([creatorProfileId, status])
+  @@index([brandId, status])
+  @@index([status, startsAt, endsAt])
+}
+
+model CampaignReward {
+  id             String   @id @default(cuid())
+  campaignId     String
+  title          String
+  description    String?
+  priceAmount    Decimal  @db.Decimal(18, 2)
+  currency       String   @db.VarChar(3)
+  stockTotal     Int
+  stockRemaining Int
+  perUserLimit   Int?
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  campaign      Campaign               @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contributions CampaignContribution[]
+  vouchers      Voucher[]
+
+  @@index([campaignId, isActive])
+  @@index([campaignId, stockRemaining])
+}
+
+model CampaignMission {
+  id              String        @id @default(cuid())
+  campaignId      String
+  title           String
+  description     String?
+  rewardPoints    Int           @default(0)
+  maxParticipants Int?
+  status          MissionStatus @default(OPEN)
+  dueAt           DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  campaign     Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userMissions UserMission[]
+
+  @@index([campaignId, status])
+}
+
+model CampaignParticipant {
+  id           String   @id @default(cuid())
+  campaignId   String
+  userId       String
+  joinedAt     DateTime @default(now())
+  status       String   @default("active")
+  referralCode String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, userId])
+  @@index([userId, status])
+}
+
+model CampaignContribution {
+  id               String             @id @default(cuid())
+  campaignId       String
+  backerUserId     String
+  campaignRewardId String?
+  quantity         Int                @default(1)
+  amount           Decimal            @db.Decimal(18, 2)
+  feeAmount        Decimal            @default(0) @db.Decimal(18, 2)
+  currency         String             @db.VarChar(3)
+  status           ContributionStatus @default(INITIATED)
+  paymentMethod    String?
+  idempotencyKey   String             @unique
+  externalRef      String?
+  settledAt        DateTime?
+  refundedAt       DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  campaign            Campaign             @relation(fields: [campaignId], references: [id])
+  backer              User                 @relation("ContributionBacker", fields: [backerUserId], references: [id])
+  reward              CampaignReward?      @relation(fields: [campaignRewardId], references: [id])
+  paymentTransactions PaymentTransaction[]
+  vouchers            Voucher[]
+  fraudFlags          FraudFlag[]
+
+  @@index([campaignId, status])
+  @@index([backerUserId, createdAt])
+  @@index([campaignRewardId])
+}
+
+model UserMission {
+  id                String        @id @default(cuid())
+  campaignMissionId String
+  userId            String
+  status            MissionStatus @default(OPEN)
+  acceptedAt        DateTime?
+  submittedAt       DateTime?
+  reviewedAt        DateTime?
+  score             Int?
+  reviewerUserId    String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  mission CampaignMission   @relation(fields: [campaignMissionId], references: [id], onDelete: Cascade)
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  proofs  ProofSubmission[]
+
+  @@unique([campaignMissionId, userId])
+  @@index([userId, status])
+  @@index([campaignMissionId, status])
+}
+
+model ProofSubmission {
+  id              String      @id @default(cuid())
+  userMissionId   String
+  submitterUserId String
+  reviewerUserId  String?
+  status          ProofStatus @default(SUBMITTED)
+  content         Json
+  attachmentUrls  Json?
+  rejectReason    String?
+  reviewedAt      DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  userMission UserMission @relation(fields: [userMissionId], references: [id], onDelete: Cascade)
+  submitter   User        @relation("ProofSubmitter", fields: [submitterUserId], references: [id])
+  reviewer    User?       @relation("ProofReviewer", fields: [reviewerUserId], references: [id])
+
+  @@index([userMissionId, status])
+  @@index([reviewerUserId, status])
+}
+
+model Wallet {
+  id            String   @id @default(cuid())
+  userId        String
+  currency      String   @default("NPT") @db.VarChar(10)
+  balance       Decimal  @default(0) @db.Decimal(20, 4)
+  lockedBalance Decimal  @default(0) @db.Decimal(20, 4)
+  allowCashout  Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+
+  @@unique([userId, currency])
+  @@index([userId, isActive])
+}
+
+model WalletTransaction {
+  id              String                @id @default(cuid())
+  walletId        String
+  userId          String
+  type            WalletTransactionType
+  amount          Decimal               @db.Decimal(20, 4)
+  balanceBefore   Decimal               @db.Decimal(20, 4)
+  balanceAfter    Decimal               @db.Decimal(20, 4)
+  currency        String                @default("NPT") @db.VarChar(10)
+  referenceType   String
+  referenceId     String
+  description     String?
+  createdByUserId String?
+  createdAt       DateTime              @default(now())
+  metadata        Json?
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([walletId, referenceType, referenceId, type])
+  @@index([walletId, createdAt])
+  @@index([userId, createdAt])
+  @@index([referenceType, referenceId])
+}
+
+model Voucher {
+  id                     String        @id @default(cuid())
+  code                   String        @unique
+  campaignId             String
+  campaignRewardId       String?
+  campaignContributionId String?
+  ownerUserId            String
+  status                 VoucherStatus @default(ISSUED)
+  faceValue              Decimal?      @db.Decimal(18, 2)
+  currency               String?       @db.VarChar(3)
+  expiresAt              DateTime?
+  issuedAt               DateTime      @default(now())
+  redeemedAt             DateTime?
+  voidReason             String?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  campaign     Campaign              @relation(fields: [campaignId], references: [id])
+  reward       CampaignReward?       @relation(fields: [campaignRewardId], references: [id])
+  contribution CampaignContribution? @relation(fields: [campaignContributionId], references: [id])
+  owner        User                  @relation(fields: [ownerUserId], references: [id])
+  redemptions  VoucherRedemption[]
+
+  @@index([ownerUserId, status, expiresAt])
+  @@index([campaignId, status])
+}
+
+model VoucherRedemption {
+  id               String   @id @default(cuid())
+  voucherId        String
+  redeemedByUserId String
+  productId        String?
+  redeemedAt       DateTime @default(now())
+  channel          String?
+  orderRef         String?
+  metadata         Json?
+  createdAt        DateTime @default(now())
+
+  voucher    Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  redeemedBy User     @relation(fields: [redeemedByUserId], references: [id])
+  product    Product? @relation(fields: [productId], references: [id])
+
+  @@index([redeemedByUserId, redeemedAt])
+  @@index([voucherId, redeemedAt])
+}
+
+model PaymentTransaction {
+  id                     String        @id @default(cuid())
+  campaignContributionId String
+  provider               String
+  providerPaymentId      String?
+  providerEventId        String?
+  idempotencyKey         String?
+  amount                 Decimal       @db.Decimal(18, 2)
+  currency               String        @db.VarChar(3)
+  status                 PaymentStatus @default(CREATED)
+  paymentMethod          String?
+  failureCode            String?
+  failureMessage         String?
+  webhookPayload         Json?
+  paidAt                 DateTime?
+  refundedAt             DateTime?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  contribution CampaignContribution @relation(fields: [campaignContributionId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerEventId])
+  @@unique([provider, providerPaymentId])
+  @@index([campaignContributionId, status])
+  @@index([provider, providerPaymentId])
+  @@index([provider, providerEventId])
+}
+
+model PayoutRequest {
+  id                 String       @id @default(cuid())
+  creatorProfileId   String
+  requestedByUserId  String
+  approvedByUserId   String?
+  amount             Decimal      @db.Decimal(18, 2)
+  feeAmount          Decimal      @default(0) @db.Decimal(18, 2)
+  currency           String       @db.VarChar(3)
+  destinationAccount String
+  status             PayoutStatus @default(REQUESTED)
+  reason             String?
+  rejectionReason    String?
+  requestedAt        DateTime     @default(now())
+  approvedAt         DateTime?
+  processedAt        DateTime?
+  paidAt             DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  creatorProfile CreatorProfile @relation(fields: [creatorProfileId], references: [id])
+  requestedBy    User           @relation("PayoutRequester", fields: [requestedByUserId], references: [id])
+  approvedBy     User?          @relation("PayoutApprover", fields: [approvedByUserId], references: [id])
+
+  @@index([creatorProfileId, status, requestedAt])
+  @@index([status, createdAt])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  payload   Json?
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  sentAt    DateTime?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@index([type, createdAt])
+}
+
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  eventName  String
+  userId     String?
+  sessionId  String?
+  entityType String?
+  entityId   String?
+  source     String?
+  ipAddress  String?
+  userAgent  String?
+  properties Json?
+  occurredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([eventName, occurredAt])
+  @@index([userId, occurredAt])
+  @@index([entityType, entityId])
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  actorUserId    String?
+  action         String
+  entityType     String
+  entityId       String
+  requestId      String?
+  idempotencyKey String?
+  ipAddress      String?
+  userAgent      String?
+  beforeData     Json?
+  afterData      Json?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorUserId], references: [id])
+
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId, createdAt])
+  @@index([action, createdAt])
+}
+
+model FraudFlag {
+  id                     String    @id @default(cuid())
+  createdByUserId        String?
+  userId                 String?
+  campaignId             String?
+  campaignContributionId String?
+  riskLevel              String
+  reasonCode             String
+  status                 String    @default("open")
+  note                   String?
+  resolvedAt             DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  createdBy    User?                 @relation("FraudCreatedBy", fields: [createdByUserId], references: [id])
+  user         User?                 @relation(fields: [userId], references: [id])
+  campaign     Campaign?             @relation(fields: [campaignId], references: [id])
+  contribution CampaignContribution? @relation(fields: [campaignContributionId], references: [id])
+
+  @@index([status, riskLevel, createdAt])
+  @@index([userId, createdAt])
+  @@index([campaignId, createdAt])
+  @@index([campaignContributionId, createdAt])
+}
