@@ -1,0 +1,34 @@
+import { z } from "zod";
+import { paginationSchema } from "@/lib/validators/common";
+
+export const adminUserQuerySchema = paginationSchema.extend({
+  query: z.string().trim().min(1).max(120).optional()
+});
+
+export const adminRejectSchema = z.object({
+  reason: z.string().trim().min(3).max(500)
+});
+
+export const adminCampaignDecisionSchema = z.object({
+  decision: z.enum(["APPROVED", "REJECTED", "CHANGES_REQUESTED"]),
+  reason: z.string().trim().max(500).optional()
+}).superRefine((value, ctx) => {
+  if ((value.decision === "REJECTED" || value.decision === "CHANGES_REQUESTED") && !value.reason) {
+    ctx.addIssue({ code: "custom", path: ["reason"], message: "reason is required" });
+  }
+});
+
+export const adminProofDecisionSchema = z.object({
+  decision: z.enum(["APPROVED", "REJECTED", "OVERRIDE_APPROVE"]),
+  reason: z.string().trim().max(500).optional(),
+  note: z.string().trim().max(500).optional()
+}).superRefine((value, ctx) => {
+  if (value.decision === "REJECTED" && !value.reason) {
+    ctx.addIssue({ code: "custom", path: ["reason"], message: "reason is required" });
+  }
+});
+
+export const adminAuditQuerySchema = paginationSchema.extend({
+  action: z.string().trim().min(1).max(120).optional(),
+  targetType: z.string().trim().min(1).max(120).optional()
+});
