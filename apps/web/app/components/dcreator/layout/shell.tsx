@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 
 type NavItem = { href: string; label: string };
@@ -11,8 +12,61 @@ const publicNav: NavItem[] = [
   { href: "/auth/register/brand", label: "Brand" }
 ];
 
+type AuthUser = {
+  id: string;
+  email: string;
+  displayName: string;
+  role: string;
+};
+
 export function PublicHeader() {
   const pathname = usePathname();
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    async function loadMe() {
+      try {
+        const response = await fetch("/api/auth/me", { cache: "no-store" });
+        const payload = await response.json();
+        if (!alive) return;
+        if (response.ok && payload?.success) {
+          setCurrentUser(payload.data as AuthUser);
+        } else {
+          setCurrentUser(null);
+        }
+      } catch {
+        if (alive) setCurrentUser(null);
+      } finally {
+        if (alive) setAuthReady(true);
+      }
+    }
+    void loadMe();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const initials = useMemo(() => {
+    if (!currentUser?.displayName) return "U";
+    return currentUser.displayName
+      .split(" ")
+      .map((part) => part.trim().charAt(0))
+      .filter(Boolean)
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
+  }, [currentUser?.displayName]);
+
+  async function handleLogout() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      setCurrentUser(null);
+      window.location.href = "/";
+    }
+  }
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/70 bg-white/90 backdrop-blur">
@@ -37,8 +91,24 @@ export function PublicHeader() {
           ))}
         </nav>
         <div className="flex items-center justify-end gap-2">
-          <Link href="/auth/login" className="dc-btn-secondary">Đăng nhập</Link>
-          <Link href="/auth/register" className="dc-btn-primary hidden px-7 py-3 text-base sm:inline-flex">Đăng ký tài khoản</Link>
+          {!authReady ? (
+            <div className="h-10 w-44 animate-pulse rounded-full bg-zinc-200" />
+          ) : currentUser ? (
+            <>
+              <Link href="/dashboard/user" className="dc-focus inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100">
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">
+                  {initials}
+                </span>
+                <span className="max-w-28 truncate">{currentUser.displayName}</span>
+              </Link>
+              <button type="button" onClick={handleLogout} className="dc-btn-secondary">Đăng xuất</button>
+            </>
+          ) : (
+            <>
+              <Link href="/auth/login" className="dc-btn-secondary">Đăng nhập</Link>
+              <Link href="/auth/register" className="dc-btn-primary hidden px-7 py-3 text-base sm:inline-flex">Đăng ký tài khoản</Link>
+            </>
+          )}
         </div>
       </div>
     </header>

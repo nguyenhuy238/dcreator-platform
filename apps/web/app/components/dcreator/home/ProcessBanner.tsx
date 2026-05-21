@@ -10,8 +10,10 @@ type Step = {
 
 export function ProcessBanner({ steps }: { steps: Step[] }) {
   const [active, setActive] = useState(0);
-  const current = steps[active];
+  const current = steps[active] ?? steps[0];
   const next = () => setActive((s) => (s === steps.length - 1 ? 0 : s + 1));
+
+  if (!current) return null;
 
   return (
     <button

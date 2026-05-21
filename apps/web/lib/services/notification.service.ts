@@ -1,4 +1,4 @@
-import { NotificationChannel, NotificationEvent } from "@prisma/client";
+import { NotificationChannel, NotificationEvent, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { getEmailNotificationProvider } from "@/lib/notifications/email-provider";
@@ -43,7 +43,7 @@ export async function createNotification(input: CreateNotificationInput) {
           event: input.event,
           title: input.title,
           content: input.content,
-          metadata: input.metadata,
+          metadata: input.metadata as Prisma.InputJsonValue | undefined,
           channel,
           deliveryStatus: channel === NotificationChannel.IN_APP ? "SENT" : "QUEUED",
           sentAt: channel === NotificationChannel.IN_APP ? new Date() : null

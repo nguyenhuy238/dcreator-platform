@@ -52,7 +52,7 @@ export async function getBrandKpis(brandId: string) {
       by: ["creatorId"],
       where: { brandId, eventName: AnalyticsEventName.campaign_contribution_success, creatorId: { not: null } },
       _count: { _all: true },
-      orderBy: { _count: { _all: "desc" } },
+      orderBy: { _count: { creatorId: "desc" } },
       take: 1
     })
   ]);

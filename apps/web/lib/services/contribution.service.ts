@@ -47,11 +47,11 @@ export function verifyContributionWebhookSignature(rawBody: string, signature: s
 }
 
 export async function createCampaignContribution(
-  campaignId: string,
+  campaignRef: string,
   supporterId: string,
   input: CreateContributionInput
 ): Promise<ContributionResultDTO> {
-  await flagContributionSpam(supporterId, campaignId);
+  await flagContributionSpam(supporterId, campaignRef);
   const supporter = await prisma.account.findUnique({
     where: { id: supporterId },
     select: { id: true, isActive: true, riskFlags: { select: { id: true, score: true } } }
@@ -82,8 +82,8 @@ export async function createCampaignContribution(
 
   if (input.paymentMethod === "N_POINTS") {
     return prisma.$transaction(async (tx) => {
-      const campaign = await tx.campaign.findUnique({
-        where: { id: campaignId },
+      const campaign = await tx.campaign.findFirst({
+        where: { OR: [{ id: campaignRef }, { slug: campaignRef }] },
         select: { id: true, status: true, fundedAmountVnd: true, backerCount: true, brandId: true, creatorId: true }
       });
       if (!campaign || campaign.status !== "ACTIVE") {
@@ -91,7 +91,7 @@ export async function createCampaignContribution(
       }
 
       const rewardUpdate = await tx.reward.updateMany({
-        where: { id: input.rewardId, campaignId, isActive: true, stockRemaining: { gt: 0 } },
+        where: { id: input.rewardId, campaignId: campaign.id, isActive: true, stockRemaining: { gt: 0 } },
         data: { stockRemaining: { decrement: 1 } }
       });
       if (rewardUpdate.count === 0) {
@@ -110,7 +110,7 @@ export async function createCampaignContribution(
 
       const contribution = await tx.contribution.create({
         data: {
-          campaignId,
+          campaignId: campaign.id,
           supporterId,
           rewardId: reward.id,
           paymentMethod: "N_POINTS",
@@ -157,7 +157,7 @@ export async function createCampaignContribution(
           actorId: supporterId,
           action: "CONTRIBUTION_SUCCESS",
           targetType: "Campaign",
-          targetId: campaignId,
+          targetId: campaign.id,
           metadata: { contributionId: contribution.id, paymentMethod: "N_POINTS", rewardId: reward.id }
         }
       });
@@ -168,7 +168,7 @@ export async function createCampaignContribution(
             eventName: "campaign_support_started",
             userId: supporterId,
             sessionId: `srv_${supporterId}`,
-            campaignId,
+            campaignId: campaign.id,
             brandId: campaign.brandId,
             creatorId: campaign.creatorId,
             metadata: { amountVnd: input.amount, paymentMethod: "N_POINTS" }
@@ -177,7 +177,7 @@ export async function createCampaignContribution(
             eventName: "reward_selected",
             userId: supporterId,
             sessionId: `srv_${supporterId}`,
-            campaignId,
+            campaignId: campaign.id,
             brandId: campaign.brandId,
             creatorId: campaign.creatorId,
             metadata: { rewardId: reward.id }
@@ -190,7 +190,7 @@ export async function createCampaignContribution(
           eventName: "campaign_contribution_success",
           userId: supporterId,
           sessionId: `srv_${supporterId}`,
-          campaignId,
+          campaignId: campaign.id,
           brandId: campaign.brandId,
           creatorId: campaign.creatorId,
           metadata: { amountVnd: input.amount }
@@ -202,7 +202,7 @@ export async function createCampaignContribution(
           eventName: "voucher_issued",
           userId: supporterId,
           sessionId: `srv_${supporterId}`,
-          campaignId,
+          campaignId: campaign.id,
           brandId: campaign.brandId,
           creatorId: campaign.creatorId
         }
@@ -218,8 +218,8 @@ export async function createCampaignContribution(
   }
 
   return prisma.$transaction(async (tx) => {
-    const campaign = await tx.campaign.findUnique({
-      where: { id: campaignId },
+    const campaign = await tx.campaign.findFirst({
+      where: { OR: [{ id: campaignRef }, { slug: campaignRef }] },
       select: { id: true, status: true, brandId: true, creatorId: true }
     });
     if (!campaign || campaign.status !== "ACTIVE") {
@@ -227,7 +227,7 @@ export async function createCampaignContribution(
     }
 
     const rewardUpdate = await tx.reward.updateMany({
-      where: { id: input.rewardId, campaignId, isActive: true, stockRemaining: { gt: 0 } },
+      where: { id: input.rewardId, campaignId: campaign.id, isActive: true, stockRemaining: { gt: 0 } },
       data: { stockRemaining: { decrement: 1 } }
     });
     if (rewardUpdate.count === 0) {
@@ -250,7 +250,7 @@ export async function createCampaignContribution(
 
     const contribution = await tx.contribution.create({
       data: {
-        campaignId,
+        campaignId: campaign.id,
         supporterId,
         rewardId: input.rewardId,
         paymentMethod: "PAYOS",
@@ -266,7 +266,7 @@ export async function createCampaignContribution(
         actorId: supporterId,
         action: "CONTRIBUTION_PENDING",
         targetType: "Campaign",
-        targetId: campaignId,
+        targetId: campaign.id,
         metadata: { contributionId: contribution.id, paymentMethod: "PAYOS", rewardId: input.rewardId }
       }
     });
@@ -277,7 +277,7 @@ export async function createCampaignContribution(
           eventName: "campaign_support_started",
           userId: supporterId,
           sessionId: `srv_${supporterId}`,
-          campaignId,
+          campaignId: campaign.id,
           brandId: campaign.brandId,
           creatorId: campaign.creatorId,
           metadata: { amountVnd: input.amount, paymentMethod: "PAYOS" }
@@ -286,7 +286,7 @@ export async function createCampaignContribution(
           eventName: "reward_selected",
           userId: supporterId,
           sessionId: `srv_${supporterId}`,
-          campaignId,
+          campaignId: campaign.id,
           brandId: campaign.brandId,
           creatorId: campaign.creatorId,
           metadata: { rewardId: input.rewardId }

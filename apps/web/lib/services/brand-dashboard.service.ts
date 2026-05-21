@@ -45,6 +45,8 @@ type BrandMeta = {
   }>;
 };
 
+type VerificationStatus = BrandMeta["brandProfile"]["verificationStatus"];
+
 function parseBrandMeta(value: unknown): BrandMeta {
   const fallback: BrandMeta = {
     brandProfile: {
@@ -67,12 +69,11 @@ function parseBrandMeta(value: unknown): BrandMeta {
           brandName: typeof (profile as { brandName?: unknown }).brandName === "string" ? (profile as { brandName: string }).brandName : "",
           logoUrl: typeof (profile as { logoUrl?: unknown }).logoUrl === "string" ? (profile as { logoUrl: string }).logoUrl : "",
           businessInfo: typeof (profile as { businessInfo?: unknown }).businessInfo === "string" ? (profile as { businessInfo: string }).businessInfo : "",
-          verificationStatus:
-            (profile as { verificationStatus?: unknown }).verificationStatus === "VERIFIED" ||
-            (profile as { verificationStatus?: unknown }).verificationStatus === "PENDING" ||
-            (profile as { verificationStatus?: unknown }).verificationStatus === "REJECTED"
-              ? ((profile as { verificationStatus: "VERIFIED" | "PENDING" | "REJECTED" }).verificationStatus)
-              : "UNVERIFIED"
+          verificationStatus: ((): VerificationStatus => {
+            const status = (profile as { verificationStatus?: unknown }).verificationStatus;
+            if (status === "VERIFIED" || status === "PENDING" || status === "REJECTED" || status === "UNVERIFIED") return status;
+            return "UNVERIFIED";
+          })()
         }
       : fallback.brandProfile;
 

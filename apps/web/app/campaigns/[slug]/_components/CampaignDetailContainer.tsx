@@ -5,6 +5,7 @@ import type { CampaignDetailDTO } from "@/lib/dto/campaign-detail";
 import styles from "../campaign-detail.module.css";
 import {
   BackersSection,
+  CampaignStatsSection,
   FaqPolicySection,
   FundingSection,
   HeroSection,
@@ -77,6 +78,10 @@ export function CampaignDetailContainer({ slug }: Props) {
         }
 
         setData(body.data);
+        setSelectedRewardId((prev) => {
+          if (prev && body.data?.rewards.some((reward) => reward.id === prev)) return prev;
+          return body.data?.rewards.find((reward) => !reward.isOutOfStock)?.id ?? null;
+        });
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : "Cannot load campaign detail");
@@ -126,18 +131,20 @@ export function CampaignDetailContainer({ slug }: Props) {
 
   return (
     <main className={`container ${styles.page}`}>
-      <div>
+      <div className={styles.leftColumn}>
         <HeroSection hero={data.hero} />
         <div className={styles.full}>
+          <CampaignStatsSection data={data} />
           <MissionsSection missions={data.missions} />
           <TimelineSection timeline={data.timeline} />
           <BackersSection socialProof={data.socialProof} />
           <FaqPolicySection faqPolicy={data.faqPolicy} />
         </div>
       </div>
-      <div>
+      <div className={styles.rightColumn}>
         <FundingSection funding={data.funding} />
         <RewardsSection
+          campaignTitle={data.hero.title}
           rewards={data.rewards}
           selectedRewardId={selectedRewardId}
           onSelect={setSelectedRewardId}
@@ -148,6 +155,7 @@ export function CampaignDetailContainer({ slug }: Props) {
           open={isSupportOpen}
           onClose={() => setIsSupportOpen(false)}
           campaignId={data.hero.id}
+          campaignSlug={data.hero.slug}
           rewards={data.rewards}
           initialRewardId={selectedRewardId}
         />

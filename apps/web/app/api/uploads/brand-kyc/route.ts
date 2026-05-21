@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 
-function ensureImage(file: File | null, label: string) {
+function ensureImage(file: File | null, label: string): asserts file is File {
   if (!file) throw new AppError(`Thiếu file ${label}`, 422, "FILE_REQUIRED");
   if (!file.type.startsWith("image/")) {
     throw new AppError(`${label} phải là file ảnh`, 422, "INVALID_FILE_TYPE");
