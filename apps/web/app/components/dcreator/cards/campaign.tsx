@@ -19,9 +19,9 @@ export function RewardCard({ title, description, price, stock, benefits, eta }: 
 }
 
 export function MissionCard({ title, status, reward, due }: { title: string; status: string; reward: string; due: string }) {
-  return <article className="dc-card p-4"><div className="mb-2 flex items-center justify-between"><h4 className="font-bold">{title}</h4><StatusBadge status={status} /></div><p className="text-sm text-zinc-600">Thưởng: {reward}</p><p className="text-xs text-zinc-500">Deadline: {due}</p><button className="dc-btn-secondary mt-3">Nộp proof</button></article>;
+  return <article className="dc-card p-4"><div className="mb-2 flex items-center justify-between"><h4 className="font-bold">{title}</h4><StatusBadge status={status} /></div><p className="text-sm text-zinc-600">Thưởng: {reward}</p><p className="text-xs text-zinc-500">Deadline: {due}</p><Link href="/me/missions" className="dc-btn-secondary mt-3">Nộp proof</Link></article>;
 }
 
 export function VoucherCard({ code, status, expiry }: { code: string; status: string; expiry: string }) {
-  return <article className="dc-card p-4"><div className="flex items-center justify-between"><p className="font-mono text-lg font-bold tracking-wide">{code}</p><StatusBadge status={status} /></div><p className="mt-2 text-sm text-zinc-600">Hết hạn: {expiry}</p><button className="dc-btn-secondary mt-3">Xem voucher</button></article>;
+  return <article className="dc-card p-4"><div className="flex items-center justify-between"><p className="font-mono text-lg font-bold tracking-wide">{code}</p><StatusBadge status={status} /></div><p className="mt-2 text-sm text-zinc-600">Hết hạn: {expiry}</p><Link href={`/vouchers/${code}`} className="dc-btn-secondary mt-3">Xem voucher</Link></article>;
 }

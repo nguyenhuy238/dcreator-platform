@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
 async function createRiskFlag(input: {
@@ -15,7 +16,7 @@ async function createRiskFlag(input: {
       targetId: input.targetId,
       reason: input.reason,
       score: input.score,
-      metadata: (input.metadata ?? null) as object | null
+      metadata: (input.metadata ?? undefined) as Prisma.InputJsonValue | undefined
     }
   });
 }
@@ -147,6 +148,7 @@ export async function scanFraudRiskSignals() {
       _count: { _all: true },
       where: { status: "SUCCESS" },
       having: { idempotencyKey: { _count: { gt: 1 } } },
+      orderBy: { idempotencyKey: "asc" },
       take: 50
     }),
     prisma.contribution.findMany({
@@ -159,7 +161,8 @@ export async function scanFraudRiskSignals() {
       by: ["accountId"],
       _count: { _all: true },
       where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
-      having: { _count: { accountId: { gt: 20 } } },
+      having: { accountId: { _count: { gt: 20 } } },
+      orderBy: { accountId: "asc" },
       take: 50
     }),
     prisma.riskFlag.findMany({
