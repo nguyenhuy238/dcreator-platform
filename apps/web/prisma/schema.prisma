@@ -95,6 +95,17 @@ enum PayoutRequestStatus {
   PAID
 }
 
+enum ContributionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum ContributionPaymentMethod {
+  N_POINTS
+  PAYOS
+}
+
 enum NotificationChannel {
   IN_APP
   EMAIL
@@ -134,6 +145,7 @@ model Account {
   walletTransactions WalletTransaction[]
   paymentTransactions PaymentTransaction[]
   payoutRequests   PayoutRequest[]
+  rewardClaims    RewardClaim[]
 }
 
 model AuthSession {
@@ -194,6 +206,7 @@ model Campaign {
   category       CampaignCategory  @default(LIFESTYLE)
   targetAmountVnd Int              @default(10000000)
   fundedAmountVnd Int              @default(0)
+  backerCount     Int              @default(0)
   isPublic       Boolean           @default(true)
   budgetVnd      Int
   status         CampaignStatus   @default(DRAFT)
@@ -244,12 +257,22 @@ model Contribution {
   id             String            @id @default(cuid())
   campaignId     String
   supporterId    String
+  rewardId       String?
+  paymentMethod  ContributionPaymentMethod @default(N_POINTS)
+  status         ContributionStatus @default(PENDING)
+  idempotencyKey String?
+  paymentTransactionId String?
   amountVnd      Int
   note           String?
   createdAt      DateTime          @default(now())
 
   campaign       Campaign          @relation(fields: [campaignId], references: [id])
   supporter      Account           @relation(fields: [supporterId], references: [id])
+  reward         Reward?           @relation(fields: [rewardId], references: [id])
+  paymentTransaction PaymentTransaction? @relation(fields: [paymentTransactionId], references: [id])
+  rewardClaim    RewardClaim?
+
+  @@unique([supporterId, idempotencyKey])
 }
 
 model Reward {
@@ -263,6 +286,24 @@ model Reward {
   createdAt      DateTime @default(now())
 
   campaign       Campaign @relation(fields: [campaignId], references: [id])
+  contributions  Contribution[]
+  claims         RewardClaim[]
+}
+
+model RewardClaim {
+  id             String   @id @default(cuid())
+  rewardId       String
+  contributionId String   @unique
+  accountId      String
+  voucherCode    String   @unique
+  status         String   @default("ISSUED")
+  createdAt      DateTime @default(now())
+
+  reward         Reward   @relation(fields: [rewardId], references: [id])
+  contribution   Contribution @relation(fields: [contributionId], references: [id])
+  account        Account  @relation(fields: [accountId], references: [id])
+
+  @@index([accountId, createdAt])
 }
 
 model Wallet {
@@ -318,6 +359,7 @@ model PaymentTransaction {
 
   wallet             Wallet                    @relation(fields: [walletId], references: [id])
   account            Account                   @relation(fields: [accountId], references: [id])
+  contributions      Contribution[]
 
   @@unique([accountId, idempotencyKey])
   @@index([walletId, status, createdAt])

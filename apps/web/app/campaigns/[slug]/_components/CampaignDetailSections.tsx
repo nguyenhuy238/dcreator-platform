@@ -45,12 +45,14 @@ export function RewardsSection({
   rewards,
   selectedRewardId,
   onSelect,
-  cta
+  cta,
+  onSupport
 }: {
   rewards: CampaignDetailDTO["rewards"];
   selectedRewardId: string | null;
   onSelect: (id: string) => void;
   cta: CTA;
+  onSupport: () => void;
 }) {
   return (
     <section className="card">
@@ -74,7 +76,7 @@ export function RewardsSection({
               <p>Estimated delivery: {reward.estimatedDelivery}</p>
               <div className={styles.actions}>
                 <button type="button" onClick={() => onSelect(reward.id)} disabled={reward.isOutOfStock}>
-                  Chon reward
+                  Chọn reward
                 </button>
               </div>
             </article>
@@ -82,10 +84,10 @@ export function RewardsSection({
         })}
       </div>
       <div className={styles.actions}>
-        <button type="button" disabled={cta.disabled}>
+        <button type="button" disabled={cta.disabled} onClick={onSupport}>
           {cta.label}
         </button>
-        <span className={styles.inlineMuted}>SupportModal/ContributionModal se mo o buoc tiep theo.</span>
+        <span className={styles.inlineMuted}>Ủng hộ campaign theo reward và phương thức thanh toán.</span>
       </div>
     </section>
   );

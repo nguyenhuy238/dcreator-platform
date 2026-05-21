@@ -12,6 +12,7 @@ import {
   RewardsSection,
   TimelineSection
 } from "./CampaignDetailSections";
+import { SupportModal } from "./SupportModal";
 
 type Props = { slug: string };
 
@@ -24,24 +25,24 @@ type ApiResponse = {
 
 function getCampaignCTA(data: CampaignDetailDTO, selectedRewardId: string | null) {
   if (data.viewer.hasSupported) {
-    return { label: "Xem voucher cua toi", disabled: false };
+    return { label: "Xem voucher của tôi", disabled: false };
   }
   if (data.funding.isEnded) {
     return { label: "Campaign da ket thuc", disabled: true };
   }
   if (!selectedRewardId) {
     return data.viewer.isLoggedIn
-      ? { label: "Ung ho ngay", disabled: true }
-      : { label: "Dang nhap de ung ho", disabled: false };
+      ? { label: "Ủng hộ", disabled: true }
+      : { label: "Đăng nhập để ủng hộ", disabled: false };
   }
   const selectedReward = data.rewards.find((reward) => reward.id === selectedRewardId);
   if (!selectedReward || selectedReward.isOutOfStock) {
     return { label: "Het luot", disabled: true };
   }
   if (!data.viewer.isLoggedIn) {
-    return { label: "Dang nhap de ung ho", disabled: false };
+    return { label: "Đăng nhập để ủng hộ", disabled: false };
   }
-  return { label: "Ung ho ngay", disabled: false };
+  return { label: "Ủng hộ", disabled: false };
 }
 
 export function CampaignDetailContainer({ slug }: Props) {
@@ -50,6 +51,7 @@ export function CampaignDetailContainer({ slug }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
   const [selectedRewardId, setSelectedRewardId] = useState<string | null>(null);
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -90,7 +92,7 @@ export function CampaignDetailContainer({ slug }: Props) {
   }, [slug]);
 
   const cta = useMemo(
-    () => (data ? getCampaignCTA(data, selectedRewardId) : { label: "Ung ho ngay", disabled: true }),
+    () => (data ? getCampaignCTA(data, selectedRewardId) : { label: "Ủng hộ", disabled: true }),
     [data, selectedRewardId]
   );
 
@@ -140,6 +142,14 @@ export function CampaignDetailContainer({ slug }: Props) {
           selectedRewardId={selectedRewardId}
           onSelect={setSelectedRewardId}
           cta={cta}
+          onSupport={() => setIsSupportOpen(true)}
+        />
+        <SupportModal
+          open={isSupportOpen}
+          onClose={() => setIsSupportOpen(false)}
+          campaignId={data.hero.id}
+          rewards={data.rewards}
+          initialRewardId={selectedRewardId}
         />
       </div>
     </main>
