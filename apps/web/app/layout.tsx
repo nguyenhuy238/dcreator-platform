@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { NotificationBell } from "@/app/_components/NotificationBell";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -12,6 +13,7 @@ const navLinks = [
   { href: "/campaigns", label: "Campaigns" },
   { href: "/wallet", label: "Wallet" },
   { href: "/vouchers", label: "Vouchers" },
+  { href: "/notifications", label: "Notifications" },
   { href: "/dashboard/user", label: "User" },
   { href: "/dashboard/creator", label: "Creator" },
   { href: "/dashboard/brand", label: "Brand" },
@@ -32,6 +34,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                   {item.label}
                 </Link>
               ))}
+              <NotificationBell />
             </nav>
           </div>
         </header>

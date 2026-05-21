@@ -153,14 +153,31 @@ enum VoucherUsageType {
 enum NotificationChannel {
   IN_APP
   EMAIL
-  SMS
+  PUSH
 }
 
-enum NotificationStatus {
+enum NotificationDeliveryStatus {
   QUEUED
   SENT
   FAILED
-  READ
+}
+
+enum NotificationEvent {
+  USER_CONTRIBUTION_SUCCESS
+  USER_RECEIVED_VOUCHER
+  MISSION_ACCEPTED
+  PROOF_SUBMITTED
+  PROOF_APPROVED
+  PROOF_REJECTED
+  CREATOR_APPLICATION_APPROVED
+  BRAND_APPLICATION_APPROVED
+  CAMPAIGN_APPROVED
+  CAMPAIGN_REJECTED
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  PAYOUT_REQUESTED
+  PAYOUT_APPROVED
+  PAYOUT_REJECTED
 }
 
 enum AnalyticsEventName {
@@ -522,16 +539,24 @@ model PaymentOrder {
 }
 
 model Notification {
-  id             String              @id @default(cuid())
+  id             String                       @id @default(cuid())
   accountId      String
-  channel        NotificationChannel
+  event          NotificationEvent
+  channel        NotificationChannel          @default(IN_APP)
   title          String
   content        String
-  status         NotificationStatus  @default(QUEUED)
+  metadata       Json?
+  isRead         Boolean                      @default(false)
+  readAt         DateTime?
+  deliveryStatus NotificationDeliveryStatus   @default(QUEUED)
   sentAt         DateTime?
-  createdAt      DateTime            @default(now())
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
 
-  account        Account             @relation(fields: [accountId], references: [id])
+  account        Account                      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, createdAt])
+  @@index([accountId, isRead, createdAt])
 }
 
 model AnalyticsDaily {
