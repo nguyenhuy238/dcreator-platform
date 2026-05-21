@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { CampaignCard } from "@/app/components/dcreator/cards/campaign";
@@ -22,18 +22,32 @@ export default function CampaignsPage() {
     <>
       <PublicHeader />
       <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-6 md:px-6">
-        <PageHeader title="Campaign Marketplace" subtitle="Tìm campaign phù hợp để ủng hộ, nhận reward hoặc tham gia mission." />
+        <PageHeader title="Chiến dịch dành cho bạn" subtitle="Tìm chiến dịch phù hợp để ủng hộ hoặc tham gia mission." />
         <section className="dc-card mb-5 grid gap-3 p-4 md:grid-cols-[1fr_220px]">
-          <input aria-label="Tìm campaign" className="dc-input" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm theo tên campaign..." />
+          <input
+            aria-label="Tìm chiến dịch"
+            className="dc-input"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Tìm theo tên chiến dịch..."
+          />
           <select aria-label="Lọc trạng thái" className="dc-input" value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="all">Tất cả trạng thái</option>
-            <option value="active">Active</option>
-            <option value="ended">Ended</option>
-            <option value="full">Full</option>
+            <option value="active">Đang hoạt động</option>
+            <option value="ended">Đã kết thúc</option>
+            <option value="full">Đã đủ slot</option>
           </select>
         </section>
 
-        {filtered.length === 0 ? <EmptyState title="Không có campaign phù hợp" description="Hãy thử thay đổi từ khóa hoặc bộ lọc trạng thái." /> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{filtered.map((item) => <CampaignCard key={item.id} campaign={item} />)}</div>}
+        {filtered.length === 0 ? (
+          <EmptyState title="Không có chiến dịch phù hợp" description="Hãy thử thay đổi từ khóa hoặc bộ lọc trạng thái." />
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((item) => (
+              <CampaignCard key={item.id} campaign={item} />
+            ))}
+          </div>
+        )}
       </main>
       <PublicFooter />
     </>

@@ -76,7 +76,14 @@ export async function listRoleRequests(type: RoleRequestType) {
   return prisma.roleRequest.findMany({
     where: { type, status: RoleRequestStatus.PENDING },
     orderBy: { createdAt: "asc" },
-    include: { account: { select: { id: true, displayName: true, email: true } } }
+    select: {
+      id: true,
+      note: true,
+      brandName: true,
+      brandWebsite: true,
+      createdAt: true,
+      account: { select: { id: true, displayName: true, email: true } }
+    }
   });
 }
 
