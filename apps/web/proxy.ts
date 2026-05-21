@@ -25,7 +25,7 @@ function authorize(pathname: string, role: ReturnType<typeof decodeSession>["rol
   return true;
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   if (!token) return deny(request);
 
