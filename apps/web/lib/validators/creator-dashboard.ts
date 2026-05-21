@@ -1,0 +1,40 @@
+import { z } from "zod";
+
+const supportedPlatforms = ["TikTok", "Instagram", "YouTube", "Facebook"] as const;
+
+export const creatorJobStatusSchema = z.enum(["accepted", "in_progress", "submitted", "approved", "rejected"]);
+
+export const creatorProofSubmissionSchema = z.object({
+  videoUrl: z.url().max(400),
+  screenshotUrl: z.url().max(400).optional(),
+  note: z.string().trim().max(500).optional()
+});
+
+export const creatorPayoutRequestSchema = z.object({
+  amountVnd: z.number().int().positive(),
+  note: z.string().trim().max(500).optional(),
+  idempotencyKey: z.string().trim().min(6).max(120)
+});
+
+export const creatorProfileUpdateSchema = z.object({
+  displayName: z.string().trim().min(2).max(120),
+  avatarUrl: z.url().max(400).optional().or(z.literal("")),
+  bio: z.string().trim().max(1000).optional(),
+  categories: z.array(z.string().trim().min(1).max(64)).max(20).default([]),
+  socialLinks: z.array(z.object({ label: z.string().trim().min(1).max(40), url: z.url().max(400) })).max(10).default([])
+});
+
+export const creatorChannelSchema = z.object({
+  platform: z.enum(supportedPlatforms),
+  url: z.url().max(400),
+  followerCount: z.number().int().min(0),
+  isVerified: z.boolean().default(false)
+});
+
+export const creatorChannelsUpdateSchema = z.object({
+  channels: z.array(creatorChannelSchema).max(20)
+});
+
+export type CreatorJobStatus = z.infer<typeof creatorJobStatusSchema>;
+export type CreatorChannelsUpdateInput = z.infer<typeof creatorChannelsUpdateSchema>;
+export type CreatorProfileUpdateInput = z.infer<typeof creatorProfileUpdateSchema>;
