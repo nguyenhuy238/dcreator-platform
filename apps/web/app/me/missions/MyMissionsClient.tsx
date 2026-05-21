@@ -11,7 +11,7 @@ type Mission = {
 };
 
 function Timeline({ status }: { status: string }) {
-  return <p>Status timeline: open -> accepted/doing -> submitted/pending_review -> approved/done or rejected or expired/cancelled. Current: {status}</p>;
+  return <p>{`Status timeline: open -> accepted/doing -> submitted/pending_review -> approved/done or rejected or expired/cancelled. Current: ${status}`}</p>;
 }
 
 function SubmitProofForm({ submissionId, canResubmit }: { submissionId: string; canResubmit: boolean }) {

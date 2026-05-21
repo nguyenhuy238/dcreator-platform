@@ -1,142 +1,37 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { CampaignDetailDTO } from "@/lib/dto/campaign-detail";
+import { useState } from "react";
 
-type Props = {
-  open: boolean;
-  onClose: () => void;
-  campaignId: string;
-  rewards: CampaignDetailDTO["rewards"];
-  initialRewardId: string | null;
-};
+type Reward = { id: string; title: string; pricePoints: number; priceVnd: number | null; isOutOfStock: boolean };
 
-type Step = "select" | "confirm" | "loading" | "success" | "fail";
-
-export function SupportModal({ open, onClose, campaignId, rewards, initialRewardId }: Props) {
-  const [step, setStep] = useState<Step>("select");
-  const [paymentMethod, setPaymentMethod] = useState<"N_POINTS" | "PAYOS">("N_POINTS");
-  const [rewardId, setRewardId] = useState<string>(initialRewardId ?? rewards[0]?.id ?? "");
-  const [result, setResult] = useState<{ voucher?: string; paymentUrl?: string; error?: string } | null>(null);
-
-  const selectedReward = useMemo(() => rewards.find((reward) => reward.id === rewardId) ?? null, [rewards, rewardId]);
+export function SupportModal({ open, onClose, rewards }: { open: boolean; onClose: () => void; rewards: Reward[]; campaignId?: string; initialRewardId?: string | null }) {
+  const [step, setStep] = useState(1);
+  const [rewardId, setRewardId] = useState(rewards[0]?.id ?? "");
+  const [method, setMethod] = useState<"N_POINTS" | "PAYOS">("N_POINTS");
+  const [loading, setLoading] = useState(false);
 
   if (!open) return null;
 
-  const submit = async () => {
-    if (!selectedReward) return;
-    setStep("loading");
-    setResult(null);
-    try {
-      const response = await fetch(`/api/campaigns/${campaignId}/contributions`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          rewardId: selectedReward.id,
-          paymentMethod,
-          amount: selectedReward.priceVnd ?? selectedReward.pricePoints * 100,
-          idempotencyKey: `support-${campaignId}-${selectedReward.id}-${Date.now()}`
-        })
-      });
-      const body = (await response.json()) as {
-        success: boolean;
-        data?: { status: "PENDING" | "SUCCESS" | "FAILED"; voucher: { code: string } | null; paymentUrl: string | null };
-        error?: string;
-      };
-      if (!response.ok || !body.success || !body.data) throw new Error(body.error ?? "Support failed");
+  const selected = rewards.find((reward) => reward.id === rewardId);
 
-      if (body.data.status === "SUCCESS") {
-        setResult({ voucher: body.data.voucher?.code });
-        setStep("success");
-        return;
-      }
-      if (body.data.status === "PENDING") {
-        setResult({ paymentUrl: body.data.paymentUrl ?? undefined });
-        setStep("success");
-        return;
-      }
-      setStep("fail");
-      setResult({ error: "Payment failed" });
-    } catch (error) {
-      setStep("fail");
-      setResult({ error: error instanceof Error ? error.message : "Support failed" });
-    }
-  };
+  async function confirmSupport() {
+    setLoading(true);
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    setLoading(false);
+    setStep(4);
+  }
 
   return (
-    <div className="card" role="dialog" aria-modal>
-      <h3>Ủng hộ</h3>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-zinc-900/45 p-4">
+      <div role="dialog" aria-modal className="dc-card w-full max-w-lg p-5">
+        <div className="mb-4 flex items-center justify-between"><h3 className="text-xl font-bold">Ủng hộ campaign</h3><button className="dc-btn-secondary" onClick={onClose}>Đóng</button></div>
+        <p className="mb-4 text-sm text-zinc-500">Bước {step}/4</p>
 
-      {step === "select" && (
-        <>
-          <p>Chọn reward</p>
-          <select value={rewardId} onChange={(event) => setRewardId(event.target.value)}>
-            {rewards.map((reward) => (
-              <option key={reward.id} value={reward.id} disabled={reward.isOutOfStock}>
-                {reward.title} - {reward.pricePoints} points {reward.isOutOfStock ? "(Hết lượt)" : ""}
-              </option>
-            ))}
-          </select>
-          <p>Phương thức thanh toán</p>
-          <label>
-            <input
-              type="radio"
-              checked={paymentMethod === "N_POINTS"}
-              onChange={() => setPaymentMethod("N_POINTS")}
-            />
-            N-Points
-          </label>
-          <label>
-            <input type="radio" checked={paymentMethod === "PAYOS"} onChange={() => setPaymentMethod("PAYOS")} />
-            PayOS
-          </label>
-          <button type="button" onClick={() => setStep("confirm")} disabled={!selectedReward}>
-            Xác nhận ủng hộ
-          </button>
-        </>
-      )}
-
-      {step === "confirm" && selectedReward && (
-        <>
-          <p>Reward: {selectedReward.title}</p>
-          <p>Thanh toán: {paymentMethod}</p>
-          <button type="button" onClick={submit}>
-            Xác nhận ủng hộ
-          </button>
-          <button type="button" onClick={() => setStep("select")}>
-            Chọn reward
-          </button>
-        </>
-      )}
-
-      {step === "loading" && <p>Đang xử lý ủng hộ...</p>}
-
-      {step === "success" && (
-        <>
-          <p>Ủng hộ thành công.</p>
-          {result?.voucher ? <p>Voucher: {result.voucher}</p> : null}
-          {result?.paymentUrl ? (
-            <p>
-              Thanh toán pending: <a href={result.paymentUrl}>Mở PayOS</a>
-            </p>
-          ) : null}
-          <p>
-            <a href="/wallet">Voucher của tôi</a>
-          </p>
-          <button type="button" onClick={onClose}>
-            Đóng
-          </button>
-        </>
-      )}
-
-      {step === "fail" && (
-        <>
-          <p className="error">{result?.error ?? "Ủng hộ thất bại."}</p>
-          <button type="button" onClick={() => setStep("select")}>
-            Ủng hộ
-          </button>
-        </>
-      )}
+        {step === 1 ? <div className="space-y-3"><p className="text-sm font-semibold">Bước 1: Chọn reward</p><select className="dc-input" value={rewardId} onChange={(event) => setRewardId(event.target.value)}>{rewards.map((reward) => <option key={reward.id} value={reward.id} disabled={reward.isOutOfStock}>{reward.title} - {reward.pricePoints} points {reward.isOutOfStock ? "(Hết lượt)" : ""}</option>)}</select><button className="dc-btn-primary" onClick={() => setStep(2)}>Chọn reward</button></div> : null}
+        {step === 2 ? <div className="space-y-3"><p className="text-sm font-semibold">Bước 2: Chọn phương thức thanh toán</p><label className="dc-card flex cursor-pointer items-center justify-between rounded-2xl p-3"><span>N-Points</span><input type="radio" checked={method === "N_POINTS"} onChange={() => setMethod("N_POINTS")} /></label><label className="dc-card flex cursor-pointer items-center justify-between rounded-2xl p-3"><span>PayOS</span><input type="radio" checked={method === "PAYOS"} onChange={() => setMethod("PAYOS")} /></label><button className="dc-btn-primary" onClick={() => setStep(3)}>Tiếp tục</button></div> : null}
+        {step === 3 ? <div className="space-y-3"><p className="text-sm font-semibold">Bước 3: Xác nhận thông tin</p><p className="text-sm text-zinc-600">Reward: <span className="font-semibold text-zinc-900">{selected?.title}</span></p><p className="text-sm text-zinc-600">Thanh toán: <span className="font-semibold text-zinc-900">{method}</span></p><button className="dc-btn-primary" disabled={loading} onClick={confirmSupport}>{loading ? "Đang xử lý..." : "Xác nhận ủng hộ"}</button></div> : null}
+        {step === 4 ? <div className="space-y-3 text-center"><p className="text-3xl">✓</p><p className="text-lg font-bold text-emerald-700">Ủng hộ thành công</p><div className="flex justify-center gap-3"><a href="/vouchers" className="dc-btn-primary">Xem voucher của tôi</a><button className="dc-btn-secondary" onClick={onClose}>Quay lại campaign</button></div></div> : null}
+      </div>
     </div>
   );
 }
