@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3000",
+    "dev:safe": "npm run db:prepare && npm run dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint --max-warnings 0",
@@ -12,7 +13,9 @@
     "test": "node --test --experimental-strip-types tests/**/*.test.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "node prisma/seed.mjs"
+    "db:seed": "node prisma/seed.mjs",
+    "db:prepare": "npm run db:migrate && npm run db:generate",
+    "verify": "npm run db:generate && tsc --noEmit && npm run test && npm run lint"
   },
   "dependencies": {
     "@prisma/client": "^6.8.2",

@@ -35,6 +35,22 @@ enum CampaignStatus {
   ARCHIVED
 }
 
+enum CampaignType {
+  DONATION
+  PREORDER
+  SPONSORSHIP
+  COMMUNITY
+}
+
+enum CampaignCategory {
+  TECH
+  FASHION
+  FOOD
+  BEAUTY
+  LIFESTYLE
+  EDUCATION
+}
+
 enum MissionStatus {
   OPEN
   SUBMITTED
@@ -82,6 +98,7 @@ model Account {
   updatedAt      DateTime           @updatedAt
 
   campaigns      Campaign[]         @relation("CampaignBrand")
+  campaignsAsCreator Campaign[]     @relation("CampaignCreator")
   wallet         Wallet?
   profile        Profile?
   submissions    MissionSubmission[]
@@ -143,9 +160,16 @@ model Profile {
 model Campaign {
   id             String           @id @default(cuid())
   brandId        String
+  creatorId      String?
   slug           String           @unique
   title          String
   brief          String
+  coverImageUrl  String?
+  campaignType   CampaignType      @default(COMMUNITY)
+  category       CampaignCategory  @default(LIFESTYLE)
+  targetAmountVnd Int              @default(10000000)
+  fundedAmountVnd Int              @default(0)
+  isPublic       Boolean           @default(true)
   budgetVnd      Int
   status         CampaignStatus   @default(DRAFT)
   startsAt       DateTime?
@@ -154,6 +178,7 @@ model Campaign {
   updatedAt      DateTime         @updatedAt
 
   brand          Account          @relation("CampaignBrand", fields: [brandId], references: [id])
+  creator        Account?         @relation("CampaignCreator", fields: [creatorId], references: [id])
   missions       Mission[]
   rewards        Reward[]
   contributions  Contribution[]

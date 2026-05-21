@@ -42,6 +42,40 @@ npm run dev --workspace=apps/web
 
 App runs at `http://localhost:3000`.
 
+## Safe Workflow (Recommended)
+
+Use this flow every time schema/backend changes:
+
+1. Prepare DB + Prisma client:
+
+```bash
+npm run db:prepare --workspace=apps/web
+```
+
+2. Optional seed refresh:
+
+```bash
+npm run db:seed --workspace=apps/web
+```
+
+3. Run full verification:
+
+```bash
+npm run verify --workspace=apps/web
+```
+
+4. Start dev safely:
+
+```bash
+npm run dev:safe --workspace=apps/web
+```
+
+Quick checklist before commit:
+
+- Prisma model changes include migration SQL.
+- `npm run verify --workspace=apps/web` passes.
+- Critical routes/API are manually smoke-tested (`/campaigns`, `/api/campaigns`).
+
 ## Core Routes
 
 - `/`
