@@ -1,8 +1,8 @@
-﻿import Link from "next/link";
-import { CampaignCard } from "@/app/components/dcreator/cards/campaign";
-import { mockCampaigns } from "@/app/components/dcreator/data/mock";
+import Link from "next/link";
+import { CampaignCard } from "@/app/campaigns/_components/CampaignCard";
 import { ProcessBanner } from "@/app/components/dcreator/home/ProcessBanner";
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
+import { listCampaigns } from "@/lib/services/campaign.service";
 
 const highlights = [
   {
@@ -82,7 +82,13 @@ const faqs = [
   }
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const featuredCampaigns = await listCampaigns({
+    sort: "trending",
+    page: 1,
+    limit: 3,
+    status: "ACTIVE"
+  });
   return (
     <>
       <PublicHeader />
@@ -133,8 +139,8 @@ export default function HomePage() {
             </Link>
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {mockCampaigns.map((campaign) => (
-              <CampaignCard key={campaign.id} campaign={campaign} />
+            {featuredCampaigns.items.map((campaign) => (
+              <CampaignCard key={campaign.slug} campaign={campaign} />
             ))}
           </div>
         </section>
@@ -240,3 +246,5 @@ export default function HomePage() {
     </>
   );
 }
+
+
