@@ -1,2 +1,2 @@
 export { campaignQuerySchema } from "@/lib/validators/campaign";
-export { paymentRequestSchema } from "@/lib/validators/payment";
+export { payosCreatePaymentSchema } from "@/lib/validators/payment";

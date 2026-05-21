@@ -7,9 +7,9 @@ import { payosCreatePaymentSchema } from "@/lib/validators/payment";
 
 export async function POST(request: NextRequest) {
   try {
-    const actor = await requireAuth(request);
+    const account = await requireAuth(request);
     const payload = payosCreatePaymentSchema.parse(await request.json());
-    const payment = await createPayosPayment(actor, payload);
+    const payment = await createPayosPayment(account, payload);
     return ok(payment, 201);
   } catch (error) {
     return toErrorResponse(error);
