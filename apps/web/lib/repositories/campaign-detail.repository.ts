@@ -28,8 +28,12 @@ export async function findPublicCampaignDetailBySlug(slug: string, viewerId?: st
         select: {
           id: true,
           title: true,
+          description: true,
           pointsCost: true,
-          stock: true,
+          stockTotal: true,
+          stockRemaining: true,
+          rewardType: true,
+          estimatedDeliveryAt: true,
           createdAt: true
         }
       },

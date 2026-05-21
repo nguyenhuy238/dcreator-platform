@@ -106,6 +106,27 @@ enum ContributionPaymentMethod {
   PAYOS
 }
 
+enum RewardType {
+  PHYSICAL_PRODUCT
+  DIGITAL_VOUCHER
+  EXPERIENCE
+  CREATOR_PERK
+  DISCOUNT_CODE
+}
+
+enum VoucherStatus {
+  ISSUED
+  ACTIVE
+  USED
+  EXPIRED
+  CANCELLED
+}
+
+enum VoucherUsageType {
+  ONE_TIME
+  MULTI_USE
+}
+
 enum NotificationChannel {
   IN_APP
   EMAIL
@@ -279,10 +300,13 @@ model Reward {
   id             String   @id @default(cuid())
   campaignId     String
   title          String
+  description    String?
+  rewardType     RewardType @default(DIGITAL_VOUCHER)
   pointsCost     Int
-  voucherCode    String?
-  stock          Int
+  stockTotal     Int
+  stockRemaining Int
   isActive       Boolean  @default(true)
+  estimatedDeliveryAt DateTime?
   createdAt      DateTime @default(now())
 
   campaign       Campaign @relation(fields: [campaignId], references: [id])
@@ -296,7 +320,13 @@ model RewardClaim {
   contributionId String   @unique
   accountId      String
   voucherCode    String   @unique
-  status         String   @default("ISSUED")
+  status         VoucherStatus @default(ISSUED)
+  usageType      VoucherUsageType @default(ONE_TIME)
+  expiryAt       DateTime?
+  activatedAt    DateTime?
+  usedAt         DateTime?
+  cancelledAt    DateTime?
+  cancelledReason String?
   createdAt      DateTime @default(now())
 
   reward         Reward   @relation(fields: [rewardId], references: [id])

@@ -4,7 +4,8 @@ import {
   CampaignStatus,
   CampaignType,
   CampaignCategory,
-  MissionStatus
+  MissionStatus,
+  RewardType
 } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -107,19 +108,25 @@ async function main() {
       where: { id: `${campaign.id}_reward_1` },
       update: {
         title: "Voucher 100K",
+        description: "Voucher dung trong he sinh thai dCreator",
+        rewardType: RewardType.DIGITAL_VOUCHER,
         pointsCost: 1000,
-        stock: 100,
-        voucherCode: `${slug.toUpperCase()}_100`,
-        isActive: true
+        stockTotal: 100,
+        stockRemaining: 100,
+        isActive: true,
+        estimatedDeliveryAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
       },
       create: {
         id: `${campaign.id}_reward_1`,
         campaignId: campaign.id,
         title: "Voucher 100K",
+        description: "Voucher dung trong he sinh thai dCreator",
+        rewardType: RewardType.DIGITAL_VOUCHER,
         pointsCost: 1000,
-        stock: 100,
-        voucherCode: `${slug.toUpperCase()}_100`,
-        isActive: true
+        stockTotal: 100,
+        stockRemaining: 100,
+        isActive: true,
+        estimatedDeliveryAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
       }
     });
   }

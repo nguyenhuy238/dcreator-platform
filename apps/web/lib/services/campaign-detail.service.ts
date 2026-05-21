@@ -64,13 +64,13 @@ export async function getCampaignDetailBySlug(slug: string, viewerId?: string): 
     rewards: campaign.rewards.map((reward) => ({
       id: reward.id,
       title: reward.title,
-      description: `Nhan voucher ${reward.title} khi ung ho campaign.`,
+      description: reward.description ?? `Nhan voucher ${reward.title} khi ung ho campaign.`,
       pricePoints: reward.pointsCost,
       priceVnd: null,
-      stockTotal: reward.stock,
-      stockRemaining: reward.stock,
-      estimatedDelivery: "Trong 7-14 ngay sau khi campaign ket thuc",
-      isOutOfStock: reward.stock <= 0
+      stockTotal: reward.stockTotal,
+      stockRemaining: reward.stockRemaining,
+      estimatedDelivery: reward.estimatedDeliveryAt?.toISOString() ?? "Trong 7-14 ngay sau khi campaign ket thuc",
+      isOutOfStock: reward.stockRemaining <= 0
     })),
     missions: campaign.missions.map((mission) => ({
       id: mission.id,

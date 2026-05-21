@@ -89,8 +89,8 @@ export async function createCampaignContribution(
       }
 
       const rewardUpdate = await tx.reward.updateMany({
-        where: { id: input.rewardId, campaignId, isActive: true, stock: { gt: 0 } },
-        data: { stock: { decrement: 1 } }
+        where: { id: input.rewardId, campaignId, isActive: true, stockRemaining: { gt: 0 } },
+        data: { stockRemaining: { decrement: 1 } }
       });
       if (rewardUpdate.count === 0) {
         throw new AppError("Reward is out of stock", 409, "REWARD_OUT_OF_STOCK");
@@ -179,8 +179,8 @@ export async function createCampaignContribution(
     }
 
     const rewardUpdate = await tx.reward.updateMany({
-      where: { id: input.rewardId, campaignId, isActive: true, stock: { gt: 0 } },
-      data: { stock: { decrement: 1 } }
+      where: { id: input.rewardId, campaignId, isActive: true, stockRemaining: { gt: 0 } },
+      data: { stockRemaining: { decrement: 1 } }
     });
     if (rewardUpdate.count === 0) {
       throw new AppError("Reward is out of stock", 409, "REWARD_OUT_OF_STOCK");
@@ -263,7 +263,7 @@ export async function handleContributionPayosWebhook(payload: ContributionWebhoo
         data: { status: "FAILED" }
       });
       if (contribution.rewardId) {
-        await tx.reward.update({ where: { id: contribution.rewardId }, data: { stock: { increment: 1 } } });
+        await tx.reward.update({ where: { id: contribution.rewardId }, data: { stockRemaining: { increment: 1 } } });
       }
       return { contributionId: contribution.id, status: "FAILED", idempotent: false };
     }

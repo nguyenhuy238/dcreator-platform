@@ -28,7 +28,7 @@ export async function listCampaigns(input: ListCampaignsInput) {
   if (input.type) where.campaignType = input.type;
   if (input.category) where.category = input.category;
   if (input.rewardAvailable) {
-    where.rewards = { some: { isActive: true, stock: { gt: 0 } } };
+    where.rewards = { some: { isActive: true, stockRemaining: { gt: 0 } } };
   }
   if (input.search) {
     where.OR = [
@@ -71,7 +71,7 @@ export async function listCampaigns(input: ListCampaignsInput) {
         brand: { select: { displayName: true } },
         creator: { select: { displayName: true } },
         contributions: { select: { supporterId: true } },
-        rewards: { select: { stock: true, isActive: true } }
+        rewards: { select: { stockRemaining: true, isActive: true } }
       }
     })
   ]);
@@ -81,7 +81,7 @@ export async function listCampaigns(input: ListCampaignsInput) {
       const distinctBackers = new Set(campaign.contributions.map((c) => c.supporterId)).size;
       const rewardsLeft = campaign.rewards
         .filter((reward) => reward.isActive)
-        .reduce((sum, reward) => sum + reward.stock, 0);
+        .reduce((sum, reward) => sum + reward.stockRemaining, 0);
 
       return {
         id: campaign.id,

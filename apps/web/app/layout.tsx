@@ -11,9 +11,11 @@ const navLinks = [
   { href: "/", label: "Home" },
   { href: "/campaigns", label: "Campaigns" },
   { href: "/wallet", label: "Wallet" },
+  { href: "/vouchers", label: "Vouchers" },
   { href: "/dashboard/user", label: "User" },
   { href: "/dashboard/creator", label: "Creator" },
   { href: "/dashboard/brand", label: "Brand" },
+  { href: "/admin/vouchers", label: "Admin Vouchers" },
   { href: "/admin", label: "Admin" }
 ];
 

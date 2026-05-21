@@ -4,3 +4,4 @@ export * from "./payment";
 export * from "./common";
 export * from "./wallet";
 export * from "./contribution";
+export * from "./voucher";
