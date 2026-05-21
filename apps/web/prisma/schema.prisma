@@ -10,8 +10,21 @@ datasource db {
 enum Role {
   USER
   CREATOR
-  BRAND
+  BRAND_OWNER
+  BRAND_STAFF
   ADMIN
+  OPS
+}
+
+enum RoleRequestType {
+  CREATOR
+  BRAND
+}
+
+enum RoleRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum CampaignStatus {
@@ -76,6 +89,43 @@ model Account {
   auditLogs      AuditLog[]
   notifications  Notification[]
   riskFlags      RiskFlag[]         @relation("RiskFlagAccount")
+  sessions       AuthSession[]
+  roleRequests   RoleRequest[]      @relation("RoleRequestApplicant")
+  reviewedRoleRequests RoleRequest[] @relation("RoleRequestReviewer")
+}
+
+model AuthSession {
+  id             String   @id @default(cuid())
+  accountId      String
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  account        Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([expiresAt])
+}
+
+model RoleRequest {
+  id             String            @id @default(cuid())
+  accountId      String
+  type           RoleRequestType
+  status         RoleRequestStatus @default(PENDING)
+  brandName      String?
+  brandWebsite   String?
+  note           String?
+  reviewedById   String?
+  reviewedAt     DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  account        Account           @relation("RoleRequestApplicant", fields: [accountId], references: [id], onDelete: Cascade)
+  reviewedBy     Account?          @relation("RoleRequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([accountId, status])
+  @@index([type, status])
 }
 
 model Profile {

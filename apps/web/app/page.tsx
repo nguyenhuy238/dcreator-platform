@@ -9,6 +9,7 @@ export default function HomePage() {
         <Link href="/campaigns">Campaign Marketplace</Link>
         <Link href="/auth/login">Đăng nhập</Link>
         <Link href="/auth/register">Đăng ký</Link>
+        <Link href="/auth/role-request">Yêu cầu role</Link>
       </section>
     </main>
   );

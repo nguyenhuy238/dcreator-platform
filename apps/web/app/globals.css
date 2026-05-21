@@ -61,3 +61,42 @@ a {
 .error {
   color: #b91c1c;
 }
+
+form {
+  display: grid;
+  gap: 10px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+}
+
+input,
+textarea,
+button {
+  font: inherit;
+}
+
+input,
+textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+button {
+  width: fit-content;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: #0f4fd1;
+  color: #fff;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
