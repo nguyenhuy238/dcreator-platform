@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -50,6 +51,9 @@ export default function LoginPage() {
         <button type="submit" disabled={loading}>
           {loading ? "Logging in..." : "Login"}
         </button>
+        <p>
+          Chua co tai khoan? <Link href="/auth/register">Dang ky</Link>
+        </p>
         {error ? <p className="error">{error}</p> : null}
       </form>
     </main>

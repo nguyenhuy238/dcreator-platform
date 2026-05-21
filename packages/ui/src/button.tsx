@@ -1,20 +1,33 @@
-"use client";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { cn } from "./utils";
 
-import { ReactNode } from "react";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
-interface ButtonProps {
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children: ReactNode;
-  className?: string;
-  appName: string;
-}
+  variant?: ButtonVariant;
+};
 
-export const Button = ({ children, className, appName }: ButtonProps) => {
+const variantClasses: Record<ButtonVariant, string> = {
+  primary: "bg-dc-primary text-white hover:bg-dc-primary-hover",
+  secondary: "bg-white text-dc-text border border-dc-border hover:bg-dc-subtle",
+  ghost: "bg-transparent text-dc-text hover:bg-zinc-100",
+  danger: "bg-red-600 text-white hover:bg-red-700",
+};
+
+export function Button({ children, className, variant = "primary", ...props }: ButtonProps) {
   return (
     <button
-      className={className}
-      onClick={() => alert(`Hello from your ${appName} app!`)}
+      className={cn(
+        "inline-flex min-h-11 items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dc-info/40",
+        "disabled:cursor-not-allowed disabled:opacity-60",
+        variantClasses[variant],
+        className,
+      )}
+      {...props}
     >
       {children}
     </button>
   );
-};
+}
