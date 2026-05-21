@@ -60,7 +60,22 @@ export function BrandDashboardClient() {
   const applications = data.applications as Array<{ id: string; account: { displayName: string }; mission: { title: string } }>;
   const proofs = data.proofs as Array<{ id: string; account: { displayName: string }; mission: { title: string }; videoUrl: string | null }>;
   const budget = data.budget as { prepaidFundBalance: number; transactionHistory: Array<{ id: string; type: string; pointsDelta: number }> };
-  const analytics = data.analytics as { campaignPerformance: Array<{ id: string; title: string; fundedAmountVnd: number }>; topCreator: { displayName: string } | null; topProduct: { title: string } | null; voucherRedemption: number; conversionRate: number };
+  const analytics = data.analytics as {
+    campaignPerformance: Array<{ id: string; title: string; fundedAmountVnd: number }>;
+    topCreator: { displayName: string } | null;
+    topProduct: { title: string } | null;
+    voucherRedemption: number;
+    conversionRate: number;
+    kpis?: {
+      campaignViews: number;
+      ctaRate: number;
+      contributionConversion: number;
+      totalFundedVnd: number;
+      topCreator: { displayName: string } | null;
+      rewardClaimRate: number;
+      voucherRedemptionRate: number;
+    };
+  };
 
   return (
     <main className="container">
@@ -131,6 +146,13 @@ export function BrandDashboardClient() {
 
       <section>
         <h2>Analytics</h2>
+        <p>Campaign views: {analytics?.kpis?.campaignViews ?? 0}</p>
+        <p>CTA rate: {analytics?.kpis?.ctaRate ?? 0}%</p>
+        <p>Contribution conversion: {analytics?.kpis?.contributionConversion ?? 0}%</p>
+        <p>Total funded: {(analytics?.kpis?.totalFundedVnd ?? 0).toLocaleString("vi-VN")} VND</p>
+        <p>Top creator (KPI): {analytics?.kpis?.topCreator?.displayName || "N/A"}</p>
+        <p>Reward claim rate: {analytics?.kpis?.rewardClaimRate ?? 0}%</p>
+        <p>Voucher redemption rate: {analytics?.kpis?.voucherRedemptionRate ?? 0}%</p>
         <p>Top creator: {analytics?.topCreator?.displayName || "N/A"}</p>
         <p>Top product: {analytics?.topProduct?.title || "N/A"}</p>
         <p>Voucher redemption: {analytics?.voucherRedemption ?? 0}</p>

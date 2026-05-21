@@ -7,6 +7,7 @@ import {
   decideCampaignReview,
   decideProofByAdmin,
   getAdminOverview,
+  getAdminAnalytics,
   getAuditLogs,
   getFinanceSnapshot,
   getFraudRiskSnapshot,
@@ -146,4 +147,9 @@ export async function GET_audit_logs(request: NextRequest) {
     limit: request.nextUrl.searchParams.get("limit") ?? undefined
   });
   return ok(await getAuditLogs(parsed));
+}
+
+export async function GET_analytics(request: NextRequest) {
+  await requireAdminOps(request);
+  return ok(await getAdminAnalytics());
 }

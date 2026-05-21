@@ -30,7 +30,7 @@ export function AdminDashboardClient() {
     setLoading(true);
     setError("");
     try {
-      const [overview, users, creatorVerifications, brandVerifications, campaignReviews, proofs, vouchers, finance, fraudRisk, auditLogs] = await Promise.all([
+      const [overview, users, creatorVerifications, brandVerifications, campaignReviews, proofs, vouchers, finance, fraudRisk, auditLogs, analytics] = await Promise.all([
         getData("/api/admin/dashboard/overview"),
         getData(`/api/admin/dashboard/users?query=${encodeURIComponent(userQuery)}&page=1&limit=20`),
         getData("/api/admin/dashboard/creator-verifications"),
@@ -40,9 +40,10 @@ export function AdminDashboardClient() {
         getData(`/api/admin/dashboard/vouchers?code=${encodeURIComponent(voucherCode)}&page=1&limit=20`),
         getData("/api/admin/dashboard/finance"),
         getData("/api/admin/dashboard/fraud-risk"),
-        getData(`/api/admin/dashboard/audit-logs?action=${encodeURIComponent(auditAction)}&page=1&limit=30`)
+        getData(`/api/admin/dashboard/audit-logs?action=${encodeURIComponent(auditAction)}&page=1&limit=30`),
+        getData("/api/admin/dashboard/analytics")
       ]);
-      setData({ overview, users, creatorVerifications, brandVerifications, campaignReviews, proofs, vouchers, finance, fraudRisk, auditLogs });
+      setData({ overview, users, creatorVerifications, brandVerifications, campaignReviews, proofs, vouchers, finance, fraudRisk, auditLogs, analytics });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
     } finally {
@@ -79,6 +80,7 @@ export function AdminDashboardClient() {
   const finance = data.finance as { paymentTransactions: Array<{ id: string; provider: string; requestedAmountVnd: number; status: string }>; walletTransactions: Array<{ id: string; type: string; pointsDelta: number; cashDeltaVnd: number }>; payoutRequests: Array<{ id: string; amountVnd: number; status: string }>; brandPrepaidFunds: Array<{ userId: string; pointsBalance: number }> };
   const fraud = data.fraudRisk as { suspiciousContributions: Array<{ id: string; amountVnd: number }>; duplicatePayments: Array<{ idempotencyKey: string; _count: { _all: number } }>; spamProofs: Array<{ accountId: string; _count: { _all: number } }>; flaggedAccounts: Array<{ id: string; reason: string; score: number }> };
   const audit = data.auditLogs as { items: Array<{ id: string; action: string; targetType: string; targetId: string; createdAt: string; metadata?: unknown }> };
+  const analytics = data.analytics as { activeCampaigns: number; totalContributionVnd: number; failedPayment: number; fraudAlerts: number; pendingReviews: number };
 
   return (
     <main className="container">
@@ -96,6 +98,15 @@ export function AdminDashboardClient() {
           <tr><td>Total contributions</td><td>{overview.totalContributions.toLocaleString("vi-VN")}</td></tr>
           <tr><td>Fraud alerts</td><td>{overview.fraudAlerts}</td></tr>
         </tbody></table>
+      </section>
+
+      <section>
+        <h2>Analytics KPI</h2>
+        <p>Active campaigns: {analytics?.activeCampaigns ?? 0}</p>
+        <p>Total contribution: {(analytics?.totalContributionVnd ?? 0).toLocaleString("vi-VN")} VND</p>
+        <p>Failed payment: {analytics?.failedPayment ?? 0}</p>
+        <p>Fraud alerts: {analytics?.fraudAlerts ?? 0}</p>
+        <p>Pending reviews: {analytics?.pendingReviews ?? 0}</p>
       </section>
 
       <section>

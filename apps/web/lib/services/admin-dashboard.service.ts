@@ -5,6 +5,7 @@ import { approveProof, rejectProof } from "@/lib/services/mission.service";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
 import { listAdminVouchers } from "@/lib/services/voucher.service";
 import { scanFraudRiskSignals } from "@/lib/services/fraud-flag.service";
+import { getAdminKpis } from "@/lib/services/analytics.service";
 
 export async function getAdminOverview() {
   const [totalUsers, totalCreators, totalBrands, activeCampaigns, pendingReviews, totalContributions, fraudAlerts] = await Promise.all([
@@ -183,4 +184,8 @@ export async function getAuditLogs(input: { action?: string; targetType?: string
   ]);
 
   return { items, pagination: { page: input.page, limit: input.limit, total, totalPages: Math.max(1, Math.ceil(total / input.limit)) } };
+}
+
+export async function getAdminAnalytics() {
+  return getAdminKpis();
 }

@@ -82,7 +82,7 @@ export async function createCampaignContribution(
     return prisma.$transaction(async (tx) => {
       const campaign = await tx.campaign.findUnique({
         where: { id: campaignId },
-        select: { id: true, status: true, fundedAmountVnd: true, backerCount: true }
+        select: { id: true, status: true, fundedAmountVnd: true, backerCount: true, brandId: true, creatorId: true }
       });
       if (!campaign || campaign.status !== "ACTIVE") {
         throw new AppError("Campaign is not active", 409, "CAMPAIGN_INACTIVE");
@@ -160,6 +160,52 @@ export async function createCampaignContribution(
         }
       });
 
+      await tx.analyticsEvent.createMany({
+        data: [
+          {
+            eventName: "campaign_support_started",
+            userId: supporterId,
+            sessionId: `srv_${supporterId}`,
+            campaignId,
+            brandId: campaign.brandId,
+            creatorId: campaign.creatorId,
+            metadata: { amountVnd: input.amount, paymentMethod: "N_POINTS" }
+          },
+          {
+            eventName: "reward_selected",
+            userId: supporterId,
+            sessionId: `srv_${supporterId}`,
+            campaignId,
+            brandId: campaign.brandId,
+            creatorId: campaign.creatorId,
+            metadata: { rewardId: reward.id }
+          }
+        ]
+      });
+
+      await tx.analyticsEvent.create({
+        data: {
+          eventName: "campaign_contribution_success",
+          userId: supporterId,
+          sessionId: `srv_${supporterId}`,
+          campaignId,
+          brandId: campaign.brandId,
+          creatorId: campaign.creatorId,
+          metadata: { amountVnd: input.amount }
+        }
+      });
+
+      await tx.analyticsEvent.create({
+        data: {
+          eventName: "voucher_issued",
+          userId: supporterId,
+          sessionId: `srv_${supporterId}`,
+          campaignId,
+          brandId: campaign.brandId,
+          creatorId: campaign.creatorId
+        }
+      });
+
       return {
         contributionId: contribution.id,
         status: "SUCCESS",
@@ -172,7 +218,7 @@ export async function createCampaignContribution(
   return prisma.$transaction(async (tx) => {
     const campaign = await tx.campaign.findUnique({
       where: { id: campaignId },
-      select: { id: true, status: true }
+      select: { id: true, status: true, brandId: true, creatorId: true }
     });
     if (!campaign || campaign.status !== "ACTIVE") {
       throw new AppError("Campaign is not active", 409, "CAMPAIGN_INACTIVE");
@@ -223,6 +269,29 @@ export async function createCampaignContribution(
       }
     });
 
+    await tx.analyticsEvent.createMany({
+      data: [
+        {
+          eventName: "campaign_support_started",
+          userId: supporterId,
+          sessionId: `srv_${supporterId}`,
+          campaignId,
+          brandId: campaign.brandId,
+          creatorId: campaign.creatorId,
+          metadata: { amountVnd: input.amount, paymentMethod: "PAYOS" }
+        },
+        {
+          eventName: "reward_selected",
+          userId: supporterId,
+          sessionId: `srv_${supporterId}`,
+          campaignId,
+          brandId: campaign.brandId,
+          creatorId: campaign.creatorId,
+          metadata: { rewardId: input.rewardId }
+        }
+      ]
+    });
+
     return {
       contributionId: contribution.id,
       status: "PENDING",
@@ -265,6 +334,14 @@ export async function handleContributionPayosWebhook(payload: ContributionWebhoo
       if (contribution.rewardId) {
         await tx.reward.update({ where: { id: contribution.rewardId }, data: { stockRemaining: { increment: 1 } } });
       }
+      await tx.analyticsEvent.create({
+        data: {
+          eventName: "payment_failed",
+          userId: contribution.supporterId,
+          sessionId: `srv_${contribution.supporterId}`,
+          campaignId: contribution.campaignId
+        }
+      });
       return { contributionId: contribution.id, status: "FAILED", idempotent: false };
     }
 
@@ -296,6 +373,30 @@ export async function handleContributionPayosWebhook(payload: ContributionWebhoo
         targetId: contribution.campaignId,
         metadata: { contributionId: contribution.id, rewardClaimId: claim.id }
       }
+    });
+
+    await tx.analyticsEvent.createMany({
+      data: [
+        {
+          eventName: "payment_success",
+          userId: contribution.supporterId,
+          sessionId: `srv_${contribution.supporterId}`,
+          campaignId: contribution.campaignId
+        },
+        {
+          eventName: "campaign_contribution_success",
+          userId: contribution.supporterId,
+          sessionId: `srv_${contribution.supporterId}`,
+          campaignId: contribution.campaignId,
+          metadata: { amountVnd: contribution.amountVnd }
+        },
+        {
+          eventName: "voucher_issued",
+          userId: contribution.supporterId,
+          sessionId: `srv_${contribution.supporterId}`,
+          campaignId: contribution.campaignId
+        }
+      ]
     });
 
     return { contributionId: contribution.id, status: "SUCCESS", idempotent: false, voucherCode: claim.voucherCode };

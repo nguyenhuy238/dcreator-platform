@@ -68,6 +68,16 @@ export async function redeemVoucher(code: string, accountId: string, redemptionN
       }
     });
 
+    await tx.analyticsEvent.create({
+      data: {
+        eventName: "voucher_redeemed",
+        userId: accountId,
+        sessionId: `srv_${accountId}`,
+        campaignId: voucher.reward.campaign.id,
+        brandId: voucher.reward.campaign.brandId
+      }
+    });
+
     return updated;
   });
 }

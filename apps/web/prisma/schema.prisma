@@ -163,6 +163,24 @@ enum NotificationStatus {
   READ
 }
 
+enum AnalyticsEventName {
+  campaign_view
+  campaign_cta_click
+  campaign_support_started
+  campaign_contribution_success
+  reward_selected
+  voucher_issued
+  voucher_redeemed
+  mission_accept
+  mission_submit
+  proof_approved
+  proof_rejected
+  creator_apply_job
+  brand_create_campaign
+  payment_success
+  payment_failed
+}
+
 model Account {
   id             String             @id @default(cuid())
   email          String             @unique
@@ -191,6 +209,7 @@ model Account {
   paymentTransactions PaymentTransaction[]
   payoutRequests   PayoutRequest[]
   rewardClaims    RewardClaim[]
+  analyticsEvents AnalyticsEvent[]
 }
 
 model AuthSession {
@@ -267,6 +286,7 @@ model Campaign {
   contributions  Contribution[]
   paymentOrders  PaymentOrder[]
   analytics      AnalyticsDaily[]
+  analyticsEvents AnalyticsEvent[]
 }
 
 model Mission {
@@ -552,4 +572,26 @@ model RiskFlag {
   createdAt      DateTime @default(now())
 
   account        Account? @relation("RiskFlagAccount", fields: [accountId], references: [id])
+}
+
+model AnalyticsEvent {
+  id             String             @id @default(cuid())
+  eventName      AnalyticsEventName
+  userId         String?
+  sessionId      String
+  campaignId     String?
+  brandId        String?
+  creatorId      String?
+  metadata       Json?
+  createdAt      DateTime           @default(now())
+
+  user           Account?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  campaign       Campaign?          @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([eventName, createdAt])
+  @@index([sessionId, createdAt])
+  @@index([userId, createdAt])
+  @@index([campaignId, createdAt])
+  @@index([brandId, createdAt])
+  @@index([creatorId, createdAt])
 }

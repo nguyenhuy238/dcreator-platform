@@ -142,6 +142,15 @@ async function finalizePaymentByIntent(tx: Prisma.TransactionClient, paymentId: 
   const payment = await tx.paymentTransaction.findUniqueOrThrow({ where: { id: paymentId } });
   const intent = parseIntent(payment);
 
+  await tx.analyticsEvent.create({
+    data: {
+      eventName: status === "SUCCESS" ? "payment_success" : "payment_failed",
+      userId: payment.accountId,
+      sessionId: `srv_${payment.accountId}`,
+      metadata: { intent, amountVnd: payment.requestedAmountVnd }
+    }
+  });
+
   if (status !== "SUCCESS") {
     if (intent === "CONTRIBUTION") {
       const contribution = await tx.contribution.findFirst({ where: { paymentTransactionId: payment.id } });
@@ -203,7 +212,7 @@ async function finalizePaymentByIntent(tx: Prisma.TransactionClient, paymentId: 
 
   const contribution = await tx.contribution.findFirst({
     where: { paymentTransactionId: payment.id },
-    include: { reward: true }
+    include: { reward: true, campaign: { select: { id: true, brandId: true, creatorId: true } } }
   });
   if (!contribution) throw new AppError("Contribution not found", 404, "CONTRIBUTION_NOT_FOUND");
   if (contribution.status !== "PENDING") return;
@@ -218,7 +227,29 @@ async function finalizePaymentByIntent(tx: Prisma.TransactionClient, paymentId: 
         voucherCode: generateVoucherCode()
       }
     });
+    await tx.analyticsEvent.create({
+      data: {
+        eventName: "voucher_issued",
+        userId: contribution.supporterId,
+        sessionId: `srv_${contribution.supporterId}`,
+        campaignId: contribution.campaignId,
+        brandId: contribution.campaign.brandId,
+        creatorId: contribution.campaign.creatorId
+      }
+    });
   }
+
+  await tx.analyticsEvent.create({
+    data: {
+      eventName: "campaign_contribution_success",
+      userId: contribution.supporterId,
+      sessionId: `srv_${contribution.supporterId}`,
+      campaignId: contribution.campaignId,
+      brandId: contribution.campaign.brandId,
+      creatorId: contribution.campaign.creatorId,
+      metadata: { amountVnd: contribution.amountVnd }
+    }
+  });
   await tx.campaign.update({
     where: { id: contribution.campaignId },
     data: { fundedAmountVnd: { increment: contribution.amountVnd }, backerCount: { increment: 1 } }

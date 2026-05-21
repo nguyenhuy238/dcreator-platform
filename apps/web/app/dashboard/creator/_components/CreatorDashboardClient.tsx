@@ -55,6 +55,16 @@ type Payout = {
   history: Array<{ id: string; amountVnd: number; status: string; createdAt: string }>;
 };
 
+type Analytics = {
+  jobAccepted: number;
+  proofSubmitted: number;
+  proofApproved: number;
+  commissionEarnedVnd: number;
+  contributionDriven: number;
+  contributionDrivenVnd: number;
+  salesConversions: number;
+};
+
 async function fetcher<T>(url: string) {
   const res = await fetch(url, { cache: "no-store" });
   const payload = (await res.json()) as ApiPayload<T>;
@@ -75,6 +85,7 @@ export function CreatorDashboardClient() {
   const [channels, setChannels] = useState<Channels | null>(null);
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [payout, setPayout] = useState<Payout | null>(null);
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [proof, setProof] = useState({ submissionId: "", videoUrl: "", screenshotUrl: "", note: "" });
   const [payoutForm, setPayoutForm] = useState({ amountVnd: "", note: "" });
   const [message, setMessage] = useState("");
@@ -83,7 +94,7 @@ export function CreatorDashboardClient() {
     setLoading(true);
     setError("");
     try {
-      const [o, m, j, c, p, ch, pf, po] = await Promise.all([
+      const [o, m, j, c, p, ch, pf, po, a] = await Promise.all([
         fetcher<Overview>("/api/creator/dashboard/overview"),
         fetcher<MarketplaceJob[]>("/api/creator/dashboard/marketplace"),
         fetcher<MyJob[]>("/api/creator/dashboard/my-jobs"),
@@ -91,7 +102,8 @@ export function CreatorDashboardClient() {
         fetcher<Profile>("/api/creator/dashboard/profile"),
         fetcher<Channels>("/api/creator/dashboard/channels"),
         fetcher<Portfolio>("/api/creator/dashboard/portfolio"),
-        fetcher<Payout>("/api/creator/dashboard/payouts")
+        fetcher<Payout>("/api/creator/dashboard/payouts"),
+        fetcher<Analytics>("/api/creator/dashboard/analytics")
       ]);
       setOverview(o);
       setMarketplace(m);
@@ -101,6 +113,7 @@ export function CreatorDashboardClient() {
       setChannels(ch);
       setPortfolio(pf);
       setPayout(po);
+      setAnalytics(a);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
     } finally {
@@ -163,6 +176,17 @@ export function CreatorDashboardClient() {
     <main className="container">
       <h1>Creator Dashboard</h1>
       {message ? <p>{message}</p> : null}
+
+      <section>
+        <h2>Analytics KPI</h2>
+        <p>Job accepted: {analytics?.jobAccepted ?? 0}</p>
+        <p>Proof submitted: {analytics?.proofSubmitted ?? 0}</p>
+        <p>Proof approved: {analytics?.proofApproved ?? 0}</p>
+        <p>Commission earned: {(analytics?.commissionEarnedVnd ?? 0).toLocaleString("vi-VN")} VND</p>
+        <p>Contribution driven: {analytics?.contributionDriven ?? 0}</p>
+        <p>Contribution driven value: {(analytics?.contributionDrivenVnd ?? 0).toLocaleString("vi-VN")} VND</p>
+        <p>Sales/conversions: {analytics?.salesConversions ?? 0}</p>
+      </section>
 
       <section>
         <h2>Overview</h2>

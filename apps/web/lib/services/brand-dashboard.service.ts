@@ -3,6 +3,7 @@ import { CampaignStatus, MissionAudience, Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { approveProof, rejectProof } from "@/lib/services/mission.service";
+import { getBrandKpis } from "@/lib/services/analytics.service";
 import { createTopupPayment, ensureWalletByAccountId, getWalletTransactions } from "@/lib/services/wallet.service";
 import type { z } from "zod";
 import type {
@@ -190,7 +191,7 @@ export async function upsertProduct(accountId: string, input: ProductInput) {
 }
 
 export async function createBrandCampaign(accountId: string, input: CampaignInput) {
-  return prisma.campaign.create({
+  const campaign = await prisma.campaign.create({
     data: {
       brandId: accountId,
       slug: input.slug,
@@ -205,6 +206,18 @@ export async function createBrandCampaign(accountId: string, input: CampaignInpu
       status: "DRAFT"
     }
   });
+
+  await prisma.analyticsEvent.create({
+    data: {
+      eventName: "brand_create_campaign",
+      userId: accountId,
+      sessionId: `srv_${accountId}`,
+      campaignId: campaign.id,
+      brandId: accountId
+    }
+  });
+
+  return campaign;
 }
 
 export async function editDraftCampaign(accountId: string, campaignId: string, input: CampaignInput) {
@@ -409,11 +422,14 @@ export async function getBrandAnalytics(accountId: string) {
     ? await prisma.account.findUnique({ where: { id: topCreatorRaw[0].accountId }, select: { id: true, displayName: true } })
     : null;
 
+  const kpis = await getBrandKpis(accountId);
+
   return {
     campaignPerformance,
     topCreator,
     topProduct: topProductRaw[0] ?? null,
     voucherRedemption,
-    conversionRate: conversionRaw._count._all > 0 ? Number(((conversionRaw._sum.amountVnd ?? 0) / conversionRaw._count._all).toFixed(2)) : 0
+    conversionRate: conversionRaw._count._all > 0 ? Number(((conversionRaw._sum.amountVnd ?? 0) / conversionRaw._count._all).toFixed(2)) : 0,
+    kpis
   };
 }

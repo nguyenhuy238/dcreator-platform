@@ -123,6 +123,31 @@ export async function acceptMission(missionId: string, accountId: string, role: 
     }
   });
 
+  await prisma.analyticsEvent.create({
+    data: {
+      eventName: "mission_accept",
+      userId: accountId,
+      sessionId: `srv_${accountId}`,
+      campaignId: mission.campaignId,
+      brandId: mission.campaign.brandId,
+      creatorId: mission.audience === "CREATOR" ? accountId : null,
+      metadata: { audience: mission.audience }
+    }
+  });
+
+  if (mission.audience === "CREATOR") {
+    await prisma.analyticsEvent.create({
+      data: {
+        eventName: "creator_apply_job",
+        userId: accountId,
+        sessionId: `srv_${accountId}`,
+        campaignId: mission.campaignId,
+        brandId: mission.campaign.brandId,
+        creatorId: accountId
+      }
+    });
+  }
+
   return submission;
 }
 
@@ -141,7 +166,7 @@ export async function submitMissionProof(
 ) {
   const submission = await prisma.missionSubmission.findUnique({
     where: { id: submissionId },
-    include: { mission: true }
+    include: { mission: { include: { campaign: true } } }
   });
   if (!submission) throw new AppError("Submission not found", 404, "SUBMISSION_NOT_FOUND");
   if (submission.accountId !== accountId) throw new AppError("Forbidden", 403, "FORBIDDEN");
@@ -167,6 +192,17 @@ export async function submitMissionProof(
       targetType: "MissionSubmission",
       targetId: updated.id,
       metadata: payload
+    }
+  });
+
+  await prisma.analyticsEvent.create({
+    data: {
+      eventName: "mission_submit",
+      userId: accountId,
+      sessionId: `srv_${accountId}`,
+      campaignId: submission.mission.campaignId,
+      brandId: submission.mission.campaign.brandId,
+      creatorId: accountId
     }
   });
 
@@ -239,6 +275,17 @@ export async function approveProof(submissionId: string, reviewerId: string, rev
       }
     });
 
+    await tx.analyticsEvent.create({
+      data: {
+        eventName: "proof_approved",
+        userId: submission.accountId,
+        sessionId: `srv_${submission.accountId}`,
+        campaignId: submission.mission.campaignId,
+        brandId: submission.mission.campaign.brandId,
+        creatorId: submission.accountId
+      }
+    });
+
     return updated;
   });
 }
@@ -295,6 +342,18 @@ export async function rejectProof(
         targetType: "MissionSubmission",
         targetId: submission.id,
         metadata: { reviewerRole, rejectReason, note: note ?? null }
+      }
+    });
+
+    await tx.analyticsEvent.create({
+      data: {
+        eventName: "proof_rejected",
+        userId: submission.accountId,
+        sessionId: `srv_${submission.accountId}`,
+        campaignId: submission.mission.campaignId,
+        brandId: submission.mission.campaign.brandId,
+        creatorId: submission.accountId,
+        metadata: { rejectReason }
       }
     });
 

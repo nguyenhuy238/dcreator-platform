@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { acceptMission, submitMissionProof } from "@/lib/services/mission.service";
 import { createCreatorPayoutRequest, ensureWalletByAccountId } from "@/lib/services/wallet.service";
+import { getCreatorKpis } from "@/lib/services/analytics.service";
 import type { CreatorChannelsUpdateInput, CreatorProfileUpdateInput } from "@/lib/validators/creator-dashboard";
 
 function toJobStatus(status: MissionLifecycleStatus) {
@@ -275,4 +276,8 @@ export async function createCreatorPayoutWithKyc(
   }
 
   return createCreatorPayoutRequest(accountId, amountVnd, note, idempotencyKey);
+}
+
+export async function getCreatorAnalyticsKpis(accountId: string) {
+  return getCreatorKpis(accountId);
 }

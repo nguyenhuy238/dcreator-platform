@@ -23,6 +23,19 @@ export async function requireAuth(request: NextRequest) {
   return account;
 }
 
+export async function getAuthIfAny(request: NextRequest) {
+  const session = await getCurrentSessionFromRequest(request);
+  if (!session) return null;
+
+  const account = await prisma.account.findUnique({
+    where: { id: session.sub },
+    select: { id: true, email: true, displayName: true, role: true, isActive: true }
+  });
+
+  if (!account || !account.isActive) return null;
+  return account;
+}
+
 export async function requireAtLeastRole(request: NextRequest, role: Role) {
   const account = await requireAuth(request);
   if (!hasAtLeastRole(account.role, role)) {
