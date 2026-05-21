@@ -7,39 +7,50 @@ import {
   MissionStatus,
   RewardType
 } from "@prisma/client";
+import { randomBytes, scryptSync } from "node:crypto";
 
 const prisma = new PrismaClient();
+const DEFAULT_PASSWORD = "Test@123456";
+
+function hashPassword(password) {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
 
 async function main() {
-  const brand = await prisma.account.upsert({
-    where: { email: "brand@dcreator.local" },
-    update: {},
-    create: {
-      email: "brand@dcreator.local",
-      displayName: "Brand Demo",
-      role: Role.BRAND_OWNER
-    }
-  });
+  const defaultAccounts = [
+    { email: "user@dcreator.local", displayName: "User Demo", role: Role.USER },
+    { email: "creator@dcreator.local", displayName: "Creator Demo", role: Role.CREATOR },
+    { email: "brand@dcreator.local", displayName: "Brand Owner Demo", role: Role.BRAND_OWNER },
+    { email: "brand.staff@dcreator.local", displayName: "Brand Staff Demo", role: Role.BRAND_STAFF },
+    { email: "admin@dcreator.local", displayName: "Admin Demo", role: Role.ADMIN },
+    { email: "ops@dcreator.local", displayName: "Ops Demo", role: Role.OPS }
+  ];
 
-  const creator = await prisma.account.upsert({
-    where: { email: "creator@dcreator.local" },
-    update: {},
-    create: {
-      email: "creator@dcreator.local",
-      displayName: "Creator Demo",
-      role: Role.CREATOR
-    }
-  });
+  const seededAccounts = {};
+  for (const account of defaultAccounts) {
+    const upserted = await prisma.account.upsert({
+      where: { email: account.email },
+      update: {
+        displayName: account.displayName,
+        role: account.role,
+        isActive: true
+      },
+      create: {
+        email: account.email,
+        displayName: account.displayName,
+        role: account.role,
+        isActive: true,
+        passwordHash: hashPassword(DEFAULT_PASSWORD)
+      }
+    });
+    seededAccounts[account.role] = upserted;
+  }
 
-  const user = await prisma.account.upsert({
-    where: { email: "user@dcreator.local" },
-    update: {},
-    create: {
-      email: "user@dcreator.local",
-      displayName: "User Demo",
-      role: Role.USER
-    }
-  });
+  const brand = seededAccounts[Role.BRAND_OWNER];
+  const creator = seededAccounts[Role.CREATOR];
+  const user = seededAccounts[Role.USER];
 
   const campaignSeeds = [
     ["spring-ugc-2026", "Spring UGC Challenge", CampaignType.SPONSORSHIP, CampaignCategory.LIFESTYLE, 50000000, 32000000, 30],
@@ -131,15 +142,22 @@ async function main() {
     });
   }
 
-  await prisma.wallet.upsert({
-    where: { userId: user.id },
-    update: {},
-    create: {
-      userId: user.id,
-      pointsBalance: 2000,
-      cashBalanceVnd: 0
-    }
-  });
+  for (const account of Object.values(seededAccounts)) {
+    await prisma.wallet.upsert({
+      where: { userId: account.id },
+      update: {},
+      create: {
+        userId: account.id,
+        pointsBalance: account.id === user.id ? 2000 : 1000,
+        cashBalanceVnd: 0
+      }
+    });
+  }
+
+  console.log("Seeded default test accounts (password: Test@123456):");
+  for (const account of defaultAccounts) {
+    console.log(`- ${account.role}: ${account.email}`);
+  }
 }
 
 main().finally(async () => {
