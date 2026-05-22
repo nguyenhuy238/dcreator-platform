@@ -5,8 +5,18 @@ import { toErrorResponse } from "@/lib/errors";
 
 export async function GET(request: NextRequest) {
   try {
-    const account = await requireAuth(request);
-    return ok(account);
+    const user = await requireAuth(request);
+    return ok({
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+        roles: user.roles,
+        creatorProfile: user.creatorProfile,
+        brands: user.brands
+      }
+    });
   } catch (error) {
     return toErrorResponse(error);
   }

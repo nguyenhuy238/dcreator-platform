@@ -2,7 +2,8 @@ import { Role, RoleRequestStatus, RoleRequestType } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { ok } from "@/lib/api-response";
 import { assertSameOrigin } from "@/lib/auth/csrf";
-import { requireAnyRole } from "@/lib/auth/guard";
+import { requireRole } from "@/lib/auth/guards";
+import { DASHBOARD_ACCESS } from "@/lib/auth/role-constants";
 import { prisma } from "@/lib/db";
 import { AppError, toErrorResponse } from "@/lib/errors";
 
@@ -12,7 +13,7 @@ export async function POST(
 ) {
   try {
     assertSameOrigin(request);
-    const reviewer = await requireAnyRole(request, [Role.ADMIN, Role.OPS]);
+    const reviewer = await requireRole(request, DASHBOARD_ACCESS.admin);
     const { requestId } = await context.params;
     if (!requestId) {
       throw new AppError("requestId is required", 422, "VALIDATION_ERROR");

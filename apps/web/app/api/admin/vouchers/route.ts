@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { ok } from "@/lib/api-response";
-import { requireAnyRole } from "@/lib/auth/guard";
+import { requireRole } from "@/lib/auth/guards";
+import { DASHBOARD_ACCESS } from "@/lib/auth/role-constants";
 import { toErrorResponse } from "@/lib/errors";
 import { listAdminVouchers } from "@/lib/services/voucher.service";
 import { voucherAdminQuerySchema } from "@/lib/validators";
@@ -14,7 +15,7 @@ function optionalQueryParam(request: NextRequest, key: string) {
 
 export async function GET(request: NextRequest) {
   try {
-    await requireAnyRole(request, ["ADMIN", "OPS"]);
+    await requireRole(request, DASHBOARD_ACCESS.admin);
     const parsed = voucherAdminQuerySchema.parse({
       code: optionalQueryParam(request, "code"),
       user: optionalQueryParam(request, "user"),

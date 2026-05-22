@@ -105,11 +105,11 @@ export default async function HomePage() {
             <Link href="/campaigns" className="dc-btn-primary">
               Khám phá chiến dịch
             </Link>
-            <Link href="/auth/register/creator" className="dc-btn-secondary">
-              Dành cho Creator
+            <Link href="/auth/register" className="dc-btn-secondary">
+              Tạo tài khoản
             </Link>
-            <Link href="/auth/register/brand" className="dc-btn-secondary">
-              Dành cho Brand
+            <Link href="/dashboard/user/profile" className="dc-btn-secondary">
+              Nâng cấp role tại Profile
             </Link>
           </div>
         </section>
@@ -154,8 +154,8 @@ export default async function HomePage() {
                 Duyệt nhanh cơ hội hợp tác, nhận job đúng tệp và bắt đầu kiếm hoa hồng dễ hơn.
               </p>
               <div className="mt-7">
-                <Link href="/auth/register/creator" className="dc-btn-primary bg-white text-zinc-900 hover:bg-zinc-100">
-                  Xem job ngay
+                <Link href="/dashboard/user/profile" className="dc-btn-primary bg-white text-zinc-900 hover:bg-zinc-100">
+                  Đăng ký Creator tại Profile
                 </Link>
               </div>
             </div>
@@ -231,11 +231,11 @@ export default async function HomePage() {
               <h2 className="mt-2 text-2xl font-black text-white">Sẵn sàng mở rộng doanh thu cùng dCreator?</h2>
               <p className="mt-1 text-sm text-zinc-300">Chọn vai trò phù hợp để bắt đầu chiến dịch hoặc nhận job mới.</p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Link href="/auth/register/creator" className="dc-btn-secondary border-white/15 bg-white text-zinc-900 hover:bg-zinc-100">
-                  Vào Creator
+                <Link href="/dashboard/user/profile" className="dc-btn-secondary border-white/15 bg-white text-zinc-900 hover:bg-zinc-100">
+                  Đăng ký Creator
                 </Link>
-                <Link href="/auth/register/brand" className="dc-btn-primary bg-white text-zinc-900 hover:bg-zinc-100">
-                  Vào Brand
+                <Link href="/dashboard/user/profile" className="dc-btn-primary bg-white text-zinc-900 hover:bg-zinc-100">
+                  Đăng ký Brand
                 </Link>
               </div>
             </div>

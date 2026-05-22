@@ -4,6 +4,7 @@ import { assertApiRateLimit, parseJsonWithSchema } from "@/lib/api/middleware";
 import { assertSameOrigin } from "@/lib/auth/csrf";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { verifyPassword } from "@/lib/auth/password";
+import { resolvePrimaryRole } from "@/lib/auth/role-constants";
 import { prisma } from "@/lib/db";
 import { AppError, toErrorResponse } from "@/lib/errors";
 import { loginSchema } from "@/lib/validators/auth";
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest) {
 
     const account = await prisma.account.findUnique({
       where: { email: input.email },
-      select: { id: true, email: true, displayName: true, passwordHash: true, role: true, isActive: true }
+      select: { id: true, email: true, displayName: true, passwordHash: true, role: true, isActive: true, roleAssignments: { select: { role: true } } }
     });
 
     if (!account || !account.passwordHash || !account.isActive) {
@@ -28,14 +29,17 @@ export async function POST(request: NextRequest) {
       throw new AppError("Invalid credentials", 401, "AUTH_INVALID_CREDENTIALS");
     }
 
-    const sessionToken = await createSession(account.id, account.role);
+    const roles = Array.from(new Set(account.roleAssignments.map((item) => item.role)));
+    const primaryRole = resolvePrimaryRole(roles);
+    const sessionToken = await createSession(account.id, primaryRole);
     await setSessionCookie(sessionToken);
 
     return ok({
       id: account.id,
       email: account.email,
       displayName: account.displayName,
-      role: account.role
+      role: primaryRole,
+      roles
     });
   } catch (error) {
     return toErrorResponse(error);

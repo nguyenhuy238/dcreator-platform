@@ -3,20 +3,22 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
+import type { Role } from "@prisma/client";
+import { getNavigationItemsByRoles, isAdminRoles } from "@/app/components/dcreator/layout/role-navigation";
+import { DashboardSwitcher } from "@/app/components/dcreator/layout/dashboard-switcher";
 
 type NavItem = { href: string; label: string };
 
 const publicNav: NavItem[] = [
-  { href: "/campaigns", label: "Chiến dịch" },
-  { href: "/auth/register/creator", label: "Creator" },
-  { href: "/auth/register/brand", label: "Brand" }
+  { href: "/campaigns", label: "Chiến dịch" }
 ];
 
 type AuthUser = {
   id: string;
   email: string;
   displayName: string;
-  role: string;
+  avatarUrl?: string | null;
+  roles: Role[];
 };
 
 export function PublicHeader() {
@@ -32,7 +34,7 @@ export function PublicHeader() {
         const payload = await response.json();
         if (!alive) return;
         if (response.ok && payload?.success) {
-          setCurrentUser(payload.data as AuthUser);
+          setCurrentUser(payload.data?.user as AuthUser);
         } else {
           setCurrentUser(null);
         }
@@ -68,7 +70,8 @@ export function PublicHeader() {
     }
   }
 
-  const canAccessAdmin = currentUser?.role === "ADMIN" || currentUser?.role === "OPS";
+  const roleNav = currentUser ? getNavigationItemsByRoles(currentUser.roles) : [];
+  const canAccessAdmin = currentUser ? isAdminRoles(currentUser.roles) : false;
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/70 bg-white/90 backdrop-blur">
@@ -79,7 +82,7 @@ export function PublicHeader() {
           </span>
           <span>dCreator</span>
         </Link>
-        <nav className="hidden w-full max-w-lg grid-cols-3 items-center justify-self-end text-center text-sm text-zinc-600 md:grid md:mr-6">
+        <nav className="hidden w-full max-w-lg grid-cols-1 items-center justify-self-end text-center text-sm text-zinc-600 md:grid md:mr-6">
           {publicNav.map((item) => (
             <Link
               key={item.href}
@@ -97,13 +100,12 @@ export function PublicHeader() {
             <div className="h-10 w-44 animate-pulse rounded-full bg-zinc-200" />
           ) : currentUser ? (
             <>
+              {roleNav.slice(0, 3).map((item) => (
+                <Link key={item.href} href={item.href} className="dc-btn-secondary hidden md:inline-flex">{item.label}</Link>
+              ))}
               {canAccessAdmin ? (
                 <>
-                  <Link href="/admin" className="dc-btn-secondary hidden md:inline-flex">Admin</Link>
-                  <Link href="/admin/users" className="dc-btn-secondary hidden md:inline-flex">Users</Link>
-                  <Link href="/admin/campaigns" className="dc-btn-secondary hidden md:inline-flex">Campaigns</Link>
-                  <Link href="/admin/proofs" className="dc-btn-secondary hidden md:inline-flex">Proofs</Link>
-                  <Link href="/admin/vouchers" className="dc-btn-secondary hidden md:inline-flex">Vouchers</Link>
+                  <Link href="/admin" className="dc-btn-secondary hidden xl:inline-flex">Admin</Link>
                 </>
               ) : null}
               <Link href="/dashboard/user" className="dc-focus inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100">
@@ -159,8 +161,8 @@ export function PublicFooter() {
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">Liên kết nhanh</p>
               <div className="mt-3 grid gap-2 text-sm">
                 <Link href="/campaigns" className="transition hover:text-white">Chiến dịch</Link>
-                <Link href="/auth/register/creator" className="transition hover:text-white">Creator</Link>
-                <Link href="/auth/register/brand" className="transition hover:text-white">Brand</Link>
+                <Link href="/auth/register" className="transition hover:text-white">Đăng ký tài khoản</Link>
+                <Link href="/dashboard/user/profile" className="transition hover:text-white">User profile</Link>
               </div>
             </div>
           <div>
@@ -245,10 +247,40 @@ export function MobileBottomNav({ items }: { items: NavItem[] }) {
 }
 
 export function AppShell({ children, sidebarItems }: { children: React.ReactNode; sidebarItems: NavItem[] }) {
+  const pathname = usePathname();
+  const [roles, setRoles] = useState<Role[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadRoles() {
+      try {
+        const response = await fetch("/api/auth/me", { cache: "no-store" });
+        const payload = await response.json();
+        if (!active) return;
+        if (response.ok && payload?.success && Array.isArray(payload?.data?.user?.roles)) {
+          setRoles(payload.data.user.roles as Role[]);
+        } else {
+          setRoles([]);
+        }
+      } catch {
+        if (active) setRoles([]);
+      }
+    }
+    if (pathname.startsWith("/dashboard") || pathname.startsWith("/admin")) {
+      void loadRoles();
+    }
+    return () => {
+      active = false;
+    };
+  }, [pathname]);
+
   return (
     <div className="mx-auto flex w-full max-w-7xl">
       <DashboardSidebar items={sidebarItems} />
-      <main className="min-h-screen flex-1 px-4 pb-24 pt-6 md:px-6">{children}</main>
+      <main className="min-h-screen flex-1 px-4 pb-24 pt-6 md:px-6">
+        <DashboardSwitcher roles={roles} />
+        {children}
+      </main>
       <MobileBottomNav items={sidebarItems} />
     </div>
   );

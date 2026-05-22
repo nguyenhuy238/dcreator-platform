@@ -1,44 +1,20 @@
 import type { Role } from "@prisma/client";
 import type { NextRequest } from "next/server";
-import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
-import { getCurrentSessionFromRequest } from "@/lib/auth/session";
-import { hasAtLeastRole, hasSomeRole } from "@/lib/auth/roles";
+import { hasRole } from "@/lib/auth/dashboard-access";
+import { getCurrentUser, requireCurrentUser } from "@/lib/auth/current-user";
 
 export async function requireAuth(request: NextRequest) {
-  const session = await getCurrentSessionFromRequest(request);
-  if (!session) {
-    throw new AppError("Unauthorized", 401, "AUTH_UNAUTHORIZED");
-  }
-
-  const account = await prisma.account.findUnique({
-    where: { id: session.sub },
-    select: { id: true, email: true, displayName: true, role: true, isActive: true }
-  });
-
-  if (!account || !account.isActive) {
-    throw new AppError("Unauthorized", 401, "AUTH_UNAUTHORIZED");
-  }
-
-  return account;
+  return requireCurrentUser(request);
 }
 
 export async function getAuthIfAny(request: NextRequest) {
-  const session = await getCurrentSessionFromRequest(request);
-  if (!session) return null;
-
-  const account = await prisma.account.findUnique({
-    where: { id: session.sub },
-    select: { id: true, email: true, displayName: true, role: true, isActive: true }
-  });
-
-  if (!account || !account.isActive) return null;
-  return account;
+  return getCurrentUser(request);
 }
 
 export async function requireAtLeastRole(request: NextRequest, role: Role) {
   const account = await requireAuth(request);
-  if (!hasAtLeastRole(account.role, role)) {
+  if (!account.roles.includes(role)) {
     throw new AppError("Forbidden", 403, "AUTH_FORBIDDEN");
   }
   return account;
@@ -46,7 +22,7 @@ export async function requireAtLeastRole(request: NextRequest, role: Role) {
 
 export async function requireAnyRole(request: NextRequest, roles: Role[]) {
   const account = await requireAuth(request);
-  if (!hasSomeRole(account.role, roles)) {
+  if (!hasRole(account.roles, roles)) {
     throw new AppError("Forbidden", 403, "AUTH_FORBIDDEN");
   }
   return account;
