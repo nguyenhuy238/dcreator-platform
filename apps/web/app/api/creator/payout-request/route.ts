@@ -1,13 +1,14 @@
 import { NextRequest } from "next/server";
 import { ok } from "@/lib/api-response";
-import { requireAnyRole } from "@/lib/auth/guard";
+import { requireRole } from "@/lib/auth/guards";
+import { DASHBOARD_ACCESS } from "@/lib/auth/role-constants";
 import { toErrorResponse } from "@/lib/errors";
 import { createCreatorPayoutRequest } from "@/lib/services/wallet.service";
 import { payoutRequestSchema } from "@/lib/validators";
 
 export async function POST(request: NextRequest) {
   try {
-    const account = await requireAnyRole(request, ["CREATOR", "ADMIN", "OPS"]);
+    const account = await requireRole(request, DASHBOARD_ACCESS.creator);
     const payload = payoutRequestSchema.parse(await request.json());
     const data = await createCreatorPayoutRequest(
       account.id,

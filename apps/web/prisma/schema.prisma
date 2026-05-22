@@ -16,6 +16,34 @@ enum Role {
   OPS
 }
 
+enum ApplicationStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  NEEDS_REVISION
+}
+
+enum SocialPlatform {
+  TIKTOK
+  INSTAGRAM
+  YOUTUBE
+  FACEBOOK
+  OTHER
+}
+
+enum BrandMemberRole {
+  OWNER
+  STAFF
+}
+
+enum BrandStatus {
+  ACTIVE
+  SUSPENDED
+  REJECTED
+  PENDING_VERIFICATION
+}
+
 enum RoleRequestType {
   CREATOR
   BRAND
@@ -227,6 +255,187 @@ model Account {
   payoutRequests   PayoutRequest[]
   rewardClaims    RewardClaim[]
   analyticsEvents AnalyticsEvent[]
+  roleAssignments AccountRole[]
+  creatorApplications CreatorApplication[]
+  creatorProfile CreatorProfile?
+  brandApplications BrandApplication[]
+  ownedBrandMemberships BrandMember[] @relation("BrandMemberAccount")
+  reviewedCreatorApplications CreatorApplication[] @relation("CreatorApplicationReviewer")
+  reviewedBrandApplications BrandApplication[] @relation("BrandApplicationReviewer")
+  reviewedBrands Brand[] @relation("BrandReviewer")
+  ownedBrands Brand[] @relation("BrandOwner")
+}
+
+model AccountRole {
+  id             String   @id @default(cuid())
+  accountId      String
+  role           Role
+  createdAt      DateTime @default(now())
+
+  account        Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, role])
+  @@index([role, createdAt])
+}
+
+model CreatorApplication {
+  id               String            @id @default(cuid())
+  accountId        String
+  status           ApplicationStatus @default(PENDING_REVIEW)
+  displayName      String
+  avatarUrl        String?
+  bio              String?
+  mainPlatform     SocialPlatform
+  socialUrl        String
+  handle           String?
+  followerCount    Int?
+  contentCategory  String?
+  portfolioUrl     String?
+  location         String?
+  expectedRate     Int?
+  maxJobsPerMonth  Int?
+  realName         String?
+  phone            String?
+  identityNumber   String?
+  identityFrontUrl String?
+  identityBackUrl  String?
+  selfieUrl        String?
+  bankAccountName  String?
+  bankAccountNumber String?
+  bankName         String?
+  taxCode          String?
+  rejectReason     String?
+  reviewNote       String?
+  reviewedById     String?
+  reviewedAt       DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  account          Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  reviewedBy       Account?          @relation("CreatorApplicationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([accountId, createdAt])
+  @@index([status, createdAt])
+}
+
+model CreatorProfile {
+  id                String   @id @default(cuid())
+  accountId         String   @unique
+  displayName       String
+  avatarUrl         String?
+  bio               String?
+  mainPlatform      SocialPlatform
+  socialUrl         String
+  handle            String?
+  followerCount     Int?
+  contentCategory   String?
+  portfolioUrl      String?
+  location          String?
+  expectedRate      Int?
+  maxJobsPerMonth   Int?
+  realName          String?
+  phone             String?
+  identityNumber    String?
+  identityFrontUrl  String?
+  identityBackUrl   String?
+  selfieUrl         String?
+  bankAccountName   String?
+  bankAccountNumber String?
+  bankName          String?
+  taxCode           String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  account           Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model BrandApplication {
+  id                           String            @id @default(cuid())
+  accountId                    String
+  status                       ApplicationStatus @default(PENDING_REVIEW)
+  brandName                    String
+  logoUrl                      String?
+  legalName                    String?
+  industry                     String?
+  website                      String?
+  fanpage                      String?
+  address                      String?
+  contactName                  String
+  contactPhone                 String
+  contactEmail                 String
+  description                  String?
+  businessGoal                 String?
+  taxCode                      String?
+  businessLicenseUrl           String?
+  representativeName           String?
+  representativePhone          String?
+  representativeEmail          String?
+  representativeIdentityNumber String?
+  bankAccountName              String?
+  bankAccountNumber            String?
+  bankName                     String?
+  productCategories            String?
+  inventoryDescription         String?
+  expectedCampaignBudget       Int?
+  expectedCreatorCount         Int?
+  rejectReason                 String?
+  reviewNote                   String?
+  reviewedById                 String?
+  reviewedAt                   DateTime?
+  createdAt                    DateTime          @default(now())
+  updatedAt                    DateTime          @updatedAt
+
+  account                      Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  reviewedBy                   Account?          @relation("BrandApplicationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([accountId, createdAt])
+  @@index([status, createdAt])
+}
+
+model Brand {
+  id                  String      @id @default(cuid())
+  ownerAccountId      String
+  name                String
+  logoUrl             String?
+  legalName           String?
+  industry            String?
+  website             String?
+  fanpage             String?
+  address             String?
+  contactName         String
+  contactPhone        String
+  contactEmail        String
+  description         String?
+  businessGoal        String?
+  taxCode             String?
+  businessLicenseUrl  String?
+  representativeName  String?
+  representativePhone String?
+  representativeEmail String?
+  status              BrandStatus @default(PENDING_VERIFICATION)
+  reviewedById        String?
+  reviewedAt          DateTime?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  owner               Account     @relation("BrandOwner", fields: [ownerAccountId], references: [id], onDelete: Restrict)
+  reviewedBy          Account?    @relation("BrandReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  members             BrandMember[]
+}
+
+model BrandMember {
+  id         String          @id @default(cuid())
+  brandId    String
+  accountId  String
+  role       BrandMemberRole @default(STAFF)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  brand      Brand           @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  account    Account         @relation("BrandMemberAccount", fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([brandId, accountId])
+  @@index([accountId, role])
 }
 
 model AuthSession {

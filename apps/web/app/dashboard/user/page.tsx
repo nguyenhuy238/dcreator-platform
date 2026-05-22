@@ -8,6 +8,7 @@ import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, Sta
 
 const nav = [
   { href: "/dashboard/user", label: "Tổng quan" },
+  { href: "/dashboard/user/profile", label: "User profile" },
   { href: "/campaigns", label: "Campaign" },
   { href: "/wallet", label: "Wallet" },
   { href: "/vouchers", label: "Voucher" },
