@@ -23,21 +23,35 @@ Nền tảng độc lập 100% cho Creator Economy + Social Commerce + Crowd-spo
 ```bash
 cp apps/web/.env.example apps/web/.env
 ```
-2. Cấu hình PostgreSQL trong `DATABASE_URL`.
+2. Cấu hình PostgreSQL trong `apps/web/.env`:
+- Dùng DB riêng cho dự án này (không dùng chung DB với project khác).
+- Ví dụ mặc định: `dcreator_platform_web`.
+- (Khuyến nghị) tạo thêm `SHADOW_DATABASE_URL` cho Prisma migrate dev.
 3. Cài dependencies:
 ```bash
 npm install
 ```
-4. Tạo Prisma client + migrate + seed:
+4. Với máy clone mới, setup DB bằng 1 lệnh (reset schema + migrate + seed):
 ```bash
-npm run db:generate --workspace=web
+npm run db:setup --workspace=web
+```
+5. Nếu chỉ apply migration (không reset dữ liệu):
+```bash
 npm run db:migrate --workspace=web
+npm run db:generate --workspace=web
 npm run db:seed --workspace=web
 ```
-5. Chạy local:
+6. Chạy local:
 ```bash
 npm run dev
 ```
+
+## Lỗi thường gặp khi clone mới
+
+- `Drift detected`:
+  DB đang chứa schema cũ/khác project. Chạy `npm run db:setup --workspace=web` để reset về đúng migration của repo.
+- `P2021: table public.Account does not exist` khi seed:
+  Chưa migrate thành công nhưng đã seed. Chạy lại `db:setup` hoặc chạy migrate trước rồi seed.
 
 ## Security baseline
 
