@@ -69,33 +69,44 @@
 }
 
 .stickyPanel {
-  position: sticky;
-  top: 86px;
-  z-index: 2;
+  position: static;
+}
+
+.fundingPanel {
+  padding: 18px;
 }
 
 .fundingGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.fundingKpiCard {
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
 .kpiLabel {
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   color: #64748b;
 }
 
 .kpiValue {
   margin: 4px 0 0;
-  font-size: 1.55rem;
+  font-size: clamp(1.55rem, 2.4vw, 1.95rem);
   font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
 .progressTrack {
-  margin: 10px 0;
-  height: 10px;
+  margin: 8px 0 10px;
+  height: 11px;
   background: #e2e8f0;
   border-radius: 999px;
   overflow: hidden;
@@ -107,18 +118,23 @@
 }
 
 .progressValue {
-  margin: 0;
-  font-size: 1.6rem;
+  margin: 0 0 4px;
+  font-size: 2rem;
   font-weight: 700;
   color: #0f3da2;
+  letter-spacing: -0.02em;
 }
 
 .fundingMeta {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 14px;
   color: #334155;
-  font-size: 14px;
+  font-size: 15px;
+}
+
+.fundingMeta p {
+  margin: 0;
 }
 
 .grid {
@@ -159,8 +175,9 @@
 }
 
 .rewardMeta {
-  margin: 4px 0;
+  margin: 6px 0;
   color: #1e293b;
+  line-height: 1.35;
 }
 
 .statsGrid {
@@ -230,6 +247,19 @@
 
 .rewardPanel {
   margin-top: 0;
+  padding-top: 18px;
+}
+
+.rewardIntro {
+  margin: 0 0 10px;
+}
+
+.rewardCtaRow {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+  justify-content: space-between;
+  gap: 10px 14px;
 }
 
 .skeleton {
@@ -272,8 +302,20 @@
 }
 
 @media (max-width: 899px) {
-  .stickyPanel {
-    position: static;
+  .fundingGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .fundingMeta {
+    font-size: 14px;
+  }
+
+  .rewardCtaRow {
+    align-items: flex-start;
+  }
+
+  .rewardCtaRow .primaryBtn {
+    min-width: 120px;
   }
 
   .heroMedia {
