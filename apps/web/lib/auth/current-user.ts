@@ -41,7 +41,8 @@ export async function getCurrentUser(request: NextRequest): Promise<CurrentUser 
   });
   if (!account || !account.isActive) return null;
 
-  const roles = Array.from(new Set<Role>(account.roleAssignments.map((item) => item.role)));
+  const assignmentRoles = account.roleAssignments.map((item) => item.role);
+  const roles = Array.from(new Set<Role>(assignmentRoles.length > 0 ? assignmentRoles : [session.role]));
   const primaryRole = resolvePrimaryRole(roles);
   return {
     id: account.id,
@@ -80,7 +81,8 @@ export async function getCurrentUserFromServer() {
       }
     });
     if (!account || !account.isActive) return null;
-    const roles = Array.from(new Set<Role>(account.roleAssignments.map((item) => item.role)));
+    const assignmentRoles = account.roleAssignments.map((item) => item.role);
+    const roles = Array.from(new Set<Role>(assignmentRoles.length > 0 ? assignmentRoles : [payload.role]));
     const primaryRole = resolvePrimaryRole(roles);
     return {
       id: account.id,

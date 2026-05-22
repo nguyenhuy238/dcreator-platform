@@ -29,7 +29,8 @@ export async function POST(request: NextRequest) {
       throw new AppError("Invalid credentials", 401, "AUTH_INVALID_CREDENTIALS");
     }
 
-    const roles = Array.from(new Set(account.roleAssignments.map((item) => item.role)));
+    const assignmentRoles = account.roleAssignments.map((item) => item.role);
+    const roles = Array.from(new Set(assignmentRoles.length > 0 ? assignmentRoles : [account.role]));
     const primaryRole = resolvePrimaryRole(roles);
     const sessionToken = await createSession(account.id, primaryRole);
     await setSessionCookie(sessionToken);
