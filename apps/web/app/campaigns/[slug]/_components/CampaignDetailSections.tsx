@@ -28,14 +28,14 @@ export function HeroSection({ hero }: { hero: CampaignDetailDTO["hero"] }) {
 
 export function FundingSection({ funding }: { funding: CampaignDetailDTO["funding"] }) {
   return (
-    <section className={`${styles.panel} ${styles.stickyPanel}`}>
+    <section className={`${styles.panel} ${styles.stickyPanel} ${styles.fundingPanel}`}>
       <h2 className={styles.sectionTitle}>Funding</h2>
       <div className={styles.fundingGrid}>
-        <div>
+        <div className={styles.fundingKpiCard}>
           <p className={styles.kpiLabel}>Target</p>
           <p className={styles.kpiValue}>{formatCurrencyVnd(funding.targetAmountVnd)}</p>
         </div>
-        <div>
+        <div className={styles.fundingKpiCard}>
           <p className={styles.kpiLabel}>Funded</p>
           <p className={styles.kpiValue}>{formatCurrencyVnd(funding.fundedAmountVnd)}</p>
         </div>
@@ -101,7 +101,7 @@ export function RewardsSection({
   return (
     <section className={`${styles.panel} ${styles.rewardPanel}`}>
       <h2 className={styles.sectionTitle}>Reward tiers</h2>
-      <p className={styles.inlineMuted}>Chon 1 reward de ung ho campaign {campaignTitle}.</p>
+      <p className={`${styles.inlineMuted} ${styles.rewardIntro}`}>Chon 1 reward de ung ho campaign {campaignTitle}.</p>
       <div className={styles.grid}>
         {rewards.map((reward) => {
           const selected = reward.id === selectedRewardId;
@@ -134,7 +134,7 @@ export function RewardsSection({
           );
         })}
       </div>
-      <div className={styles.actions}>
+      <div className={`${styles.actions} ${styles.rewardCtaRow}`}>
         <button type="button" className={styles.primaryBtn} disabled={cta.disabled} onClick={onSupport}>
           {cta.label}
         </button>
