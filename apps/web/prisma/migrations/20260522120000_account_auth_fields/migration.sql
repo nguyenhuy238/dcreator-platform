@@ -1,4 +1,1 @@
-ALTER TABLE "Account"
-  ADD COLUMN IF NOT EXISTS "passwordHash" TEXT,
-  ADD COLUMN IF NOT EXISTS "avatarUrl" TEXT,
-  ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN NOT NULL DEFAULT true;
+-- No-op: schema has been squashed into 20260521040812_dcreator baseline migration.

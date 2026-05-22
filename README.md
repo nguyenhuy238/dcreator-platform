@@ -31,11 +31,11 @@ cp apps/web/.env.example apps/web/.env
 ```bash
 npm install
 ```
-4. Với máy clone mới, setup DB bằng 1 lệnh (reset schema + migrate + seed):
+4. Với máy clone mới, setup DB bằng 1 lệnh (reset DB theo baseline migration + generate + seed):
 ```bash
 npm run db:setup --workspace=web
 ```
-5. Nếu chỉ apply migration (không reset dữ liệu):
+5. Nếu cần chạy theo migration history (không reset dữ liệu):
 ```bash
 npm run db:migrate --workspace=web
 npm run db:generate --workspace=web
@@ -49,9 +49,11 @@ npm run dev
 ## Lỗi thường gặp khi clone mới
 
 - `Drift detected`:
-  DB đang chứa schema cũ/khác project. Chạy `npm run db:setup --workspace=web` để reset về đúng migration của repo.
+  DB đang chứa schema cũ/khác project. Chạy `npm run db:setup --workspace=web` để reset lại toàn bộ schema theo baseline migration.
 - `P2021: table public.Account does not exist` khi seed:
   Chưa migrate thành công nhưng đã seed. Chạy lại `db:setup` hoặc chạy migrate trước rồi seed.
+- `P2022: column ... does not exist` khi seed:
+  Thường do DB local chưa reset sạch sau khi đổi migration history. Chạy lại `npm run db:setup --workspace=web`.
 
 ## Security baseline
 
