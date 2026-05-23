@@ -6,12 +6,10 @@ import { usePathname } from "next/navigation";
 import type { Role } from "@prisma/client";
 import { getNavigationItemsByRoles, isAdminRoles } from "@/app/components/dcreator/layout/role-navigation";
 import { DashboardSwitcher } from "@/app/components/dcreator/layout/dashboard-switcher";
+import { getPrimaryDashboard } from "@/lib/auth/dashboard-access";
+import { ROLE } from "@/lib/auth/role-constants";
 
 type NavItem = { href: string; label: string };
-
-const publicNav: NavItem[] = [
-  { href: "/campaigns", label: "Chiến dịch" }
-];
 
 type AuthUser = {
   id: string;
@@ -22,7 +20,6 @@ type AuthUser = {
 };
 
 export function PublicHeader() {
-  const pathname = usePathname();
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
 
@@ -70,8 +67,16 @@ export function PublicHeader() {
     }
   }
 
-  const roleNav = currentUser ? getNavigationItemsByRoles(currentUser.roles) : [];
   const canAccessAdmin = currentUser ? isAdminRoles(currentUser.roles) : false;
+  const dashboardItem = currentUser ? getPrimaryDashboard(currentUser.roles) : null;
+  const profileHref =
+    currentUser?.roles.includes(ROLE.BRAND_OWNER) || currentUser?.roles.includes(ROLE.BRAND_STAFF)
+      ? "/dashboard/brand/profile"
+      : "/dashboard/user/profile";
+  const campaignHref =
+    currentUser?.roles.includes(ROLE.BRAND_OWNER) || currentUser?.roles.includes(ROLE.BRAND_STAFF)
+      ? "/brand"
+      : "/campaigns";
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/70 bg-white/90 backdrop-blur">
@@ -82,33 +87,23 @@ export function PublicHeader() {
           </span>
           <span>dCreator</span>
         </Link>
-        <nav className="hidden w-full max-w-lg grid-cols-1 items-center justify-self-end text-center text-sm text-zinc-600 md:grid md:mr-6">
-          {publicNav.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`w-full rounded-xl py-2 transition hover:bg-zinc-200 hover:text-zinc-950 ${
-                pathname === item.href || pathname.startsWith(`${item.href}/`) ? "bg-zinc-200 text-zinc-950" : ""
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <div />
         <div className="flex items-center justify-end gap-2">
           {!authReady ? (
             <div className="h-10 w-44 animate-pulse rounded-full bg-zinc-200" />
           ) : currentUser ? (
             <>
-              {roleNav.slice(0, 3).map((item) => (
-                <Link key={item.href} href={item.href} className="dc-btn-secondary hidden md:inline-flex">{item.label}</Link>
-              ))}
+              {dashboardItem ? (
+                <Link href={dashboardItem.href} className="dc-btn-secondary hidden md:inline-flex">{dashboardItem.label}</Link>
+              ) : null}
+              <Link href={campaignHref} className="dc-btn-secondary hidden md:inline-flex">Chiến dịch</Link>
+              <Link href="/wallet" className="dc-btn-secondary hidden md:inline-flex">Ví / N-Points</Link>
               {canAccessAdmin ? (
                 <>
                   <Link href="/admin" className="dc-btn-secondary hidden xl:inline-flex">Admin</Link>
                 </>
               ) : null}
-              <Link href="/dashboard/user" className="dc-focus inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100">
+              <Link href={profileHref} className="dc-focus inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100">
                 <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">
                   {initials}
                 </span>
@@ -266,22 +261,23 @@ export function AppShell({ children, sidebarItems }: { children: React.ReactNode
         if (active) setRoles([]);
       }
     }
-    if (pathname.startsWith("/dashboard") || pathname.startsWith("/admin")) {
-      void loadRoles();
-    }
+    void loadRoles();
     return () => {
       active = false;
     };
   }, [pathname]);
 
+  const roleSidebarItems = roles.length > 0 ? getNavigationItemsByRoles(roles) : [];
+  const effectiveSidebarItems = roleSidebarItems.length > 0 ? roleSidebarItems : sidebarItems;
+
   return (
     <div className="mx-auto flex w-full max-w-7xl">
-      <DashboardSidebar items={sidebarItems} />
+      <DashboardSidebar items={effectiveSidebarItems} />
       <main className="min-h-screen flex-1 px-4 pb-24 pt-6 md:px-6">
         <DashboardSwitcher roles={roles} />
         {children}
       </main>
-      <MobileBottomNav items={sidebarItems} />
+      <MobileBottomNav items={effectiveSidebarItems} />
     </div>
   );
 }

@@ -167,7 +167,14 @@ export async function applyBrand(accountId: string, input: BrandApplicationInput
       productCategories: normalizeOptional(input.productCategories),
       inventoryDescription: normalizeOptional(input.inventoryDescription),
       expectedCampaignBudget: input.expectedCampaignBudget,
-      expectedCreatorCount: input.expectedCreatorCount
+      expectedCreatorCount: input.expectedCreatorCount,
+      revenueSharePercent: input.revenueSharePercent,
+      commissionRatePercent: input.commissionRatePercent,
+      bccAgreementAccepted: input.bccAgreementAccepted ?? false,
+      bccAgreementVersion: normalizeOptional(input.bccAgreementVersion),
+      legalResponsibilityAccepted: input.legalResponsibilityAccepted ?? false,
+      contractFileUrl: normalizeOptional(input.contractFileUrl),
+      contractSignedAt: input.contractSignedAt ? new Date(input.contractSignedAt) : new Date()
     }
   });
 }
@@ -209,7 +216,14 @@ export async function updateBrandApplication(accountId: string, applicationId: s
       productCategories: normalizeOptional(input.productCategories),
       inventoryDescription: normalizeOptional(input.inventoryDescription),
       expectedCampaignBudget: input.expectedCampaignBudget,
-      expectedCreatorCount: input.expectedCreatorCount
+      expectedCreatorCount: input.expectedCreatorCount,
+      revenueSharePercent: input.revenueSharePercent,
+      commissionRatePercent: input.commissionRatePercent,
+      bccAgreementAccepted: input.bccAgreementAccepted ?? false,
+      bccAgreementVersion: normalizeOptional(input.bccAgreementVersion),
+      legalResponsibilityAccepted: input.legalResponsibilityAccepted ?? false,
+      contractFileUrl: normalizeOptional(input.contractFileUrl),
+      contractSignedAt: input.contractSignedAt ? new Date(input.contractSignedAt) : new Date()
     }
   });
 }
@@ -355,6 +369,14 @@ export async function reviewBrandApplication(actorId: string, applicationId: str
           representativeName: app.representativeName,
           representativePhone: app.representativePhone,
           representativeEmail: app.representativeEmail,
+          productCategories: app.productCategories,
+          inventoryDescription: app.inventoryDescription,
+          revenueSharePercent: app.revenueSharePercent,
+          commissionRatePercent: app.commissionRatePercent,
+          bccAgreementVersion: app.bccAgreementVersion,
+          legalResponsibilityAccepted: app.legalResponsibilityAccepted,
+          contractFileUrl: app.contractFileUrl,
+          contractSignedAt: app.contractSignedAt,
           status: BrandStatus.ACTIVE,
           reviewedById: actorId,
           reviewedAt: new Date()

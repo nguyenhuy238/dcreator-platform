@@ -1,8 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AppShell, PublicHeader } from "@/app/components/dcreator/layout/shell";
 
 type QueueItem = { id: string; mission: { title: string }; account: { displayName: string } };
+
+const nav = [
+  { href: "/dashboard/brand", label: "Brand Dashboard" },
+  { href: "/dashboard/brand/profile", label: "Brand Profile" },
+  { href: "/brand", label: "Chiến dịch" },
+  { href: "/brand/proofs", label: "Duyệt proof" },
+  { href: "/wallet", label: "Quỹ" }
+];
 
 export default function BrandProofQueuePage() {
   const [items, setItems] = useState<QueueItem[]>([]);
@@ -23,15 +32,22 @@ export default function BrandProofQueuePage() {
   }
 
   return (
-    <main className="container">
-      <h1>Brand proof review queue</h1>
-      {items.map((item) => (
-        <section key={item.id}>
-          <p>{item.mission.title} - {item.account.displayName}</p>
-          <button onClick={() => review(item.id, "APPROVED")}>Approve</button>
-          <button onClick={() => review(item.id, "REJECTED")}>Reject</button>
-        </section>
-      ))}
-    </main>
+    <>
+      <PublicHeader />
+      <AppShell sidebarItems={nav}>
+        <h1 className="text-3xl font-black">Proof review</h1>
+        <div className="mt-6 grid gap-3">
+          {items.map((item) => (
+            <section key={item.id} className="dc-card flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+              <p className="font-semibold">{item.mission.title} - {item.account.displayName}</p>
+              <div className="flex gap-2">
+                <button className="dc-btn-primary" onClick={() => review(item.id, "APPROVED")}>Approve</button>
+                <button className="dc-btn-secondary" onClick={() => review(item.id, "REJECTED")}>Reject</button>
+              </div>
+            </section>
+          ))}
+        </div>
+      </AppShell>
+    </>
   );
 }

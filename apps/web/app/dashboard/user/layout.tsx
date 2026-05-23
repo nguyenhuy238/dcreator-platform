@@ -6,6 +6,8 @@ import { hasRole } from "@/lib/auth/dashboard-access";
 export default async function UserDashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUserFromServer();
   if (!user) redirect("/auth/login?next=/dashboard/user");
-  if (!hasRole(user.roles, DASHBOARD_ACCESS.user)) redirect("/dashboard/user/profile?denied=Bạn không có quyền truy cập User Dashboard.");
+  if (!hasRole(user.roles, DASHBOARD_ACCESS.user)) {
+    redirect("/dashboard/user/profile?denied=Ban khong co quyen truy cap User Dashboard.");
+  }
   return children;
 }

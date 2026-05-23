@@ -22,8 +22,8 @@ export function toErrorResponse(error: unknown): NextResponse {
   }
 
   if (error instanceof ZodError) {
-    return fail("Validation failed", 422, "VALIDATION_ERROR", error.flatten());
+    return fail("Kiểm tra dữ liệu thất bại", 422, "VALIDATION_ERROR", error.flatten());
   }
 
-  return fail("Internal server error", 500, "INTERNAL_ERROR");
+  return fail("Lỗi hệ thống nội bộ", 500, "INTERNAL_ERROR");
 }

@@ -378,6 +378,14 @@ model BrandApplication {
   inventoryDescription         String?
   expectedCampaignBudget       Int?
   expectedCreatorCount         Int?
+  revenueSharePercent          Int?
+  commissionRatePercent        Int?
+  bccAgreementAccepted         Boolean           @default(false)
+  bccAgreementVersion          String?
+  bccAgreementTerms            String?
+  legalResponsibilityAccepted  Boolean           @default(false)
+  contractFileUrl              String?
+  contractSignedAt             DateTime?
   rejectReason                 String?
   reviewNote                   String?
   reviewedById                 String?
@@ -412,6 +420,14 @@ model Brand {
   representativeName  String?
   representativePhone String?
   representativeEmail String?
+  productCategories   String?
+  inventoryDescription String?
+  revenueSharePercent Int?
+  commissionRatePercent Int?
+  bccAgreementVersion String?
+  legalResponsibilityAccepted Boolean @default(false)
+  contractFileUrl     String?
+  contractSignedAt    DateTime?
   status              BrandStatus @default(PENDING_VERIFICATION)
   reviewedById        String?
   reviewedAt          DateTime?
