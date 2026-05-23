@@ -32,3 +32,22 @@ export const adminAuditQuerySchema = paginationSchema.extend({
   action: z.string().trim().min(1).max(120).optional(),
   targetType: z.string().trim().min(1).max(120).optional()
 });
+
+export const adminCreatorCampaignApplicationStatusSchema = z.enum(["ACCEPTED", "DOING", "REJECTED"]);
+
+export const adminCreatorCampaignApplicationQuerySchema = z.object({
+  status: adminCreatorCampaignApplicationStatusSchema.optional(),
+  query: z.string().trim().min(1).max(120).optional()
+});
+
+export const adminCreatorCampaignDecisionSchema = z
+  .object({
+    decision: z.enum(["APPROVED", "REJECTED"]),
+    rejectReason: z.string().trim().max(500).optional(),
+    note: z.string().trim().max(500).optional()
+  })
+  .superRefine((value, ctx) => {
+    if (value.decision === "REJECTED" && !value.rejectReason) {
+      ctx.addIssue({ code: "custom", path: ["rejectReason"], message: "rejectReason is required" });
+    }
+  });

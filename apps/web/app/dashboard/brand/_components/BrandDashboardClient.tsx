@@ -57,7 +57,14 @@ export function BrandDashboardClient() {
   const profile = data.profile as { brandName: string; logoUrl: string; businessInfo: string; verificationStatus: string };
   const products = data.products as Array<{ id: string; name: string; sku: string; stockQty: number; voucherStock: number; campaignEligibility: boolean }>;
   const campaigns = data.campaigns as Array<{ id: string; title: string; status: string }>;
-  const applications = data.applications as Array<{ id: string; account: { displayName: string }; mission: { title: string } }>;
+  const applications = data.applications as Array<{
+    id: string;
+    account: {
+      displayName: string;
+      creatorProfile: { mainPlatform: string; socialUrl: string; followerCount: number | null } | null;
+    };
+    mission: { title: string };
+  }>;
   const proofs = data.proofs as Array<{ id: string; account: { displayName: string }; mission: { title: string }; videoUrl: string | null }>;
   const budget = data.budget as { prepaidFundBalance: number; transactionHistory: Array<{ id: string; type: string; pointsDelta: number }> };
   const analytics = data.analytics as {
@@ -124,7 +131,13 @@ export function BrandDashboardClient() {
       <section>
         <h2>Creator Applications</h2>
         {applications?.length ? applications.map((a) => (
-          <p key={a.id}>{a.account.displayName} - {a.mission.title} <button onClick={() => postJson("/api/brand/dashboard/creator-applications", { submissionId: a.id, decision: "APPROVED" })}>Approve</button> <button onClick={() => postJson("/api/brand/dashboard/creator-applications", { submissionId: a.id, decision: "REJECTED", note: "Not fit" })}>Reject</button></p>
+          <p key={a.id}>
+            {a.account.displayName} - {a.mission.title}
+            {a.account.creatorProfile ? ` | ${a.account.creatorProfile.mainPlatform} | ${a.account.creatorProfile.socialUrl} | Followers: ${a.account.creatorProfile.followerCount ?? 0}` : " | Chưa có hồ sơ Creator"}
+            {" "}
+            <button onClick={() => postJson("/api/brand/dashboard/creator-applications", { submissionId: a.id, decision: "APPROVED" })}>Approve</button>{" "}
+            <button onClick={() => postJson("/api/brand/dashboard/creator-applications", { submissionId: a.id, decision: "REJECTED", note: "Not fit" })}>Reject</button>
+          </p>
         )) : <p>Không có creator applications.</p>}
       </section>
 

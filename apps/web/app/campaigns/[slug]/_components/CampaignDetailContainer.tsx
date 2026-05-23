@@ -13,6 +13,7 @@ import {
   RewardsSection,
   TimelineSection
 } from "./CampaignDetailSections";
+import { CreatorCampaignApplyButton } from "@/app/campaigns/_components/CreatorCampaignApplyButton";
 import { SupportModal } from "./SupportModal";
 
 type Props = { slug: string };
@@ -143,6 +144,11 @@ export function CampaignDetailContainer({ slug }: Props) {
       </div>
       <div className={styles.rightColumn}>
         <FundingSection funding={data.funding} />
+        <section className={styles.panel}>
+          <h2 className={styles.sectionTitle}>Đăng ký chiến dịch Creator</h2>
+          <p className={styles.inlineMuted}>Nộp đơn để Brand/Admin duyệt trước khi nhận nhiệm vụ.</p>
+          <CreatorCampaignApplyButton slug={data.hero.slug} />
+        </section>
         <RewardsSection
           campaignTitle={data.hero.title}
           rewards={data.rewards}

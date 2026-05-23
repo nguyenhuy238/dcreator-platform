@@ -3,6 +3,7 @@ import { ok } from "@/lib/api-response";
 import { requireAdminOps } from "@/lib/auth/admin-guard";
 import { toErrorResponse } from "@/lib/errors";
 import {
+  decideCreatorCampaignApplicationByAdmin,
   approveRoleRequestByAdmin,
   decideCampaignReview,
   decideProofByAdmin,
@@ -14,6 +15,7 @@ import {
   getVoucherManagement,
   listPendingCampaignReviews,
   listPendingProofs,
+  listCreatorCampaignApplicationsForAdmin,
   listRoleRequests,
   listUsersForAdmin,
   lockUserByAdmin,
@@ -23,6 +25,8 @@ import {
 import {
   adminAuditQuerySchema,
   adminCampaignDecisionSchema,
+  adminCreatorCampaignApplicationQuerySchema,
+  adminCreatorCampaignDecisionSchema,
   adminProofDecisionSchema,
   adminRejectSchema,
   adminUserQuerySchema
@@ -159,4 +163,27 @@ export async function GET_audit_logs(request: NextRequest) {
 export async function GET_analytics(request: NextRequest) {
   await requireAdminOps(request);
   return ok(await getAdminAnalytics());
+}
+
+export async function GET_creator_campaign_applications(request: NextRequest) {
+  await requireAdminOps(request);
+  const parsed = adminCreatorCampaignApplicationQuerySchema.parse({
+    status: optionalQueryParam(request, "status"),
+    query: optionalQueryParam(request, "query")
+  });
+  return ok(await listCreatorCampaignApplicationsForAdmin(parsed.status, parsed.query));
+}
+
+export async function POST_creator_campaign_application_decision(request: NextRequest, submissionId: string) {
+  const actor = await requireAdminOps(request);
+  const payload = adminCreatorCampaignDecisionSchema.parse(await request.json());
+  return ok(
+    await decideCreatorCampaignApplicationByAdmin(
+      actor.id,
+      submissionId,
+      payload.decision,
+      payload.rejectReason,
+      payload.note
+    )
+  );
 }

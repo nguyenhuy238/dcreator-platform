@@ -293,11 +293,27 @@ export async function addRewardTier(accountId: string, input: RewardInput) {
 export async function listCreatorApplications(accountId: string) {
   return prisma.missionSubmission.findMany({
     where: {
-      mission: { campaign: { brandId: accountId }, audience: MissionAudience.CREATOR },
+      mission: {
+        campaign: { brandId: accountId },
+        audience: { in: [MissionAudience.CREATOR, MissionAudience.USER] }
+      },
       lifecycleStatus: { in: ["ACCEPTED", "DOING"] }
     },
     include: {
-      account: { select: { id: true, displayName: true, email: true } },
+      account: {
+        select: {
+          id: true,
+          displayName: true,
+          email: true,
+          creatorProfile: {
+            select: {
+              mainPlatform: true,
+              socialUrl: true,
+              followerCount: true
+            }
+          }
+        }
+      },
       mission: { select: { id: true, title: true, campaign: { select: { id: true, title: true } } } }
     },
     orderBy: { createdAt: "desc" }

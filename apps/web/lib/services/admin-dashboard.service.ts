@@ -1,4 +1,4 @@
-import { CampaignStatus, Role, RoleRequestStatus, RoleRequestType } from "@prisma/client";
+import { CampaignStatus, MissionAudience, MissionLifecycleStatus, Role, RoleRequestStatus, RoleRequestType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { approveProof, rejectProof } from "@/lib/services/mission.service";
@@ -195,4 +195,103 @@ export async function getAuditLogs(input: { action?: string; targetType?: string
 
 export async function getAdminAnalytics() {
   return getAdminKpis();
+}
+
+export async function listCreatorCampaignApplicationsForAdmin(status?: MissionLifecycleStatus, query?: string) {
+  return prisma.missionSubmission.findMany({
+    where: {
+      mission: {
+        audience: { in: [MissionAudience.CREATOR, MissionAudience.USER] }
+      },
+      lifecycleStatus: status ?? { in: ["ACCEPTED", "DOING", "REJECTED"] },
+      ...(query
+        ? {
+            OR: [
+              { account: { displayName: { contains: query, mode: "insensitive" } } },
+              { account: { email: { contains: query, mode: "insensitive" } } },
+              { mission: { title: { contains: query, mode: "insensitive" } } },
+              { mission: { campaign: { title: { contains: query, mode: "insensitive" } } } }
+            ]
+          }
+        : {})
+    },
+    include: {
+      account: {
+        select: {
+          id: true,
+          displayName: true,
+          email: true,
+          creatorProfile: {
+            select: {
+              mainPlatform: true,
+              socialUrl: true,
+              followerCount: true
+            }
+          }
+        }
+      },
+      mission: {
+        select: {
+          id: true,
+          title: true,
+          audience: true,
+          campaign: { select: { id: true, title: true, slug: true } }
+        }
+      }
+    },
+    orderBy: { createdAt: "desc" }
+  });
+}
+
+export async function decideCreatorCampaignApplicationByAdmin(
+  actorId: string,
+  submissionId: string,
+  decision: "APPROVED" | "REJECTED",
+  rejectReason?: string,
+  note?: string
+) {
+  const current = await prisma.missionSubmission.findUnique({
+    where: { id: submissionId },
+    include: { mission: { include: { campaign: true } } }
+  });
+  if (!current) throw new AppError("Submission not found", 404, "SUBMISSION_NOT_FOUND");
+  if (current.lifecycleStatus === "DONE") throw new AppError("Submission already finalized", 409, "SUBMISSION_FINALIZED");
+
+  const updated = decision === "APPROVED"
+    ? await prisma.missionSubmission.update({
+        where: { id: submissionId },
+        data: {
+          lifecycleStatus: "DOING",
+          note: note ?? current.note,
+          rejectReason: null,
+          reviewedAt: new Date(),
+          reviewedById: actorId
+        }
+      })
+    : await prisma.missionSubmission.update({
+        where: { id: submissionId },
+        data: {
+          lifecycleStatus: "REJECTED",
+          status: "REJECTED",
+          rejectReason: rejectReason ?? "Rejected by admin",
+          note: note ?? current.note,
+          reviewedAt: new Date(),
+          reviewedById: actorId
+        }
+      });
+
+  await writeAuditLog({
+    actorId,
+    action: `ADMIN_CREATOR_CAMPAIGN_APPLICATION_${decision}`,
+    targetType: "MissionSubmission",
+    targetId: submissionId,
+    metadata: {
+      campaignId: current.mission.campaignId,
+      missionId: current.missionId,
+      rejectReason: rejectReason ?? null,
+      note: note ?? null
+    }
+  });
+
+  return updated;
 }
