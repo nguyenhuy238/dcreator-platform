@@ -1,6 +1,6 @@
 import type { Role } from "@prisma/client";
 import { DASHBOARD_ACCESS, ROLE } from "@/lib/auth/role-constants";
-import { hasRole } from "@/lib/auth/dashboard-access";
+import { getPrimaryDashboard, hasRole } from "@/lib/auth/dashboard-access";
 
 export type NavItem = { label: string; href: string };
 export type NavGroup = { label: string; roles: readonly Role[]; items: NavItem[] };
@@ -34,9 +34,11 @@ export const navigationGroups: NavGroup[] = [
     roles: DASHBOARD_ACCESS.brand,
     items: [
       { label: "Brand Dashboard", href: "/dashboard/brand" },
-      { label: "Campaigns", href: "/dashboard/brand" },
-      { label: "Products / Inventory", href: "/dashboard/brand" },
-      { label: "Analytics", href: "/dashboard/brand" }
+      { label: "Onboarding / BCC", href: "/dashboard/brand/onboarding" },
+      { label: "Brand Profile", href: "/dashboard/brand/profile" },
+      { label: "Chiến dịch", href: "/brand" },
+      { label: "Duyệt proof", href: "/brand/proofs" },
+      { label: "Quỹ", href: "/wallet" }
     ]
   },
   {
@@ -56,8 +58,12 @@ export const navigationGroups: NavGroup[] = [
 ];
 
 export function getNavigationItemsByRoles(roles: Role[]) {
+  if (roles.length === 0) return [];
+
+  const primaryDashboard = getPrimaryDashboard(roles);
   const map = new Map<string, NavItem>();
   for (const group of navigationGroups) {
+    if (group.items[0]?.href !== primaryDashboard.href) continue;
     if (!hasRole(roles, group.roles)) continue;
     for (const item of group.items) {
       map.set(item.href, item);

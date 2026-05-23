@@ -42,7 +42,7 @@ export const brandApplicationSchema = z.object({
   description: z.string().trim().max(2000).optional(),
   businessGoal: z.string().trim().max(1200).optional(),
   taxCode: z.string().trim().max(60).optional(),
-  businessLicenseUrl: optionalUrl,
+  businessLicenseUrl: z.string().trim().max(400).optional().or(z.literal("")),
   representativeName: z.string().trim().max(120).optional(),
   representativePhone: z.string().trim().max(40).optional(),
   representativeEmail: z.email().trim().toLowerCase().optional(),
@@ -53,7 +53,14 @@ export const brandApplicationSchema = z.object({
   productCategories: z.string().trim().max(600).optional(),
   inventoryDescription: z.string().trim().max(1200).optional(),
   expectedCampaignBudget: z.number().int().min(0).optional(),
-  expectedCreatorCount: z.number().int().min(0).optional()
+  expectedCreatorCount: z.number().int().min(0).optional(),
+  revenueSharePercent: z.number().int().min(0).max(100).optional(),
+  commissionRatePercent: z.number().int().min(0).max(100).optional(),
+  bccAgreementAccepted: z.boolean().optional(),
+  bccAgreementVersion: z.string().trim().max(60).optional(),
+  legalResponsibilityAccepted: z.boolean().optional(),
+  contractFileUrl: z.string().trim().max(400).optional().or(z.literal("")),
+  contractSignedAt: z.string().datetime().optional()
 });
 
 export const rejectApplicationSchema = z.object({

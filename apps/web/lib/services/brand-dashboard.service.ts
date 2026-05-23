@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { CampaignStatus, MissionAudience, Role } from "@prisma/client";
+import { Brand, CampaignStatus, MissionAudience, Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { approveProof, rejectProof } from "@/lib/services/mission.service";
@@ -8,6 +8,7 @@ import { createTopupPayment, ensureWalletByAccountId, getWalletTransactions } fr
 import type { z } from "zod";
 import type {
   brandProfileSchema,
+  brandOnboardingSchema,
   budgetLockSchema,
   budgetTopupSchema,
   campaignCreateSchema,
@@ -18,6 +19,7 @@ import type {
 } from "@/lib/validators/brand-dashboard";
 
 type BrandProfileInput = z.infer<typeof brandProfileSchema>;
+type BrandOnboardingInput = z.infer<typeof brandOnboardingSchema>;
 type ProductInput = z.infer<typeof productSchema>;
 type CampaignInput = z.infer<typeof campaignCreateSchema>;
 type RewardInput = z.infer<typeof rewardTierSchema>;
@@ -128,11 +130,93 @@ export async function getBrandOverview(accountId: string) {
   };
 }
 
+function toOnboardingStatus(brand: Brand | null) {
+  const completed = Boolean(
+    brand?.legalName &&
+      brand.industry &&
+      brand.taxCode &&
+      brand.productCategories &&
+      brand.inventoryDescription &&
+      brand.bccAgreementVersion &&
+      brand.legalResponsibilityAccepted &&
+      brand.revenueSharePercent !== null &&
+      brand.commissionRatePercent !== null
+  );
+
+  return {
+    completed,
+    legalName: brand?.legalName ?? "",
+    industry: brand?.industry ?? "",
+    taxCode: brand?.taxCode ?? "",
+    businessLicenseUrl: brand?.businessLicenseUrl ?? "",
+    productCategories: brand?.productCategories ?? "",
+    inventoryDescription: brand?.inventoryDescription ?? "",
+    revenueSharePercent: brand?.revenueSharePercent ?? 70,
+    commissionRatePercent: brand?.commissionRatePercent ?? 10,
+    bccAgreementVersion: brand?.bccAgreementVersion ?? "BCC-dCreator-v1",
+    bccAgreementTerms: brand?.bccAgreementTerms ?? "",
+    legalResponsibilityAccepted: brand?.legalResponsibilityAccepted ?? false,
+    contractFileUrl: brand?.contractFileUrl ?? "",
+    contractSignedAt: brand?.contractSignedAt?.toISOString() ?? null,
+    status: brand?.status ?? null
+  };
+}
+
+export async function getBrandOnboarding(accountId: string) {
+  const brand = await prisma.brand.findFirst({ where: { ownerAccountId: accountId }, orderBy: { createdAt: "desc" } });
+  if (!brand) throw new AppError("Brand not found", 404, "BRAND_NOT_FOUND");
+  return toOnboardingStatus(brand);
+}
+
+export async function updateBrandOnboarding(accountId: string, input: BrandOnboardingInput) {
+  const brand = await prisma.brand.findFirst({ where: { ownerAccountId: accountId }, orderBy: { createdAt: "desc" } });
+  if (!brand) throw new AppError("Brand not found", 404, "BRAND_NOT_FOUND");
+
+  const updated = await prisma.brand.update({
+    where: { id: brand.id },
+    data: {
+      legalName: input.legalName,
+      industry: input.industry,
+      taxCode: input.taxCode,
+      businessLicenseUrl: input.businessLicenseUrl || null,
+      productCategories: input.productCategories,
+      inventoryDescription: input.inventoryDescription,
+      revenueSharePercent: input.revenueSharePercent,
+      commissionRatePercent: input.commissionRatePercent,
+      bccAgreementVersion: input.bccAgreementVersion,
+      bccAgreementTerms: input.bccAgreementTerms || null,
+      legalResponsibilityAccepted: input.legalResponsibilityAccepted,
+      contractFileUrl: input.contractFileUrl || null,
+      contractSignedAt: input.requestAdminReview ? null : new Date()
+    }
+  });
+
+  return toOnboardingStatus(updated);
+}
+
 export async function getBrandProfile(accountId: string) {
-  const account = await prisma.account.findUnique({ where: { id: accountId }, include: { profile: true } });
+  const [account, brand, latestApplication] = await Promise.all([
+    prisma.account.findUnique({ where: { id: accountId }, include: { profile: true } }),
+    prisma.brand.findFirst({ where: { ownerAccountId: accountId }, orderBy: { createdAt: "desc" } }),
+    prisma.brandApplication.findFirst({ where: { accountId }, orderBy: { createdAt: "desc" } })
+  ]);
   if (!account) throw new AppError("Account not found", 404, "ACCOUNT_NOT_FOUND");
   const meta = parseBrandMeta(account.profile?.socialLinks);
-  return meta.brandProfile;
+  const bccSource = brand ?? latestApplication;
+  return {
+    ...meta.brandProfile,
+    bccAgreement: bccSource
+      ? {
+          revenueSharePercent: bccSource.revenueSharePercent,
+          commissionRatePercent: bccSource.commissionRatePercent,
+          bccAgreementVersion: bccSource.bccAgreementVersion,
+          legalResponsibilityAccepted: bccSource.legalResponsibilityAccepted,
+          contractFileUrl: bccSource.contractFileUrl,
+          contractSignedAt: bccSource.contractSignedAt?.toISOString() ?? null,
+          status: brand ? brand.status : latestApplication?.status ?? null
+        }
+      : null
+  };
 }
 
 export async function updateBrandProfile(accountId: string, input: BrandProfileInput) {

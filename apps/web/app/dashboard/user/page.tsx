@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import type { Role } from "@prisma/client";
 import { AppShell, PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { MissionCard, VoucherCard } from "@/app/components/dcreator/cards/campaign";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatsCard } from "@/app/components/dcreator/ui/base";
+import { getDefaultDashboardPath } from "@/lib/auth/dashboard-access";
 
 const nav = [
   { href: "/dashboard/user", label: "Tổng quan" },
@@ -51,6 +54,7 @@ function formatDate(value: string | null) {
 }
 
 export default function UserDashboardPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [wallet, setWallet] = useState<WalletMe | null>(null);
@@ -58,6 +62,18 @@ export default function UserDashboardPage() {
   const [missions, setMissions] = useState<MyMission[]>([]);
 
   useEffect(() => {
+    let active = true;
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!active || !response.ok || !payload?.success) return;
+        const roles = payload.data?.user?.roles as Role[] | undefined;
+        if (!Array.isArray(roles)) return;
+        const defaultDashboard = getDefaultDashboardPath(roles);
+        if (defaultDashboard !== "/dashboard/user") router.replace(defaultDashboard);
+      })
+      .catch(() => {});
+
     Promise.all([
       fetch("/api/wallet/me", { cache: "no-store" }),
       fetch("/api/me/vouchers", { cache: "no-store" }),
@@ -78,7 +94,11 @@ export default function UserDashboardPage() {
       })
       .catch((requestError: Error) => setError(requestError.message))
       .finally(() => setLoading(false));
-  }, []);
+
+    return () => {
+      active = false;
+    };
+  }, [router]);
 
   const weeklyPoints = useMemo(() => {
     if (!wallet) return 0;

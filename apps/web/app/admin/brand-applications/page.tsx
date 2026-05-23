@@ -6,8 +6,18 @@ type Item = {
   id: string;
   status: string;
   brandName: string;
+  legalName: string | null;
+  industry: string | null;
   contactEmail: string;
   taxCode: string | null;
+  productCategories: string | null;
+  revenueSharePercent: number | null;
+  commissionRatePercent: number | null;
+  bccAgreementAccepted: boolean;
+  bccAgreementVersion: string | null;
+  legalResponsibilityAccepted: boolean;
+  contractFileUrl: string | null;
+  contractSignedAt: string | null;
   rejectReason: string | null;
   account: { email: string; displayName: string };
 };
@@ -81,7 +91,20 @@ export default function BrandApplicationsAdminPage() {
             <p className="font-semibold">{item.brandName} ({item.contactEmail})</p>
             <p className="text-sm">Applicant: {item.account.displayName} - {item.account.email}</p>
             <p className="text-sm">Status: {item.status}</p>
+            {item.legalName ? <p className="text-sm">Legal name: {item.legalName}</p> : null}
+            {item.industry ? <p className="text-sm">Industry: {item.industry}</p> : null}
             {item.taxCode ? <p className="text-sm">Tax code: {item.taxCode}</p> : null}
+            {item.productCategories ? <p className="text-sm">Product categories: {item.productCategories}</p> : null}
+            <div className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm">
+              <p className="font-semibold">BCC terms</p>
+              <p>Revenue share: {item.revenueSharePercent ?? "N/A"}%</p>
+              <p>Commission: {item.commissionRatePercent ?? "N/A"}%</p>
+              <p>Version: {item.bccAgreementVersion ?? "N/A"}</p>
+              <p>Agreement accepted: {item.bccAgreementAccepted ? "Yes" : "No"}</p>
+              <p>Legal responsibility accepted: {item.legalResponsibilityAccepted ? "Yes" : "No"}</p>
+              {item.contractFileUrl ? <a className="font-semibold text-zinc-900 underline" href={item.contractFileUrl} target="_blank" rel="noreferrer">Contract file</a> : null}
+              {item.contractSignedAt ? <p>Signed at: {new Date(item.contractSignedAt).toLocaleString("vi-VN")}</p> : null}
+            </div>
             {item.rejectReason ? <p className="text-sm text-red-700">Reject reason: {item.rejectReason}</p> : null}
             <div className="mt-3 flex gap-2">
               <button className="dc-btn-primary" onClick={() => void decide(item.id, "APPROVED")}>Approve</button>

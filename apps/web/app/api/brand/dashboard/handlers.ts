@@ -9,6 +9,7 @@ import {
   editDraftCampaign,
   getBrandAnalytics,
   getBrandBudget,
+  getBrandOnboarding,
   getBrandOverview,
   getBrandProfile,
   listBrandCampaigns,
@@ -19,10 +20,12 @@ import {
   reviewBrandProof,
   submitCampaignForAdminReview,
   topupBrandFund,
+  updateBrandOnboarding,
   updateBrandProfile,
   upsertProduct
 } from "@/lib/services/brand-dashboard.service";
 import {
+  brandOnboardingSchema,
   brandProfileSchema,
   budgetLockSchema,
   budgetTopupSchema,
@@ -41,6 +44,17 @@ export async function GET_overview(request: NextRequest) {
 export async function GET_profile(request: NextRequest) {
   const account = await requireBrandActor(request);
   return ok(await getBrandProfile(account.id));
+}
+
+export async function GET_onboarding(request: NextRequest) {
+  const account = await requireBrandActor(request);
+  return ok(await getBrandOnboarding(account.id));
+}
+
+export async function PUT_onboarding(request: NextRequest) {
+  const account = await requireBrandActor(request);
+  const payload = brandOnboardingSchema.parse(await request.json());
+  return ok(await updateBrandOnboarding(account.id, payload));
 }
 
 export async function PUT_profile(request: NextRequest) {
