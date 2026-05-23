@@ -53,7 +53,7 @@ const queueCards: Array<{ key: keyof AdminOverview["queues"]; title: string; hre
   { key: "contentSubmissionsPendingReview", title: "Content submissions", href: "/admin/content-review" },
   { key: "productInventoryPendingReview", title: "Product/Inventory review", href: "/admin/product-inventory" },
   { key: "fulfillmentPendingIssues", title: "Fulfillment lỗi/chờ xử lý", href: "/admin/fulfillment" },
-  { key: "payoutPendingReview", title: "Payout/commission chờ duyệt", href: "/admin/finance" }
+  { key: "payoutPendingReview", title: "Payout/commission chờ duyệt", href: "/admin/payouts" }
 ];
 
 export function AdminDashboardClient() {
