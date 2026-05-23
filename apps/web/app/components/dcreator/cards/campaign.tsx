@@ -1,7 +1,23 @@
 import Link from "next/link";
 import Image from "next/image";
-import type { CampaignItem } from "../data/mock";
 import { StatusBadge } from "../ui/base";
+
+type CampaignItem = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  cover: string;
+  status: "active" | "review" | "ended" | "full";
+  campaignType: "Sponsorship" | "Voucher" | "Product Launch";
+  brand: string;
+  creator: string;
+  fundedAmount: number;
+  targetAmount: number;
+  backers: number;
+  rewardsLeft: number;
+  daysLeft: number;
+};
 
 const currency = (n: number) => `${n.toLocaleString("vi-VN")}đ`;
 

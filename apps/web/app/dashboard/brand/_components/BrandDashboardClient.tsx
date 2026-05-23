@@ -105,15 +105,15 @@ export function BrandDashboardClient() {
       {message ? <ActionToast message={message === "Success" ? "Cập nhật thành công" : message} /> : null}
       <section>
         <div className="dc-grid-dashboard">
-          <StatsCard title="Campaign active" value={`${overview?.activeCampaigns ?? 0}`} />
+          <StatsCard title="Campaign đang chạy" value={`${overview?.activeCampaigns ?? 0}`} />
           <StatsCard title="Tổng ngân sách" value={`${(overview?.totalBudget ?? 0).toLocaleString("vi-VN")} VND`} />
-          <StatsCard title="Prepaid fund" value={`${(overview?.prepaidFundBalance ?? 0).toLocaleString("vi-VN")} VND`} />
+          <StatsCard title="Quỹ prepaid" value={`${(overview?.prepaidFundBalance ?? 0).toLocaleString("vi-VN")} VND`} />
           <StatsCard title="Creator tham gia" value={`${overview?.totalCreators ?? 0}`} />
         </div>
       </section>
 
       <section>
-        <SectionHeader title="Brand profile" action={<Link href="/dashboard/brand/profile" className="dc-btn-secondary">Cập nhật hồ sơ</Link>} />
+        <SectionHeader title="Hồ sơ thương hiệu" action={<Link href="/dashboard/brand/profile" className="dc-btn-secondary">Cập nhật hồ sơ</Link>} />
         {!profile ? <EmptyState title="Chưa có hồ sơ brand" description="Hoàn thiện thông tin để gửi duyệt." /> : (
           <article className="dc-card p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -129,7 +129,7 @@ export function BrandDashboardClient() {
       </section>
 
       <section>
-        <SectionHeader title="Product & Inventory" action={<Link href="/dashboard/brand/products" className="dc-btn-secondary">Quản lý sản phẩm</Link>} />
+        <SectionHeader title="Sản phẩm & tồn kho" action={<Link href="/dashboard/brand/products" className="dc-btn-secondary">Quản lý sản phẩm</Link>} />
         {products?.length ? (
           <div className="grid gap-3 md:grid-cols-2">
             {products.slice(0, 6).map((p) => (
@@ -145,7 +145,7 @@ export function BrandDashboardClient() {
       </section>
 
       <section>
-        <SectionHeader title="Campaign management" action={<Link href="/brand" className="dc-btn-secondary">Xem campaign public</Link>} />
+        <SectionHeader title="Quản lý campaign" action={<Link href="/brand" className="dc-btn-secondary">Xem campaign public</Link>} />
         {campaigns?.length ? (
           <div className="grid gap-3">
             {campaigns.map((c) => (
@@ -164,12 +164,20 @@ export function BrandDashboardClient() {
       </section>
 
       <section>
-        <h2>Reward Management</h2>
-        <button onClick={() => postJson("/api/brand/dashboard/rewards", { campaignId: campaigns?.[0]?.id, title: "Default reward", stockTotal: 10, priceVnd: 100000, pricePoints: 1000 })}>Add reward tier (sample)</button>
+        <SectionHeader title="Reward / voucher" subtitle="Thiết lập reward theo campaign bằng dữ liệu thật." />
+        <div className="dc-card p-4">
+          <p className="text-sm text-zinc-600">
+            Tạo reward/voucher tại màn hình quản lý sản phẩm và campaign setup để đồng bộ tồn kho, giá và trạng thái duyệt.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href="/dashboard/brand/products" className="dc-btn-secondary">Quản lý sản phẩm</Link>
+            <Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Thiết lập campaign</Link>
+          </div>
+        </div>
       </section>
 
       <section>
-        <SectionHeader title="Creator applications" subtitle="Duyệt Creator apply vào campaign/job." />
+        <SectionHeader title="Đơn ứng tuyển Creator" subtitle="Duyệt Creator apply vào campaign/job." />
         {applications?.length ? (
           <div className="grid gap-3">
             {applications.slice(0, 8).map((a) => (
@@ -191,7 +199,7 @@ export function BrandDashboardClient() {
       </section>
 
       <section>
-        <SectionHeader title="Proof review" subtitle="Duyệt proof/video Creator nộp." />
+        <SectionHeader title="Duyệt proof/video" subtitle="Duyệt proof/video Creator nộp." />
         {proofs?.length ? (
           <div className="grid gap-3">
             {proofs.slice(0, 8).map((p) => (
@@ -209,27 +217,38 @@ export function BrandDashboardClient() {
       </section>
 
       <section>
-        <h2>Budget/Prepaid Fund</h2>
-        <p>Current prepaid balance: {budget?.prepaidFundBalance ?? 0}</p>
-        <button onClick={() => postJson("/api/brand/dashboard/budget/topup", { amountVnd: 500000, idempotencyKey: `topup_${Date.now()}` })}>Top-up sample</button>
-        <button onClick={() => postJson("/api/brand/dashboard/budget/lock", { campaignId: campaigns?.[0]?.id, amountVnd: 100000, idempotencyKey: `lock_${Date.now()}` })}>Lock budget sample</button>
-        <h3>Transaction history</h3>
-        {budget?.transactionHistory?.length ? budget.transactionHistory.map((t) => <p key={t.id}>{t.type}: {t.pointsDelta}</p>) : <p>Không có transaction.</p>}
+        <SectionHeader title="Quỹ prepaid / giao dịch" action={<Link href="/wallet" className="dc-btn-secondary">Đi tới ví</Link>} />
+        <div className="dc-card p-4">
+          <p className="text-sm text-zinc-600">
+            Số dư quỹ hiện tại: <span className="font-semibold text-zinc-900">{(budget?.prepaidFundBalance ?? 0).toLocaleString("vi-VN")} VND</span>
+          </p>
+          {budget?.transactionHistory?.length ? (
+            <div className="mt-3 grid gap-2">
+              {budget.transactionHistory.slice(0, 8).map((t) => (
+                <div key={t.id} className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700">
+                  {t.type}: {t.pointsDelta.toLocaleString("vi-VN")}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-zinc-600">Không có transaction.</p>
+          )}
+        </div>
       </section>
 
       <section>
         <SectionHeader title="KPI / Analytics" />
         <div className="dc-grid-dashboard">
-          <StatsCard title="Campaign views" value={`${analytics?.kpis?.campaignViews ?? 0}`} />
-          <StatsCard title="CTA rate" value={`${analytics?.kpis?.ctaRate ?? 0}%`} />
-          <StatsCard title="Contribution conversion" value={`${analytics?.kpis?.contributionConversion ?? 0}%`} />
-          <StatsCard title="Voucher redemption rate" value={`${analytics?.kpis?.voucherRedemptionRate ?? 0}%`} />
+          <StatsCard title="Lượt xem campaign" value={`${analytics?.kpis?.campaignViews ?? 0}`} />
+          <StatsCard title="Tỷ lệ CTA" value={`${analytics?.kpis?.ctaRate ?? 0}%`} />
+          <StatsCard title="Tỷ lệ chuyển đổi ủng hộ" value={`${analytics?.kpis?.contributionConversion ?? 0}%`} />
+          <StatsCard title="Tỷ lệ redeem voucher" value={`${analytics?.kpis?.voucherRedemptionRate ?? 0}%`} />
         </div>
         <div className="mt-4 grid gap-3">
           {analytics?.campaignPerformance?.length ? analytics.campaignPerformance.map((c) => (
             <article key={c.id} className="dc-card p-4">
               <p className="font-semibold text-zinc-900">{c.title}</p>
-              <p className="text-sm text-zinc-600">Funded: {c.fundedAmountVnd.toLocaleString("vi-VN")} VND</p>
+              <p className="text-sm text-zinc-600">Đã huy động: {c.fundedAmountVnd.toLocaleString("vi-VN")} VND</p>
             </article>
           )) : <EmptyState title="Chưa có dữ liệu KPI chi tiết" description="Dữ liệu analytics sẽ tăng theo hoạt động campaign." />}
         </div>
