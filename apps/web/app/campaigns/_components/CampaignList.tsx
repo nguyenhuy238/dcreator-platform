@@ -89,8 +89,8 @@ export function CampaignList() {
         </div>
       ) : null}
 
-      {!loading && error ? <p className="error">Error: {error}</p> : null}
-      {!loading && !error && items.length === 0 ? <p>Không có campaign phù hợp bộ lọc.</p> : null}
+      {!loading && error ? <p className={styles.error}>Không thể tải chiến dịch: {error}</p> : null}
+      {!loading && !error && items.length === 0 ? <p className={styles.empty}>Không có chiến dịch phù hợp bộ lọc.</p> : null}
 
       {!loading && !error && items.length > 0 ? (
         <>
@@ -100,14 +100,14 @@ export function CampaignList() {
             ))}
           </div>
           <div className={styles.pager}>
-            <button disabled={page <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
-              Prev
+            <button className={styles.pagerBtn} disabled={page <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
+              Trang trước
             </button>
-            <span>
-              Page {page}/{totalPages}
+            <span className={styles.pagerText}>
+              Trang {page}/{totalPages}
             </span>
-            <button disabled={page >= totalPages} onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}>
-              Next
+            <button className={styles.pagerBtn} disabled={page >= totalPages} onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}>
+              Trang sau
             </button>
           </div>
         </>

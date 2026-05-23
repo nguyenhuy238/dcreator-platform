@@ -85,20 +85,20 @@ export function AdminDashboardClient() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Admin Overview" subtitle="Hàng chờ xử lý và cảnh báo vận hành." />
+        <PageHeader title="Admin Command Center" subtitle="Hàng chờ xử lý và cảnh báo vận hành." />
         <LoadingSkeleton rows={6} />
       </>
     );
   }
 
   if (error || !overview) {
-    return <ErrorState title="Không tải được Admin Overview" description={error || "Unknown error"} onRetry={() => void refresh()} />;
+    return <ErrorState title="Không tải được Admin Command Center" description={error || "Unknown error"} onRetry={() => void refresh()} />;
   }
 
   return (
     <>
       <PageHeader
-        title="Admin Overview"
+        title="Admin Command Center"
         subtitle="Ưu tiên xử lý các queue pending trước khi theo dõi KPI tổng."
         action={<button className="dc-btn-secondary" onClick={() => void refresh()}>Làm mới</button>}
       />

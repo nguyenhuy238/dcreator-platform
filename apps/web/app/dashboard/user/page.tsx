@@ -18,11 +18,11 @@ import { getDefaultDashboardPath } from "@/lib/auth/dashboard-access";
 
 const nav = [
   { href: "/dashboard/user", label: "Tổng quan" },
-  { href: "/dashboard/user/profile", label: "User profile" },
-  { href: "/campaigns", label: "Campaign" },
-  { href: "/wallet", label: "Wallet" },
+  { href: "/dashboard/user/profile", label: "Hồ sơ người dùng" },
+  { href: "/campaigns", label: "Chiến dịch" },
+  { href: "/wallet", label: "Ví" },
   { href: "/vouchers", label: "Voucher" },
-  { href: "/me/missions", label: "Missions" }
+  { href: "/me/missions", label: "Nhiệm vụ" }
 ];
 
 type ApiSuccess<T> = { success: true; data: T };
@@ -164,7 +164,7 @@ export default function UserDashboardPage() {
       <PublicHeader />
       <AppShell sidebarItems={nav}>
         <PageHeader
-          title="User Dashboard"
+          title="Dashboard Người dùng"
           subtitle="Theo dõi ủng hộ, voucher, mission và số dư N-Points."
           action={
             <Link className="dc-btn-primary" href="/campaigns">
@@ -223,7 +223,7 @@ export default function UserDashboardPage() {
                   </p>
                   <p className="text-sm text-zinc-600">Thanh toán: {item.paymentMethod}</p>
                   <p className="text-sm text-zinc-600">Trạng thái: {contributionStatusLabel(item.status)}</p>
-                  {item.reward ? <p className="text-sm text-zinc-600">Reward: {item.reward.title}</p> : null}
+                  {item.reward ? <p className="text-sm text-zinc-600">Phần thưởng: {item.reward.title}</p> : null}
                   {item.rewardClaim ? (
                     <p className="text-sm text-emerald-700">Voucher: {item.rewardClaim.voucherCode}</p>
                   ) : null}
@@ -312,4 +312,3 @@ export default function UserDashboardPage() {
     </>
   );
 }
-

@@ -15,8 +15,8 @@ type Voucher = {
 
 const nav = [
   { href: "/dashboard/user", label: "Tổng quan" },
-  { href: "/campaigns", label: "Campaign" },
-  { href: "/wallet", label: "Wallet" },
+  { href: "/campaigns", label: "Chiến dịch" },
+  { href: "/wallet", label: "Ví" },
   { href: "/vouchers", label: "Voucher" }
 ];
 
@@ -55,7 +55,7 @@ export default function MyVouchersPage() {
     <>
       <PublicHeader />
       <AppShell sidebarItems={nav}>
-        <PageHeader title="My Vouchers" subtitle="Theo dõi mã voucher theo trạng thái và hạn sử dụng." action={<Link className="dc-btn-primary" href="/campaigns">Khám phá campaign</Link>} />
+        <PageHeader title="Voucher của tôi" subtitle="Theo dõi mã voucher theo trạng thái và hạn sử dụng." action={<Link className="dc-btn-primary" href="/campaigns">Khám phá chiến dịch</Link>} />
 
         {error ? <ErrorState title="Không thể tải voucher" description={error} /> : null}
 
@@ -73,7 +73,7 @@ export default function MyVouchersPage() {
           {loading ? (
             <div className="grid gap-3">{Array.from({ length: 3 }).map((_, index) => <div key={index} className="h-32 animate-pulse rounded-3xl bg-zinc-100" />)}</div>
           ) : items.length === 0 ? (
-            <EmptyState title="Chưa có voucher" description="Hãy tham gia campaign và mission để nhận voucher." action={<Link href="/campaigns" className="dc-btn-primary">Xem campaign</Link>} />
+            <EmptyState title="Chưa có voucher" description="Hãy tham gia campaign và mission để nhận voucher." action={<Link href="/campaigns" className="dc-btn-primary">Chọn reward</Link>} />
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {items.map((item) => (
@@ -83,7 +83,7 @@ export default function MyVouchersPage() {
                     <StatusBadge status={statusLabel[item.status]} />
                   </div>
                   <p className="mt-2 font-semibold text-zinc-900">{item.reward.title}</p>
-                  <p className="mt-1 text-sm text-zinc-600">Campaign: {item.reward.campaign.title}</p>
+                  <p className="mt-1 text-sm text-zinc-600">Chiến dịch: {item.reward.campaign.title}</p>
                   <p className="mt-1 text-sm text-zinc-600">Hết hạn: {item.expiryAt ? new Date(item.expiryAt).toLocaleDateString("vi-VN") : "Không giới hạn"}</p>
                   <div className="mt-3 flex gap-2">
                     <Link href={`/vouchers/${item.voucherCode}`} className="dc-btn-secondary">Xem voucher</Link>

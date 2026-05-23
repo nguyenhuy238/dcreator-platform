@@ -30,7 +30,7 @@ function getCampaignCTA(data: CampaignDetailDTO, selectedRewardId: string | null
     return { label: "Nhận voucher", disabled: false };
   }
   if (data.funding.isEnded) {
-    return { label: "Campaign da ket thuc", disabled: true };
+    return { label: "Chiến dịch đã kết thúc", disabled: true };
   }
   if (!selectedRewardId) {
     return data.viewer.isLoggedIn
@@ -115,8 +115,10 @@ export function CampaignDetailContainer({ slug }: Props) {
   if (isNotFound) {
     return (
       <main className="container">
-        <h1>Campaign khong ton tai</h1>
-        <p>Campaign co the chua public hoac da bi go.</p>
+        <div className="dc-card mt-8 p-6">
+          <h1 className="text-2xl font-black text-zinc-900">Chiến dịch không tồn tại</h1>
+          <p className="mt-2 text-sm text-zinc-600">Chiến dịch có thể chưa được public hoặc đã bị gỡ.</p>
+        </div>
       </main>
     );
   }
@@ -124,8 +126,10 @@ export function CampaignDetailContainer({ slug }: Props) {
   if (error || !data) {
     return (
       <main className="container">
-        <h1>Loi tai campaign detail</h1>
-        <p className="error">{error ?? "Khong the tai du lieu."}</p>
+        <div className="dc-card mt-8 border-red-200 bg-red-50 p-6">
+          <h1 className="text-2xl font-black text-red-700">Lỗi tải campaign detail</h1>
+          <p className="mt-2 text-sm text-red-600">{error ?? "Không thể tải dữ liệu."}</p>
+        </div>
       </main>
     );
   }

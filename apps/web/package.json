@@ -11,6 +11,8 @@
     "lint": "eslint --max-warnings 0",
     "check-types": "next typegen && tsc --noEmit",
     "test": "node --test --experimental-strip-types tests/**/*.test.ts",
+    "test:visual": "node --test --experimental-strip-types tests/mobile-visual-regression.test.ts",
+    "test:visual:update": "set VISUAL_UPDATE=1&& node --test --experimental-strip-types tests/mobile-visual-regression.test.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",

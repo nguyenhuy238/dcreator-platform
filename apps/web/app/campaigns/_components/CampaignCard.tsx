@@ -29,25 +29,30 @@ export function CampaignCard({ campaign }: { campaign: CampaignCardData }) {
         height={675}
       />
       <div className={styles.cardBody}>
-        <h3>{campaign.title}</h3>
-        <p className={styles.meta}>Brand: {campaign.brand}</p>
-        <p className={styles.meta}>Creator: {campaign.creator ?? "N/A"}</p>
-        <p className={styles.meta}>Type: {campaign.campaignType}</p>
+        <div className={styles.row}>
+          <span className={styles.badge}>Đang mở</span>
+          <span className={styles.badgeMuted}>{campaign.campaignType}</span>
+        </div>
+        <h3 className={styles.title}>{campaign.title}</h3>
+        <p className={styles.meta}>Thương hiệu: {campaign.brand}</p>
+        <p className={styles.meta}>Creator: {campaign.creator ?? "Chưa chỉ định"}</p>
         <p className={styles.meta}>
-          Funded: {campaign.fundedAmount.toLocaleString("vi-VN")} / {campaign.targetAmount.toLocaleString("vi-VN")} VND
+          Đã ủng hộ: {campaign.fundedAmount.toLocaleString("vi-VN")} / {campaign.targetAmount.toLocaleString("vi-VN")} VND
         </p>
         <div className={styles.barWrap}>
           <div className={styles.bar} style={{ width: `${campaign.progressPercent}%` }} />
         </div>
-        <p className={styles.meta}>Backers: {campaign.backers}</p>
-        <p className={styles.meta}>Rewards left: {campaign.rewardsLeft}</p>
+        <p className={styles.meta}>Backer: {campaign.backers}</p>
+        <p className={styles.meta}>Reward còn lại: {campaign.rewardsLeft}</p>
         <p className={styles.meta}>
-          Deadline: {campaign.deadline ? new Date(campaign.deadline).toLocaleDateString("vi-VN") : "N/A"}
+          Hạn chót: {campaign.deadline ? new Date(campaign.deadline).toLocaleDateString("vi-VN") : "Không giới hạn"}
         </p>
-        <Link href={`/campaigns/${campaign.slug}`} className={styles.cta}>
-          Ủng hộ
-        </Link>
-        <CreatorCampaignApplyButton slug={campaign.slug} compact />
+        <div className={styles.actionRow}>
+          <Link href={`/campaigns/${campaign.slug}`} className={styles.cta}>
+            Chọn reward
+          </Link>
+          <CreatorCampaignApplyButton slug={campaign.slug} compact />
+        </div>
       </div>
     </article>
   );

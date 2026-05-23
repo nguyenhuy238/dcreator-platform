@@ -79,13 +79,17 @@ export function CreatorDashboardClient() {
         fetcher<CreatorMissionItem[]>("/api/me/mission"),
         fetcher<Array<{ id: string; title: string; rewardPoints: number; rewardCommissionVnd: number; deadlineAt: string | null; campaign: { title: string; category: string; status: string } }>>("/api/creator/dashboard/marketplace?campaignStatus=ACTIVE"),
         fetcher<CreatorApplicationSnapshot>("/api/profile/creator-application"),
-        fetcher<{ proofApproved: number; proofSubmitted: number; commissionEarned: number }>("/api/creator/dashboard/analytics")
+        fetcher<{ proofApproved?: number; proofSubmitted?: number; commissionEarned?: number }>("/api/creator/dashboard/analytics")
       ]);
       setOverview(overviewData);
       setMissions(missionData);
       setMarketplaceJobs(marketplaceData);
       setCreatorApplication(creatorApplicationData);
-      setAnalytics(analyticsData);
+      setAnalytics({
+        proofApproved: Number(analyticsData?.proofApproved ?? 0),
+        proofSubmitted: Number(analyticsData?.proofSubmitted ?? 0),
+        commissionEarned: Number(analyticsData?.commissionEarned ?? 0)
+      });
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Không thể tải dữ liệu dashboard");
     } finally {
@@ -129,7 +133,7 @@ export function CreatorDashboardClient() {
           </section>
           {creatorApplication ? (
             <section className="rounded-2xl border border-zinc-200 bg-white p-4">
-              <p className="text-sm font-semibold text-zinc-900">Trạng thái Creator onboarding: {creatorApplication.status}</p>
+              <p className="text-sm font-semibold text-zinc-900">Trạng thái hồ sơ Creator: {creatorApplication.status}</p>
               {creatorApplication.application?.rejectReason ? (
                 <p className="mt-1 text-sm text-red-700">Lý do từ chối: {creatorApplication.application.rejectReason}</p>
               ) : null}
@@ -139,7 +143,7 @@ export function CreatorDashboardClient() {
             </section>
           ) : null}
           <section>
-            <SectionHeader title="Campaign/Job có thể ứng tuyển" />
+            <SectionHeader title="Chiến dịch/job có thể ứng tuyển" />
             {marketplaceJobs.length === 0 ? (
               <EmptyState title="Không có job phù hợp" description="Hiện chưa có nhiệm vụ Creator đang mở theo điều kiện hiện tại." />
             ) : (
@@ -157,8 +161,8 @@ export function CreatorDashboardClient() {
           </section>
           {analytics ? (
             <section className="dc-grid-dashboard">
-              <StatsCard title="Proof đã nộp" value={analytics.proofSubmitted.toLocaleString("vi-VN")} />
-              <StatsCard title="Proof đã duyệt" value={analytics.proofApproved.toLocaleString("vi-VN")} />
+              <StatsCard title="Proof đã nộp" value={(analytics.proofSubmitted ?? 0).toLocaleString("vi-VN")} />
+              <StatsCard title="Proof đã duyệt" value={(analytics.proofApproved ?? 0).toLocaleString("vi-VN")} />
               <StatsCard title="Tổng hoa hồng" value={`${analytics.commissionEarned.toLocaleString("vi-VN")}đ`} />
             </section>
           ) : null}
