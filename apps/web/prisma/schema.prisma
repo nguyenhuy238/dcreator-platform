@@ -778,6 +778,12 @@ model Campaign {
   fulfillmentOrders FulfillmentOrder[]
   productSubmissions ProductSubmission[]
   creatorMissions CreatorMission[]
+
+  @@index([isPublic, status, updatedAt])
+  @@index([isPublic, status, createdAt])
+  @@index([isPublic, status, endsAt])
+  @@index([isPublic, status, fundedAmountVnd])
+  @@index([isPublic, status, backerCount])
 }
 
 model ProductSubmission {

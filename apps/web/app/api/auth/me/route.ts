@@ -6,7 +6,7 @@ import { toErrorResponse } from "@/lib/errors";
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth(request);
-    return ok({
+    const response = ok({
       user: {
         id: user.id,
         email: user.email,
@@ -23,6 +23,8 @@ export async function GET(request: NextRequest) {
         brandRequestStatus: user.brandRequestStatus
       }
     });
+    response.headers.set("Cache-Control", "private, max-age=15, stale-while-revalidate=30");
+    return response;
   } catch (error) {
     return toErrorResponse(error);
   }

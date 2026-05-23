@@ -59,3 +59,38 @@ a {
 .dc-kpi {
   @apply text-2xl font-black tracking-tight text-zinc-900;
 }
+
+.dc-loading-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.dc-loading-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+  animation: dc-shimmer 1.25s linear infinite;
+}
+
+.dc-loading-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 2px solid #d4d4d8;
+  border-top-color: #18181b;
+  animation: dc-spin 0.8s linear infinite;
+}
+
+@keyframes dc-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes dc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
