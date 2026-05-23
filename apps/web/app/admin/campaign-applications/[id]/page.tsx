@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -58,10 +58,10 @@ export default function AdminCampaignApplicationDetailPage() {
     try {
       const res = await fetch(`/api/admin/campaign-applications/${id}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<Detail>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load detail failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải chi tiết thất bại");
       setItem(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load detail failed");
+      setError(e instanceof Error ? e.message : "Tải chi tiết thất bại");
     } finally {
       setLoading(false);
     }
@@ -82,12 +82,12 @@ export default function AdminCampaignApplicationDetailPage() {
         body: JSON.stringify({})
       });
       const body = (await res.json()) as ApiResult<unknown>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Action failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Thao tác thất bại");
       setToast("Đã cập nhật application");
       setTimeout(() => setToast(""), 1800);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed");
+      setError(e instanceof Error ? e.message : "Thao tác thất bại");
     } finally {
       setActing(false);
     }
@@ -103,7 +103,7 @@ export default function AdminCampaignApplicationDetailPage() {
   }
 
   if (error || !item) {
-    return <ErrorState title="Không tải được application detail" description={error || "Unknown error"} onRetry={() => void load()} />;
+    return <ErrorState title="Không tải được application detail" description={error || "Lỗi không xác định"} onRetry={() => void load()} />;
   }
 
   return (
@@ -122,11 +122,11 @@ export default function AdminCampaignApplicationDetailPage() {
         </div>
         <div className="mt-3 grid gap-2 text-sm text-zinc-700">
           <p>Creator: {item.account.displayName} • {item.account.email}</p>
-          <p>Platform: {item.account.creatorProfile?.mainPlatform ?? "N/A"} • Followers: {(item.account.creatorProfile?.followerCount ?? 0).toLocaleString("vi-VN")}</p>
-          <p>Category: {item.account.creatorProfile?.contentCategory ?? "N/A"}</p>
-          <p>Social URL: {item.account.creatorProfile?.socialUrl ?? "N/A"}</p>
-          <p>Handle: {item.account.creatorProfile?.handle ?? "N/A"}</p>
-          <p>Portfolio: {item.account.creatorProfile?.portfolioUrl ?? "N/A"}</p>
+          <p>Platform: {item.account.creatorProfile?.mainPlatform ?? "Không có"} • Followers: {(item.account.creatorProfile?.followerCount ?? 0).toLocaleString("vi-VN")}</p>
+          <p>Category: {item.account.creatorProfile?.contentCategory ?? "Không có"}</p>
+          <p>Social URL: {item.account.creatorProfile?.socialUrl ?? "Không có"}</p>
+          <p>Handle: {item.account.creatorProfile?.handle ?? "Không có"}</p>
+          <p>Portfolio: {item.account.creatorProfile?.portfolioUrl ?? "Không có"}</p>
         </div>
       </section>
 
@@ -140,10 +140,10 @@ export default function AdminCampaignApplicationDetailPage() {
       <section className="mt-4 dc-card p-4">
         <p className="font-semibold">Creator motivation / attachments</p>
         <div className="mt-2 grid gap-2 text-sm text-zinc-700">
-          <p>Why join (note): {item.note ?? "N/A"}</p>
-          <p>Additional note: {item.proofTextNote ?? "N/A"}</p>
-          <p>Social post/link: {item.socialPostUrl ?? "N/A"}</p>
-          <p>Attachment file: {item.fileUploadUrl ?? "N/A"}</p>
+          <p>Why join (note): {item.note ?? "Không có"}</p>
+          <p>Additional note: {item.proofTextNote ?? "Không có"}</p>
+          <p>Social post/link: {item.socialPostUrl ?? "Không có"}</p>
+          <p>Attachment file: {item.fileUploadUrl ?? "Không có"}</p>
         </div>
       </section>
 

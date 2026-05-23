@@ -37,10 +37,10 @@ export default function AdminSupportPage() {
       if (query.trim()) params.set("query", query.trim());
       const res = await fetch(`/api/admin/support?${params.toString()}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<Item[]>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load support tickets failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải danh sách hỗ trợ thất bại");
       setItems(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load support tickets failed");
+      setError(e instanceof Error ? e.message : "Tải danh sách hỗ trợ thất bại");
     } finally {
       setLoading(false);
     }

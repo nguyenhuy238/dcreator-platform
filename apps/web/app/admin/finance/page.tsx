@@ -38,12 +38,12 @@ export default function AdminFinancePage() {
       ]);
       const fBody = await fRes.json();
       const rBody = await rRes.json();
-      if (!fRes.ok || !fBody.success) throw new Error(fBody.error ?? "Load finance failed");
-      if (!rRes.ok || !rBody.success) throw new Error(rBody.error ?? "Load fraud failed");
+      if (!fRes.ok || !fBody.success) throw new Error(fBody.error ?? "Tải dữ liệu tài chính thất bại");
+      if (!rRes.ok || !rBody.success) throw new Error(rBody.error ?? "Tải dữ liệu rủi ro thất bại");
       setFinance(fBody.data);
       setFraud(rBody.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load finance failed");
+      setError(e instanceof Error ? e.message : "Tải dữ liệu tài chính thất bại");
     } finally {
       setLoading(false);
     }
@@ -54,7 +54,7 @@ export default function AdminFinancePage() {
   }, []);
 
   if (loading) return <><PageHeader title="Finance CMS" subtitle="Theo dõi tài chính và rủi ro hệ thống." /><LoadingSkeleton rows={4} /></>;
-  if (error || !finance || !fraud) return <ErrorState title="Không tải được dữ liệu finance" description={error ?? "Unknown error"} onRetry={() => void load()} />;
+  if (error || !finance || !fraud) return <ErrorState title="Không tải được dữ liệu finance" description={error ?? "Lỗi không xác định"} onRetry={() => void load()} />;
 
   return (
     <>

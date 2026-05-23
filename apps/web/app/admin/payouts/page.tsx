@@ -30,10 +30,10 @@ export default function AdminPayoutsPage() {
       if (query.trim()) params.set("query", query.trim());
       const res = await fetch(`/api/admin/payouts?${params.toString()}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<Item[]>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load payouts failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải yêu cầu rút thưởng thất bại");
       setItems(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load payouts failed");
+      setError(e instanceof Error ? e.message : "Tải yêu cầu rút thưởng thất bại");
     } finally {
       setLoading(false);
     }

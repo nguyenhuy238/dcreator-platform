@@ -190,7 +190,7 @@ export function WalletPageClient() {
                       <div className="mt-2 grid gap-1 text-sm text-zinc-600 sm:grid-cols-3">
                         <p>Points: {transaction.pointsDelta > 0 ? "+" : ""}{transaction.pointsDelta.toLocaleString("vi-VN")}</p>
                         <p>Cash: {transaction.cashDeltaVnd > 0 ? "+" : ""}{formatVnd(transaction.cashDeltaVnd)}</p>
-                        <p>Ref: {transaction.referenceType ?? "N/A"}</p>
+                        <p>Ref: {transaction.referenceType ?? "Không có"}</p>
                       </div>
                     </article>
                   ))}

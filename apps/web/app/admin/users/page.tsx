@@ -25,10 +25,10 @@ export default function AdminUsersPage() {
       const url = query.trim() ? `/api/admin/dashboard/users?query=${encodeURIComponent(query.trim())}&page=1&limit=50` : "/api/admin/dashboard/users?page=1&limit=50";
       const res = await fetch(url, { cache: "no-store" });
       const body = await res.json();
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load users failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải danh sách người dùng thất bại");
       setItems(body.data.items);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load users failed");
+      setError(e instanceof Error ? e.message : "Tải danh sách người dùng thất bại");
     } finally {
       setLoading(false);
     }

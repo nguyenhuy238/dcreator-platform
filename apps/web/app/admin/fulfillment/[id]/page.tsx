@@ -53,7 +53,7 @@ export default function AdminFulfillmentDetailPage() {
     try {
       const res = await fetch(`/api/admin/fulfillment/${id}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<Detail>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load detail failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải chi tiết thất bại");
       setItem(body.data);
       setStatus(body.data.opsMeta.opsStatus ?? "pending");
       setTrackingCode(body.data.opsMeta.trackingCode ?? "");
@@ -62,7 +62,7 @@ export default function AdminFulfillmentDetailPage() {
       setPaymentStatus(body.data.opsMeta.paymentStatus ?? "NONE");
       setFailureReason(body.data.opsMeta.failureReason ?? "");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load detail failed");
+      setError(e instanceof Error ? e.message : "Tải chi tiết thất bại");
     } finally {
       setLoading(false);
     }
@@ -97,29 +97,29 @@ export default function AdminFulfillmentDetailPage() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Fulfillment Detail" subtitle="Đang tải dữ liệu..." />
+        <PageHeader title="Chi tiết giao nhận" subtitle="Đang tải dữ liệu..." />
         <LoadingSkeleton rows={5} />
       </>
     );
   }
   if (error || !item) {
-    return <ErrorState title="Không tải được fulfillment detail" description={error || "Unknown error"} onRetry={() => void load()} />;
+    return <ErrorState title="Không tải được fulfillment detail" description={error || "Lỗi không xác định"} onRetry={() => void load()} />;
   }
 
   return (
     <>
-      <PageHeader title={item.inventoryBatch?.productSubmission.name ?? "Fulfillment"} subtitle={`Campaign: ${item.campaign?.title ?? "N/A"}`} action={<button className="dc-btn-secondary" onClick={() => router.push("/admin/fulfillment")}>Back</button>} />
+      <PageHeader title={item.inventoryBatch?.productSubmission.name ?? "Giao nhận"} subtitle={`Campaign: ${item.campaign?.title ?? "Không có"}`} action={<button className="dc-btn-secondary" onClick={() => router.push("/admin/fulfillment")}>Back</button>} />
       {error ? <div className="mb-4"><ErrorState title="Có lỗi thao tác" description={error} onRetry={() => void load()} /></div> : null}
       <SectionCard title="Current status">
         <div className="flex items-center justify-between">
           <StatusBadge status={item.opsMeta.opsStatus.toLowerCase()} />
         </div>
         <div className="mt-2 grid gap-2 text-sm text-zinc-700">
-          <p>Creator: {item.creatorAccount?.displayName ?? "N/A"} ({item.creatorAccount?.email ?? "N/A"})</p>
-          <p>Brand: {item.campaign?.brand.displayName ?? "N/A"} ({item.campaign?.brand.email ?? "N/A"})</p>
-          <p>Product: {item.inventoryBatch?.productSubmission.name ?? "N/A"} • SKU: {item.inventoryBatch?.productSubmission.sku ?? "N/A"}</p>
-          <p>Recipient: {item.recipientName ?? "N/A"} • {item.recipientPhone ?? "N/A"}</p>
-          <p>Address: {item.shippingAddress ?? "N/A"}</p>
+          <p>Creator: {item.creatorAccount?.displayName ?? "Không có"} ({item.creatorAccount?.email ?? "Không có"})</p>
+          <p>Brand: {item.campaign?.brand.displayName ?? "Không có"} ({item.campaign?.brand.email ?? "Không có"})</p>
+          <p>Product: {item.inventoryBatch?.productSubmission.name ?? "Không có"} • SKU: {item.inventoryBatch?.productSubmission.sku ?? "Không có"}</p>
+          <p>Recipient: {item.recipientName ?? "Không có"} • {item.recipientPhone ?? "Không có"}</p>
+          <p>Address: {item.shippingAddress ?? "Không có"}</p>
         </div>
       </SectionCard>
       <SectionCard title="Update operation" className="mt-4">
@@ -146,7 +146,7 @@ export default function AdminFulfillmentDetailPage() {
             <option value="REFUNDED">REFUNDED</option>
           </select>
           <input className="dc-input md:col-span-2" placeholder="Failure reason (if failed/cancelled)" value={failureReason} onChange={(e) => setFailureReason(e.target.value)} />
-          <textarea className="dc-input md:col-span-2 min-h-24" placeholder="Ops note" value={opsNote} onChange={(e) => setOpsNote(e.target.value)} />
+          <textarea className="dc-input md:col-span-2 min-h-24" placeholder="Ghi chú vận hành" value={opsNote} onChange={(e) => setOpsNote(e.target.value)} />
         </div>
         <button
           className="dc-btn-primary mt-3"
@@ -169,7 +169,7 @@ export default function AdminFulfillmentDetailPage() {
               <div key={`${h.at}-${idx}`} className="rounded-2xl border border-zinc-200 p-3 text-sm">
                 <p className="font-semibold">{h.status} • {new Date(h.at).toLocaleString("vi-VN")}</p>
                 <p className="text-zinc-600">by: {h.by}</p>
-                <p className="text-zinc-600">{h.note ?? "No note"}</p>
+                <p className="text-zinc-600">{h.note ?? "Không có ghi chú"}</p>
               </div>
             ))}
           </div>
@@ -180,7 +180,7 @@ export default function AdminFulfillmentDetailPage() {
         open={confirmSave}
         title={`Set fulfillment to ${status}?`}
         description="Trạng thái này có thể ảnh hưởng payout/commission hoặc yêu cầu xử lý support tiếp theo."
-        confirmText="Confirm update"
+        confirmText="Xác nhận cập nhật"
         onCancel={() => setConfirmSave(false)}
         onConfirm={() => {
           setConfirmSave(false);

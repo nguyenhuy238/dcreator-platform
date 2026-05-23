@@ -60,10 +60,10 @@ export default function AdminContentReviewDetailPage() {
     try {
       const res = await fetch(`/api/admin/content-review/${id}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<Detail>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load detail failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải chi tiết thất bại");
       setItem(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load detail failed");
+      setError(e instanceof Error ? e.message : "Tải chi tiết thất bại");
     } finally {
       setLoading(false);
     }
@@ -88,12 +88,12 @@ export default function AdminContentReviewDetailPage() {
         body: JSON.stringify({ feedback: feedback.trim(), markReadyToPublish })
       });
       const body = (await res.json()) as ApiResult<unknown>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Action failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Thao tác thất bại");
       setToast("Đã cập nhật content submission");
       setTimeout(() => setToast(""), 1800);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed");
+      setError(e instanceof Error ? e.message : "Thao tác thất bại");
     } finally {
       setActing(false);
     }
@@ -109,7 +109,7 @@ export default function AdminContentReviewDetailPage() {
   }
 
   if (error || !item) {
-    return <ErrorState title="Không tải được content detail" description={error || "Unknown error"} onRetry={() => void load()} />;
+    return <ErrorState title="Không tải được content detail" description={error || "Lỗi không xác định"} onRetry={() => void load()} />;
   }
 
   const brandGuide = item.mission.campaign.brand.brandApplications[0];
@@ -125,25 +125,25 @@ export default function AdminContentReviewDetailPage() {
         </div>
         <div className="mt-2 grid gap-2 text-sm text-zinc-700">
           <p>Creator: {item.account.displayName} • {item.account.email}</p>
-          <p>Platform: {item.account.creatorProfile?.mainPlatform ?? "N/A"} • Followers: {(item.account.creatorProfile?.followerCount ?? 0).toLocaleString("vi-VN")}</p>
-          <p>Category: {item.account.creatorProfile?.contentCategory ?? "N/A"}</p>
-          <p>Profile link: {item.account.creatorProfile?.socialUrl ?? "N/A"}</p>
+          <p>Platform: {item.account.creatorProfile?.mainPlatform ?? "Không có"} • Followers: {(item.account.creatorProfile?.followerCount ?? 0).toLocaleString("vi-VN")}</p>
+          <p>Category: {item.account.creatorProfile?.contentCategory ?? "Không có"}</p>
+          <p>Profile link: {item.account.creatorProfile?.socialUrl ?? "Không có"}</p>
         </div>
       </SectionCard>
 
       <SectionCard title="Content draft" className="mt-4">
         <div className="mt-2 grid gap-1 text-sm text-zinc-700">
-          <p>Video/link draft: {item.videoUrl ?? item.socialPostUrl ?? "N/A"}</p>
-          <p>Image/screenshot: {item.imageUrl ?? item.screenshotUrl ?? "N/A"}</p>
-          <p>File upload: {item.fileUploadUrl ?? "N/A"}</p>
-          <p>Caption/description: {item.proofTextNote ?? "N/A"}</p>
-          <p>Product link/social post: {item.socialPostUrl ?? "N/A"}</p>
+          <p>Video/link draft: {item.videoUrl ?? item.socialPostUrl ?? "Không có"}</p>
+          <p>Image/screenshot: {item.imageUrl ?? item.screenshotUrl ?? "Không có"}</p>
+          <p>File upload: {item.fileUploadUrl ?? "Không có"}</p>
+          <p>Caption/description: {item.proofTextNote ?? "Không có"}</p>
+          <p>Product link/social post: {item.socialPostUrl ?? "Không có"}</p>
         </div>
       </SectionCard>
 
       <SectionCard title="Campaign brief & brand guideline" className="mt-4">
         <p className="mt-2 text-sm text-zinc-700">Brief: {item.mission.campaign.brief}</p>
-        <p className="mt-2 text-sm text-zinc-700">Brand guideline: {brandGuide?.description ?? brandGuide?.businessGoal ?? brandGuide?.bccAgreementTerms ?? "N/A"}</p>
+        <p className="mt-2 text-sm text-zinc-700">Brand guideline: {brandGuide?.description ?? brandGuide?.businessGoal ?? brandGuide?.bccAgreementTerms ?? "Không có"}</p>
       </SectionCard>
 
       <SectionCard title="Feedback history" className="mt-4">
@@ -154,14 +154,14 @@ export default function AdminContentReviewDetailPage() {
             {item.reviews.map((review) => (
               <div key={review.id} className="rounded-2xl border border-zinc-200 p-3 text-sm">
                 <p className="font-semibold">{review.decision} • {review.reviewer.displayName} ({review.reviewer.role})</p>
-                <p className="text-zinc-600">{review.note ?? review.rejectReason ?? "No feedback"}</p>
+                <p className="text-zinc-600">{review.note ?? review.rejectReason ?? "Chưa có phản hồi"}</p>
               </div>
             ))}
           </div>
         )}
       </SectionCard>
 
-      <SectionCard title="Decision" className="mt-4">
+      <SectionCard title="Quyết định" className="mt-4">
         <textarea className="dc-input mt-3 min-h-24" placeholder="Nhập feedback bắt buộc..." value={feedback} onChange={(e) => setFeedback(e.target.value)} />
         <div className="mt-3 flex flex-wrap gap-2">
           <button className="dc-btn-primary" disabled={acting} onClick={() => void act("approve", false)}>Approve</button>
@@ -174,9 +174,9 @@ export default function AdminContentReviewDetailPage() {
 
       <ConfirmDialog
         open={pendingAction !== null}
-        title={pendingAction === "reject" ? "Reject submission?" : "Request changes?"}
+        title={pendingAction === "reject" ? "Từ chối bài nộp?" : "Request changes?"}
         description={pendingAction === "reject" ? "Submission sẽ bị từ chối và gửi feedback cho Creator." : "Creator sẽ nhận yêu cầu sửa theo feedback đã nhập."}
-        confirmText={pendingAction === "reject" ? "Reject" : "Request changes"}
+        confirmText={pendingAction === "reject" ? "Từ chối" : "Yêu cầu chỉnh sửa"}
         onCancel={() => setPendingAction(null)}
         onConfirm={() => {
           if (!pendingAction) return;

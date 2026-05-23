@@ -1,6 +1,28 @@
 import type { ReactNode } from "react";
 
 export function StatusBadge({ status }: { status: string }) {
+  const labels: Record<string, string> = {
+    DRAFT: "Bản nháp",
+    PENDING: "Đang chờ",
+    PENDING_REVIEW: "Chờ duyệt",
+    APPROVED: "Đã duyệt",
+    REJECTED: "Đã từ chối",
+    ACTIVE: "Đang hoạt động",
+    INACTIVE: "Không hoạt động",
+    COMPLETED: "Đã hoàn thành",
+    CANCELLED: "Đã hủy",
+    FAILED: "Thất bại",
+    SUCCESS: "Thành công",
+    PROCESSING: "Đang xử lý",
+    PAID: "Đã thanh toán",
+    UNPAID: "Chưa thanh toán",
+    EXPIRED: "Đã hết hạn",
+    USED: "Đã sử dụng",
+    AVAILABLE: "Có sẵn",
+    OUT_OF_STOCK: "Hết hàng",
+    FULL: "Hết slot",
+    NO_SLOTS: "Hết slot"
+  };
   const map: Record<string, string> = {
     active: "bg-emerald-50 text-emerald-700 border-emerald-200",
     review: "bg-amber-50 text-amber-700 border-amber-200",
@@ -14,7 +36,7 @@ export function StatusBadge({ status }: { status: string }) {
     pending: "bg-blue-50 text-blue-700 border-blue-200"
   };
 
-  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${map[status] ?? "bg-zinc-100 text-zinc-700 border-zinc-200"}`}>{status}</span>;
+  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${map[status.toLowerCase()] ?? "bg-zinc-100 text-zinc-700 border-zinc-200"}`}>{labels[status] ?? status}</span>;
 }
 
 export function PageHeader({ title, subtitle, action }: { title: string; subtitle: string; action?: ReactNode }) {
@@ -66,9 +88,9 @@ export function ConfirmDialog({
   title,
   message,
   description,
-  confirmLabel = "Confirm",
+  confirmLabel = "Xác nhận",
   confirmText,
-  cancelLabel = "Cancel",
+  cancelLabel = "Hủy",
   tone = "danger",
   onConfirm,
   onCancel

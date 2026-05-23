@@ -54,10 +54,10 @@ export default function AdminCreatorDetailPage() {
     try {
       const res = await fetch(`/api/admin/creators/${id}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<CreatorApplicationDetail>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load detail failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải chi tiết thất bại");
       setItem(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load detail failed");
+      setError(e instanceof Error ? e.message : "Tải chi tiết thất bại");
     } finally {
       setLoading(false);
     }
@@ -77,12 +77,12 @@ export default function AdminCreatorDetailPage() {
         body: payload ? JSON.stringify(payload) : undefined
       });
       const body = (await res.json()) as ApiResult<unknown>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Action failed");
-      setToast(message ?? "Success");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Thao tác thất bại");
+      setToast(message ?? "Thành công");
       setTimeout(() => setToast(""), 2000);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed");
+      setError(e instanceof Error ? e.message : "Thao tác thất bại");
     } finally {
       setActing(false);
     }
@@ -98,7 +98,7 @@ export default function AdminCreatorDetailPage() {
   }
 
   if (error || !item) {
-    return <ErrorState title="Không tải được hồ sơ Creator" description={error || "Unknown error"} onRetry={() => void load()} />;
+    return <ErrorState title="Không tải được hồ sơ Creator" description={error || "Lỗi không xác định"} onRetry={() => void load()} />;
   }
 
   const channels = [
@@ -116,10 +116,10 @@ export default function AdminCreatorDetailPage() {
           <StatusBadge status={item.status.toLowerCase()} />
         </div>
         <div className="mt-3 grid gap-2 text-sm text-zinc-700">
-          <p>Category: {item.contentCategory ?? "N/A"}</p>
-          <p>Handle: {item.handle ?? "N/A"}</p>
+          <p>Category: {item.contentCategory ?? "Không có"}</p>
+          <p>Handle: {item.handle ?? "Không có"}</p>
           <p>Followers: {(item.followerCount ?? 0).toLocaleString("vi-VN")}</p>
-          <p>Location: {item.location ?? "N/A"}</p>
+          <p>Location: {item.location ?? "Không có"}</p>
           <p>Expected rate: {item.expectedRate ?? 0}</p>
           <p>Max jobs/month: {item.maxJobsPerMonth ?? 0}</p>
           {item.bio ? <p>Bio: {item.bio}</p> : null}
@@ -167,7 +167,7 @@ export default function AdminCreatorDetailPage() {
             className="dc-btn-secondary"
             disabled={acting || item.status !== "PENDING_REVIEW"}
             onClick={() => {
-              const reason = window.prompt("Request changes reason:", "Bổ sung hồ sơ social/profile")?.trim();
+              const reason = window.prompt("Lý do yêu cầu chỉnh sửa:", "Bổ sung hồ sơ social/profile")?.trim();
               if (!reason) return;
               void patch(`/api/admin/creators/${item.id}/request-changes`, { reason }, "Requested changes");
             }}

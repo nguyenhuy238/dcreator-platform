@@ -14,7 +14,7 @@ export default async function MissionDetailPage({ params }: Props) {
         <p>{mission.title}</p>
         <p>{mission.description}</p>
         <p>Status: {mission.status}</p>
-        <p>Deadline: {mission.deadlineAt ? new Date(mission.deadlineAt).toLocaleString() : "No deadline"}</p>
+        <p>Deadline: {mission.deadlineAt ? new Date(mission.deadlineAt).toLocaleString() : "Không có hạn"}</p>
         <p>Campaign: {mission.campaign.title}</p>
         <AcceptMissionButton missionId={mission.id} />
       </main>

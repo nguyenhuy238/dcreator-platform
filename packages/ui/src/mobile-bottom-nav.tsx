@@ -1,4 +1,4 @@
-const items = ["Trang chủ", "Campaign", "Nhiệm vụ", "Voucher", "Tài khoản"];
+const items = ["Trang chủ", "Chiến dịch", "Nhiệm vụ", "Voucher", "Tài khoản"];
 
 export function MobileBottomNav() {
   return (

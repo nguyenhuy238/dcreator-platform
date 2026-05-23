@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -103,13 +103,13 @@ export default function AdminCampaignApplicationsPage() {
       const applicationBody = (await applicationRes.json()) as ApiResult<CampaignApplicationItem[]>;
       const creatorMissionBody = (await creatorMissionRes.json()) as ApiResult<CreatorMissionItem[]>;
 
-      if (!applicationRes.ok || !applicationBody.success) throw new Error(applicationBody.error ?? "Load applications failed");
-      if (!creatorMissionRes.ok || !creatorMissionBody.success) throw new Error(creatorMissionBody.error ?? "Load creator missions failed");
+      if (!applicationRes.ok || !applicationBody.success) throw new Error(applicationBody.error ?? "Tải danh sách đơn ứng tuyển thất bại");
+      if (!creatorMissionRes.ok || !creatorMissionBody.success) throw new Error(creatorMissionBody.error ?? "Tải nhiệm vụ Creator thất bại");
 
       setItems(applicationBody.data);
       setCreatorMissions(creatorMissionBody.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load applications failed");
+      setError(e instanceof Error ? e.message : "Tải danh sách đơn ứng tuyển thất bại");
     } finally {
       setLoading(false);
     }
@@ -165,12 +165,12 @@ export default function AdminCampaignApplicationsPage() {
         body: JSON.stringify({ action, reason, purchaseAmountVnd })
       });
       const body = await res.json();
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Action failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Thao tác thất bại");
 
       setNotice("Đã cập nhật workflow creator mission thành công.");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed");
+      setError(e instanceof Error ? e.message : "Thao tác thất bại");
     }
   }
 
@@ -281,7 +281,7 @@ export default function AdminCampaignApplicationsPage() {
                       <div>
                         <p className="font-semibold">{item.account.displayName}</p>
                         <p className="text-xs text-zinc-500">
-                          {item.account.email} • {item.account.creatorProfile?.mainPlatform ?? "N/A"} • {item.account.creatorProfile?.followerCount ?? 0} followers
+                          {item.account.email} • {item.account.creatorProfile?.mainPlatform ?? "Không có"} • {item.account.creatorProfile?.followerCount ?? 0} followers
                         </p>
                         <p className="text-xs text-zinc-500">Campaign: {item.mission.campaign.title} • Brand: {item.mission.campaign.brand.displayName}</p>
                       </div>

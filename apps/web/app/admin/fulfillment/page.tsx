@@ -50,10 +50,10 @@ export default function AdminFulfillmentPage() {
       if (query.trim()) params.set("query", query.trim());
       const res = await fetch(`/api/admin/fulfillment?${params.toString()}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<Item[]>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load fulfillment queue failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải hàng đợi giao nhận thất bại");
       setItems(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load fulfillment queue failed");
+      setError(e instanceof Error ? e.message : "Tải hàng đợi giao nhận thất bại");
     } finally {
       setLoading(false);
     }
@@ -121,7 +121,7 @@ export default function AdminFulfillmentPage() {
             <option value="REFUND_PENDING">REFUND_PENDING</option>
             <option value="REFUNDED">REFUNDED</option>
           </select>
-          <input className="dc-input" placeholder="Ops note" value={createForm.opsNote} onChange={(e) => setCreateForm((p) => ({ ...p, opsNote: e.target.value }))} />
+          <input className="dc-input" placeholder="Ghi chú vận hành" value={createForm.opsNote} onChange={(e) => setCreateForm((p) => ({ ...p, opsNote: e.target.value }))} />
         </div>
         <button className="dc-btn-primary mt-3" onClick={() => void createExportRequest()}>Create export request</button>
       </section>
@@ -138,18 +138,18 @@ export default function AdminFulfillmentPage() {
                 <article key={item.id} className="dc-card p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="font-semibold text-zinc-900">{item.inventoryBatch?.productSubmission.name ?? "N/A product"}</p>
+                      <p className="font-semibold text-zinc-900">{item.inventoryBatch?.productSubmission.name ?? "Sản phẩm không có"}</p>
                       <p className="text-xs text-zinc-500">
-                        Campaign: {item.campaign?.title ?? "N/A"} • Brand: {item.campaign?.brand.displayName ?? "N/A"} • Creator: {item.creatorAccount?.displayName ?? "N/A"}
+                        Campaign: {item.campaign?.title ?? "Không có"} • Brand: {item.campaign?.brand.displayName ?? "Không có"} • Creator: {item.creatorAccount?.displayName ?? "Không có"}
                       </p>
                     </div>
                     <StatusBadge status={(item.opsMeta.opsStatus || item.status).toLowerCase()} />
                   </div>
                   <div className="mt-2 text-sm text-zinc-600">
-                    <p>Recipient: {item.recipientName ?? "N/A"} • {item.recipientPhone ?? "N/A"}</p>
-                    <p>Address: {item.shippingAddress ?? "N/A"}</p>
-                    <p>Batch: {item.inventoryBatch?.batchCode ?? "N/A"}</p>
-                    <p>Method: {item.opsMeta.fulfillmentMethod ?? "N/A"} • Payment: {item.opsMeta.paymentStatus ?? "N/A"}</p>
+                    <p>Recipient: {item.recipientName ?? "Không có"} • {item.recipientPhone ?? "Không có"}</p>
+                    <p>Address: {item.shippingAddress ?? "Không có"}</p>
+                    <p>Batch: {item.inventoryBatch?.batchCode ?? "Không có"}</p>
+                    <p>Method: {item.opsMeta.fulfillmentMethod ?? "Không có"} • Payment: {item.opsMeta.paymentStatus ?? "Không có"}</p>
                     {item.opsMeta.trackingCode ? <p>Tracking: {item.opsMeta.trackingCode}</p> : null}
                     {item.opsMeta.failureReason ? <p className="text-red-700">Failure: {item.opsMeta.failureReason}</p> : null}
                     <Link className="dc-btn-primary mt-2 inline-flex" href={`/admin/fulfillment/${item.id}`}>Open detail</Link>

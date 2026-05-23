@@ -49,11 +49,11 @@ Brand cam kết bảo mật thông tin khách hàng và chỉ sử dụng dữ l
 Brand xác nhận đã đọc, hiểu và đồng ý với nội dung hợp đồng BCC khi hoàn tất BCC. URL hợp đồng BCC đã ký chỉ là tài liệu phụ được đính kèm để lưu giữ văn bản chính thức.`;
 
 const nav = [
-  { href: "/dashboard/brand", label: "Brand Dashboard" },
+  { href: "/dashboard/brand", label: "Bảng điều khiển Nhãn hàng" },
   { href: "/dashboard/brand/onboarding", label: "Onboarding / BCC" },
   { href: "/dashboard/brand/products", label: "Sản phẩm & lô hàng" },
   { href: "/dashboard/brand/campaign-setup", label: "Yêu cầu campaign" },
-  { href: "/dashboard/brand/profile", label: "Brand Profile" },
+  { href: "/dashboard/brand/profile", label: "Hồ sơ Nhãn hàng" },
   { href: "/brand", label: "Chiến dịch" },
   { href: "/brand/proofs", label: "Duyệt proof" },
   { href: "/wallet", label: "Quỹ" }

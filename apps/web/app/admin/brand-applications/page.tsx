@@ -41,7 +41,7 @@ export default function BrandApplicationsAdminPage() {
     const res = await fetch(`/api/admin/dashboard/brand-applications?${params.toString()}`, { cache: "no-store" });
     const body = await res.json();
     if (!res.ok || !body.success) {
-      setError(body.error ?? "Load failed");
+      setError(body.error ?? "Tải dữ liệu thất bại");
       setLoading(false);
       return;
     }
@@ -69,7 +69,7 @@ export default function BrandApplicationsAdminPage() {
     });
     const body = await res.json();
     if (!res.ok || !body.success) {
-      setError(body.error ?? "Action failed");
+      setError(body.error ?? "Thao tác thất bại");
       return;
     }
     await load();
@@ -109,11 +109,11 @@ export default function BrandApplicationsAdminPage() {
             {item.businessLicenseUrl ? <p className="text-sm">Business license: <a className="underline" href={item.businessLicenseUrl} target="_blank" rel="noreferrer">{item.businessLicenseUrl}</a></p> : null}
             <div className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm">
               <p className="font-semibold">BCC terms</p>
-              <p>Revenue share: {item.revenueSharePercent ?? "N/A"}%</p>
-              <p>Commission: {item.commissionRatePercent ?? "N/A"}%</p>
-              <p>Version: {item.bccAgreementVersion ?? "N/A"}</p>
-              <p>Agreement accepted: {item.bccAgreementAccepted ? "Yes" : "No"}</p>
-              <p>Legal responsibility accepted: {item.legalResponsibilityAccepted ? "Yes" : "No"}</p>
+              <p>Revenue share: {item.revenueSharePercent ?? "Không có"}%</p>
+              <p>Commission: {item.commissionRatePercent ?? "Không có"}%</p>
+              <p>Version: {item.bccAgreementVersion ?? "Không có"}</p>
+              <p>Agreement accepted: {item.bccAgreementAccepted ? "Có" : "Không"}</p>
+              <p>Legal responsibility accepted: {item.legalResponsibilityAccepted ? "Có" : "Không"}</p>
               {item.bccAgreementTerms ? <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-zinc-600">{item.bccAgreementTerms}</p> : null}
               {item.contractFileUrl ? <a className="font-semibold text-zinc-900 underline" href={item.contractFileUrl} target="_blank" rel="noreferrer">Contract file</a> : null}
               {item.contractSignedAt ? <p>Signed at: {new Date(item.contractSignedAt).toLocaleString("vi-VN")}</p> : null}

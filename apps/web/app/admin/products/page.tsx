@@ -32,10 +32,10 @@ export default function AdminProductsPage() {
       if (query.trim()) params.set("query", query.trim());
       const res = await fetch(`/api/admin/products?${params.toString()}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<Item[]>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load products failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải sản phẩm thất bại");
       setItems(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load products failed");
+      setError(e instanceof Error ? e.message : "Tải sản phẩm thất bại");
     } finally {
       setLoading(false);
     }
@@ -74,7 +74,7 @@ export default function AdminProductsPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="font-semibold">{item.name}</p>
-                    <p className="text-xs text-zinc-500">Brand: {item.brand.name} • SKU: {item.sku ?? "N/A"}</p>
+                    <p className="text-xs text-zinc-500">Brand: {item.brand.name} • SKU: {item.sku ?? "Không có"}</p>
                   </div>
                   <StatusBadge status={item.reviewStatus.toLowerCase()} />
                 </div>

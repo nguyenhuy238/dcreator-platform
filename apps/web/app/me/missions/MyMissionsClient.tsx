@@ -14,8 +14,8 @@ type Mission = {
 
 const nav = [
   { href: "/dashboard/user", label: "Tổng quan" },
-  { href: "/campaigns", label: "Campaign" },
-  { href: "/me/missions", label: "Missions" },
+  { href: "/campaigns", label: "Chiến dịch" },
+  { href: "/me/missions", label: "Nhiệm vụ" },
   { href: "/vouchers", label: "Voucher" }
 ];
 
@@ -30,7 +30,7 @@ function SubmitProofForm({ submissionId, canResubmit }: { submissionId: string; 
       body: JSON.stringify(data)
     });
     const payload = (await res.json()) as { success: boolean; error?: string };
-    setMessage(res.ok && payload.success ? "Submitted proof" : payload.error ?? "Submit failed");
+    setMessage(res.ok && payload.success ? "Đã nộp minh chứng" : payload.error ?? "Nộp minh chứng thất bại");
   }
 
   if (!canResubmit) return null;
@@ -43,7 +43,7 @@ function SubmitProofForm({ submissionId, canResubmit }: { submissionId: string; 
       <input className="dc-input" placeholder="social post URL" value={data.socialPostUrl} onChange={(e) => setData({ ...data, socialPostUrl: e.target.value })} />
       <input className="dc-input" placeholder="screenshot URL" value={data.screenshotUrl} onChange={(e) => setData({ ...data, screenshotUrl: e.target.value })} />
       <input className="dc-input" placeholder="file upload URL" value={data.fileUploadUrl} onChange={(e) => setData({ ...data, fileUploadUrl: e.target.value })} />
-      <textarea className="dc-input" placeholder="text note" value={data.proofTextNote} onChange={(e) => setData({ ...data, proofTextNote: e.target.value })} />
+      <textarea className="dc-input" placeholder="Ghi chú minh chứng" value={data.proofTextNote} onChange={(e) => setData({ ...data, proofTextNote: e.target.value })} />
       <button className="dc-btn-primary w-fit" onClick={onSubmit}>Submit proof</button>
       {message ? <p className="text-sm text-zinc-700">{message}</p> : null}
     </div>

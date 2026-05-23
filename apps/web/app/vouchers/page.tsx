@@ -37,7 +37,7 @@ export default function MyVouchersPage() {
     fetch("/api/me/vouchers", { cache: "no-store" })
       .then((response) => response.json())
       .then((body) => {
-        if (!body.success) throw new Error(body.error ?? "Load vouchers failed");
+        if (!body.success) throw new Error(body.error ?? "Tải voucher thất bại");
         setItems(body.data as Voucher[]);
       })
       .catch((requestError: Error) => setError(requestError.message))

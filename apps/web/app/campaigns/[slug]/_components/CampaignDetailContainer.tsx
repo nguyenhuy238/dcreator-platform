@@ -71,7 +71,7 @@ export function CampaignDetailContainer({ slug }: Props) {
             setIsNotFound(true);
             return;
           }
-          throw new Error(body.error ?? "Load campaign detail failed");
+          throw new Error(body.error ?? "Tải chi tiết chiến dịch thất bại");
         }
 
         if (!body.success || !body.data) {

@@ -48,10 +48,10 @@ export default function AdminCampaignDetailPage() {
     try {
       const res = await fetch(`/api/admin/campaigns/${id}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<CampaignDetail>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load campaign detail failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải chi tiết chiến dịch thất bại");
       setItem(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load campaign detail failed");
+      setError(e instanceof Error ? e.message : "Tải chi tiết chiến dịch thất bại");
     } finally {
       setLoading(false);
     }
@@ -76,12 +76,12 @@ export default function AdminCampaignDetailPage() {
         body: action === "approve" ? JSON.stringify({}) : JSON.stringify({ reason: reason.trim() })
       });
       const body = (await res.json()) as ApiResult<unknown>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Action failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Thao tác thất bại");
       setToast("Đã cập nhật trạng thái campaign");
       setTimeout(() => setToast(""), 1800);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed");
+      setError(e instanceof Error ? e.message : "Thao tác thất bại");
     } finally {
       setActing(false);
     }
@@ -90,14 +90,14 @@ export default function AdminCampaignDetailPage() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Campaign Detail" subtitle="Đang tải dữ liệu..." />
+        <PageHeader title="Chi tiết chiến dịch" subtitle="Đang tải dữ liệu..." />
         <LoadingSkeleton rows={6} />
       </>
     );
   }
 
   if (error || !item) {
-    return <ErrorState title="Không tải được campaign detail" description={error || "Unknown error"} onRetry={() => void load()} />;
+    return <ErrorState title="Không tải được campaign detail" description={error || "Lỗi không xác định"} onRetry={() => void load()} />;
   }
 
   return (
@@ -120,12 +120,12 @@ export default function AdminCampaignDetailPage() {
         </div>
         <div className="mt-3 grid gap-2 text-sm text-zinc-700">
           <p>Brief: {item.brief}</p>
-          <p>Timeline: {item.startsAt ? new Date(item.startsAt).toLocaleString("vi-VN") : "N/A"} - {item.endsAt ? new Date(item.endsAt).toLocaleString("vi-VN") : "N/A"}</p>
+          <p>Timeline: {item.startsAt ? new Date(item.startsAt).toLocaleString("vi-VN") : "Không có"} - {item.endsAt ? new Date(item.endsAt).toLocaleString("vi-VN") : "Không có"}</p>
           <p>Budget: {item.budgetVnd.toLocaleString("vi-VN")} VND</p>
           <p>KPI: Target {item.kpiSnapshot.targetAmountVnd.toLocaleString("vi-VN")} / Funded {item.kpiSnapshot.fundedAmountVnd.toLocaleString("vi-VN")} / Backers {item.kpiSnapshot.backerCount}</p>
-          <p>Commission: {item.commission.commissionRatePercent ?? "N/A"}% • Revenue share: {item.commission.revenueSharePercent ?? "N/A"}%</p>
+          <p>Commission: {item.commission.commissionRatePercent ?? "Không có"}% • Revenue share: {item.commission.revenueSharePercent ?? "Không có"}%</p>
           <p>Quota Creator/User: {item.quota.creator} / {item.quota.user}</p>
-          <p>Brand approved: {item.brandProfile?.status === "ACTIVE" ? "Yes" : "No"}</p>
+          <p>Brand approved: {item.brandProfile?.status === "ACTIVE" ? "Có" : "Không"}</p>
         </div>
       </SectionCard>
 
@@ -173,7 +173,7 @@ export default function AdminCampaignDetailPage() {
       </section>
 
       <section className="mt-4">
-        <SectionCard title="Decision">
+        <SectionCard title="Quyết định">
         <textarea className="dc-input mt-3 min-h-24" placeholder="Reason for reject/request changes/pause" value={reason} onChange={(e) => setReason(e.target.value)} />
         <div className="mt-3 flex flex-wrap gap-2">
           <button className="dc-btn-primary" disabled={acting} onClick={() => void act("approve")}>Approve & Publish</button>
@@ -213,7 +213,7 @@ export default function AdminCampaignDetailPage() {
         open={confirmAction === "request-changes"}
         title="Request campaign changes?"
         message="Campaign sẽ được trả về trạng thái cần chỉnh sửa."
-        confirmLabel="Request changes"
+        confirmLabel="Yêu cầu chỉnh sửa"
         tone="danger"
         onCancel={() => setConfirmAction(null)}
         onConfirm={() => {

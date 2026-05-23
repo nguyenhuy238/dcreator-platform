@@ -3,6 +3,6 @@ export function formatCurrencyVnd(value: number) {
 }
 
 export function formatDateTime(value: string | null) {
-  if (!value) return "N/A";
+  if (!value) return "Không có";
   return new Date(value).toLocaleString("vi-VN");
 }

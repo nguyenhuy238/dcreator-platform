@@ -48,7 +48,7 @@ export default function AdminSupportDetailPage() {
     try {
       const res = await fetch(`/api/admin/support/${id}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<Detail>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load support detail failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải chi tiết hỗ trợ thất bại");
       setItem(body.data);
       setStatus(body.data.status);
       setPriority(body.data.priority);
@@ -56,7 +56,7 @@ export default function AdminSupportDetailPage() {
       setResponseSummary(body.data.responseSummary ?? "");
       setInternalNote(body.data.internalNote ?? "");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load support detail failed");
+      setError(e instanceof Error ? e.message : "Tải chi tiết hỗ trợ thất bại");
     } finally {
       setLoading(false);
     }
@@ -122,8 +122,8 @@ export default function AdminSupportDetailPage() {
     }
   }
 
-  if (loading) return <><PageHeader title="Support Detail" subtitle="Đang tải dữ liệu..." /><LoadingSkeleton rows={5} /></>;
-  if (error || !item) return <ErrorState title="Không tải được support detail" description={error || "Unknown error"} onRetry={() => void load()} />;
+  if (loading) return <><PageHeader title="Chi tiết yêu cầu hỗ trợ" subtitle="Đang tải dữ liệu..." /><LoadingSkeleton rows={5} /></>;
+  if (error || !item) return <ErrorState title="Không tải được support detail" description={error || "Lỗi không xác định"} onRetry={() => void load()} />;
 
   return (
     <>
@@ -139,7 +139,7 @@ export default function AdminSupportDetailPage() {
           <p>Category: {item.category}</p>
           <p>Requester: {item.requester.displayName} ({item.requester.email})</p>
           <p>Assignee: {item.assignee?.displayName ?? "Unassigned"}</p>
-          <p>Related IDs: brand={item.relatedBrandId ?? "N/A"} creator={item.relatedCreatorId ?? "N/A"} campaign={item.relatedCampaignId ?? "N/A"} order={item.relatedOrderId ?? "N/A"} payout={item.relatedPayoutId ?? "N/A"}</p>
+          <p>Related IDs: brand={item.relatedBrandId ?? "Không có"} creator={item.relatedCreatorId ?? "Không có"} campaign={item.relatedCampaignId ?? "Không có"} order={item.relatedOrderId ?? "Không có"} payout={item.relatedPayoutId ?? "Không có"}</p>
         </div>
       </section>
       <section className="mt-4 dc-card p-4">
@@ -160,7 +160,7 @@ export default function AdminSupportDetailPage() {
           </select>
           <input className="dc-input md:col-span-2" placeholder="Assignee account id" value={assigneeAccountId} onChange={(e) => setAssigneeAccountId(e.target.value)} />
           <textarea className="dc-input md:col-span-2 min-h-24" placeholder="Response summary (public-facing)" value={responseSummary} onChange={(e) => setResponseSummary(e.target.value)} />
-          <textarea className="dc-input md:col-span-2 min-h-24" placeholder="Internal note (ops)" value={internalNote} onChange={(e) => setInternalNote(e.target.value)} />
+          <textarea className="dc-input md:col-span-2 min-h-24" placeholder="Ghi chú nội bộ (ops)" value={internalNote} onChange={(e) => setInternalNote(e.target.value)} />
         </div>
         <button className="dc-btn-primary mt-3" disabled={acting} onClick={() => void saveTicket()}>Save ticket</button>
       </section>

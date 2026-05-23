@@ -18,7 +18,7 @@ type ApiResult<T> = { success: boolean; data: T; error?: string };
 async function load<T>(url: string) {
   const res = await fetch(url, { cache: "no-store" });
   const payload = (await res.json()) as ApiResult<T>;
-  if (!res.ok || !payload.success) throw new Error(payload.error ?? "Load failed");
+  if (!res.ok || !payload.success) throw new Error(payload.error ?? "Tải dữ liệu thất bại");
   return payload.data;
 }
 
@@ -44,7 +44,7 @@ export function BrandDashboardClient() {
       ]);
       setData({ overview, profile, products, campaigns, applications, proofs, budget, analytics });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load failed");
+      setError(e instanceof Error ? e.message : "Tải dữ liệu thất bại");
     } finally {
       setLoading(false);
     }
@@ -57,7 +57,7 @@ export function BrandDashboardClient() {
   async function postJson(url: string, body: unknown) {
     const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const payload = (await res.json()) as ApiResult<unknown>;
-    setMessage(res.ok && payload.success ? "Success" : payload.error ?? "Failed");
+    setMessage(res.ok && payload.success ? "Thành công" : payload.error ?? "Failed");
     if (res.ok && payload.success) await refresh();
   }
 
@@ -98,11 +98,11 @@ export function BrandDashboardClient() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Brand Dashboard"
+        title="Bảng điều khiển Nhãn hàng"
         subtitle="Theo dõi duyệt hồ sơ, campaign, creator application và proof review."
         action={<Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Tạo campaign</Link>}
       />
-      {message ? <ActionToast message={message === "Success" ? "Cập nhật thành công" : message} /> : null}
+      {message ? <ActionToast message={message === "Thành công" ? "Cập nhật thành công" : message} /> : null}
       <section>
         <div className="dc-grid-dashboard">
           <StatsCard title="Campaign đang chạy" value={`${overview?.activeCampaigns ?? 0}`} />
@@ -119,11 +119,11 @@ export function BrandDashboardClient() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-wider text-zinc-500">Tên thương hiệu</p>
-                <p className="text-lg font-bold text-zinc-900">{profile.brandName || "N/A"}</p>
+                <p className="text-lg font-bold text-zinc-900">{profile.brandName || "Không có"}</p>
               </div>
               <StatusBadge status={String(profile.verificationStatus).toLowerCase()} />
             </div>
-            <p className="mt-2 text-sm text-zinc-600">Thông tin: {profile.businessInfo || "N/A"}</p>
+            <p className="mt-2 text-sm text-zinc-600">Thông tin: {profile.businessInfo || "Không có"}</p>
           </article>
         )}
       </section>

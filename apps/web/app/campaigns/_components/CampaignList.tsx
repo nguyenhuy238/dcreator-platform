@@ -60,7 +60,7 @@ export function CampaignList() {
       })
       .catch((err: unknown) => {
         if (!mounted) return;
-        setError(err instanceof Error ? err.message : "Unknown error");
+        setError(err instanceof Error ? err.message : "Lỗi không xác định");
       })
       .finally(() => {
         if (!mounted) return;

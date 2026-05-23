@@ -112,16 +112,16 @@ export default function UserDashboardPage() {
         const contributionBody = (await contributionRes.json()) as ApiResponse<MyContribution[]>;
 
         if (!walletRes.ok || !walletBody.success) {
-          throw new Error(walletBody.success ? "Load wallet failed" : walletBody.error);
+          throw new Error(walletBody.success ? "Tải ví thất bại" : walletBody.error);
         }
         if (!voucherRes.ok || !voucherBody.success) {
-          throw new Error(voucherBody.success ? "Load vouchers failed" : voucherBody.error);
+          throw new Error(voucherBody.success ? "Tải voucher thất bại" : voucherBody.error);
         }
         if (!missionRes.ok || !missionBody.success) {
-          throw new Error(missionBody.success ? "Load missions failed" : missionBody.error);
+          throw new Error(missionBody.success ? "Tải nhiệm vụ thất bại" : missionBody.error);
         }
         if (!contributionRes.ok || !contributionBody.success) {
-          throw new Error(contributionBody.success ? "Load contributions failed" : contributionBody.error);
+          throw new Error(contributionBody.success ? "Tải lượt ủng hộ thất bại" : contributionBody.error);
         }
 
         setWallet(walletBody.data);

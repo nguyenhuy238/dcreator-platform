@@ -37,10 +37,10 @@ export default function AdminCreatorsPage() {
       if (query.trim()) params.set("query", query.trim());
       const res = await fetch(`/api/admin/creators?${params.toString()}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<Item[]>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load creator requests failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải yêu cầu Creator thất bại");
       setItems(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load creator requests failed");
+      setError(e instanceof Error ? e.message : "Tải yêu cầu Creator thất bại");
     } finally {
       setLoading(false);
     }
@@ -52,7 +52,7 @@ export default function AdminCreatorsPage() {
 
   return (
     <>
-      <PageHeader title="Creator Requests" subtitle="Duyệt hồ sơ nâng cấp Creator." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
+      <PageHeader title="Yêu cầu Creator" subtitle="Duyệt hồ sơ nâng cấp Creator." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
       <section className="dc-card p-4">
         <div className="grid gap-2 md:grid-cols-5">
           <select className="dc-input" value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -89,7 +89,7 @@ export default function AdminCreatorsPage() {
                   <div>
                     <p className="font-semibold">{item.displayName}</p>
                     <p className="text-xs text-zinc-500">
-                      {item.mainPlatform} • {item.contentCategory ?? "N/A"} • {item.account.email}
+                      {item.mainPlatform} • {item.contentCategory ?? "Không có"} • {item.account.email}
                     </p>
                   </div>
                   <StatusBadge status={item.status.toLowerCase()} />

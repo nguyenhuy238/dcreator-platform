@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -86,13 +86,13 @@ export default function AdminContentReviewPage() {
       const contentBody = (await contentRes.json()) as ApiResult<Item[]>;
       const creatorMissionBody = (await creatorMissionRes.json()) as ApiResult<CreatorMissionItem[]>;
 
-      if (!contentRes.ok || !contentBody.success) throw new Error(contentBody.error ?? "Load submissions failed");
-      if (!creatorMissionRes.ok || !creatorMissionBody.success) throw new Error(creatorMissionBody.error ?? "Load creator missions failed");
+      if (!contentRes.ok || !contentBody.success) throw new Error(contentBody.error ?? "Tải danh sách bài nộp thất bại");
+      if (!creatorMissionRes.ok || !creatorMissionBody.success) throw new Error(creatorMissionBody.error ?? "Tải nhiệm vụ Creator thất bại");
 
       setItems(contentBody.data);
       setCreatorMissions(creatorMissionBody.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load submissions failed");
+      setError(e instanceof Error ? e.message : "Tải danh sách bài nộp thất bại");
     } finally {
       setLoading(false);
     }
@@ -121,12 +121,12 @@ export default function AdminContentReviewPage() {
         body: JSON.stringify({ action, reason })
       });
       const body = await res.json();
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Action failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Thao tác thất bại");
 
       setNotice("Đã cập nhật duyệt video review.");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed");
+      setError(e instanceof Error ? e.message : "Thao tác thất bại");
     }
   }
 
@@ -220,7 +220,7 @@ export default function AdminContentReviewPage() {
                         <div>
                           <p className="font-semibold">{item.account.displayName}</p>
                           <p className="text-xs text-zinc-500">
-                            {item.account.email} • {item.account.creatorProfile?.mainPlatform ?? "N/A"} • Campaign: {item.campaign.title}
+                            {item.account.email} • {item.account.creatorProfile?.mainPlatform ?? "Không có"} • Campaign: {item.campaign.title}
                           </p>
                           <p className="text-xs text-zinc-500">Mission: {item.mission.title} • Queue: Video review</p>
                         </div>
@@ -243,14 +243,14 @@ export default function AdminContentReviewPage() {
                       <div>
                         <p className="font-semibold">{item.account.displayName}</p>
                         <p className="text-xs text-zinc-500">
-                          {item.account.email} • {item.account.creatorProfile?.mainPlatform ?? "N/A"} • Campaign: {item.mission.campaign.title}
+                          {item.account.email} • {item.account.creatorProfile?.mainPlatform ?? "Không có"} • Campaign: {item.mission.campaign.title}
                         </p>
                         <p className="text-xs text-zinc-500">Brand: {item.mission.campaign.brand.displayName}</p>
                       </div>
                       <StatusBadge status={item.statusView.toLowerCase()} />
                     </div>
-                    <p className="mt-2 text-sm text-zinc-700 line-clamp-2">{item.proofTextNote ?? "No caption/note"}</p>
-                    <p className="mt-1 text-xs text-zinc-500">Draft link: {item.videoUrl ?? item.socialPostUrl ?? "N/A"}</p>
+                    <p className="mt-2 text-sm text-zinc-700 line-clamp-2">{item.proofTextNote ?? "Chưa có chú thích/ghi chú"}</p>
+                    <p className="mt-1 text-xs text-zinc-500">Draft link: {item.videoUrl ?? item.socialPostUrl ?? "Không có"}</p>
                     <div className="mt-3">
                       <Link className="dc-btn-primary" href={`/admin/content-review/${item.id}`}>Review detail</Link>
                     </div>

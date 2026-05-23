@@ -7,8 +7,8 @@ import { EmptyState, ErrorState, LoadingSkeleton, PageHeader } from "@/app/compo
 type QueueItem = { id: string; mission: { title: string }; account: { displayName: string }; videoUrl: string | null };
 
 const nav = [
-  { href: "/dashboard/brand", label: "Brand Dashboard" },
-  { href: "/dashboard/brand/profile", label: "Brand Profile" },
+  { href: "/dashboard/brand", label: "Bảng điều khiển Nhãn hàng" },
+  { href: "/dashboard/brand/profile", label: "Hồ sơ Nhãn hàng" },
   { href: "/brand", label: "Chiến dịch" },
   { href: "/brand/proofs", label: "Duyệt proof" },
   { href: "/wallet", label: "Quỹ" }

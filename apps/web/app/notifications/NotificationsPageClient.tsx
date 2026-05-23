@@ -52,7 +52,7 @@ export function NotificationsPageClient() {
     <section className="container">
       <h1>My Notifications</h1>
       <p>Unread: {unreadCount}</p>
-      {loading ? <p>Loading...</p> : null}
+      {loading ? <p>Đang tải...</p> : null}
       {!loading &&
         items.map((item) => (
           <article key={item.id} className="card">

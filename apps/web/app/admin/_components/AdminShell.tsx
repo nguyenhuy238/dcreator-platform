@@ -29,7 +29,7 @@ function isCurrent(pathname: string, href: string) {
 }
 
 function toBreadcrumb(pathname: string, nav: readonly AdminNavItem[]) {
-  if (pathname === "/admin") return [{ href: "/admin", label: "Overview" }];
+  if (pathname === "/admin") return [{ href: "/admin", label: "Tổng quan" }];
   const segments = pathname.split("/").filter(Boolean);
   const trails: Array<{ href: string; label: string }> = [];
   for (let i = 0; i < segments.length; i += 1) {

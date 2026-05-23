@@ -9,17 +9,17 @@ export function AcceptMissionButton({ missionId }: { missionId: string }) {
 
   async function onAccept() {
     setLoading(true);
-    setMessage("Processing...");
+    setMessage("Đang xử lý...");
     try {
       const res = await fetch(`/api/missions/${missionId}/accept`, { method: "POST" });
       const payload = (await res.json()) as { success: boolean; error?: string };
       if (!res.ok || !payload.success) {
-        setMessage(payload.error ?? "Accept failed");
+        setMessage(payload.error ?? "Nhận nhiệm vụ thất bại");
         return;
       }
       setMessage("Accepted mission");
     } catch {
-      setMessage("Network error");
+      setMessage("Lỗi mạng");
     } finally {
       setLoading(false);
     }
