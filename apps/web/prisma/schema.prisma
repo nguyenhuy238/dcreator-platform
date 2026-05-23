@@ -229,6 +229,32 @@ enum NotificationEvent {
   PAYOUT_REJECTED
 }
 
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_USER
+  RESOLVED
+  CLOSED
+}
+
+enum SupportTicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum SupportTicketCategory {
+  CONTENT
+  REVENUE
+  PAYOUT
+  CAMPAIGN
+  APPLICATION
+  FULFILLMENT
+  ACCOUNT
+  OTHER
+}
+
 enum AnalyticsEventName {
   campaign_view
   campaign_cta_click
@@ -287,6 +313,9 @@ model Account {
   ownedBrands Brand[] @relation("BrandOwner")
   reviewedProductSubmissions ProductSubmission[] @relation("ProductSubmissionReviewer")
   creatorFulfillmentOrders FulfillmentOrder[] @relation("FulfillmentCreator")
+  supportTicketsRequested SupportTicket[] @relation("SupportTicketRequester")
+  supportTicketsAssigned SupportTicket[] @relation("SupportTicketAssignee")
+  supportTicketComments SupportTicketComment[] @relation("SupportTicketCommentAuthor")
 }
 
 model AccountRole {
@@ -912,6 +941,49 @@ model RiskFlag {
   createdAt      DateTime @default(now())
 
   account        Account? @relation("RiskFlagAccount", fields: [accountId], references: [id])
+}
+
+model SupportTicket {
+  id                  String               @id @default(cuid())
+  requesterAccountId  String
+  assigneeAccountId   String?
+  title               String
+  description         String
+  status              SupportTicketStatus  @default(OPEN)
+  priority            SupportTicketPriority @default(MEDIUM)
+  category            SupportTicketCategory @default(OTHER)
+  responseSummary     String?
+  internalNote        String?
+  relatedBrandId      String?
+  relatedCreatorId    String?
+  relatedCampaignId   String?
+  relatedOrderId      String?
+  relatedPayoutId     String?
+  relatedSubmissionId String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  requester           Account              @relation("SupportTicketRequester", fields: [requesterAccountId], references: [id], onDelete: Cascade)
+  assignee            Account?             @relation("SupportTicketAssignee", fields: [assigneeAccountId], references: [id], onDelete: SetNull)
+  comments            SupportTicketComment[]
+
+  @@index([status, priority, createdAt])
+  @@index([requesterAccountId, createdAt])
+  @@index([assigneeAccountId, status, createdAt])
+}
+
+model SupportTicketComment {
+  id              String        @id @default(cuid())
+  ticketId        String
+  authorId        String
+  message         String
+  isInternal      Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+
+  ticket          SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author          Account       @relation("SupportTicketCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
 }
 
 model AnalyticsEvent {
