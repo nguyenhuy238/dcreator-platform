@@ -7,7 +7,18 @@ export const creatorJobStatusSchema = z.enum(["accepted", "in_progress", "submit
 export const creatorProofSubmissionSchema = z.object({
   videoUrl: z.url().max(400),
   screenshotUrl: z.url().max(400).optional(),
+  platform: z.enum(supportedPlatforms).optional(),
+  adCode: z.string().trim().max(120).optional(),
   note: z.string().trim().max(500).optional()
+});
+
+export const creatorMarketplaceQuerySchema = z.object({
+  category: z.enum(["TECH", "FASHION", "FOOD", "BEAUTY", "LIFESTYLE", "EDUCATION"]).optional(),
+  campaignStatus: z.enum(["ACTIVE", "PAUSED", "COMPLETED"]).optional().default("ACTIVE"),
+  minRewardPoints: z.coerce.number().int().min(0).optional(),
+  minPayoutVnd: z.coerce.number().int().min(0).optional(),
+  deadlineBefore: z.string().datetime().optional(),
+  search: z.string().trim().max(120).optional()
 });
 
 export const creatorPayoutRequestSchema = z.object({

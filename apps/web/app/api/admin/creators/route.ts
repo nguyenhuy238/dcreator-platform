@@ -13,15 +13,25 @@ export async function GET(request: NextRequest) {
     const query = request.nextUrl.searchParams.get("query") ?? undefined;
     const platformRaw = request.nextUrl.searchParams.get("platform") ?? undefined;
     const contentCategory = request.nextUrl.searchParams.get("contentCategory") ?? undefined;
+    const sort = request.nextUrl.searchParams.get("sort") ?? undefined;
 
     const parsed = adminCreatorListQuerySchema.parse({
       status: statusRaw && Object.values(ApplicationStatus).includes(statusRaw as ApplicationStatus) ? (statusRaw as ApplicationStatus) : undefined,
       query,
       platform: platformRaw && Object.values(SocialPlatform).includes(platformRaw as SocialPlatform) ? (platformRaw as SocialPlatform) : undefined,
-      contentCategory
+      contentCategory,
+      sort
     });
 
-    return ok(await listCreatorApplications(parsed.status, parsed.query, parsed.platform, parsed.contentCategory));
+    return ok(
+      await listCreatorApplications({
+        status: parsed.status,
+        query: parsed.query,
+        platform: parsed.platform,
+        contentCategory: parsed.contentCategory,
+        sort: parsed.sort
+      })
+    );
   } catch (error) {
     return toErrorResponse(error);
   }

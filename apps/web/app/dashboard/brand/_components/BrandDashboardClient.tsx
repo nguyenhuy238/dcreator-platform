@@ -1,13 +1,24 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
+import {
+  ActionToast,
+  EmptyState,
+  ErrorState,
+  LoadingSkeleton,
+  PageHeader,
+  SectionHeader,
+  StatsCard,
+  StatusBadge
+} from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
 
 async function load<T>(url: string) {
   const res = await fetch(url, { cache: "no-store" });
   const payload = (await res.json()) as ApiResult<T>;
-  if (!res.ok || !payload.success) throw new Error(payload.error ?? "Load failed");
+  if (!res.ok || !payload.success) throw new Error(payload.error ?? "Tải dữ liệu thất bại");
   return payload.data;
 }
 
@@ -33,7 +44,7 @@ export function BrandDashboardClient() {
       ]);
       setData({ overview, profile, products, campaigns, applications, proofs, budget, analytics });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load failed");
+      setError(e instanceof Error ? e.message : "Tải dữ liệu thất bại");
     } finally {
       setLoading(false);
     }
@@ -46,12 +57,12 @@ export function BrandDashboardClient() {
   async function postJson(url: string, body: unknown) {
     const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const payload = (await res.json()) as ApiResult<unknown>;
-    setMessage(res.ok && payload.success ? "Success" : payload.error ?? "Failed");
+    setMessage(res.ok && payload.success ? "Thành công" : payload.error ?? "Failed");
     if (res.ok && payload.success) await refresh();
   }
 
-  if (loading) return <main className="container"><h1>Brand Dashboard</h1><p>Loading dashboard...</p></main>;
-  if (error) return <main className="container"><h1>Brand Dashboard</h1><p className="error">{error}</p></main>;
+  if (loading) return <LoadingSkeleton rows={6} />;
+  if (error) return <ErrorState title="Không thể tải Brand Dashboard" description={error} onRetry={() => void refresh()} />;
 
   const overview = data.overview as { activeCampaigns: number; totalBudget: number; prepaidFundBalance: number; totalCreators: number; totalVideosSubmitted: number; totalSalesConversions: number };
   const profile = data.profile as { brandName: string; logoUrl: string; businessInfo: string; verificationStatus: string };
@@ -85,93 +96,163 @@ export function BrandDashboardClient() {
   };
 
   return (
-    <main className="container">
-      <h1>Brand Dashboard</h1>
-      {message ? <p>{message}</p> : null}
-
+    <div className="space-y-8">
+      <PageHeader
+        title="Bảng điều khiển Nhãn hàng"
+        subtitle="Theo dõi duyệt hồ sơ, campaign, creator application và proof review."
+        action={<Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Tạo campaign</Link>}
+      />
+      {message ? <ActionToast message={message === "Thành công" ? "Cập nhật thành công" : message} /> : null}
       <section>
-        <h2>Overview</h2>
-        <ul>
-          <li>Active campaigns: {overview?.activeCampaigns ?? 0}</li>
-          <li>Total budget: {(overview?.totalBudget ?? 0).toLocaleString("vi-VN")} VND</li>
-          <li>Prepaid fund balance: {overview?.prepaidFundBalance ?? 0}</li>
-          <li>Total creators: {overview?.totalCreators ?? 0}</li>
-          <li>Total videos submitted: {overview?.totalVideosSubmitted ?? 0}</li>
-          <li>Total sales/conversions: {(overview?.totalSalesConversions ?? 0).toLocaleString("vi-VN")}</li>
-        </ul>
+        <div className="dc-grid-dashboard">
+          <StatsCard title="Campaign đang chạy" value={`${overview?.activeCampaigns ?? 0}`} />
+          <StatsCard title="Tổng ngân sách" value={`${(overview?.totalBudget ?? 0).toLocaleString("vi-VN")} VND`} />
+          <StatsCard title="Quỹ prepaid" value={`${(overview?.prepaidFundBalance ?? 0).toLocaleString("vi-VN")} VND`} />
+          <StatsCard title="Creator tham gia" value={`${overview?.totalCreators ?? 0}`} />
+        </div>
       </section>
 
       <section>
-        <h2>Brand Profile</h2>
-        {!profile ? <p>Empty profile.</p> : <>
-          <p>Brand name: {profile.brandName || "N/A"}</p>
-          <p>Logo: {profile.logoUrl || "N/A"}</p>
-          <p>Business info: {profile.businessInfo || "N/A"}</p>
-          <p>Verification status: {profile.verificationStatus}</p>
-        </>}
+        <SectionHeader title="Hồ sơ thương hiệu" action={<Link href="/dashboard/brand/profile" className="dc-btn-secondary">Cập nhật hồ sơ</Link>} />
+        {!profile ? <EmptyState title="Chưa có hồ sơ brand" description="Hoàn thiện thông tin để gửi duyệt." /> : (
+          <article className="dc-card p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-wider text-zinc-500">Tên thương hiệu</p>
+                <p className="text-lg font-bold text-zinc-900">{profile.brandName || "Không có"}</p>
+              </div>
+              <StatusBadge status={String(profile.verificationStatus).toLowerCase()} />
+            </div>
+            <p className="mt-2 text-sm text-zinc-600">Thông tin: {profile.businessInfo || "Không có"}</p>
+          </article>
+        )}
       </section>
 
       <section>
-        <h2>Product/SKU Management</h2>
-        {products?.length ? products.map((p) => <p key={p.id}>{p.name} ({p.sku}) - stock: {p.stockQty} - voucher: {p.voucherStock} - eligible: {String(p.campaignEligibility)}</p>) : <p>Chưa có product.</p>}
+        <SectionHeader title="Sản phẩm & tồn kho" action={<Link href="/dashboard/brand/products" className="dc-btn-secondary">Quản lý sản phẩm</Link>} />
+        {products?.length ? (
+          <div className="grid gap-3 md:grid-cols-2">
+            {products.slice(0, 6).map((p) => (
+              <article key={p.id} className="dc-card p-4">
+                <p className="font-semibold text-zinc-900">{p.name}</p>
+                <p className="text-sm text-zinc-600">SKU: {p.sku}</p>
+                <p className="text-sm text-zinc-600">Tồn kho: {p.stockQty} | Voucher stock: {p.voucherStock}</p>
+                <p className="text-sm text-zinc-600">Campaign eligibility: {p.campaignEligibility ? "Sẵn sàng" : "Chưa đủ điều kiện"}</p>
+              </article>
+            ))}
+          </div>
+        ) : <EmptyState title="Chưa có sản phẩm" description="Thêm sản phẩm để dùng trong campaign và reward." />}
       </section>
 
       <section>
-        <h2>Campaign Management</h2>
-        {campaigns?.length ? campaigns.map((c) => (
-          <p key={c.id}>{c.title} - {c.status} <button onClick={() => postJson(`/api/brand/dashboard/campaigns/${c.id}/submit-review`, {})}>Submit for admin review</button></p>
-        )) : <p>Chưa có campaign.</p>}
+        <SectionHeader title="Quản lý campaign" action={<Link href="/brand" className="dc-btn-secondary">Xem campaign public</Link>} />
+        {campaigns?.length ? (
+          <div className="grid gap-3">
+            {campaigns.map((c) => (
+              <article key={c.id} className="dc-card p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="font-semibold text-zinc-900">{c.title}</p>
+                  <StatusBadge status={c.status.toLowerCase()} />
+                </div>
+                <div className="mt-3">
+                  <button className="dc-btn-secondary" onClick={() => postJson(`/api/brand/dashboard/campaigns/${c.id}/submit-review`, {})}>Gửi duyệt</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : <EmptyState title="Chưa có campaign" description="Tạo campaign/job để bắt đầu tuyển Creator." />}
       </section>
 
       <section>
-        <h2>Reward Management</h2>
-        <button onClick={() => postJson("/api/brand/dashboard/rewards", { campaignId: campaigns?.[0]?.id, title: "Default reward", stockTotal: 10, priceVnd: 100000, pricePoints: 1000 })}>Add reward tier (sample)</button>
-      </section>
-
-      <section>
-        <h2>Creator Applications</h2>
-        {applications?.length ? applications.map((a) => (
-          <p key={a.id}>
-            {a.account.displayName} - {a.mission.title}
-            {a.account.creatorProfile ? ` | ${a.account.creatorProfile.mainPlatform} | ${a.account.creatorProfile.socialUrl} | Followers: ${a.account.creatorProfile.followerCount ?? 0}` : " | Chưa có hồ sơ Creator"}
-            {" "}
-            <button onClick={() => postJson("/api/brand/dashboard/creator-applications", { submissionId: a.id, decision: "APPROVED" })}>Approve</button>{" "}
-            <button onClick={() => postJson("/api/brand/dashboard/creator-applications", { submissionId: a.id, decision: "REJECTED", note: "Not fit" })}>Reject</button>
+        <SectionHeader title="Reward / voucher" subtitle="Thiết lập reward theo campaign bằng dữ liệu thật." />
+        <div className="dc-card p-4">
+          <p className="text-sm text-zinc-600">
+            Tạo reward/voucher tại màn hình quản lý sản phẩm và campaign setup để đồng bộ tồn kho, giá và trạng thái duyệt.
           </p>
-        )) : <p>Không có creator applications.</p>}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href="/dashboard/brand/products" className="dc-btn-secondary">Quản lý sản phẩm</Link>
+            <Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Thiết lập campaign</Link>
+          </div>
+        </div>
       </section>
 
       <section>
-        <h2>Proof Review</h2>
-        {proofs?.length ? proofs.map((p) => (
-          <p key={p.id}>{p.account.displayName} - {p.mission.title} - {p.videoUrl || "No video"} <button onClick={() => postJson("/api/brand/dashboard/proofs", { submissionId: p.id, decision: "APPROVED" })}>Approve</button> <button onClick={() => postJson("/api/brand/dashboard/proofs", { submissionId: p.id, decision: "REVISION", rejectReason: "Need better angle" })}>Request revision</button></p>
-        )) : <p>Không có proof cần review.</p>}
+        <SectionHeader title="Đơn ứng tuyển Creator" subtitle="Duyệt Creator apply vào campaign/job." />
+        {applications?.length ? (
+          <div className="grid gap-3">
+            {applications.slice(0, 8).map((a) => (
+              <article key={a.id} className="dc-card p-4">
+                <p className="font-semibold text-zinc-900">{a.account.displayName} - {a.mission.title}</p>
+                <p className="mt-1 text-sm text-zinc-600">
+                  {a.account.creatorProfile
+                    ? `${a.account.creatorProfile.mainPlatform} | Followers: ${a.account.creatorProfile.followerCount ?? 0}`
+                    : "Chưa có hồ sơ Creator"}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button className="dc-btn-primary" onClick={() => postJson("/api/brand/dashboard/creator-applications", { submissionId: a.id, decision: "APPROVED" })}>Duyệt</button>
+                  <button className="dc-btn-secondary" onClick={() => postJson("/api/brand/dashboard/creator-applications", { submissionId: a.id, decision: "REJECTED", note: "Chưa phù hợp campaign" })}>Từ chối</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : <EmptyState title="Không có creator application" description="Danh sách apply mới sẽ hiển thị tại đây." />}
       </section>
 
       <section>
-        <h2>Budget/Prepaid Fund</h2>
-        <p>Current prepaid balance: {budget?.prepaidFundBalance ?? 0}</p>
-        <button onClick={() => postJson("/api/brand/dashboard/budget/topup", { amountVnd: 500000, idempotencyKey: `topup_${Date.now()}` })}>Top-up sample</button>
-        <button onClick={() => postJson("/api/brand/dashboard/budget/lock", { campaignId: campaigns?.[0]?.id, amountVnd: 100000, idempotencyKey: `lock_${Date.now()}` })}>Lock budget sample</button>
-        <h3>Transaction history</h3>
-        {budget?.transactionHistory?.length ? budget.transactionHistory.map((t) => <p key={t.id}>{t.type}: {t.pointsDelta}</p>) : <p>Không có transaction.</p>}
+        <SectionHeader title="Duyệt proof/video" subtitle="Duyệt proof/video Creator nộp." />
+        {proofs?.length ? (
+          <div className="grid gap-3">
+            {proofs.slice(0, 8).map((p) => (
+              <article key={p.id} className="dc-card p-4">
+                <p className="font-semibold text-zinc-900">{p.account.displayName} - {p.mission.title}</p>
+                <p className="mt-1 break-all text-sm text-zinc-600">{p.videoUrl || "Chưa có link video"}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button className="dc-btn-primary" onClick={() => postJson("/api/brand/dashboard/proofs", { submissionId: p.id, decision: "APPROVED" })}>Duyệt proof</button>
+                  <button className="dc-btn-secondary" onClick={() => postJson("/api/brand/dashboard/proofs", { submissionId: p.id, decision: "REVISION", rejectReason: "Cần chỉnh sửa nội dung theo brief" })}>Yêu cầu sửa</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : <EmptyState title="Không có proof cần duyệt" description="Proof pending sẽ xuất hiện ở đây." />}
       </section>
 
       <section>
-        <h2>Analytics</h2>
-        <p>Campaign views: {analytics?.kpis?.campaignViews ?? 0}</p>
-        <p>CTA rate: {analytics?.kpis?.ctaRate ?? 0}%</p>
-        <p>Contribution conversion: {analytics?.kpis?.contributionConversion ?? 0}%</p>
-        <p>Total funded: {(analytics?.kpis?.totalFundedVnd ?? 0).toLocaleString("vi-VN")} VND</p>
-        <p>Top creator (KPI): {analytics?.kpis?.topCreator?.displayName || "N/A"}</p>
-        <p>Reward claim rate: {analytics?.kpis?.rewardClaimRate ?? 0}%</p>
-        <p>Voucher redemption rate: {analytics?.kpis?.voucherRedemptionRate ?? 0}%</p>
-        <p>Top creator: {analytics?.topCreator?.displayName || "N/A"}</p>
-        <p>Top product: {analytics?.topProduct?.title || "N/A"}</p>
-        <p>Voucher redemption: {analytics?.voucherRedemption ?? 0}</p>
-        <p>Conversion rate: {analytics?.conversionRate ?? 0}</p>
-        {analytics?.campaignPerformance?.length ? analytics.campaignPerformance.map((c) => <p key={c.id}>{c.title}: {c.fundedAmountVnd.toLocaleString("vi-VN")} VND</p>) : <p>Empty analytics.</p>}
+        <SectionHeader title="Quỹ prepaid / giao dịch" action={<Link href="/wallet" className="dc-btn-secondary">Đi tới ví</Link>} />
+        <div className="dc-card p-4">
+          <p className="text-sm text-zinc-600">
+            Số dư quỹ hiện tại: <span className="font-semibold text-zinc-900">{(budget?.prepaidFundBalance ?? 0).toLocaleString("vi-VN")} VND</span>
+          </p>
+          {budget?.transactionHistory?.length ? (
+            <div className="mt-3 grid gap-2">
+              {budget.transactionHistory.slice(0, 8).map((t) => (
+                <div key={t.id} className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700">
+                  {t.type}: {t.pointsDelta.toLocaleString("vi-VN")}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-zinc-600">Không có transaction.</p>
+          )}
+        </div>
       </section>
-    </main>
+
+      <section>
+        <SectionHeader title="KPI / Analytics" />
+        <div className="dc-grid-dashboard">
+          <StatsCard title="Lượt xem campaign" value={`${analytics?.kpis?.campaignViews ?? 0}`} />
+          <StatsCard title="Tỷ lệ CTA" value={`${analytics?.kpis?.ctaRate ?? 0}%`} />
+          <StatsCard title="Tỷ lệ chuyển đổi ủng hộ" value={`${analytics?.kpis?.contributionConversion ?? 0}%`} />
+          <StatsCard title="Tỷ lệ redeem voucher" value={`${analytics?.kpis?.voucherRedemptionRate ?? 0}%`} />
+        </div>
+        <div className="mt-4 grid gap-3">
+          {analytics?.campaignPerformance?.length ? analytics.campaignPerformance.map((c) => (
+            <article key={c.id} className="dc-card p-4">
+              <p className="font-semibold text-zinc-900">{c.title}</p>
+              <p className="text-sm text-zinc-600">Đã huy động: {c.fundedAmountVnd.toLocaleString("vi-VN")} VND</p>
+            </article>
+          )) : <EmptyState title="Chưa có dữ liệu KPI chi tiết" description="Dữ liệu analytics sẽ tăng theo hoạt động campaign." />}
+        </div>
+      </section>
+    </div>
   );
 }

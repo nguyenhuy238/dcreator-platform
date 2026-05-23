@@ -1,0 +1,61 @@
+
+> dev
+> npm run db:prepare -w web && turbo run dev
+
+
+> web@0.1.0 db:prepare
+> npm run db:migrate && npm run db:generate
+
+
+> web@0.1.0 db:migrate
+> prisma migrate dev
+
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "dcreator", schema "public" at "localhost:5432"
+
+Already in sync, no schema change or pending migration was found.
+
+Running generate... (Use --skip-generate to skip the generators)
+[2K[1A[2K[GRunning generate... - Prisma Client
+[2K[1A[2K[G✔ Generated Prisma Client (v6.19.3) to .\..\..\node_modules\@prisma\client in 2
+54ms
+
+
+
+> web@0.1.0 db:generate
+> prisma generate
+
+Prisma schema loaded from prisma\schema.prisma
+
+✔ Generated Prisma Client (v6.19.3) to .\..\..\node_modules\@prisma\client in 257ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Need your database queries to be 1000x faster? Accelerate offers you that and more: https://pris.ly/tip-2-accelerate
+
+
+   • Packages in scope: @repo/eslint-config, @repo/typescript-config, @repo/ui, docs, web
+   • Running dev in 5 packages
+   • Remote caching disabled
+
+docs:dev: cache bypass, force executing 30aa428c9c49183d
+web:dev: cache bypass, force executing eee9fc744cefb3be
+docs:dev: 
+web:dev: 
+web:dev: > web@0.1.0 dev
+docs:dev: > docs@0.1.0 dev
+docs:dev: > next dev --port 3001
+docs:dev: 
+web:dev: > next dev --port 3000
+web:dev: 
+docs:dev: ▲ Next.js 16.2.0 (Turbopack)
+web:dev: ▲ Next.js 16.2.0 (Turbopack)
+docs:dev: - Local:         http://localhost:3001
+docs:dev: - Network:       http://192.168.1.245:3001
+web:dev: - Local:         http://localhost:3000
+web:dev: - Network:       http://192.168.1.245:3000
+web:dev: - Environments: .env
+web:dev: ✓ Ready in 471ms
+docs:dev: ✓ Ready in 470ms
+docs:dev: 
+web:dev: 

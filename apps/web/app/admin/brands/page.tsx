@@ -32,10 +32,10 @@ export default function AdminBrandsPage() {
       if (query.trim()) params.set("query", query.trim());
       const res = await fetch(`/api/admin/brands?${params.toString()}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<Item[]>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load brand requests failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải yêu cầu Brand thất bại");
       setItems(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load brand requests failed");
+      setError(e instanceof Error ? e.message : "Tải yêu cầu Brand thất bại");
     } finally {
       setLoading(false);
     }
@@ -47,7 +47,7 @@ export default function AdminBrandsPage() {
 
   return (
     <>
-      <PageHeader title="Brand Requests" subtitle="Duyệt hồ sơ đăng ký/onboarding Brand." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
+      <PageHeader title="Yêu cầu Brand" subtitle="Duyệt hồ sơ đăng ký/onboarding Brand." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
       <section className="dc-card p-4">
         <div className="flex flex-wrap gap-2">
           <select className="dc-input max-w-56" value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -58,7 +58,7 @@ export default function AdminBrandsPage() {
             <option value="NEEDS_REVISION">CHANGES_REQUESTED</option>
           </select>
           <input className="dc-input max-w-80" placeholder="Search brand/email/industry" value={query} onChange={(e) => setQuery(e.target.value)} />
-          <button className="dc-btn-primary" onClick={() => void load()}>Filter</button>
+          <button className="dc-btn-primary" onClick={() => void load()}>Lọc</button>
         </div>
       </section>
 
@@ -75,13 +75,13 @@ export default function AdminBrandsPage() {
                   <div>
                     <p className="font-semibold">{item.brandName}</p>
                     <p className="text-xs text-zinc-500">
-                      {item.industry ?? "N/A"} • {item.contactEmail} • Applicant: {item.account.displayName}
+                      {item.industry ?? "Không có"} • {item.contactEmail} • Applicant: {item.account.displayName}
                     </p>
                   </div>
                   <StatusBadge status={item.status.toLowerCase()} />
                 </div>
                 <div className="mt-3">
-                  <Link className="dc-btn-primary" href={`/admin/brands/${item.id}`}>View detail</Link>
+                  <Link className="dc-btn-primary" href={`/admin/brands/${item.id}`}>Xem chi tiết</Link>
                 </div>
               </article>
             ))}
@@ -91,3 +91,4 @@ export default function AdminBrandsPage() {
     </>
   );
 }
+

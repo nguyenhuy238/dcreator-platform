@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { CampaignCard } from "@/app/campaigns/_components/CampaignCard";
 import { ProcessBanner } from "@/app/components/dcreator/home/ProcessBanner";
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
@@ -160,10 +161,12 @@ export default async function HomePage() {
               </div>
             </div>
             <div className="relative min-h-[300px] md:min-h-full">
-              <img
+              <Image
                 src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&q=80"
                 alt="Creator làm việc trên chiến dịch"
-                className="absolute inset-0 h-full w-full object-cover"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 40vw"
               />
               <div className="absolute inset-0 bg-gradient-to-tr from-zinc-950 via-zinc-950/40 to-transparent" />
             </div>
@@ -189,7 +192,7 @@ export default async function HomePage() {
         <section className="mt-10 grid gap-4 md:grid-cols-2">
           {testimonials.map((item) => (
             <article key={item.name} className="dc-card bg-zinc-50 p-6">
-              <p className="text-sm text-zinc-700">"{item.quote}"</p>
+              <p className="text-sm text-zinc-700">&quot;{item.quote}&quot;</p>
               <p className="mt-4 text-sm font-bold text-zinc-900">{item.name}</p>
             </article>
           ))}
@@ -219,10 +222,12 @@ export default async function HomePage() {
         <section className="mt-10 overflow-hidden rounded-[2rem] border border-zinc-900 bg-zinc-900 text-white shadow-2xl shadow-zinc-200/30">
           <div className="grid gap-0 md:grid-cols-[1.05fr_0.95fr]">
             <div className="relative min-h-[260px] md:min-h-[320px]">
-              <img
+              <Image
                 src="https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1400&q=80"
                 alt="Creator và Brand hợp tác"
-                className="absolute inset-0 h-full w-full object-cover"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 40vw"
               />
               <div className="absolute inset-0 bg-gradient-to-tr from-zinc-950 via-zinc-950/30 to-transparent" />
             </div>

@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import type { Role } from "@prisma/client";
-import { getNavigationItemsByRoles, isAdminRoles } from "@/app/components/dcreator/layout/role-navigation";
 import { DashboardSwitcher } from "@/app/components/dcreator/layout/dashboard-switcher";
-import { getPrimaryDashboard } from "@/lib/auth/dashboard-access";
+import { DashboardShell } from "@/app/components/dcreator/layout/dashboard-shell";
 import { ROLE } from "@/lib/auth/role-constants";
+import { canAccessWorkspace, getNavItemsForWorkspace, getWorkspaceConfig, getWorkspaceForPath } from "@/lib/navigation";
 
 type NavItem = { href: string; label: string };
 
@@ -15,7 +15,7 @@ type AuthUser = {
   id: string;
   email: string;
   displayName: string;
-  avatarUrl?: string | null;
+  avatarUrl: string | null;
   roles: Role[];
 };
 
@@ -67,8 +67,8 @@ export function PublicHeader() {
     }
   }
 
-  const canAccessAdmin = currentUser ? isAdminRoles(currentUser.roles) : false;
-  const dashboardItem = currentUser ? getPrimaryDashboard(currentUser.roles) : null;
+  const canAccessAdmin = currentUser ? currentUser.roles.includes("ADMIN") || currentUser.roles.includes("OPS") : false;
+  const dashboardHref = currentUser ? "/dashboard/user" : null;
   const profileHref =
     currentUser?.roles.includes(ROLE.BRAND_OWNER) || currentUser?.roles.includes(ROLE.BRAND_STAFF)
       ? "/dashboard/brand/profile"
@@ -93,11 +93,11 @@ export function PublicHeader() {
             <div className="h-10 w-44 animate-pulse rounded-full bg-zinc-200" />
           ) : currentUser ? (
             <>
-              {dashboardItem ? (
-                <Link href={dashboardItem.href} className="dc-btn-secondary hidden md:inline-flex">{dashboardItem.label}</Link>
+              {currentUser ? (
+                <Link href={dashboardHref ?? "/dashboard/user"} className="dc-btn-secondary hidden md:inline-flex">Tài khoản cá nhân</Link>
               ) : null}
-              <Link href={campaignHref} className="dc-btn-secondary hidden md:inline-flex">Chiến dịch</Link>
-              <Link href="/wallet" className="dc-btn-secondary hidden md:inline-flex">Ví / N-Points</Link>
+              <Link href={campaignHref} className="dc-btn-secondary hidden md:inline-flex">Campaign</Link>
+              <Link href="/dashboard/user/wallet" className="dc-btn-secondary hidden md:inline-flex">Ví / N-Points</Link>
               {canAccessAdmin ? (
                 <>
                   <Link href="/admin" className="dc-btn-secondary hidden xl:inline-flex">Admin</Link>
@@ -208,6 +208,9 @@ export function PublicFooter() {
 
 export function DashboardSidebar({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
+  const activeItem = items
+    .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0];
   return (
     <aside className="hidden w-64 shrink-0 border-r border-zinc-200 bg-white p-4 lg:block">
       <p className="mb-4 px-3 text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">Workspace</p>
@@ -215,7 +218,8 @@ export function DashboardSidebar({ items }: { items: NavItem[] }) {
         <Link
           key={item.href}
           href={item.href}
-          className={`dc-focus mb-2 block rounded-2xl px-3 py-2.5 text-sm font-semibold transition ${pathname === item.href ? "!bg-zinc-900 !text-white" : "text-zinc-600 hover:!bg-zinc-900 hover:!text-white"}`}
+          aria-current={activeItem?.href === item.href ? "page" : undefined}
+          className={`dc-focus mb-2 block min-h-11 rounded-2xl px-3 py-2.5 text-sm font-semibold leading-5 transition ${activeItem?.href === item.href ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"}`}
         >
           {item.label}
         </Link>
@@ -226,13 +230,17 @@ export function DashboardSidebar({ items }: { items: NavItem[] }) {
 
 export function MobileBottomNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
+  const activeItem = items
+    .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0];
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 grid grid-cols-4 border-t border-zinc-200 bg-white lg:hidden">
       {items.slice(0, 4).map((item) => (
         <Link
           key={item.href}
           href={item.href}
-          className={`dc-focus px-2 py-3 text-center text-xs font-semibold ${pathname === item.href ? "text-zinc-900" : "text-zinc-500"}`}
+          aria-current={activeItem?.href === item.href ? "page" : undefined}
+          className={`dc-focus min-h-11 px-2 py-3 text-center text-xs font-semibold leading-4 ${activeItem?.href === item.href ? "bg-zinc-900 text-white" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"}`}
         >
           {item.label}
         </Link>
@@ -241,24 +249,47 @@ export function MobileBottomNav({ items }: { items: NavItem[] }) {
   );
 }
 
-export function AppShell({ children, sidebarItems }: { children: React.ReactNode; sidebarItems: NavItem[] }) {
+export function AppShell({ children, sidebarItems }: { children: React.ReactNode; sidebarItems?: NavItem[] }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [roles, setRoles] = useState<Role[]>([]);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [rolesLoading, setRolesLoading] = useState(true);
+  const [rolesError, setRolesError] = useState("");
+  const [dismissedDenied, setDismissedDenied] = useState(false);
+  const deniedMessage = searchParams.get("denied");
+
+  useEffect(() => {
+    setDismissedDenied(false);
+  }, [deniedMessage]);
 
   useEffect(() => {
     let active = true;
     async function loadRoles() {
+      setRolesLoading(true);
+      setRolesError("");
       try {
         const response = await fetch("/api/auth/me", { cache: "no-store" });
         const payload = await response.json();
         if (!active) return;
         if (response.ok && payload?.success && Array.isArray(payload?.data?.user?.roles)) {
           setRoles(payload.data.user.roles as Role[]);
+          setUser(payload.data.user as AuthUser);
         } else {
           setRoles([]);
+          setUser(null);
+          setRolesError("Không thể tải quyền truy cập hiện tại.");
         }
       } catch {
-        if (active) setRoles([]);
+        if (active) {
+          setRoles([]);
+          setUser(null);
+          setRolesError("Không thể tải quyền truy cập hiện tại.");
+        }
+      } finally {
+        if (active) {
+          setRolesLoading(false);
+        }
       }
     }
     void loadRoles();
@@ -267,17 +298,42 @@ export function AppShell({ children, sidebarItems }: { children: React.ReactNode
     };
   }, [pathname]);
 
-  const roleSidebarItems = roles.length > 0 ? getNavigationItemsByRoles(roles) : [];
-  const effectiveSidebarItems = roleSidebarItems.length > 0 ? roleSidebarItems : sidebarItems;
+  const workspace = getWorkspaceForPath(pathname);
+  const workspaceConfig = getWorkspaceConfig(workspace);
+  const canAccess = canAccessWorkspace(workspace, roles);
+  const workspaceNav = canAccess ? getNavItemsForWorkspace(workspace, roles) : [];
+  const effectiveSidebarItems = workspaceNav.length > 0 ? workspaceNav : (sidebarItems ?? []);
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl">
-      <DashboardSidebar items={effectiveSidebarItems} />
-      <main className="min-h-screen flex-1 px-4 pb-24 pt-6 md:px-6">
-        <DashboardSwitcher roles={roles} />
-        {children}
-      </main>
-      <MobileBottomNav items={effectiveSidebarItems} />
-    </div>
+    <DashboardShell
+      navItems={effectiveSidebarItems}
+      user={user ?? {
+        id: "client-user",
+        email: "user@dcreator.local",
+        displayName: "Người dùng dCreator",
+        avatarUrl: null,
+        roles
+      }}
+      workspaceTitle={workspaceConfig.title}
+      workspaceDescription={workspaceConfig.description}
+      loginRedirect="/dashboard/user"
+    >
+      {rolesLoading ? <div className="mb-4 h-10 w-56 animate-pulse rounded-xl bg-zinc-200" /> : null}
+      {!rolesLoading && rolesError ? (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+          {rolesError}
+        </div>
+      ) : null}
+      {deniedMessage && !dismissedDenied ? (
+        <div className="mb-4 flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p>{deniedMessage}</p>
+          <button type="button" className="rounded border border-red-300 px-2 py-0.5 text-xs" onClick={() => setDismissedDenied(true)}>
+            Đóng
+          </button>
+        </div>
+      ) : null}
+      <DashboardSwitcher roles={roles} />
+      {children}
+    </DashboardShell>
   );
 }

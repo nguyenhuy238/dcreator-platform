@@ -94,3 +94,22 @@ Quick checklist before commit:
 npm run check-types --workspace=apps/web
 npm run lint --workspace=apps/web
 ```
+
+## E2E Smoke Checks
+
+Mobile visual regression (requires running app + Playwright installed):
+
+```bash
+E2E_BASE_URL=http://localhost:3000 npm run test --workspace=apps/web -- mobile-visual-regression
+```
+
+PayOS webhook end-to-end smoke (requires real test order and secrets):
+
+```bash
+E2E_BASE_URL=http://localhost:3000 \
+PAYOS_WEBHOOK_SECRET=... \
+E2E_PAYOS_ORDER_CODE=... \
+E2E_PAYOS_IDEMPOTENCY_KEY=... \
+E2E_PAYOS_PAID_AMOUNT_VND=... \
+npm run test --workspace=apps/web -- payos-webhook-e2e
+```

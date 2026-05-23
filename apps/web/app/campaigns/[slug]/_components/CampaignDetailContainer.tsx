@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { CampaignDetailDTO } from "@/lib/dto/campaign-detail";
-import styles from "../campaign-detail.module.css";
 import {
   BackersSection,
   CampaignStatsSection,
@@ -27,10 +26,10 @@ type ApiResponse = {
 
 function getCampaignCTA(data: CampaignDetailDTO, selectedRewardId: string | null) {
   if (data.viewer.hasSupported) {
-    return { label: "Xem voucher của tôi", disabled: false };
+    return { label: "Nhận voucher", disabled: false };
   }
   if (data.funding.isEnded) {
-    return { label: "Campaign da ket thuc", disabled: true };
+    return { label: "Chiến dịch đã kết thúc", disabled: true };
   }
   if (!selectedRewardId) {
     return data.viewer.isLoggedIn
@@ -39,7 +38,7 @@ function getCampaignCTA(data: CampaignDetailDTO, selectedRewardId: string | null
   }
   const selectedReward = data.rewards.find((reward) => reward.id === selectedRewardId);
   if (!selectedReward || selectedReward.isOutOfStock) {
-    return { label: "Het luot", disabled: true };
+    return { label: "Hết lượt", disabled: true };
   }
   if (!data.viewer.isLoggedIn) {
     return { label: "Đăng nhập để ủng hộ", disabled: false };
@@ -71,7 +70,7 @@ export function CampaignDetailContainer({ slug }: Props) {
             setIsNotFound(true);
             return;
           }
-          throw new Error(body.error ?? "Load campaign detail failed");
+          throw new Error(body.error ?? "Tải chi tiết chiến dịch thất bại");
         }
 
         if (!body.success || !body.data) {
@@ -104,10 +103,10 @@ export function CampaignDetailContainer({ slug }: Props) {
 
   if (loading) {
     return (
-      <main className={`container ${styles.page}`}>
-        <div className={styles.skeleton} />
-        <div className={styles.skeleton} />
-        <div className={styles.skeleton} />
+      <main className="container grid gap-4 py-6">
+        <div className="h-36 animate-pulse rounded-3xl bg-zinc-100" />
+        <div className="h-36 animate-pulse rounded-3xl bg-zinc-100" />
+        <div className="h-36 animate-pulse rounded-3xl bg-zinc-100" />
       </main>
     );
   }
@@ -115,8 +114,10 @@ export function CampaignDetailContainer({ slug }: Props) {
   if (isNotFound) {
     return (
       <main className="container">
-        <h1>Campaign khong ton tai</h1>
-        <p>Campaign co the chua public hoac da bi go.</p>
+        <div className="dc-card mt-8 p-6">
+          <h1 className="text-2xl font-black text-zinc-900">Chiến dịch không tồn tại</h1>
+          <p className="mt-2 text-sm text-zinc-600">Chiến dịch có thể chưa được public hoặc đã bị gỡ.</p>
+        </div>
       </main>
     );
   }
@@ -124,17 +125,19 @@ export function CampaignDetailContainer({ slug }: Props) {
   if (error || !data) {
     return (
       <main className="container">
-        <h1>Loi tai campaign detail</h1>
-        <p className="error">{error ?? "Khong the tai du lieu."}</p>
+        <div className="dc-card mt-8 border-red-200 bg-red-50 p-6">
+          <h1 className="text-2xl font-black text-red-700">Lỗi tải campaign detail</h1>
+          <p className="mt-2 text-sm text-red-600">{error ?? "Không thể tải dữ liệu."}</p>
+        </div>
       </main>
     );
   }
 
   return (
-    <main className={`container ${styles.page}`}>
-      <div className={styles.leftColumn}>
+    <main className="container grid gap-4 py-6 lg:grid-cols-[1.5fr_1fr]">
+      <div className="grid gap-4">
         <HeroSection hero={data.hero} />
-        <div className={styles.full}>
+        <div className="grid gap-4">
           <CampaignStatsSection data={data} />
           <MissionsSection missions={data.missions} />
           <TimelineSection timeline={data.timeline} />
@@ -142,11 +145,11 @@ export function CampaignDetailContainer({ slug }: Props) {
           <FaqPolicySection faqPolicy={data.faqPolicy} />
         </div>
       </div>
-      <div className={styles.rightColumn}>
+      <div className="grid gap-4">
         <FundingSection funding={data.funding} />
-        <section className={styles.panel}>
-          <h2 className={styles.sectionTitle}>Đăng ký chiến dịch Creator</h2>
-          <p className={styles.inlineMuted}>Nộp đơn để Brand/Admin duyệt trước khi nhận nhiệm vụ.</p>
+        <section className="dc-card p-4 md:p-5">
+          <h2 className="text-2xl font-black text-zinc-900">Đăng ký chiến dịch Creator</h2>
+          <p className="mt-1 text-sm text-slate-600">Nộp đơn để Brand/Admin duyệt trước khi nhận nhiệm vụ.</p>
           <CreatorCampaignApplyButton slug={data.hero.slug} />
         </section>
         <RewardsSection
@@ -155,7 +158,13 @@ export function CampaignDetailContainer({ slug }: Props) {
           selectedRewardId={selectedRewardId}
           onSelect={setSelectedRewardId}
           cta={cta}
-          onSupport={() => setIsSupportOpen(true)}
+          onSupport={() => {
+            if (data.viewer.hasSupported) {
+              window.location.href = "/vouchers";
+              return;
+            }
+            setIsSupportOpen(true);
+          }}
         />
         <SupportModal
           open={isSupportOpen}

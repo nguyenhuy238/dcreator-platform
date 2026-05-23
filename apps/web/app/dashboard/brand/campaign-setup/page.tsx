@@ -1,19 +1,7 @@
 "use client";
 
 import { FormEvent, type ReactNode, useEffect, useState } from "react";
-import { AppShell, PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
-
-const nav = [
-  { href: "/dashboard/brand", label: "Brand Dashboard" },
-  { href: "/dashboard/brand/onboarding", label: "Onboarding / BCC" },
-  { href: "/dashboard/brand/products", label: "Sản phẩm & lô hàng" },
-  { href: "/dashboard/brand/campaign-setup", label: "Yêu cầu campaign" },
-  { href: "/dashboard/brand/profile", label: "Brand Profile" },
-  { href: "/brand", label: "Chiến dịch" },
-  { href: "/brand/proofs", label: "Duyệt proof" },
-  { href: "/wallet", label: "Quỹ" }
-];
 
 type CampaignRequest = {
   id: string;
@@ -193,8 +181,8 @@ export default function CampaignSetupPage() {
 
   return (
     <>
-      <PublicHeader />
-      <AppShell sidebarItems={nav}>
+      
+      <>
         <PageHeader
           title="Yêu cầu campaign"
           subtitle="Brand gửi yêu cầu, Admin duyệt rồi tạo campaign thật và publish lên hệ thống Creator/User."
@@ -365,7 +353,11 @@ export default function CampaignSetupPage() {
             </div>
           )}
         </section>
-      </AppShell>
+      </>
     </>
   );
 }
+
+
+
+

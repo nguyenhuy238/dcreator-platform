@@ -1,7 +1,7 @@
 import { cn } from "./utils";
 
-const baseItems = ["Overview", "Campaigns", "Missions", "Rewards/Vouchers", "Wallet", "Analytics", "Settings"];
-const adminItems = ["Overview", "Moderation", "Fraud Risk", "Users", "Campaign Review", "Audit Logs", "Settings"];
+const baseItems = ["Tổng quan", "Chiến dịch", "Nhiệm vụ", "Quyền lợi/Voucher", "Ví", "Phân tích", "Cài đặt"];
+const adminItems = ["Tổng quan", "Kiểm duyệt", "Rủi ro gian lận", "Người dùng", "Duyệt chiến dịch", "Nhật ký kiểm toán", "Cài đặt"];
 
 export function SidebarDashboard({ adminMode = false }: { adminMode?: boolean }) {
   const items = adminMode ? adminItems : baseItems;

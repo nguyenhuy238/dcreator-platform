@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import type { z } from "zod";
 import { prisma } from "@/lib/db";
 import type { ContributionResultDTO } from "@/lib/dto/contribution";
@@ -9,10 +10,32 @@ import {
   contributionPayosWebhookSchema
 } from "@/lib/validators/contribution";
 import { flagContributionSpam, flagDuplicateWebhook } from "@/lib/services/fraud-flag.service";
+import { shouldProcessPaymentWebhook } from "@/lib/payments/idempotency";
 import { assertNonNegativeBalance } from "./wallet.service";
 
 type CreateContributionInput = z.infer<typeof contributionCreateSchema>;
 type ContributionWebhookPayload = z.infer<typeof contributionPayosWebhookSchema>;
+
+function buildInAppNotification(input: {
+  accountId: string;
+  event:
+    | "USER_CONTRIBUTION_SUCCESS"
+    | "USER_RECEIVED_VOUCHER";
+    title: string;
+    content: string;
+    metadata?: Prisma.InputJsonValue;
+  }) {
+  return {
+    accountId: input.accountId,
+    event: input.event,
+    title: input.title,
+    content: input.content,
+    metadata: input.metadata,
+    channel: "IN_APP" as const,
+    deliveryStatus: "SENT" as const,
+    sentAt: new Date()
+  };
+}
 
 
 function toPaymentUrl(orderCode: string) {
@@ -208,6 +231,25 @@ export async function createCampaignContribution(
         }
       });
 
+      await tx.notification.createMany({
+        data: [
+          buildInAppNotification({
+            accountId: supporterId,
+            event: "USER_CONTRIBUTION_SUCCESS",
+            title: "Ủng hộ thành công",
+            content: `Bạn đã ủng hộ campaign thành công và nhận reward ${reward.title}.`,
+            metadata: { campaignId: campaign.id, contributionId: contribution.id, amountVnd: input.amount }
+          }),
+          buildInAppNotification({
+            accountId: supporterId,
+            event: "USER_RECEIVED_VOUCHER",
+            title: "Bạn vừa nhận voucher",
+            content: `Voucher cho reward ${reward.title} đã được cấp vào tài khoản của bạn.`,
+            metadata: { campaignId: campaign.id, contributionId: contribution.id, rewardId: reward.id, voucherCode: claim.voucherCode }
+          })
+        ]
+      });
+
       return {
         contributionId: contribution.id,
         status: "SUCCESS",
@@ -294,6 +336,16 @@ export async function createCampaignContribution(
       ]
     });
 
+    await tx.notification.create({
+      data: buildInAppNotification({
+        accountId: supporterId,
+        event: "USER_CONTRIBUTION_SUCCESS",
+        title: "Đang chờ xác nhận thanh toán",
+        content: "Yêu cầu ủng hộ đã được tạo. Hệ thống sẽ cập nhật ngay khi thanh toán thành công.",
+        metadata: { campaignId: campaign.id, contributionId: contribution.id, paymentTransactionId: paymentTx.id }
+      })
+    });
+
     return {
       contributionId: contribution.id,
       status: "PENDING",
@@ -313,30 +365,52 @@ export async function handleContributionPayosWebhook(payload: ContributionWebhoo
     throw new AppError("Payment amount mismatch", 409, "PAYMENT_AMOUNT_MISMATCH");
   }
 
+  const nextPaymentStatus = payload.status === "FAILED" ? "FAILED" : "SUCCESS";
+
   return prisma.$transaction(async (tx) => {
+    if (!shouldProcessPaymentWebhook(paymentTx.status)) {
+      await flagDuplicateWebhook(payload.orderCode, payload.idempotencyKey);
+      return { contributionId: null, status: paymentTx.status, idempotent: true };
+    }
+
+    const paymentUpdated = await tx.paymentTransaction.updateMany({
+      where: { id: paymentTx.id, status: "PENDING" },
+      data: {
+        status: nextPaymentStatus,
+        gatewayTransactionId: payload.transactionId,
+        rawPayload: rawPayload as Prisma.JsonObject
+      }
+    });
+
+    if (paymentUpdated.count === 0) {
+      const latest = await tx.paymentTransaction.findUniqueOrThrow({ where: { id: paymentTx.id } });
+      await flagDuplicateWebhook(payload.orderCode, payload.idempotencyKey);
+      return { contributionId: null, status: latest.status, idempotent: true };
+    }
+
     const contribution = await tx.contribution.findFirst({
       where: { paymentTransactionId: paymentTx.id },
       include: { reward: true }
     });
     if (!contribution) throw new AppError("Contribution not found", 404, "CONTRIBUTION_NOT_FOUND");
 
-    if (contribution.status !== "PENDING") {
-      await flagDuplicateWebhook(payload.orderCode, payload.idempotencyKey);
-      return { contributionId: contribution.id, status: contribution.status, idempotent: true };
-    }
-
     if (payload.status === "FAILED") {
-      await tx.paymentTransaction.update({
-        where: { id: paymentTx.id },
-        data: { status: "FAILED", gatewayTransactionId: payload.transactionId, rawPayload: rawPayload as object }
-      });
-      await tx.contribution.update({
-        where: { id: contribution.id },
+      const contributionUpdated = await tx.contribution.updateMany({
+        where: { id: contribution.id, status: "PENDING" },
         data: { status: "FAILED" }
       });
-      if (contribution.rewardId) {
+      if (contributionUpdated.count > 0 && contribution.rewardId) {
         await tx.reward.update({ where: { id: contribution.rewardId }, data: { stockRemaining: { increment: 1 } } });
       }
+      await tx.auditLog.create({
+        data: {
+          actorId: contribution.supporterId,
+          action: "CONTRIBUTION_WEBHOOK_FAILED",
+          targetType: "Campaign",
+          targetId: contribution.campaignId,
+          metadata: { contributionId: contribution.id, paymentTransactionId: paymentTx.id, transactionId: payload.transactionId }
+        }
+      });
       await tx.analyticsEvent.create({
         data: {
           eventName: "payment_failed",
@@ -348,19 +422,24 @@ export async function handleContributionPayosWebhook(payload: ContributionWebhoo
       return { contributionId: contribution.id, status: "FAILED", idempotent: false };
     }
 
-    await tx.paymentTransaction.update({
-      where: { id: paymentTx.id },
-      data: { status: "SUCCESS", gatewayTransactionId: payload.transactionId, rawPayload: rawPayload as object }
+    const contributionUpdated = await tx.contribution.updateMany({
+      where: { id: contribution.id, status: "PENDING" },
+      data: { status: "SUCCESS" }
     });
-    await tx.contribution.update({ where: { id: contribution.id }, data: { status: "SUCCESS" } });
+    if (contributionUpdated.count === 0) {
+      await flagDuplicateWebhook(payload.orderCode, payload.idempotencyKey);
+      return { contributionId: contribution.id, status: "SUCCESS", idempotent: true };
+    }
 
-    const claim = await tx.rewardClaim.create({
-      data: {
+    const claim = await tx.rewardClaim.upsert({
+      where: { contributionId: contribution.id },
+      create: {
         rewardId: contribution.rewardId!,
         contributionId: contribution.id,
         accountId: contribution.supporterId,
         voucherCode: generateVoucherCode()
-      }
+      },
+      update: {}
     });
 
     await tx.campaign.update({
@@ -402,6 +481,45 @@ export async function handleContributionPayosWebhook(payload: ContributionWebhoo
       ]
     });
 
+    await tx.notification.createMany({
+      data: [
+        buildInAppNotification({
+          accountId: contribution.supporterId,
+          event: "USER_CONTRIBUTION_SUCCESS",
+          title: "Ủng hộ thành công",
+          content: "Thanh toán đã được xác nhận. Cảm ơn bạn đã ủng hộ campaign.",
+          metadata: { campaignId: contribution.campaignId, contributionId: contribution.id, amountVnd: contribution.amountVnd }
+        }),
+        buildInAppNotification({
+          accountId: contribution.supporterId,
+          event: "USER_RECEIVED_VOUCHER",
+          title: "Voucher đã được cấp",
+          content: `Bạn đã nhận voucher reward ${contribution.reward?.title ?? ""}.`,
+          metadata: { campaignId: contribution.campaignId, contributionId: contribution.id, rewardId: contribution.rewardId, voucherCode: claim.voucherCode }
+        })
+      ]
+    });
+
     return { contributionId: contribution.id, status: "SUCCESS", idempotent: false, voucherCode: claim.voucherCode };
+  });
+}
+
+export async function listMyContributions(accountId: string) {
+  return prisma.contribution.findMany({
+    where: { supporterId: accountId },
+    orderBy: { createdAt: "desc" },
+    include: {
+      campaign: {
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          brand: { select: { displayName: true } },
+          creator: { select: { displayName: true } }
+        }
+      },
+      reward: { select: { id: true, title: true, pointsCost: true } },
+      rewardClaim: { select: { voucherCode: true, status: true } }
+    }
   });
 }

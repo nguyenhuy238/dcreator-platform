@@ -1,11 +1,10 @@
 import { Role } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { AppError } from "@/lib/errors";
-import { requireRole } from "@/lib/auth/guards";
-import { DASHBOARD_ACCESS } from "@/lib/auth/role-constants";
+import { requireAdminOrOps } from "@/lib/auth/guard";
 
 export async function requireAdminOps(request: NextRequest) {
-  return requireRole(request, DASHBOARD_ACCESS.admin);
+  return requireAdminOrOps(request);
 }
 
 export async function requireAdminForFinanceAction(request: NextRequest) {

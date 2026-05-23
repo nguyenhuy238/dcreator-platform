@@ -41,7 +41,7 @@ function formatVnd(value: number) {
 async function getOverview() {
   const res = await fetch("/api/admin/dashboard/overview", { cache: "no-store" });
   const body = (await res.json()) as ApiResult<AdminOverview>;
-  if (!res.ok || !body.success) throw new Error(body.error ?? "Load overview failed");
+  if (!res.ok || !body.success) throw new Error(body.error ?? "Tải dữ liệu tổng quan thất bại");
   return body.data;
 }
 
@@ -67,7 +67,7 @@ export function AdminDashboardClient() {
     try {
       setOverview(await getOverview());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load overview failed");
+      setError(e instanceof Error ? e.message : "Tải dữ liệu tổng quan thất bại");
     } finally {
       setLoading(false);
     }
@@ -85,20 +85,20 @@ export function AdminDashboardClient() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Admin Overview" subtitle="Hàng chờ xử lý và cảnh báo vận hành." />
+        <PageHeader title="Admin Command Center" subtitle="Hàng chờ xử lý và cảnh báo vận hành." />
         <LoadingSkeleton rows={6} />
       </>
     );
   }
 
   if (error || !overview) {
-    return <ErrorState title="Không tải được Admin Overview" description={error || "Unknown error"} onRetry={() => void refresh()} />;
+    return <ErrorState title="Không tải được Admin Command Center" description={error || "Lỗi không xác định"} onRetry={() => void refresh()} />;
   }
 
   return (
     <>
       <PageHeader
-        title="Admin Overview"
+        title="Admin Command Center"
         subtitle="Ưu tiên xử lý các queue pending trước khi theo dõi KPI tổng."
         action={<button className="dc-btn-secondary" onClick={() => void refresh()}>Làm mới</button>}
       />

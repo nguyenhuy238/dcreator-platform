@@ -45,10 +45,10 @@ export default function AdminPayoutDetailPage() {
     try {
       const res = await fetch(`/api/admin/payouts/${id}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<Detail>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load detail failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải chi tiết thất bại");
       setItem(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load detail failed");
+      setError(e instanceof Error ? e.message : "Tải chi tiết thất bại");
     } finally {
       setLoading(false);
     }
@@ -73,12 +73,12 @@ export default function AdminPayoutDetailPage() {
         body: action === "reject" ? JSON.stringify({ reason: reason.trim() }) : JSON.stringify({})
       });
       const body = (await res.json()) as ApiResult<unknown>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Action failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Thao tác thất bại");
       setToast("Đã cập nhật payout request");
       setTimeout(() => setToast(""), 1800);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed");
+      setError(e instanceof Error ? e.message : "Thao tác thất bại");
     } finally {
       setActing(false);
     }
@@ -87,13 +87,13 @@ export default function AdminPayoutDetailPage() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Payout Detail" subtitle="Đang tải dữ liệu..." />
+        <PageHeader title="Chi tiết rút thưởng" subtitle="Đang tải dữ liệu..." />
         <LoadingSkeleton rows={5} />
       </>
     );
   }
   if (error || !item) {
-    return <ErrorState title="Không tải được payout detail" description={error || "Unknown error"} onRetry={() => void load()} />;
+    return <ErrorState title="Không tải được payout detail" description={error || "Lỗi không xác định"} onRetry={() => void load()} />;
   }
 
   return (
@@ -106,8 +106,8 @@ export default function AdminPayoutDetailPage() {
         </div>
         <div className="mt-2 grid gap-2 text-sm text-zinc-700">
           <p>Creator: {item.account.displayName} • {item.account.email}</p>
-          <p>Bank: {item.account.creatorProfile?.bankName ?? "N/A"} • {item.account.creatorProfile?.bankAccountName ?? "N/A"} • {item.account.creatorProfile?.bankAccountNumber ?? "N/A"}</p>
-          <p>Note: {item.note ?? "N/A"}</p>
+          <p>Bank: {item.account.creatorProfile?.bankName ?? "Không có"} • {item.account.creatorProfile?.bankAccountName ?? "Không có"} • {item.account.creatorProfile?.bankAccountNumber ?? "Không có"}</p>
+          <p>Note: {item.note ?? "Không có"}</p>
         </div>
       </SectionCard>
       <section className="mt-4">
@@ -128,7 +128,7 @@ export default function AdminPayoutDetailPage() {
         </SectionCard>
       </section>
       <section className="mt-4">
-        <SectionCard title="Decision">
+        <SectionCard title="Quyết định">
         <textarea className="dc-input mt-3 min-h-24" placeholder="Reject reason..." value={reason} onChange={(e) => setReason(e.target.value)} />
         <div className="mt-3 flex flex-wrap gap-2">
           <button className="dc-btn-primary" disabled={acting} onClick={() => setConfirmAction("approve")}>Approve</button>
@@ -140,9 +140,9 @@ export default function AdminPayoutDetailPage() {
       {toast ? <ActionToast message={toast} /> : null}
       <ConfirmDialog
         open={confirmAction === "approve"}
-        title="Approve payout request?"
+        title="Duyệt yêu cầu rút thưởng?"
         message="Hành động này xác nhận payout đã qua bước review."
-        confirmLabel="Approve payout"
+        confirmLabel="Duyệt rút thưởng"
         tone="primary"
         onCancel={() => setConfirmAction(null)}
         onConfirm={() => {
@@ -152,9 +152,9 @@ export default function AdminPayoutDetailPage() {
       />
       <ConfirmDialog
         open={confirmAction === "mark-paid"}
-        title="Mark payout as paid?"
+        title="Đánh dấu đã thanh toán rút thưởng?"
         message="Xác nhận rằng khoản payout đã được chuyển tiền thực tế."
-        confirmLabel="Mark paid"
+        confirmLabel="Đánh dấu đã thanh toán"
         tone="danger"
         onCancel={() => setConfirmAction(null)}
         onConfirm={() => {
@@ -164,9 +164,9 @@ export default function AdminPayoutDetailPage() {
       />
       <ConfirmDialog
         open={confirmAction === "reject"}
-        title="Reject payout request?"
+        title="Từ chối yêu cầu rút thưởng?"
         message="Yêu cầu này sẽ bị từ chối và hoàn tiền về ví commission của creator."
-        confirmLabel="Reject payout"
+        confirmLabel="Từ chối rút thưởng"
         tone="danger"
         onCancel={() => setConfirmAction(null)}
         onConfirm={() => {

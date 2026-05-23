@@ -29,5 +29,16 @@ export function getDefaultDashboardPath(userRoles: Role[]) {
 
 export function getAvailableDashboards(userRoles: Role[]): DashboardItem[] {
   if (userRoles.length === 0) return [];
-  return [getPrimaryDashboard(userRoles)];
+  const items: DashboardItem[] = [];
+  const seen = new Set<DashboardItem["id"]>();
+
+  for (const role of ROLE_REDIRECT_PRIORITY) {
+    if (!userRoles.includes(role)) continue;
+    const item = DASHBOARD_BY_ROLE[role];
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    items.push(item);
+  }
+
+  return items;
 }

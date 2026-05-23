@@ -82,12 +82,12 @@ export default function AdminProductDetailPage() {
         })
       });
       const body = (await res.json()) as ApiResult<unknown>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Action failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Thao tác thất bại");
       setToast("Đã cập nhật quyết định kiểm duyệt");
       setTimeout(() => setToast(""), 1800);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed");
+      setError(e instanceof Error ? e.message : "Thao tác thất bại");
     } finally {
       setActing(false);
     }
@@ -103,7 +103,7 @@ export default function AdminProductDetailPage() {
   }
 
   if (error || !item) {
-    return <ErrorState title="Không tải được Product detail" description={error || "Unknown error"} onRetry={() => void load()} />;
+    return <ErrorState title="Không tải được Product detail" description={error || "Lỗi không xác định"} onRetry={() => void load()} />;
   }
 
   return (
@@ -115,14 +115,14 @@ export default function AdminProductDetailPage() {
           <StatusBadge status={item.reviewStatus.toLowerCase()} />
         </div>
         <div className="mt-3 grid gap-2 text-sm text-zinc-700">
-          <p>SKU: {item.sku ?? "N/A"}</p>
-          <p>Mô tả: {item.description ?? "N/A"}</p>
+          <p>SKU: {item.sku ?? "Không có"}</p>
+          <p>Mô tả: {item.description ?? "Không có"}</p>
           <p>Category: N/A (model hiện tại chưa có field category)</p>
           <p>Hình ảnh: N/A (model hiện tại chưa có field imageUrl)</p>
           <p>Giá vốn: N/A (model hiện tại chưa có field cost)</p>
           <p>Giá bán: {item.unitPriceVnd.toLocaleString("vi-VN")} VND</p>
-          <p>Brand: {item.brand.name} • Industry: {item.brand.industry ?? "N/A"} • Email: {item.brand.contactEmail ?? "N/A"}</p>
-          <p>Campaign: {item.campaign ? `${item.campaign.title} (${item.campaign.status})` : "N/A"}</p>
+          <p>Brand: {item.brand.name} • Industry: {item.brand.industry ?? "Không có"} • Email: {item.brand.contactEmail ?? "Không có"}</p>
+          <p>Campaign: {item.campaign ? `${item.campaign.title} (${item.campaign.status})` : "Không có"}</p>
           <p>Legal/content flags: N/A (chưa có field riêng, lưu qua reviewNote)</p>
           {item.reviewNote ? <p className="whitespace-pre-wrap">Review note: {item.reviewNote}</p> : null}
         </div>
@@ -132,7 +132,7 @@ export default function AdminProductDetailPage() {
         <div className="mt-3 grid gap-2 md:grid-cols-2">
           {item.inventoryBatches.map((batch) => (
             <div key={batch.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm">
-              <p className="font-semibold">Batch: {batch.batchCode ?? "N/A"}</p>
+              <p className="font-semibold">Batch: {batch.batchCode ?? "Không có"}</p>
               <p>Total: {batch.quantityTotal.toLocaleString("vi-VN")}</p>
               <p>Remaining: {batch.quantityRemaining.toLocaleString("vi-VN")}</p>
               <p>Status: {batch.stockStatus}</p>
@@ -153,7 +153,7 @@ export default function AdminProductDetailPage() {
         <textarea className="dc-input mt-2 min-h-24" placeholder="Review note / legal/content remarks" value={note} onChange={(e) => setNote(e.target.value)} />
       </SectionCard>
 
-      <SectionCard title="Decision" className="mt-4">
+      <SectionCard title="Quyết định" className="mt-4">
         <textarea className="dc-input min-h-24" placeholder="Reason (required for reject/request changes)" value={reason} onChange={(e) => setReason(e.target.value)} />
         <div className="mt-3 flex flex-wrap gap-2">
           <button className="dc-btn-primary" disabled={acting} onClick={() => void decide("approve")}>Approve product</button>
@@ -166,7 +166,7 @@ export default function AdminProductDetailPage() {
         open={pendingAction !== null}
         title={pendingAction === "reject" ? "Reject product?" : "Request product changes?"}
         description={pendingAction === "reject" ? "Brand sẽ nhận trạng thái từ chối cho sản phẩm này." : "Brand sẽ nhận yêu cầu bổ sung/chỉnh sửa cho sản phẩm này."}
-        confirmText={pendingAction === "reject" ? "Reject" : "Request changes"}
+        confirmText={pendingAction === "reject" ? "Từ chối" : "Yêu cầu chỉnh sửa"}
         onCancel={() => setPendingAction(null)}
         onConfirm={() => {
           if (!pendingAction) return;

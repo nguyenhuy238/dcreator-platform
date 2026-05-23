@@ -5,7 +5,8 @@ export const adminCreatorListQuerySchema = z.object({
   status: z.nativeEnum(ApplicationStatus).optional(),
   query: z.string().trim().max(200).optional(),
   platform: z.nativeEnum(SocialPlatform).optional(),
-  contentCategory: z.string().trim().max(120).optional()
+  contentCategory: z.string().trim().max(120).optional(),
+  sort: z.enum(["newest", "oldest"]).default("newest")
 });
 
 export const adminCreatorDecisionSchema = z.object({

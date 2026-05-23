@@ -3,8 +3,8 @@
   gap: 20px;
   padding-block: 20px 40px;
   background:
-    radial-gradient(circle at 0 0, #e9f1ff 0, transparent 40%),
-    radial-gradient(circle at 100% 20%, #f2f7ff 0, transparent 35%);
+    radial-gradient(circle at 0 0, #fafafa 0, transparent 40%),
+    radial-gradient(circle at 100% 20%, #f5f5f4 0, transparent 35%);
 }
 
 .leftColumn,
@@ -14,11 +14,11 @@
 }
 
 .panel {
-  background: #fcfdff;
-  border: 1px solid #cddfff;
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
   border-radius: 16px;
   padding: 16px;
-  box-shadow: 0 10px 30px -26px #1d4ed8;
+  box-shadow: 0 10px 30px -26px rgba(24,24,27,0.25);
   animation: revealUp 0.45s ease both;
 }
 
@@ -31,8 +31,8 @@
   height: 240px;
   object-fit: cover;
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  background: #e2e8f0;
+  border: 1px solid #ececec;
+  background: #ececec;
 }
 
 .heroTitle {
@@ -62,8 +62,8 @@
 
 .chip {
   font-size: 12px;
-  background: #eff6ff;
-  color: #1e3a8a;
+  background: #f4f4f5;
+  color: #3f3f46;
   border-radius: 999px;
   padding: 4px 10px;
 }
@@ -84,10 +84,10 @@
 }
 
 .fundingKpiCard {
-  border: 1px solid #dbeafe;
+  border: 1px solid #e4e4e7;
   border-radius: 12px;
   padding: 10px 12px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
 }
 
 .kpiLabel {
@@ -107,21 +107,21 @@
 .progressTrack {
   margin: 8px 0 10px;
   height: 11px;
-  background: #e2e8f0;
+  background: #ececec;
   border-radius: 999px;
   overflow: hidden;
 }
 
 .progressBar {
   height: 100%;
-  background: linear-gradient(90deg, #2563eb, #0ea5e9);
+  background: linear-gradient(90deg, #18181b, #52525b);
 }
 
 .progressValue {
   margin: 0 0 4px;
   font-size: 2rem;
   font-weight: 700;
-  color: #0f3da2;
+  color: #18181b;
   letter-spacing: -0.02em;
 }
 
@@ -144,7 +144,7 @@
 
 .rewardCard {
   position: relative;
-  border: 1px solid #cfe0ff;
+  border: 1px solid #e4e4e7;
   border-radius: 12px;
   padding: 14px;
   background: #fff;
@@ -157,8 +157,8 @@
   right: 10px;
   padding: 3px 8px;
   border-radius: 999px;
-  background: #fee2e2;
-  color: #b91c1c;
+  background: #fef2f2;
+  color: #dc2626;
   font-size: 12px;
   font-weight: 700;
 }
@@ -188,22 +188,22 @@
 }
 
 .statCard {
-  border: 1px solid #dbeafe;
+  border: 1px solid #e4e4e7;
   border-radius: 12px;
   padding: 10px;
-  background: linear-gradient(180deg, #f8fbff 0%, #f0f7ff 100%);
+  background: linear-gradient(180deg, #fafafa 0%, #f5f5f4 100%);
 }
 
 .statValue {
   margin: 5px 0 0;
   font-size: 1.2rem;
   font-weight: 700;
-  color: #0f3da2;
+  color: #18181b;
 }
 
 .rewardCardSelected {
-  border-color: #0f4fd1;
-  box-shadow: 0 0 0 2px #dbeafe, 0 6px 20px -16px #2563eb;
+  border-color: #18181b;
+  box-shadow: 0 0 0 2px #e4e4e7, 0 6px 20px -16px rgba(24,24,27,0.35);
   transform: translateY(-1px);
 }
 
@@ -224,14 +224,14 @@
 }
 
 .primaryBtn {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  background: linear-gradient(135deg, #18181b 0%, #3f3f46 100%);
   color: #fff;
-  box-shadow: 0 12px 22px -16px #1d4ed8;
+  box-shadow: 0 12px 22px -16px rgba(24,24,27,0.45);
 }
 
 .secondaryBtn {
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: #f4f4f5;
+  color: #3f3f46;
 }
 
 .primaryBtn:disabled,
@@ -257,7 +257,7 @@
 .rewardCtaRow {
   margin-top: 14px;
   padding-top: 12px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid #ececec;
   justify-content: space-between;
   gap: 10px 14px;
 }
@@ -265,7 +265,7 @@
 .skeleton {
   height: 140px;
   border-radius: 12px;
-  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background: linear-gradient(90deg, #ececec 25%, #f4f4f5 50%, #ececec 75%);
   background-size: 200% 100%;
   animation: shine 1.2s infinite linear;
 }
@@ -322,3 +322,4 @@
     height: 210px;
   }
 }
+

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 
 type Step = {
   title: string;
@@ -45,10 +46,14 @@ export function ProcessBanner({ steps }: { steps: Step[] }) {
         </div>
 
         <div className="relative min-h-[240px] md:min-h-full">
-          <img
+          <Image
             src={current.image}
             alt={current.title}
-            className="absolute inset-0 h-full w-full object-cover"
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 40vw"
+            loading={active === 0 ? "eager" : "lazy"}
+            priority={active === 0}
           />
           <div className="absolute inset-0 bg-gradient-to-tr from-zinc-950/75 via-zinc-950/20 to-transparent" />
           <div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-white/20 bg-black/30 px-4 py-3 backdrop-blur">

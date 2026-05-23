@@ -37,10 +37,10 @@ export default function AdminCreatorsPage() {
       if (query.trim()) params.set("query", query.trim());
       const res = await fetch(`/api/admin/creators?${params.toString()}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<Item[]>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load creator requests failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải yêu cầu Creator thất bại");
       setItems(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load creator requests failed");
+      setError(e instanceof Error ? e.message : "Tải yêu cầu Creator thất bại");
     } finally {
       setLoading(false);
     }
@@ -52,27 +52,27 @@ export default function AdminCreatorsPage() {
 
   return (
     <>
-      <PageHeader title="Creator Requests" subtitle="Duyệt hồ sơ nâng cấp Creator." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
+      <PageHeader title="Yêu cầu Creator" subtitle="Duyệt hồ sơ nâng cấp Creator." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
       <section className="dc-card p-4">
         <div className="grid gap-2 md:grid-cols-5">
           <select className="dc-input" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">All status</option>
+            <option value="">Tất cả trạng thái</option>
             <option value="PENDING_REVIEW">PENDING_REVIEW</option>
             <option value="APPROVED">APPROVED</option>
             <option value="REJECTED">REJECTED</option>
             <option value="NEEDS_REVISION">CHANGES_REQUESTED</option>
           </select>
           <select className="dc-input" value={platform} onChange={(e) => setPlatform(e.target.value)}>
-            <option value="">All platform</option>
+            <option value="">Tất cả nền tảng</option>
             <option value="TIKTOK">TIKTOK</option>
             <option value="INSTAGRAM">INSTAGRAM</option>
             <option value="YOUTUBE">YOUTUBE</option>
             <option value="FACEBOOK">FACEBOOK</option>
             <option value="OTHER">OTHER</option>
           </select>
-          <input className="dc-input" placeholder="Content category" value={category} onChange={(e) => setCategory(e.target.value)} />
-          <input className="dc-input" placeholder="Search name/email/social" value={query} onChange={(e) => setQuery(e.target.value)} />
-          <button className="dc-btn-primary" onClick={() => void load()}>Filter</button>
+          <input className="dc-input" placeholder="Danh mục nội dung" value={category} onChange={(e) => setCategory(e.target.value)} />
+          <input className="dc-input" placeholder="Tìm theo tên/email/social" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <button className="dc-btn-primary" onClick={() => void load()}>Lọc</button>
         </div>
       </section>
 
@@ -80,7 +80,7 @@ export default function AdminCreatorsPage() {
       {error ? <div className="mt-4"><ErrorState title="Không tải được danh sách Creator" description={error} onRetry={() => void load()} /></div> : null}
       {!loading && !error ? (
         items.length === 0 ? (
-          <div className="mt-4"><EmptyState title="Không có Creator request" description="Không có hồ sơ phù hợp bộ lọc." /></div>
+          <div className="mt-4"><EmptyState title="Không có yêu cầu Creator" description="Không có hồ sơ phù hợp bộ lọc." /></div>
         ) : (
           <div className="mt-4 grid gap-3">
             {items.map((item) => (
@@ -89,14 +89,14 @@ export default function AdminCreatorsPage() {
                   <div>
                     <p className="font-semibold">{item.displayName}</p>
                     <p className="text-xs text-zinc-500">
-                      {item.mainPlatform} • {item.contentCategory ?? "N/A"} • {item.account.email}
+                      {item.mainPlatform} • {item.contentCategory ?? "Không có"} • {item.account.email}
                     </p>
                   </div>
                   <StatusBadge status={item.status.toLowerCase()} />
                 </div>
                 <p className="mt-1 text-xs text-zinc-600 break-all">{item.socialUrl}</p>
                 <div className="mt-3">
-                  <Link className="dc-btn-primary" href={`/admin/creators/${item.id}`}>View detail</Link>
+                  <Link className="dc-btn-primary" href={`/admin/creators/${item.id}`}>Xem chi tiết</Link>
                 </div>
               </article>
             ))}
@@ -106,3 +106,4 @@ export default function AdminCreatorsPage() {
     </>
   );
 }
+

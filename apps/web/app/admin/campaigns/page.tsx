@@ -62,6 +62,8 @@ export default function AdminCampaignsPage() {
   }, [load]);
 
   async function review(id: string, decision: "APPROVED" | "REJECTED" | "CHANGES_REQUESTED") {
+    const actionLabel = decision === "APPROVED" ? "duyệt & publish" : decision === "REJECTED" ? "từ chối" : "yêu cầu chỉnh sửa";
+    if (!window.confirm(`Xác nhận ${actionLabel} yêu cầu campaign này?`)) return;
     let reason: string | undefined;
     if (decision !== "APPROVED") {
       reason = window.prompt("Nhập lý do:", decision === "REJECTED" ? "Không phù hợp policy" : "Cần chỉnh sửa giá, hoa hồng hoặc KPI")?.trim();
@@ -117,9 +119,9 @@ export default function AdminCampaignsPage() {
                   </div>
                   <p className="mt-3 text-sm text-zinc-600">{item.brief}</p>
                   <div className="mt-3 grid gap-2 text-sm text-zinc-600 md:grid-cols-3">
-                    <p>Mục tiêu: <span className="font-semibold text-zinc-900">{item.objective || "N/A"}</span></p>
-                    <p>Kênh: <span className="font-semibold text-zinc-900">{item.priorityChannels || "N/A"}</span></p>
-                    <p>Nhiệm vụ: <span className="font-semibold text-zinc-900">{item.missionTypes || "N/A"}</span></p>
+                    <p>Mục tiêu: <span className="font-semibold text-zinc-900">{item.objective || "Không có"}</span></p>
+                    <p>Kênh: <span className="font-semibold text-zinc-900">{item.priorityChannels || "Không có"}</span></p>
+                    <p>Nhiệm vụ: <span className="font-semibold text-zinc-900">{item.missionTypes || "Không có"}</span></p>
                     <p>Hoa hồng Creator: <span className="font-semibold text-zinc-900">{item.creatorCommissionPercent}%</span></p>
                     <p>Hoa hồng User: <span className="font-semibold text-zinc-900">{item.userCommissionPercent}%</span></p>
                     <p>Thưởng thêm: <span className="font-semibold text-zinc-900">{item.bonusBudgetVnd.toLocaleString("vi-VN")}đ</span></p>

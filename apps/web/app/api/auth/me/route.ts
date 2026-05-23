@@ -12,9 +12,15 @@ export async function GET(request: NextRequest) {
         email: user.email,
         displayName: user.displayName,
         avatarUrl: user.avatarUrl,
+        primaryRole: user.primaryRole,
         roles: user.roles,
+        isActive: user.isActive,
         creatorProfile: user.creatorProfile,
-        brands: user.brands
+        brandMemberships: user.brandMemberships,
+        activeBrandId: user.activeBrandId,
+        permissions: user.permissions,
+        creatorRequestStatus: user.creatorRequestStatus,
+        brandRequestStatus: user.brandRequestStatus
       }
     });
   } catch (error) {

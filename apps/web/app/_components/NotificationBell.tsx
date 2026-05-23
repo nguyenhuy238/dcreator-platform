@@ -62,7 +62,7 @@ export function NotificationBell() {
         type="button"
         className="notification-bell"
         onClick={() => setOpen((prev) => !prev)}
-        aria-label="Notifications"
+        aria-label="Thông báo"
       >
         🔔
         {unreadCount > 0 ? <span className="notification-badge">{unreadCount}</span> : null}
@@ -75,7 +75,7 @@ export function NotificationBell() {
               View all
             </Link>
           </div>
-          {loading ? <p>Loading...</p> : null}
+          {loading ? <p>Đang tải...</p> : null}
           {!loading && topItems.length === 0 ? <p>No notifications.</p> : null}
           {!loading &&
             topItems.map((item) => (

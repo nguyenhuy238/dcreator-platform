@@ -1,5 +1,5 @@
 -- DropIndex
-DROP INDEX "Campaign_brandApprovalStatus_idx";
+DROP INDEX IF EXISTS "Campaign_brandApprovalStatus_idx";
 
 -- DropIndex
-DROP INDEX "Campaign_feasibilityStatus_idx";
+DROP INDEX IF EXISTS "Campaign_feasibilityStatus_idx";

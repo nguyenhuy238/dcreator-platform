@@ -1,4 +1,4 @@
-import { CampaignStatus, MissionAudience, MissionLifecycleStatus, Role, RoleRequestStatus, RoleRequestType } from "@prisma/client";
+import { BrandMemberRole, BrandStatus, CampaignStatus, MissionAudience, MissionLifecycleStatus, Role, RoleRequestStatus, RoleRequestType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { approveProof, rejectProof } from "@/lib/services/mission.service";
@@ -273,11 +273,102 @@ export async function approveRoleRequestByAdmin(actorId: string, requestId: stri
 
   const targetRole = request.type === RoleRequestType.CREATOR ? Role.CREATOR : Role.BRAND_OWNER;
   const result = await prisma.$transaction(async (tx) => {
+    const account = await tx.account.findUnique({
+      where: { id: request.accountId },
+      select: { id: true, email: true, displayName: true }
+    });
+    if (!account) throw new AppError("Account not found", 404, "ACCOUNT_NOT_FOUND");
+
     const req = await tx.roleRequest.update({
       where: { id: requestId },
       data: { status: RoleRequestStatus.APPROVED, reviewedAt: new Date(), reviewedById: actorId }
     });
+
     await tx.account.update({ where: { id: req.accountId }, data: { role: targetRole } });
+    await tx.accountRole.upsert({
+      where: { accountId_role: { accountId: req.accountId, role: targetRole } },
+      create: { accountId: req.accountId, role: targetRole },
+      update: {}
+    });
+
+    if (targetRole === Role.CREATOR) {
+      const latestApplication = await tx.creatorApplication.findFirst({
+        where: { accountId: req.accountId },
+        orderBy: { createdAt: "desc" }
+      });
+      await tx.creatorProfile.upsert({
+        where: { accountId: req.accountId },
+        create: {
+          accountId: req.accountId,
+          displayName: latestApplication?.displayName ?? account.displayName,
+          avatarUrl: latestApplication?.avatarUrl ?? null,
+          bio: latestApplication?.bio ?? null,
+          mainPlatform: latestApplication?.mainPlatform ?? "OTHER",
+          socialUrl: latestApplication?.socialUrl ?? "https://example.com",
+          handle: latestApplication?.handle ?? null,
+          followerCount: latestApplication?.followerCount ?? 0,
+          contentCategory: latestApplication?.contentCategory ?? null,
+          portfolioUrl: latestApplication?.portfolioUrl ?? null,
+          location: latestApplication?.location ?? null,
+          expectedRate: latestApplication?.expectedRate ?? 0,
+          maxJobsPerMonth: latestApplication?.maxJobsPerMonth ?? 0,
+          realName: latestApplication?.realName ?? null,
+          phone: latestApplication?.phone ?? null,
+          identityNumber: latestApplication?.identityNumber ?? null,
+          identityFrontUrl: latestApplication?.identityFrontUrl ?? null,
+          identityBackUrl: latestApplication?.identityBackUrl ?? null,
+          selfieUrl: latestApplication?.selfieUrl ?? null,
+          bankAccountName: latestApplication?.bankAccountName ?? null,
+          bankAccountNumber: latestApplication?.bankAccountNumber ?? null,
+          bankName: latestApplication?.bankName ?? null,
+          taxCode: latestApplication?.taxCode ?? null
+        },
+        update: {
+          displayName: latestApplication?.displayName ?? account.displayName,
+          avatarUrl: latestApplication?.avatarUrl ?? null,
+          bio: latestApplication?.bio ?? null,
+          mainPlatform: latestApplication?.mainPlatform ?? "OTHER",
+          socialUrl: latestApplication?.socialUrl ?? "https://example.com",
+          handle: latestApplication?.handle ?? null,
+          followerCount: latestApplication?.followerCount ?? 0,
+          contentCategory: latestApplication?.contentCategory ?? null,
+          portfolioUrl: latestApplication?.portfolioUrl ?? null,
+          location: latestApplication?.location ?? null,
+          expectedRate: latestApplication?.expectedRate ?? 0,
+          maxJobsPerMonth: latestApplication?.maxJobsPerMonth ?? 0
+        }
+      });
+    }
+
+    if (targetRole === Role.BRAND_OWNER) {
+      const existingBrand = await tx.brand.findFirst({
+        where: { ownerAccountId: req.accountId },
+        select: { id: true }
+      });
+      const brand =
+        existingBrand ??
+        (await tx.brand.create({
+          data: {
+            ownerAccountId: req.accountId,
+            name: request.brandName ?? `${account.displayName} Brand`,
+            website: request.brandWebsite ?? null,
+            contactName: account.displayName,
+            contactPhone: "N/A",
+            contactEmail: account.email,
+            status: BrandStatus.ACTIVE,
+            reviewedById: actorId,
+            reviewedAt: new Date()
+          },
+          select: { id: true }
+        }));
+
+      await tx.brandMember.upsert({
+        where: { brandId_accountId: { brandId: brand.id, accountId: req.accountId } },
+        create: { brandId: brand.id, accountId: req.accountId, role: BrandMemberRole.OWNER },
+        update: { role: BrandMemberRole.OWNER }
+      });
+    }
+
     return req;
   });
 

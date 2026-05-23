@@ -43,10 +43,10 @@ export function AdminReportsClient({ source = "reports" }: { source?: "reports" 
       const endpoint = source === "analytics" ? "/api/admin/analytics" : "/api/admin/reports";
       const res = await fetch(`${endpoint}?period=${nextPeriod}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<ReportData>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load reports failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải báo cáo thất bại");
       setData(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load reports failed");
+      setError(e instanceof Error ? e.message : "Tải báo cáo thất bại");
     } finally {
       setLoading(false);
     }
@@ -60,7 +60,7 @@ export function AdminReportsClient({ source = "reports" }: { source?: "reports" 
   return (
     <>
       <PageHeader
-        title={source === "analytics" ? "Admin Analytics" : "Admin Reports"}
+        title={source === "analytics" ? "Phân tích quản trị" : "Báo cáo quản trị"}
         subtitle="Tổng hợp hiệu quả vận hành theo dữ liệu thật từ hệ thống."
         action={<button className="dc-btn-secondary" onClick={() => void load(period)}>Làm mới</button>}
       />
@@ -91,7 +91,7 @@ export function AdminReportsClient({ source = "reports" }: { source?: "reports" 
             <div className="grid gap-3 md:grid-cols-3">
               <StatsCard title="Brand" value={`${data.pendingReviewsByType.brand}`} />
               <StatsCard title="Creator" value={`${data.pendingReviewsByType.creator}`} />
-              <StatsCard title="Campaign" value={`${data.pendingReviewsByType.campaign}`} />
+              <StatsCard title="Chiến dịch" value={`${data.pendingReviewsByType.campaign}`} />
               <StatsCard title="Creator applications" value={`${data.pendingReviewsByType.creatorApplications}`} />
               <StatsCard title="Content" value={`${data.pendingReviewsByType.content}`} />
               <StatsCard title="Product/Inventory" value={`${data.pendingReviewsByType.productInventory}`} />
@@ -119,7 +119,7 @@ export function AdminReportsClient({ source = "reports" }: { source?: "reports" 
           <section className="mt-8">
             <SectionHeader title="Top Creator Performance" />
             {data.topCreatorPerformance.length === 0 ? (
-              <EmptyState title="No creator performance data" description="Chưa có dữ liệu trong kỳ lọc." />
+              <EmptyState title="Chưa có dữ liệu hiệu suất Creator" description="Chưa có dữ liệu trong kỳ lọc." />
             ) : (
               <div className="grid gap-3">
                 {data.topCreatorPerformance.map((item) => (
@@ -136,7 +136,7 @@ export function AdminReportsClient({ source = "reports" }: { source?: "reports" 
           <section className="mt-8">
             <SectionHeader title="Top Campaign Performance" />
             {data.topCampaignPerformance.length === 0 ? (
-              <EmptyState title="No campaign performance data" description="Chưa có dữ liệu doanh thu campaign trong kỳ lọc." />
+              <EmptyState title="Chưa có dữ liệu hiệu suất chiến dịch" description="Chưa có dữ liệu doanh thu campaign trong kỳ lọc." />
             ) : (
               <div className="grid gap-3">
                 {data.topCampaignPerformance.map((item) => (

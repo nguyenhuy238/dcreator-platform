@@ -1,7 +1,6 @@
 "use client";
 
 import { ChangeEvent, useEffect, useState } from "react";
-import { AppShell, PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
 
 const BCC_AGREEMENT_TERMS = `HỢP ĐỒNG BCC dCreator v1
@@ -47,17 +46,6 @@ Brand cam kết bảo mật thông tin khách hàng và chỉ sử dụng dữ l
 
 10. Hiệu lực và điều khoản chung
 Brand xác nhận đã đọc, hiểu và đồng ý với nội dung hợp đồng BCC khi hoàn tất BCC. URL hợp đồng BCC đã ký chỉ là tài liệu phụ được đính kèm để lưu giữ văn bản chính thức.`;
-
-const nav = [
-  { href: "/dashboard/brand", label: "Brand Dashboard" },
-  { href: "/dashboard/brand/onboarding", label: "Onboarding / BCC" },
-  { href: "/dashboard/brand/products", label: "Sản phẩm & lô hàng" },
-  { href: "/dashboard/brand/campaign-setup", label: "Yêu cầu campaign" },
-  { href: "/dashboard/brand/profile", label: "Brand Profile" },
-  { href: "/brand", label: "Chiến dịch" },
-  { href: "/brand/proofs", label: "Duyệt proof" },
-  { href: "/wallet", label: "Quỹ" }
-];
 
 type Onboarding = {
   completed: boolean;
@@ -323,8 +311,8 @@ export default function BrandOnboardingPage() {
 
   return (
     <>
-      <PublicHeader />
-      <AppShell sidebarItems={nav}>
+      
+      <>
         <PageHeader title="Onboarding / BCC" subtitle="Hoàn tất yêu cầu sau khi Brand được duyệt trước khi vận hành campaign." />
         {error ? <ErrorState title="Không thể xử lý onboarding" description={error} onRetry={() => void load()} /> : null}
         {success ? <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p> : null}
@@ -470,9 +458,14 @@ export default function BrandOnboardingPage() {
             </section>
           </form>
         )}
-      </AppShell>
+      </>
     </>
   );
 }
+
+
+
+
+
 
 

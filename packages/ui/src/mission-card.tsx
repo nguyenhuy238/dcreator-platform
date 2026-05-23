@@ -12,8 +12,8 @@ export function MissionCard({ title, rewardText, deadlineText, status }: { title
         <h3 className="font-heading text-lg font-black text-dc-text">{title}</h3>
         <Badge label={label} variant={variant} />
       </div>
-      <p className="mt-2 text-sm text-dc-muted">Reward: {rewardText}</p>
-      <p className="mt-1 text-xs text-dc-muted">Deadline: {deadlineText}</p>
+      <p className="mt-2 text-sm text-dc-muted">Quyền lợi: {rewardText}</p>
+      <p className="mt-1 text-xs text-dc-muted">Hạn chót: {deadlineText}</p>
       <Button className="mt-4 w-full">Tham gia</Button>
     </Card>
   );

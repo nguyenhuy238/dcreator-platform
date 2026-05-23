@@ -3,12 +3,14 @@ import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
 import { createNotification, createNotificationForAdminOps } from "@/lib/services/notification.service";
+import { assertStateTransition } from "@/lib/services/admin-transition.service";
 
-function ensureTransition(current: PayoutRequestStatus, next: PayoutRequestStatus) {
-  if (next === "APPROVED" && current !== "PENDING") throw new AppError("Only pending payout can be approved", 409, "INVALID_STATUS_TRANSITION");
-  if (next === "REJECTED" && current !== "PENDING") throw new AppError("Only pending payout can be rejected", 409, "INVALID_STATUS_TRANSITION");
-  if (next === "PAID" && current !== "APPROVED") throw new AppError("Only approved payout can be marked paid", 409, "INVALID_STATUS_TRANSITION");
-}
+const payoutTransitionMap: Record<PayoutRequestStatus, readonly PayoutRequestStatus[]> = {
+  PENDING: ["APPROVED", "REJECTED"],
+  APPROVED: ["PAID"],
+  REJECTED: [],
+  PAID: []
+};
 
 export async function getFinanceOverviewForAdmin() {
   const [campaignRevenue, commissionCredits, payoutStats, failedPayments, payoutPendingAmount] = await Promise.all([
@@ -103,7 +105,7 @@ export async function getPayoutRequestDetailForAdmin(payoutId: string) {
 
 export async function approvePayoutRequestByAdmin(actorId: string, payoutId: string) {
   const payout = await getPayoutRequestDetailForAdmin(payoutId);
-  ensureTransition(payout.status, "APPROVED");
+  assertStateTransition(payout.status, "APPROVED", payoutTransitionMap, { message: "Only pending payout can be approved" });
 
   const updated = await prisma.payoutRequest.update({
     where: { id: payoutId },
@@ -132,7 +134,7 @@ export async function approvePayoutRequestByAdmin(actorId: string, payoutId: str
 
 export async function rejectPayoutRequestByAdmin(actorId: string, payoutId: string, reason: string) {
   const payout = await getPayoutRequestDetailForAdmin(payoutId);
-  ensureTransition(payout.status, "REJECTED");
+  assertStateTransition(payout.status, "REJECTED", payoutTransitionMap, { message: "Only pending payout can be rejected" });
 
   const updated = await prisma.$transaction(async (tx) => {
     const currentWallet = await tx.wallet.findUniqueOrThrow({ where: { id: payout.walletId } });
@@ -199,7 +201,7 @@ export async function rejectPayoutRequestByAdmin(actorId: string, payoutId: stri
 
 export async function markPayoutAsPaidByAdmin(actorId: string, payoutId: string) {
   const payout = await getPayoutRequestDetailForAdmin(payoutId);
-  ensureTransition(payout.status, "PAID");
+  assertStateTransition(payout.status, "PAID", payoutTransitionMap, { message: "Only approved payout can be marked paid" });
 
   const updated = await prisma.payoutRequest.update({
     where: { id: payout.id },

@@ -49,10 +49,10 @@ export default function AdminBrandDetailPage() {
     try {
       const res = await fetch(`/api/admin/brands/${id}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<BrandApplicationDetail>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load detail failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải chi tiết thất bại");
       setItem(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load detail failed");
+      setError(e instanceof Error ? e.message : "Tải chi tiết thất bại");
     } finally {
       setLoading(false);
     }
@@ -72,12 +72,12 @@ export default function AdminBrandDetailPage() {
         body: payload ? JSON.stringify(payload) : undefined
       });
       const body = (await res.json()) as ApiResult<unknown>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Action failed");
-      setToast(message ?? "Success");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Thao tác thất bại");
+      setToast(message ?? "Thành công");
       setTimeout(() => setToast(""), 2000);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed");
+      setError(e instanceof Error ? e.message : "Thao tác thất bại");
     } finally {
       setActing(false);
     }
@@ -93,7 +93,7 @@ export default function AdminBrandDetailPage() {
   }
 
   if (error || !item) {
-    return <ErrorState title="Không tải được hồ sơ Brand" description={error || "Unknown error"} onRetry={() => void load()} />;
+    return <ErrorState title="Không tải được hồ sơ Brand" description={error || "Lỗi không xác định"} onRetry={() => void load()} />;
   }
 
   return (
@@ -106,12 +106,12 @@ export default function AdminBrandDetailPage() {
           <StatusBadge status={item.status.toLowerCase()} />
         </div>
         <div className="mt-3 grid gap-2 text-sm text-zinc-700">
-          <p>Industry: {item.industry ?? "N/A"}</p>
+          <p>Industry: {item.industry ?? "Không có"}</p>
           <p>Contact: {item.contactName} • {item.contactPhone} • {item.contactEmail}</p>
-          <p>Legal name: {item.legalName ?? "N/A"}</p>
-          <p>Tax code: {item.taxCode ?? "N/A"}</p>
-          <p>Categories: {item.productCategories ?? "N/A"}</p>
-          <p>Inventory: {item.inventoryDescription ?? "N/A"}</p>
+          <p>Legal name: {item.legalName ?? "Không có"}</p>
+          <p>Tax code: {item.taxCode ?? "Không có"}</p>
+          <p>Categories: {item.productCategories ?? "Không có"}</p>
+          <p>Inventory: {item.inventoryDescription ?? "Không có"}</p>
           {item.businessLicenseUrl ? <p>Business license: <a className="underline" href={item.businessLicenseUrl} target="_blank" rel="noreferrer">{item.businessLicenseUrl}</a></p> : null}
           {item.rejectReason ? <p className="text-red-700">Reject reason: {item.rejectReason}</p> : null}
           {item.reviewNote ? <p>Review note: {item.reviewNote}</p> : null}
@@ -139,7 +139,7 @@ export default function AdminBrandDetailPage() {
             className="dc-btn-secondary"
             disabled={acting || item.status !== "PENDING_REVIEW"}
             onClick={() => {
-              const reason = window.prompt("Request changes reason:", "Thiếu hồ sơ bổ sung ngành hàng")?.trim();
+              const reason = window.prompt("Lý do yêu cầu chỉnh sửa:", "Thiếu hồ sơ bổ sung ngành hàng")?.trim();
               if (!reason) return;
               void patch(`/api/admin/brands/${item.id}/request-changes`, { reason }, "Requested changes");
             }}

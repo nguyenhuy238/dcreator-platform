@@ -15,8 +15,8 @@ type VoucherDetail = {
 
 const nav = [
   { href: "/dashboard/user", label: "Tổng quan" },
-  { href: "/campaigns", label: "Campaign" },
-  { href: "/wallet", label: "Wallet" },
+  { href: "/campaigns", label: "Chiến dịch" },
+  { href: "/wallet", label: "Ví" },
   { href: "/vouchers", label: "Voucher" }
 ];
 
@@ -30,7 +30,7 @@ export default function VoucherDetailPage({ params }: { params: { code: string }
       const response = await fetch(`/api/vouchers/${params.code}`, { cache: "no-store" });
       const body = await response.json();
       if (!response.ok || !body.success) {
-        setError(body.error ?? "Load voucher failed");
+        setError(body.error ?? "Tải voucher thất bại");
         return;
       }
       setVoucher(body.data);
@@ -68,7 +68,7 @@ export default function VoucherDetailPage({ params }: { params: { code: string }
             </div>
             <p className="mt-3 font-semibold">{voucher.reward.title}</p>
             <p className="mt-1 text-sm text-zinc-600">Campaign: {voucher.reward.campaign.title}</p>
-            <p className="mt-1 text-sm text-zinc-600">Hạn dùng: {voucher.expiryAt ? new Date(voucher.expiryAt).toLocaleString("vi-VN") : "N/A"}</p>
+            <p className="mt-1 text-sm text-zinc-600">Hạn dùng: {voucher.expiryAt ? new Date(voucher.expiryAt).toLocaleString("vi-VN") : "Không có"}</p>
             <div className="mt-4 flex items-center gap-2">
               <button type="button" onClick={redeem} className="dc-btn-primary" disabled={voucher.status === "USED" || voucher.status === "EXPIRED"}>
                 Redeem

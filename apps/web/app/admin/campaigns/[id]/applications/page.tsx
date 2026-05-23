@@ -29,10 +29,10 @@ export default function AdminCampaignScopedApplicationsPage() {
       try {
         const res = await fetch(`/api/admin/campaigns/${campaignId}/applications`, { cache: "no-store" });
         const body = (await res.json()) as ApiResult<Item[]>;
-        if (!res.ok || !body.success) throw new Error(body.error ?? "Load applications failed");
+        if (!res.ok || !body.success) throw new Error(body.error ?? "Tải danh sách đơn ứng tuyển thất bại");
         if (active) setItems(body.data);
       } catch (e) {
-        if (active) setError(e instanceof Error ? e.message : "Load applications failed");
+        if (active) setError(e instanceof Error ? e.message : "Tải danh sách đơn ứng tuyển thất bại");
       } finally {
         if (active) setLoading(false);
       }
@@ -58,12 +58,12 @@ export default function AdminCampaignScopedApplicationsPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="font-semibold">{item.account.displayName}</p>
-                    <p className="text-xs text-zinc-500">{item.account.email} • {item.account.creatorProfile?.mainPlatform ?? "N/A"} • {item.account.creatorProfile?.followerCount ?? 0} followers</p>
+                    <p className="text-xs text-zinc-500">{item.account.email} • {item.account.creatorProfile?.mainPlatform ?? "Không có"} • {item.account.creatorProfile?.followerCount ?? 0} followers</p>
                   </div>
                   <StatusBadge status={item.lifecycleStatus.toLowerCase()} />
                 </div>
                 <div className="mt-3">
-                  <Link className="dc-btn-primary" href={`/admin/campaign-applications/${item.id}`}>Review detail</Link>
+                  <Link className="dc-btn-primary" href={`/admin/campaign-applications/${item.id}`}>Xem chi tiết</Link>
                 </div>
               </article>
             ))}

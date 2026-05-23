@@ -4,7 +4,7 @@ import { AppError } from "@/lib/errors";
 import { hasSomeRole } from "@/lib/auth/roles";
 import { resolvePrimaryRole } from "@/lib/auth/role-constants";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
-import { createNotification } from "@/lib/services/notification.service";
+import { createNotification, createNotificationForAdminOps } from "@/lib/services/notification.service";
 import type { BrandApplicationInput, CreatorApplicationInput } from "@/lib/validators/role-upgrade";
 
 function normalizeOptional(value?: string) {
@@ -67,7 +67,7 @@ export async function applyCreator(accountId: string, input: CreatorApplicationI
   });
   if (pending) throw new AppError("Creator application is pending review", 409, "APPLICATION_PENDING");
 
-  return prisma.creatorApplication.create({
+  const created = await prisma.creatorApplication.create({
     data: {
       accountId,
       status: ApplicationStatus.PENDING_REVIEW,
@@ -95,6 +95,48 @@ export async function applyCreator(accountId: string, input: CreatorApplicationI
       taxCode: normalizeOptional(input.taxCode)
     }
   });
+  await writeAuditLog({
+    actorId: accountId,
+    action: "CREATOR_APPLICATION_SUBMITTED",
+    targetType: "CreatorApplication",
+    targetId: created.id,
+    newStatus: created.status
+  });
+  await createNotificationForAdminOps({
+    event: NotificationEvent.CREATOR_APPLICATION_APPROVED,
+    title: "Có Creator application mới",
+    content: `Creator ${created.displayName} vừa gửi hồ sơ chờ duyệt.`,
+    metadata: { creatorApplicationId: created.id },
+    excludeAccountId: accountId
+  });
+  return created;
+}
+
+export async function getMyCreatorApplication(accountId: string) {
+  const [latest, creatorProfile] = await Promise.all([
+    prisma.creatorApplication.findFirst({
+      where: { accountId },
+      orderBy: { createdAt: "desc" }
+    }),
+    prisma.creatorProfile.findUnique({
+      where: { accountId },
+      select: {
+        id: true,
+        displayName: true,
+        mainPlatform: true,
+        socialUrl: true,
+        followerCount: true,
+        contentCategory: true,
+        portfolioUrl: true
+      }
+    })
+  ]);
+
+  return {
+    status: latest?.status ?? ApplicationStatus.DRAFT,
+    application: latest,
+    creatorProfile
+  };
 }
 
 export async function updateCreatorApplication(accountId: string, applicationId: string, input: CreatorApplicationInput) {
@@ -102,7 +144,7 @@ export async function updateCreatorApplication(accountId: string, applicationId:
   if (!current || current.accountId !== accountId) throw new AppError("Application not found", 404, "APPLICATION_NOT_FOUND");
   ensureCanEdit(current.status);
 
-  return prisma.creatorApplication.update({
+  const updated = await prisma.creatorApplication.update({
     where: { id: applicationId },
     data: {
       status: ApplicationStatus.PENDING_REVIEW,
@@ -134,6 +176,21 @@ export async function updateCreatorApplication(accountId: string, applicationId:
       taxCode: normalizeOptional(input.taxCode)
     }
   });
+  await writeAuditLog({
+    actorId: accountId,
+    action: "CREATOR_APPLICATION_RESUBMITTED",
+    targetType: "CreatorApplication",
+    targetId: updated.id,
+    newStatus: updated.status
+  });
+  await createNotificationForAdminOps({
+    event: NotificationEvent.CREATOR_APPLICATION_APPROVED,
+    title: "Creator application được cập nhật",
+    content: `Creator ${updated.displayName} đã cập nhật hồ sơ và gửi lại duyệt.`,
+    metadata: { creatorApplicationId: updated.id },
+    excludeAccountId: accountId
+  });
+  return updated;
 }
 
 export async function applyBrand(accountId: string, input: BrandApplicationInput) {
@@ -232,12 +289,23 @@ export async function updateBrandApplication(accountId: string, applicationId: s
   });
 }
 
-export async function listCreatorApplications(
-  status?: ApplicationStatus,
-  query?: string,
-  platform?: "TIKTOK" | "INSTAGRAM" | "YOUTUBE" | "FACEBOOK" | "OTHER",
-  contentCategory?: string
-) {
+type ListCreatorApplicationsOptions = {
+  status?: ApplicationStatus;
+  query?: string;
+  platform?: "TIKTOK" | "INSTAGRAM" | "YOUTUBE" | "FACEBOOK" | "OTHER";
+  contentCategory?: string;
+  sort?: "newest" | "oldest";
+};
+
+type ListBrandApplicationsOptions = {
+  status?: ApplicationStatus;
+  query?: string;
+  industry?: string;
+  sort?: "newest" | "oldest";
+};
+
+export async function listCreatorApplications(options: ListCreatorApplicationsOptions = {}) {
+  const { status, query, platform, contentCategory, sort = "newest" } = options;
   return prisma.creatorApplication.findMany({
     where: {
       ...(status ? { status } : {}),
@@ -254,15 +322,27 @@ export async function listCreatorApplications(
           }
         : {})
     },
-    include: { account: { select: { id: true, email: true, displayName: true } }, reviewedBy: { select: { id: true, displayName: true } } },
-    orderBy: { createdAt: "desc" }
+    include: {
+      account: {
+        select: {
+          id: true,
+          email: true,
+          displayName: true,
+          profile: { select: { phone: true } }
+        }
+      },
+      reviewedBy: { select: { id: true, displayName: true, email: true } }
+    },
+    orderBy: { createdAt: sort === "oldest" ? "asc" : "desc" }
   });
 }
 
-export async function listBrandApplications(status?: ApplicationStatus, query?: string) {
+export async function listBrandApplications(options: ListBrandApplicationsOptions = {}) {
+  const { status, query, industry, sort = "newest" } = options;
   return prisma.brandApplication.findMany({
     where: {
       ...(status ? { status } : {}),
+      ...(industry ? { industry: { contains: industry, mode: "insensitive" } } : {}),
       ...(query
         ? {
             OR: [
@@ -275,20 +355,32 @@ export async function listBrandApplications(status?: ApplicationStatus, query?: 
           }
         : {})
     },
-    include: { account: { select: { id: true, email: true, displayName: true } }, reviewedBy: { select: { id: true, displayName: true } } },
-    orderBy: { createdAt: "desc" }
-  });
-}
-
-export async function getCreatorApplicationDetail(applicationId: string) {
-  const application = await prisma.creatorApplication.findUnique({
-    where: { id: applicationId },
     include: {
       account: {
         select: {
           id: true,
           email: true,
           displayName: true,
+          profile: { select: { phone: true } }
+        }
+      },
+      reviewedBy: { select: { id: true, displayName: true, email: true } }
+    },
+    orderBy: { createdAt: sort === "oldest" ? "asc" : "desc" }
+  });
+}
+
+export async function getCreatorApplicationDetail(applicationId: string) {
+  const [application, statusHistory] = await Promise.all([
+    prisma.creatorApplication.findUnique({
+      where: { id: applicationId },
+      include: {
+      account: {
+        select: {
+          id: true,
+          email: true,
+          displayName: true,
+          profile: { select: { phone: true } },
           creatorProfile: {
             select: {
               id: true,
@@ -303,21 +395,50 @@ export async function getCreatorApplicationDetail(applicationId: string) {
       },
       reviewedBy: { select: { id: true, email: true, displayName: true } }
     }
-  });
+  }),
+    prisma.auditLog.findMany({
+      where: { targetType: "CreatorApplication", targetId: applicationId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        action: true,
+        oldStatus: true,
+        newStatus: true,
+        reason: true,
+        createdAt: true,
+        actor: { select: { id: true, displayName: true, email: true } }
+      }
+    })
+  ]);
   if (!application) throw new AppError("Application not found", 404, "APPLICATION_NOT_FOUND");
-  return application;
+  return { ...application, statusHistory };
 }
 
 export async function getBrandApplicationDetail(applicationId: string) {
-  const application = await prisma.brandApplication.findUnique({
+  const [application, statusHistory] = await Promise.all([
+    prisma.brandApplication.findUnique({
     where: { id: applicationId },
     include: {
-      account: { select: { id: true, email: true, displayName: true } },
+      account: { select: { id: true, email: true, displayName: true, profile: { select: { phone: true } } } },
       reviewedBy: { select: { id: true, displayName: true, email: true } }
     }
-  });
+  }),
+    prisma.auditLog.findMany({
+      where: { targetType: "BrandApplication", targetId: applicationId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        action: true,
+        oldStatus: true,
+        newStatus: true,
+        reason: true,
+        createdAt: true,
+        actor: { select: { id: true, displayName: true, email: true } }
+      }
+    })
+  ]);
   if (!application) throw new AppError("Application not found", 404, "APPLICATION_NOT_FOUND");
-  return application;
+  return { ...application, statusHistory };
 }
 
 export async function reviewCreatorApplication(actorId: string, applicationId: string, status: ApplicationStatus, rejectReason?: string, reviewNote?: string) {

@@ -32,10 +32,10 @@ export default function AdminProductsPage() {
       if (query.trim()) params.set("query", query.trim());
       const res = await fetch(`/api/admin/products?${params.toString()}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<Item[]>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load products failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải sản phẩm thất bại");
       setItems(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load products failed");
+      setError(e instanceof Error ? e.message : "Tải sản phẩm thất bại");
     } finally {
       setLoading(false);
     }
@@ -51,14 +51,14 @@ export default function AdminProductsPage() {
       <section className="dc-card p-4">
         <div className="flex flex-wrap gap-2">
           <select className="dc-input max-w-64" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">All status</option>
+            <option value="">Tất cả trạng thái</option>
             <option value="PENDING_REVIEW">PENDING_REVIEW</option>
             <option value="CHANGES_REQUESTED">CHANGES_REQUESTED</option>
             <option value="APPROVED">APPROVED</option>
             <option value="REJECTED">REJECTED</option>
           </select>
           <input className="dc-input max-w-80" placeholder="Search name/sku/brand/description" value={query} onChange={(e) => setQuery(e.target.value)} />
-          <button className="dc-btn-primary" onClick={() => void load()}>Filter</button>
+          <button className="dc-btn-primary" onClick={() => void load()}>Lọc</button>
         </div>
       </section>
 
@@ -74,7 +74,7 @@ export default function AdminProductsPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="font-semibold">{item.name}</p>
-                    <p className="text-xs text-zinc-500">Brand: {item.brand.name} • SKU: {item.sku ?? "N/A"}</p>
+                    <p className="text-xs text-zinc-500">Brand: {item.brand.name} • SKU: {item.sku ?? "Không có"}</p>
                   </div>
                   <StatusBadge status={item.reviewStatus.toLowerCase()} />
                 </div>
@@ -85,7 +85,7 @@ export default function AdminProductsPage() {
                   Còn lại: {item.inventoryBatches.reduce((sum, b) => sum + b.quantityRemaining, 0).toLocaleString("vi-VN")}
                 </p>
                 <div className="mt-3">
-                  <Link className="dc-btn-primary" href={`/admin/products/${item.id}`}>View detail</Link>
+                  <Link className="dc-btn-primary" href={`/admin/products/${item.id}`}>Xem chi tiết</Link>
                 </div>
               </article>
             ))}
@@ -95,3 +95,4 @@ export default function AdminProductsPage() {
     </>
   );
 }
+

@@ -1,19 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { AppShell, PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
-
-const nav = [
-  { href: "/dashboard/brand", label: "Brand Dashboard" },
-  { href: "/dashboard/brand/onboarding", label: "Onboarding / BCC" },
-  { href: "/dashboard/brand/products", label: "Sản phẩm & lô hàng" },
-  { href: "/dashboard/brand/campaign-setup", label: "Yêu cầu campaign" },
-  { href: "/dashboard/brand/profile", label: "Brand Profile" },
-  { href: "/brand", label: "Chiến dịch" },
-  { href: "/brand/proofs", label: "Duyệt proof" },
-  { href: "/wallet", label: "Quỹ" }
-];
 
 type BrandProfile = {
   brandName: string;
@@ -56,11 +44,11 @@ export default function BrandProfilePage() {
       const response = await fetch("/api/brand/dashboard/profile", { cache: "no-store" });
       const payload = (await response.json()) as ApiResponse<BrandProfile>;
       if (!response.ok || !payload.success) {
-        throw new Error(payload.success ? "Không thể tải Brand Profile" : payload.error);
+        throw new Error(payload.success ? "Không thể tải hồ sơ Brand" : payload.error);
       }
       setForm({ ...defaultForm, ...payload.data });
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Không thể tải Brand Profile");
+      setError(requestError instanceof Error ? requestError.message : "Không thể tải hồ sơ Brand");
     } finally {
       setLoading(false);
     }
@@ -83,12 +71,12 @@ export default function BrandProfilePage() {
       });
       const payload = (await response.json()) as ApiResponse<BrandProfile>;
       if (!response.ok || !payload.success) {
-        throw new Error(payload.success ? "Cập nhật Brand Profile thất bại" : payload.error);
+        throw new Error(payload.success ? "Cập nhật hồ sơ Brand thất bại" : payload.error);
       }
       setForm({ ...defaultForm, ...payload.data });
-      setSuccess("Đã cập nhật Brand Profile.");
+      setSuccess("Đã cập nhật hồ sơ Brand.");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Cập nhật Brand Profile thất bại");
+      setError(requestError instanceof Error ? requestError.message : "Cập nhật hồ sơ Brand thất bại");
     } finally {
       setSaving(false);
     }
@@ -96,8 +84,8 @@ export default function BrandProfilePage() {
 
   return (
     <>
-      <PublicHeader />
-      <AppShell sidebarItems={nav}>
+      
+      <>
         <PageHeader title="Hồ sơ Brand" subtitle="Quản lý thông tin hiển thị và trạng thái xác minh của Brand." />
         {error ? <ErrorState title="Không thể tải hồ sơ" description={error} onRetry={() => void loadProfile()} /> : null}
         {success ? <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p> : null}
@@ -191,7 +179,12 @@ export default function BrandProfilePage() {
             </aside>
           </section>
         ) : null}
-      </AppShell>
+      </>
     </>
   );
 }
+
+
+
+
+

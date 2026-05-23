@@ -20,6 +20,7 @@ export type CreatorCampaignApplicationSnapshot = {
   label: string;
   disabled: boolean;
   message: string;
+  rejectReason: string | null;
   submissionId: string | null;
   missionId: string | null;
   lifecycleStatus: MissionLifecycleStatus | null;
@@ -39,6 +40,7 @@ function toSnapshot(
       label: "Đăng nhập để nộp đơn",
       disabled: false,
       message: "Bạn cần đăng nhập trước khi nộp đơn.",
+      rejectReason: null,
       submissionId: null,
       missionId: null,
       lifecycleStatus: null
@@ -47,6 +49,7 @@ function toSnapshot(
       label: "Chỉ dành cho Creator",
       disabled: true,
       message: "Bạn cần có quyền Creator để nộp đơn.",
+      rejectReason: null,
       submissionId: null,
       missionId: null,
       lifecycleStatus: null
@@ -55,6 +58,7 @@ function toSnapshot(
       label: "Hoàn thiện hồ sơ Creator",
       disabled: true,
       message: "Vui lòng hoàn thiện hồ sơ Creator trước khi nộp đơn.",
+      rejectReason: null,
       submissionId: null,
       missionId: null,
       lifecycleStatus: null
@@ -63,6 +67,7 @@ function toSnapshot(
       label: "Chiến dịch không khả dụng",
       disabled: true,
       message: "Chiến dịch không tồn tại hoặc chưa mở đăng ký.",
+      rejectReason: null,
       submissionId: null,
       missionId: null,
       lifecycleStatus: null
@@ -71,6 +76,7 @@ function toSnapshot(
       label: "Chưa có nhiệm vụ mở",
       disabled: true,
       message: "Chiến dịch chưa có nhiệm vụ đang mở.",
+      rejectReason: null,
       submissionId: null,
       missionId: null,
       lifecycleStatus: null
@@ -79,6 +85,7 @@ function toSnapshot(
       label: "Nộp đơn đăng ký",
       disabled: false,
       message: "Nộp đơn để tham gia chiến dịch này.",
+      rejectReason: null,
       submissionId: null,
       missionId: null,
       lifecycleStatus: null
@@ -87,6 +94,7 @@ function toSnapshot(
       label: "Đã nộp - Chờ duyệt",
       disabled: true,
       message: "Đơn của bạn đang chờ Brand/Admin duyệt.",
+      rejectReason: null,
       submissionId: null,
       missionId: null,
       lifecycleStatus: "ACCEPTED"
@@ -95,6 +103,7 @@ function toSnapshot(
       label: "Đã nhận nhiệm vụ",
       disabled: true,
       message: "Đơn đã được duyệt và bạn đã được nhận nhiệm vụ.",
+      rejectReason: null,
       submissionId: null,
       missionId: null,
       lifecycleStatus: "DOING"
@@ -103,6 +112,7 @@ function toSnapshot(
       label: "Đơn đã bị từ chối",
       disabled: true,
       message: "Đơn đăng ký đã bị từ chối.",
+      rejectReason: null,
       submissionId: null,
       missionId: null,
       lifecycleStatus: "REJECTED"
@@ -175,7 +185,7 @@ export async function getCreatorCampaignApplicationStatus(
       }
     },
     orderBy: { createdAt: "desc" },
-    select: { id: true, missionId: true, lifecycleStatus: true }
+    select: { id: true, missionId: true, lifecycleStatus: true, rejectReason: true }
   });
 
   if (existing) {
@@ -183,7 +193,8 @@ export async function getCreatorCampaignApplicationStatus(
     return toSnapshot(state, {
       submissionId: existing.id,
       missionId: existing.missionId,
-      lifecycleStatus: existing.lifecycleStatus
+      lifecycleStatus: existing.lifecycleStatus,
+      rejectReason: existing.rejectReason
     });
   }
 

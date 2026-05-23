@@ -1,25 +1,37 @@
 "use client";
 
-import Link from "next/link";
+import { useMemo } from "react";
 import { usePathname } from "next/navigation";
 import type { Role } from "@prisma/client";
-import { getAvailableDashboards } from "@/lib/auth/dashboard-access";
+import { getAvailableWorkspaces, getWorkspaceForPath } from "@/lib/navigation";
 
 export function DashboardSwitcher({ roles }: { roles: Role[] }) {
   const pathname = usePathname();
-  const dashboards = getAvailableDashboards(roles);
-  if (dashboards.length <= 1) return null;
+  const workspaces = getAvailableWorkspaces(roles);
+  const currentWorkspace = useMemo(() => getWorkspaceForPath(pathname), [pathname]);
+  const current = workspaces.find((workspace) => workspace.id === currentWorkspace) ?? workspaces[0];
+  if (workspaces.length <= 1 || !current) return null;
 
   return (
-    <div className="mb-4 flex flex-wrap gap-2">
-      {dashboards.map((item) => {
-        const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-        return (
-          <Link key={item.id} href={item.href} className={active ? "dc-btn-primary" : "dc-btn-secondary"}>
-            {item.label}
-          </Link>
-        );
-      })}
+    <div className="mb-4 flex items-center gap-3">
+      <label htmlFor="workspace-switcher" className="text-sm font-semibold text-zinc-700">
+        Chuyển workspace
+      </label>
+      <select
+        id="workspace-switcher"
+        className="dc-input max-w-xs"
+        value={current.id}
+        onChange={(event) => {
+          const target = workspaces.find((workspace) => workspace.id === event.target.value);
+          if (target) window.location.href = target.href;
+        }}
+      >
+        {workspaces.map((workspace) => (
+          <option key={workspace.id} value={workspace.id}>
+            {workspace.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

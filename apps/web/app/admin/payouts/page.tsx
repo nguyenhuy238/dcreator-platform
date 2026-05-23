@@ -30,10 +30,10 @@ export default function AdminPayoutsPage() {
       if (query.trim()) params.set("query", query.trim());
       const res = await fetch(`/api/admin/payouts?${params.toString()}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<Item[]>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load payouts failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải yêu cầu rút thưởng thất bại");
       setItems(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load payouts failed");
+      setError(e instanceof Error ? e.message : "Tải yêu cầu rút thưởng thất bại");
     } finally {
       setLoading(false);
     }
@@ -49,7 +49,7 @@ export default function AdminPayoutsPage() {
       <section className="dc-card p-4">
         <div className="grid gap-2 md:grid-cols-3">
           <select className="dc-input" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">All status</option>
+            <option value="">Tất cả trạng thái</option>
             <option value="PENDING">PENDING</option>
             <option value="APPROVED">APPROVED</option>
             <option value="REJECTED">REJECTED</option>
@@ -57,7 +57,7 @@ export default function AdminPayoutsPage() {
           </select>
           <input className="dc-input md:col-span-2" placeholder="Search creator/email/note" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
-        <button className="dc-btn-primary mt-3" onClick={() => void load()}>Filter</button>
+        <button className="dc-btn-primary mt-3" onClick={() => void load()}>Lọc</button>
       </section>
       {loading ? <div className="mt-4"><LoadingSkeleton rows={5} /></div> : null}
       {error ? <div className="mt-4"><ErrorState title="Không tải được payout requests" description={error} onRetry={() => void load()} /></div> : null}
@@ -78,7 +78,7 @@ export default function AdminPayoutsPage() {
                   <StatusBadge status={item.status.toLowerCase()} />
                 </div>
                 <div className="mt-3">
-                  <Link className="dc-btn-primary" href={`/admin/payouts/${item.id}`}>Review detail</Link>
+                  <Link className="dc-btn-primary" href={`/admin/payouts/${item.id}`}>Xem chi tiết</Link>
                 </div>
               </article>
             ))}
@@ -88,4 +88,5 @@ export default function AdminPayoutsPage() {
     </>
   );
 }
+
 

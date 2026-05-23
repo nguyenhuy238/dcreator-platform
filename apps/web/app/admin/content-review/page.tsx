@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -86,13 +86,13 @@ export default function AdminContentReviewPage() {
       const contentBody = (await contentRes.json()) as ApiResult<Item[]>;
       const creatorMissionBody = (await creatorMissionRes.json()) as ApiResult<CreatorMissionItem[]>;
 
-      if (!contentRes.ok || !contentBody.success) throw new Error(contentBody.error ?? "Load submissions failed");
-      if (!creatorMissionRes.ok || !creatorMissionBody.success) throw new Error(creatorMissionBody.error ?? "Load creator missions failed");
+      if (!contentRes.ok || !contentBody.success) throw new Error(contentBody.error ?? "Tải danh sách bài nộp thất bại");
+      if (!creatorMissionRes.ok || !creatorMissionBody.success) throw new Error(creatorMissionBody.error ?? "Tải nhiệm vụ Creator thất bại");
 
       setItems(contentBody.data);
       setCreatorMissions(creatorMissionBody.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load submissions failed");
+      setError(e instanceof Error ? e.message : "Tải danh sách bài nộp thất bại");
     } finally {
       setLoading(false);
     }
@@ -105,6 +105,8 @@ export default function AdminContentReviewPage() {
   async function decideVideoReview(id: string, action: "APPROVE_VIDEO_REVIEW" | "REJECT_VIDEO_REVIEW") {
     setError("");
     setNotice("");
+    const actionLabel = action === "APPROVE_VIDEO_REVIEW" ? "duyệt video review" : "từ chối video review";
+    if (!window.confirm(`Xác nhận ${actionLabel} cho creator mission này?`)) return;
 
     let reason: string | undefined;
     if (action === "REJECT_VIDEO_REVIEW") {
@@ -119,12 +121,12 @@ export default function AdminContentReviewPage() {
         body: JSON.stringify({ action, reason })
       });
       const body = await res.json();
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Action failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Thao tác thất bại");
 
       setNotice("Đã cập nhật duyệt video review.");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed");
+      setError(e instanceof Error ? e.message : "Thao tác thất bại");
     }
   }
 
@@ -172,7 +174,7 @@ export default function AdminContentReviewPage() {
   return (
     <>
       <PageHeader
-        title="Content Review"
+        title="Duyệt nội dung"
         subtitle="Kiểm duyệt nội dung Creator. Bao gồm queue duyệt video review trước khi đăng công khai."
         action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>}
       />
@@ -182,20 +184,20 @@ export default function AdminContentReviewPage() {
           <input className="dc-input" placeholder="Creator ID" value={creatorId} onChange={(e) => setCreatorId(e.target.value)} />
           <input className="dc-input" placeholder="Brand ID" value={brandId} onChange={(e) => setBrandId(e.target.value)} />
           <select className="dc-input" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">All status</option>
+            <option value="">Tất cả trạng thái</option>
             {statusOptions.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
           <select className="dc-input" value={platform} onChange={(e) => setPlatform(e.target.value)}>
-            <option value="">All platform</option>
+            <option value="">Tất cả nền tảng</option>
             <option value="TIKTOK">TIKTOK</option>
             <option value="INSTAGRAM">INSTAGRAM</option>
             <option value="YOUTUBE">YOUTUBE</option>
             <option value="FACEBOOK">FACEBOOK</option>
             <option value="OTHER">OTHER</option>
           </select>
-          <input className="dc-input md:col-span-3" placeholder="Search campaign/creator/brand/note" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input className="dc-input md:col-span-3" placeholder="Tìm campaign/creator/brand/ghi chú" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
-        <button className="dc-btn-primary mt-3" onClick={() => void load()}>Filter</button>
+        <button className="dc-btn-primary mt-3" onClick={() => void load()}>Lọc</button>
       </section>
 
       {notice ? <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</p> : null}
@@ -218,7 +220,7 @@ export default function AdminContentReviewPage() {
                         <div>
                           <p className="font-semibold">{item.account.displayName}</p>
                           <p className="text-xs text-zinc-500">
-                            {item.account.email} • {item.account.creatorProfile?.mainPlatform ?? "N/A"} • Campaign: {item.campaign.title}
+                            {item.account.email} • {item.account.creatorProfile?.mainPlatform ?? "Không có"} • Campaign: {item.campaign.title}
                           </p>
                           <p className="text-xs text-zinc-500">Mission: {item.mission.title} • Queue: Video review</p>
                         </div>
@@ -241,16 +243,16 @@ export default function AdminContentReviewPage() {
                       <div>
                         <p className="font-semibold">{item.account.displayName}</p>
                         <p className="text-xs text-zinc-500">
-                          {item.account.email} • {item.account.creatorProfile?.mainPlatform ?? "N/A"} • Campaign: {item.mission.campaign.title}
+                          {item.account.email} • {item.account.creatorProfile?.mainPlatform ?? "Không có"} • Campaign: {item.mission.campaign.title}
                         </p>
                         <p className="text-xs text-zinc-500">Brand: {item.mission.campaign.brand.displayName}</p>
                       </div>
                       <StatusBadge status={item.statusView.toLowerCase()} />
                     </div>
-                    <p className="mt-2 text-sm text-zinc-700 line-clamp-2">{item.proofTextNote ?? "No caption/note"}</p>
-                    <p className="mt-1 text-xs text-zinc-500">Draft link: {item.videoUrl ?? item.socialPostUrl ?? "N/A"}</p>
+                    <p className="mt-2 text-sm text-zinc-700 line-clamp-2">{item.proofTextNote ?? "Chưa có chú thích/ghi chú"}</p>
+                    <p className="mt-1 text-xs text-zinc-500">Draft link: {item.videoUrl ?? item.socialPostUrl ?? "Không có"}</p>
                     <div className="mt-3">
-                      <Link className="dc-btn-primary" href={`/admin/content-review/${item.id}`}>Review detail</Link>
+                      <Link className="dc-btn-primary" href={`/admin/content-review/${item.id}`}>Xem chi tiết</Link>
                     </div>
                   </article>
                 );
@@ -262,3 +264,4 @@ export default function AdminContentReviewPage() {
     </>
   );
 }
+

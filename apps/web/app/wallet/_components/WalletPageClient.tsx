@@ -24,8 +24,8 @@ type WalletResponse = {
 
 const nav = [
   { href: "/dashboard/user", label: "Tổng quan" },
-  { href: "/campaigns", label: "Campaign" },
-  { href: "/wallet", label: "Wallet" },
+  { href: "/campaigns", label: "Chiến dịch" },
+  { href: "/wallet", label: "Ví" },
   { href: "/vouchers", label: "Voucher" }
 ];
 
@@ -121,15 +121,15 @@ export function WalletPageClient() {
         {data ? (
           <>
             <section className="dc-grid-dashboard">
-              <StatsCard title="N-Points balance" value={`${data.wallet.pointsBalance.toLocaleString("vi-VN")} points`} />
-              <StatsCard title="Commission wallet" value={formatVnd(data.wallet.cashBalanceVnd)} />
-              <StatsCard title="Payment pending" value={`${data.pendingPayments.length}`} />
-              <StatsCard title="Payout requests" value={`${data.payouts.length}`} />
+              <StatsCard title="Số dư N-Points" value={`${data.wallet.pointsBalance.toLocaleString("vi-VN")} điểm`} />
+              <StatsCard title="Ví hoa hồng" value={formatVnd(data.wallet.cashBalanceVnd)} />
+              <StatsCard title="Thanh toán chờ xác nhận" value={`${data.pendingPayments.length}`} />
+              <StatsCard title="Yêu cầu payout" value={`${data.payouts.length}`} />
             </section>
 
             <section className="mt-8 grid gap-4 lg:grid-cols-[1.2fr_1fr]">
               <article className="dc-card p-5">
-                <SectionHeader title="Top-up" subtitle="Tạo giao dịch nạp tiền qua PayOS" />
+                <SectionHeader title="Nạp tiền" subtitle="Tạo giao dịch nạp tiền qua PayOS" />
                 <form onSubmit={handleTopup} className="grid gap-3">
                   <label className="grid gap-1 text-sm font-medium text-zinc-700">
                     <span>Số tiền nạp (VND)</span>
@@ -148,7 +148,7 @@ export function WalletPageClient() {
                   </label>
                   <p className="text-sm text-zinc-600">Ước tính nhận: {topupPointEstimate.toLocaleString("vi-VN")} N-Points</p>
                   <div className="flex flex-wrap gap-2">
-                    <button type="submit" className="dc-btn-primary">Tạo payment</button>
+                    <button type="submit" className="dc-btn-primary">Nạp quỹ</button>
                     <button type="button" className="dc-btn-secondary" onClick={handlePayoutRequest}>Tạo payout request 50,000 VND</button>
                   </div>
                 </form>
@@ -158,7 +158,7 @@ export function WalletPageClient() {
               </article>
 
               <article className="dc-card p-5">
-                <SectionHeader title="Payment Pending" subtitle="Các giao dịch nạp đang chờ xác nhận" />
+                <SectionHeader title="Thanh toán chờ xác nhận" subtitle="Các giao dịch nạp đang chờ xác nhận" />
                 {data.pendingPayments.length === 0 ? (
                   <EmptyState title="Không có giao dịch pending" description="Sau khi tạo payment, trạng thái đang chờ sẽ xuất hiện ở đây." />
                 ) : (
@@ -176,7 +176,7 @@ export function WalletPageClient() {
             </section>
 
             <section className="mt-8">
-              <SectionHeader title="Transaction History" subtitle="20 giao dịch gần nhất" />
+              <SectionHeader title="Lịch sử giao dịch" subtitle="20 giao dịch gần nhất" />
               {data.transactions.length === 0 ? (
                 <EmptyState title="Chưa có giao dịch" description="Lịch sử giao dịch sẽ xuất hiện khi bạn nạp tiền hoặc sử dụng điểm." />
               ) : (
@@ -190,7 +190,7 @@ export function WalletPageClient() {
                       <div className="mt-2 grid gap-1 text-sm text-zinc-600 sm:grid-cols-3">
                         <p>Points: {transaction.pointsDelta > 0 ? "+" : ""}{transaction.pointsDelta.toLocaleString("vi-VN")}</p>
                         <p>Cash: {transaction.cashDeltaVnd > 0 ? "+" : ""}{formatVnd(transaction.cashDeltaVnd)}</p>
-                        <p>Ref: {transaction.referenceType ?? "N/A"}</p>
+                        <p>Ref: {transaction.referenceType ?? "Không có"}</p>
                       </div>
                     </article>
                   ))}

@@ -65,7 +65,7 @@ export default function AdminProductInventoryPage() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="font-semibold text-zinc-900">{item.name}</p>
-                      <p className="text-xs text-zinc-500">Brand: {item.brand.name} • SKU: {item.sku ?? "N/A"}</p>
+                      <p className="text-xs text-zinc-500">Brand: {item.brand.name} • SKU: {item.sku ?? "Không có"}</p>
                     </div>
                     <StatusBadge status={item.reviewStatus.toLowerCase()} />
                   </div>
@@ -73,7 +73,7 @@ export default function AdminProductInventoryPage() {
                   <div className="mt-3 grid gap-2 md:grid-cols-2">
                     {item.inventoryBatches.map((batch) => (
                       <div key={batch.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm">
-                        <p className="font-semibold">Batch: {batch.batchCode ?? "N/A"}</p>
+                        <p className="font-semibold">Batch: {batch.batchCode ?? "Không có"}</p>
                         <p>Total: {batch.quantityTotal.toLocaleString("vi-VN")}</p>
                         <p>Remaining: {batch.quantityRemaining.toLocaleString("vi-VN")}</p>
                         <p>Status: {batch.stockStatus}</p>

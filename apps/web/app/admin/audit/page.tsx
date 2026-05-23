@@ -23,10 +23,10 @@ export default function AdminAuditPage() {
       query.set("limit", "100");
       const res = await fetch(`/api/admin/dashboard/audit-logs?${query.toString()}`, { cache: "no-store" });
       const body = await res.json();
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Load audit logs failed");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải nhật ký kiểm toán thất bại");
       setItems(body.data.items);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load audit logs failed");
+      setError(e instanceof Error ? e.message : "Tải nhật ký kiểm toán thất bại");
     } finally {
       setLoading(false);
     }
@@ -48,7 +48,7 @@ export default function AdminAuditPage() {
         <form className="grid gap-3 md:grid-cols-3" onSubmit={onSubmit}>
           <input className="dc-input" placeholder="Action" value={action} onChange={(e) => setAction(e.target.value)} />
           <input className="dc-input" placeholder="Target type" value={targetType} onChange={(e) => setTargetType(e.target.value)} />
-          <button className="dc-btn-primary" type="submit">Filter</button>
+          <button className="dc-btn-primary" type="submit">Lọc</button>
         </form>
       </section>
       {error ? <div className="mt-4"><ErrorState title="Không tải được audit logs" description={error} onRetry={() => void load()} /></div> : null}
@@ -75,7 +75,7 @@ export default function AdminAuditPage() {
                       <td className="px-4 py-3 font-medium">{item.action}</td>
                       <td className="px-4 py-3">{item.targetType} / {item.targetId.slice(0, 10)}***</td>
                       <td className="px-4 py-3">{new Date(item.createdAt).toLocaleString("vi-VN")}</td>
-                      <td className="px-4 py-3 text-xs text-zinc-500">{item.metadata ? JSON.stringify(item.metadata) : "N/A"}</td>
+                      <td className="px-4 py-3 text-xs text-zinc-500">{item.metadata ? JSON.stringify(item.metadata) : "Không có"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -87,3 +87,4 @@ export default function AdminAuditPage() {
     </>
   );
 }
+
