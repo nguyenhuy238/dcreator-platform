@@ -9,12 +9,31 @@ function deny(request: NextRequest) {
 }
 
 function authorize(pathname: string, role: ReturnType<typeof decodeSession>["role"]) {
-  void pathname;
-  void role;
+  if (pathname.startsWith("/admin")) {
+    return role === "ADMIN" || role === "OPS";
+  }
+  if (pathname.startsWith("/dashboard/brand") || pathname.startsWith("/brand")) {
+    return role === "BRAND_OWNER" || role === "BRAND_STAFF" || role === "ADMIN" || role === "OPS";
+  }
+  if (pathname.startsWith("/dashboard/creator")) {
+    return role === "CREATOR" || role === "ADMIN" || role === "OPS";
+  }
   return true;
 }
 
-export function proxy(request: NextRequest) {
+async function hasCompletedBrandOnboarding(request: NextRequest) {
+  const response = await fetch(new URL("/api/brand/dashboard/onboarding", request.url), {
+    cache: "no-store",
+    headers: {
+      cookie: request.headers.get("cookie") ?? ""
+    }
+  });
+  if (!response.ok) return false;
+  const payload = (await response.json()) as { success?: boolean; data?: { completed?: boolean } };
+  return Boolean(payload?.success && payload?.data?.completed);
+}
+
+export async function proxy(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   if (!token) return deny(request);
 
@@ -31,6 +50,24 @@ export function proxy(request: NextRequest) {
       }
       return NextResponse.redirect(url);
     }
+    const pathname = request.nextUrl.pathname;
+    const isBrandWorkspace =
+      pathname.startsWith("/dashboard/brand") || pathname.startsWith("/brand");
+    const isBrandDashboardHome = pathname === "/dashboard/brand" || pathname === "/dashboard/brand/";
+    const isBrandOnboardingPage =
+      pathname === "/dashboard/brand/onboarding" || pathname.startsWith("/dashboard/brand/onboarding/");
+    if (isBrandWorkspace && !isBrandDashboardHome && !isBrandOnboardingPage) {
+      const completed = await hasCompletedBrandOnboarding(request);
+      if (!completed) {
+        return NextResponse.redirect(new URL("/dashboard/brand/onboarding", request.url));
+      }
+    }
+    if (pathname.startsWith("/wallet") && (session.role === "BRAND_OWNER" || session.role === "BRAND_STAFF")) {
+      const completed = await hasCompletedBrandOnboarding(request);
+      if (!completed) {
+        return NextResponse.redirect(new URL("/dashboard/brand/onboarding", request.url));
+      }
+    }
     return NextResponse.next();
   } catch {
     return deny(request);
@@ -38,5 +75,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/:path*"]
+  matcher: ["/dashboard/:path*", "/admin/:path*", "/brand/:path*", "/wallet/:path*"]
 };

@@ -6,6 +6,9 @@ import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader } fr
 
 const nav = [
   { href: "/dashboard/brand", label: "Brand Dashboard" },
+  { href: "/dashboard/brand/onboarding", label: "Onboarding / BCC" },
+  { href: "/dashboard/brand/products", label: "Sản phẩm & lô hàng" },
+  { href: "/dashboard/brand/campaign-setup", label: "Yêu cầu campaign" },
   { href: "/dashboard/brand/profile", label: "Brand Profile" },
   { href: "/brand", label: "Chiến dịch" },
   { href: "/brand/proofs", label: "Duyệt proof" },
@@ -14,6 +17,8 @@ const nav = [
 
 type BrandProfile = {
   brandName: string;
+  contactName: string;
+  contactEmail: string;
   logoUrl: string;
   businessInfo: string;
   verificationStatus: "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
@@ -23,16 +28,18 @@ type ApiResponse<T> = { success: true; data: T } | { success: false; error: stri
 
 const defaultForm: BrandProfile = {
   brandName: "",
+  contactName: "",
+  contactEmail: "",
   logoUrl: "",
   businessInfo: "",
   verificationStatus: "UNVERIFIED"
 };
 
 function statusLabel(status: BrandProfile["verificationStatus"]) {
-  if (status === "VERIFIED") return "Da xac minh";
-  if (status === "PENDING") return "Dang cho duyet";
-  if (status === "REJECTED") return "Bi tu choi";
-  return "Chua xac minh";
+  if (status === "VERIFIED") return "Đã xác minh";
+  if (status === "PENDING") return "Đang chờ duyệt";
+  if (status === "REJECTED") return "Bị từ chối";
+  return "Chưa xác minh";
 }
 
 export default function BrandProfilePage() {
@@ -49,11 +56,11 @@ export default function BrandProfilePage() {
       const response = await fetch("/api/brand/dashboard/profile", { cache: "no-store" });
       const payload = (await response.json()) as ApiResponse<BrandProfile>;
       if (!response.ok || !payload.success) {
-        throw new Error(payload.success ? "Khong the tai Brand Profile" : payload.error);
+        throw new Error(payload.success ? "Không thể tải Brand Profile" : payload.error);
       }
       setForm({ ...defaultForm, ...payload.data });
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Khong the tai Brand Profile");
+      setError(requestError instanceof Error ? requestError.message : "Không thể tải Brand Profile");
     } finally {
       setLoading(false);
     }
@@ -76,12 +83,12 @@ export default function BrandProfilePage() {
       });
       const payload = (await response.json()) as ApiResponse<BrandProfile>;
       if (!response.ok || !payload.success) {
-        throw new Error(payload.success ? "Cap nhat Brand Profile that bai" : payload.error);
+        throw new Error(payload.success ? "Cập nhật Brand Profile thất bại" : payload.error);
       }
       setForm({ ...defaultForm, ...payload.data });
-      setSuccess("Da cap nhat Brand Profile.");
+      setSuccess("Đã cập nhật Brand Profile.");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Cap nhat Brand Profile that bai");
+      setError(requestError instanceof Error ? requestError.message : "Cập nhật Brand Profile thất bại");
     } finally {
       setSaving(false);
     }
@@ -91,22 +98,22 @@ export default function BrandProfilePage() {
     <>
       <PublicHeader />
       <AppShell sidebarItems={nav}>
-        <PageHeader title="Brand Profile" subtitle="Quan ly thong tin hien thi va trang thai xac minh cua Brand." />
-        {error ? <ErrorState title="Khong the tai profile" description={error} onRetry={() => void loadProfile()} /> : null}
+        <PageHeader title="Hồ sơ Brand" subtitle="Quản lý thông tin hiển thị và trạng thái xác minh của Brand." />
+        {error ? <ErrorState title="Không thể tải hồ sơ" description={error} onRetry={() => void loadProfile()} /> : null}
         {success ? <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p> : null}
 
         {loading ? (
           <LoadingSkeleton rows={4} />
         ) : !form.brandName && !error ? (
-          <EmptyState title="Chua co Brand Profile" description="Nhap thong tin Brand de hoan tat ho so." />
+          <EmptyState title="Chưa có hồ sơ Brand" description="Nhập thông tin Brand để hoàn tất hồ sơ." />
         ) : null}
 
         {!loading ? (
           <section className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
             <form className="dc-card grid gap-4 p-5" onSubmit={submitProfile}>
-              <SectionHeader title="Thong tin Brand" />
+              <SectionHeader title="Thông tin Brand" />
               <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-                Brand name
+                Tên Brand
                 <input
                   className="dc-input"
                   value={form.brandName}
@@ -115,7 +122,27 @@ export default function BrandProfilePage() {
                 />
               </label>
               <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-                Logo URL
+                Tên liên hệ
+                <input
+                  className="dc-input"
+                  value={form.contactName}
+                  onChange={(event) => setForm((current) => ({ ...current, contactName: event.target.value }))}
+                  required
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                Email liên hệ
+                <input
+                  className="dc-input"
+                  type="email"
+                  value={form.contactEmail}
+                  onChange={(event) => setForm((current) => ({ ...current, contactEmail: event.target.value }))}
+                  placeholder="brand@example.com"
+                  required
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                URL logo
                 <input
                   className="dc-input"
                   type="url"
@@ -125,25 +152,25 @@ export default function BrandProfilePage() {
                 />
               </label>
               <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-                Business info
+                Thông tin kinh doanh
                 <textarea
                   className="dc-input min-h-32"
                   value={form.businessInfo}
                   onChange={(event) => setForm((current) => ({ ...current, businessInfo: event.target.value }))}
-                  placeholder="Nganh hang, san pham, muc tieu campaign..."
+                  placeholder="Ngành hàng, sản phẩm, mục tiêu campaign..."
                 />
               </label>
               <button className="dc-btn-primary w-fit" type="submit" disabled={saving}>
-                {saving ? "Dang luu..." : "Luu Brand Profile"}
+                {saving ? "Đang lưu..." : "Lưu hồ sơ Brand"}
               </button>
             </form>
 
             <aside className="dc-card h-fit p-5">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">Preview</p>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">Xem trước</p>
               <div className="mt-4 flex items-center gap-3">
                 {form.logoUrl ? (
                   <div
-                    aria-label={form.brandName || "Brand logo"}
+                    aria-label={form.brandName || "Logo Brand"}
                     className="h-14 w-14 rounded-2xl border border-zinc-200 bg-zinc-100 bg-cover bg-center"
                     role="img"
                     style={{ backgroundImage: `url(${form.logoUrl})` }}
@@ -154,11 +181,13 @@ export default function BrandProfilePage() {
                   </div>
                 )}
                 <div>
-                  <p className="font-bold text-zinc-900">{form.brandName || "Brand name"}</p>
+                  <p className="font-bold text-zinc-900">{form.brandName || "Tên Brand"}</p>
+                  <p className="text-sm text-zinc-600">{form.contactName || "Tên liên hệ"}</p>
+                  <p className="text-sm text-zinc-500">{form.contactEmail || "Email liên hệ"}</p>
                   <p className="text-sm text-zinc-500">{statusLabel(form.verificationStatus)}</p>
                 </div>
               </div>
-              <p className="mt-4 text-sm leading-6 text-zinc-600">{form.businessInfo || "Chua co thong tin Brand."}</p>
+              <p className="mt-4 text-sm leading-6 text-zinc-600">{form.businessInfo || "Chưa có thông tin Brand."}</p>
             </aside>
           </section>
         ) : null}

@@ -160,7 +160,6 @@ export default function UserProfilePage() {
       bccAgreementAccepted: true,
       bccAgreementVersion: BRAND_BCC_VERSION,
       legalResponsibilityAccepted: true,
-      contractSignedAt: new Date().toISOString(),
       applicationId: isResubmit ? data.brandApplication?.id : undefined
     };
     const response = await fetch(endpoint, {

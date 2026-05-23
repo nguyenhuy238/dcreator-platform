@@ -215,7 +215,7 @@ export function DashboardSidebar({ items }: { items: NavItem[] }) {
         <Link
           key={item.href}
           href={item.href}
-          className={`dc-focus mb-2 block rounded-2xl px-3 py-2.5 text-sm font-semibold transition ${pathname === item.href ? "bg-zinc-900 text-white" : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"}`}
+          className={`dc-focus mb-2 block rounded-2xl px-3 py-2.5 text-sm font-semibold transition ${pathname === item.href ? "!bg-zinc-900 !text-white" : "text-zinc-600 hover:!bg-zinc-900 hover:!text-white"}`}
         >
           {item.label}
         </Link>
