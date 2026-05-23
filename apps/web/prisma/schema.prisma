@@ -44,6 +44,18 @@ enum BrandStatus {
   PENDING_VERIFICATION
 }
 
+enum FulfillmentType {
+  NONE_WAREHOUSE
+  BRAND_FULFILLMENT
+}
+
+enum OpsReviewStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
 enum RoleRequestType {
   CREATOR
   BRAND
@@ -68,6 +80,34 @@ enum CampaignType {
   PREORDER
   SPONSORSHIP
   COMMUNITY
+}
+
+enum CampaignSetupSource {
+  JOIN_EXISTING_DCREATOR_CAMP
+  BRAND_REQUESTED
+}
+
+enum CampaignFeasibilityStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  NEEDS_ADJUSTMENT
+  REJECTED
+}
+
+enum BrandCampaignApprovalStatus {
+  DRAFT
+  WAITING_DCREATOR_REVIEW
+  WAITING_BRAND_APPROVAL
+  APPROVED
+  CHANGE_REQUESTED
+}
+
+enum BrandCampaignRequestStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  NEEDS_REVISION
 }
 
 enum CampaignCategory {
@@ -363,6 +403,7 @@ model Account {
   reviewedCreatorApplications CreatorApplication[] @relation("CreatorApplicationReviewer")
   reviewedBrandApplications BrandApplication[] @relation("BrandApplicationReviewer")
   reviewedBrands Brand[] @relation("BrandReviewer")
+  reviewedBrandCampaignRequests BrandCampaignRequest[] @relation("BrandCampaignRequestReviewer")
   ownedBrands Brand[] @relation("BrandOwner")
   reviewedProductSubmissions ProductSubmission[] @relation("ProductSubmissionReviewer")
   creatorFulfillmentOrders FulfillmentOrder[] @relation("FulfillmentCreator")
@@ -544,7 +585,91 @@ model Brand {
   owner               Account     @relation("BrandOwner", fields: [ownerAccountId], references: [id], onDelete: Restrict)
   reviewedBy          Account?    @relation("BrandReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   members             BrandMember[]
+  products            BrandProduct[]
+  campaignRequests    BrandCampaignRequest[]
   productSubmissions  ProductSubmission[]
+}
+
+model BrandCampaignRequest {
+  id                       String                     @id @default(cuid())
+  brandId                  String
+  requestedSlug            String
+  title                    String
+  brief                    String
+  setupSource              CampaignSetupSource        @default(BRAND_REQUESTED)
+  objective                String?
+  priorityChannels         String?
+  missionTypes             String?
+  creatorCommissionPercent Int                        @default(0)
+  userCommissionPercent    Int                        @default(0)
+  bonusBudgetVnd           Int                        @default(0)
+  budgetVnd                Int
+  targetAmountVnd          Int                        @default(10000000)
+  campaignType             CampaignType               @default(COMMUNITY)
+  category                 CampaignCategory           @default(LIFESTYLE)
+  startsAt                 DateTime?
+  endsAt                   DateTime?
+  status                   BrandCampaignRequestStatus @default(PENDING_REVIEW)
+  adminNote                String?
+  brandFeedback            String?
+  createdCampaignId        String?
+  reviewedById             String?
+  reviewedAt               DateTime?
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
+
+  brand                    Brand                      @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  createdCampaign          Campaign?                  @relation("CampaignFromBrandRequest", fields: [createdCampaignId], references: [id], onDelete: SetNull)
+  reviewedBy               Account?                   @relation("BrandCampaignRequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([brandId, createdAt])
+  @@index([status, createdAt])
+  @@index([createdCampaignId])
+}
+
+model BrandProduct {
+  id                  String                @id @default(cuid())
+  brandId             String
+  sku                 String
+  name                String
+  description         String?
+  imageUrl            String?
+  stockQty            Int                   @default(0)
+  voucherStock        Int                   @default(0)
+  campaignEligibility Boolean               @default(true)
+  suggestedPriceVnd   Int                   @default(0)
+  costPriceVnd        Int                   @default(0)
+  priceVnd            Int                   @default(0)
+  pricePoints         Int                   @default(0)
+  returnPolicy        String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  brand               Brand                 @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  batches             BrandInventoryBatch[]
+
+  @@unique([brandId, sku])
+  @@index([brandId, createdAt])
+  @@index([campaignEligibility])
+}
+
+model BrandInventoryBatch {
+  id                  String          @id @default(cuid())
+  productId           String
+  quantity            Int             @default(0)
+  expiryDate          DateTime?
+  fulfillmentType     FulfillmentType @default(BRAND_FULFILLMENT)
+  opsStatus           OpsReviewStatus @default(PENDING_REVIEW)
+  appraisedValueVnd   Int             @default(0)
+  viableMarginPercent Int             @default(0)
+  opsNote             String?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  product             BrandProduct    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, createdAt])
+  @@index([opsStatus])
 }
 
 model BrandMember {
@@ -617,6 +742,17 @@ model Campaign {
   brief          String
   coverImageUrl  String?
   campaignType   CampaignType      @default(COMMUNITY)
+  setupSource    CampaignSetupSource @default(BRAND_REQUESTED)
+  objective      String?
+  priorityChannels String?
+  missionTypes   String?
+  creatorCommissionPercent Int      @default(0)
+  userCommissionPercent Int         @default(0)
+  bonusBudgetVnd Int                @default(0)
+  feasibilityStatus CampaignFeasibilityStatus @default(DRAFT)
+  feasibilityNote String?
+  brandApprovalStatus BrandCampaignApprovalStatus @default(DRAFT)
+  brandFeedback   String?
   category       CampaignCategory  @default(LIFESTYLE)
   targetAmountVnd Int              @default(10000000)
   fundedAmountVnd Int              @default(0)
@@ -637,6 +773,7 @@ model Campaign {
   paymentOrders  PaymentOrder[]
   analytics      AnalyticsDaily[]
   analyticsEvents AnalyticsEvent[]
+  sourceBrandRequests BrandCampaignRequest[] @relation("CampaignFromBrandRequest")
   fulfillmentOrders FulfillmentOrder[]
   productSubmissions ProductSubmission[]
   creatorMissions CreatorMission[]

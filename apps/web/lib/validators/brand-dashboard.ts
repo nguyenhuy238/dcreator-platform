@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export const brandProfileSchema = z.object({
   brandName: z.string().trim().min(2).max(160),
+  contactName: z.string().trim().min(2).max(120).optional().or(z.literal("")),
+  contactEmail: z.email().trim().toLowerCase().optional().or(z.literal("")),
   logoUrl: z.url().max(400).optional().or(z.literal("")),
   businessInfo: z.string().trim().max(2000).optional(),
   verificationStatus: z.enum(["UNVERIFIED", "PENDING", "VERIFIED", "REJECTED"]).default("UNVERIFIED")
@@ -11,11 +13,26 @@ export const productSchema = z.object({
   id: z.string().trim().min(3).max(64).optional(),
   sku: z.string().trim().min(1).max(80),
   name: z.string().trim().min(1).max(160),
+  description: z.string().trim().max(2000).optional().or(z.literal("")),
+  imageUrl: z.url().max(400).optional().or(z.literal("")),
   stockQty: z.number().int().min(0),
   voucherStock: z.number().int().min(0),
   campaignEligibility: z.boolean().default(true),
+  suggestedPriceVnd: z.number().int().min(0).optional(),
+  costPriceVnd: z.number().int().min(0).optional(),
   priceVnd: z.number().int().min(0).optional(),
-  pricePoints: z.number().int().min(0).optional()
+  pricePoints: z.number().int().min(0).optional(),
+  returnPolicy: z.string().trim().max(1200).optional().or(z.literal("")),
+  batches: z.array(z.object({
+    id: z.string().trim().min(3).max(64).optional(),
+    quantity: z.number().int().min(0),
+    expiryDate: z.string().trim().max(40).optional().or(z.literal("")),
+    fulfillmentType: z.enum(["NONE_WAREHOUSE", "BRAND_FULFILLMENT"]),
+    opsStatus: z.enum(["DRAFT", "PENDING_REVIEW", "APPROVED", "REJECTED"]).default("DRAFT"),
+    appraisedValueVnd: z.number().int().min(0).optional(),
+    viableMarginPercent: z.number().int().min(0).max(100).optional(),
+    opsNote: z.string().trim().max(1000).optional().or(z.literal(""))
+  })).default([])
 });
 
 export const brandOnboardingSchema = z.object({
@@ -27,11 +44,11 @@ export const brandOnboardingSchema = z.object({
   inventoryDescription: z.string().trim().max(1200, { message: "Mô tả tồn kho tối đa 1200 ký tự." }).optional().or(z.literal("")),
   revenueSharePercent: z.number().int().min(0, { message: "Phần trăm doanh thu phải từ 0 đến 100." }).max(100, { message: "Phần trăm doanh thu phải từ 0 đến 100." }).default(70),
   commissionRatePercent: z.number().int().min(0, { message: "Commission phải từ 0 đến 100." }).max(100, { message: "Commission phải từ 0 đến 100." }).default(10),
-  bccAgreementAccepted: z.boolean().refine((value) => value === true, { message: "Bạn phải đồng ý với nội dung hợp đồng BCC." }),
+  bccAgreementAccepted: z.boolean(),
   bccAgreementVersion: z.string().trim().min(1).max(60).default("BCC-dCreator-v1"),
   bccAgreementTerms: z.string().trim().min(10, { message: "Nội dung hợp đồng BCC phải có ít nhất 10 ký tự." }).max(10000, { message: "Nội dung hợp đồng BCC tối đa 10000 ký tự." }),
   requestAdminReview: z.boolean().optional(),
-  legalResponsibilityAccepted: z.boolean().refine((value) => value === true, { message: "Bạn phải xác nhận chịu trách nhiệm pháp lý." }),
+  legalResponsibilityAccepted: z.boolean(),
   contractFileUrl: z.string().trim().max(400, { message: "Ghi chú hợp đồng / tài liệu bổ sung tối đa 400 ký tự." }).optional().or(z.literal(""))
 }).superRefine((value, ctx) => {
   const hasValidBusinessLicenseUrl = (() => {
@@ -45,7 +62,16 @@ export const brandOnboardingSchema = z.object({
   })();
 
   if (value.requestAdminReview) {
-    return;
+    if (!value.contractFileUrl) {
+      ctx.addIssue({ code: "custom", path: ["contractFileUrl"], message: "Vui lòng tải file hợp đồng / tài liệu bổ sung." });
+    }
+  }
+
+  if (!value.requestAdminReview && !value.bccAgreementAccepted) {
+    ctx.addIssue({ code: "custom", path: ["bccAgreementAccepted"], message: "Bạn phải đồng ý với nội dung hợp đồng BCC." });
+  }
+  if (!value.requestAdminReview && !value.legalResponsibilityAccepted) {
+    ctx.addIssue({ code: "custom", path: ["legalResponsibilityAccepted"], message: "Bạn phải xác nhận chịu trách nhiệm pháp lý." });
   }
 
   if (!hasValidBusinessLicenseUrl) {
@@ -77,6 +103,36 @@ export const campaignCreateSchema = z.object({
   targetAmountVnd: z.number().int().positive().optional(),
   category: z.enum(["TECH", "FASHION", "FOOD", "BEAUTY", "LIFESTYLE", "EDUCATION"]),
   campaignType: z.enum(["DONATION", "PREORDER", "SPONSORSHIP", "COMMUNITY"]),
+  setupSource: z.enum(["JOIN_EXISTING_DCREATOR_CAMP", "BRAND_REQUESTED"]).default("BRAND_REQUESTED"),
+  objective: z.string().trim().max(1000).optional().or(z.literal("")),
+  priorityChannels: z.string().trim().max(500).optional().or(z.literal("")),
+  missionTypes: z.string().trim().max(500).optional().or(z.literal("")),
+  creatorCommissionPercent: z.number().int().min(0).max(100).default(0),
+  userCommissionPercent: z.number().int().min(0).max(100).default(0),
+  bonusBudgetVnd: z.number().int().min(0).default(0),
+  startsAt: z.string().datetime().optional(),
+  endsAt: z.string().datetime().optional()
+});
+
+export const campaignBrandFeedbackSchema = z.object({
+  feedback: z.string().trim().min(10).max(1200)
+});
+
+export const campaignRequestSchema = z.object({
+  requestedSlug: z.string().trim().min(3).max(120),
+  title: z.string().trim().min(3).max(200),
+  brief: z.string().trim().min(10).max(3000),
+  budgetVnd: z.number().int().positive(),
+  targetAmountVnd: z.number().int().positive().optional(),
+  category: z.enum(["TECH", "FASHION", "FOOD", "BEAUTY", "LIFESTYLE", "EDUCATION"]),
+  campaignType: z.enum(["DONATION", "PREORDER", "SPONSORSHIP", "COMMUNITY"]),
+  setupSource: z.enum(["JOIN_EXISTING_DCREATOR_CAMP", "BRAND_REQUESTED"]).default("BRAND_REQUESTED"),
+  objective: z.string().trim().max(1000).optional().or(z.literal("")),
+  priorityChannels: z.string().trim().max(500).optional().or(z.literal("")),
+  missionTypes: z.string().trim().max(500).optional().or(z.literal("")),
+  creatorCommissionPercent: z.number().int().min(0).max(100).default(0),
+  userCommissionPercent: z.number().int().min(0).max(100).default(0),
+  bonusBudgetVnd: z.number().int().min(0).default(0),
   startsAt: z.string().datetime().optional(),
   endsAt: z.string().datetime().optional()
 });

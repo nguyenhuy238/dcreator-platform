@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { ApplicationStatus, Brand, CampaignStatus, MissionAudience, Role } from "@prisma/client";
+import { ApplicationStatus, Brand, BrandInventoryBatch, BrandProduct, CampaignStatus, MissionAudience, Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { approveProof, rejectProof } from "@/lib/services/mission.service";
@@ -12,7 +12,9 @@ import type {
   brandOnboardingSchema,
   budgetLockSchema,
   budgetTopupSchema,
+  campaignBrandFeedbackSchema,
   campaignCreateSchema,
+  campaignRequestSchema,
   creatorApplicationDecisionSchema,
   productSubmissionSchema,
   productSchema,
@@ -24,6 +26,8 @@ type BrandProfileInput = z.infer<typeof brandProfileSchema>;
 type BrandOnboardingInput = z.infer<typeof brandOnboardingSchema>;
 type ProductInput = z.infer<typeof productSchema>;
 type CampaignInput = z.infer<typeof campaignCreateSchema>;
+type CampaignBrandFeedbackInput = z.infer<typeof campaignBrandFeedbackSchema>;
+type CampaignRequestInput = z.infer<typeof campaignRequestSchema>;
 type RewardInput = z.infer<typeof rewardTierSchema>;
 type CreatorApplicationDecisionInput = z.infer<typeof creatorApplicationDecisionSchema>;
 type ProofReviewDecisionInput = z.infer<typeof proofReviewDecisionSchema>;
@@ -31,9 +35,13 @@ type BudgetLockInput = z.infer<typeof budgetLockSchema>;
 type BudgetTopupInput = z.infer<typeof budgetTopupSchema>;
 type ProductSubmissionInput = z.infer<typeof productSubmissionSchema>;
 
+type BrandProductWithBatches = BrandProduct & { batches: BrandInventoryBatch[] };
+
 type BrandMeta = {
   brandProfile: {
     brandName: string;
+    contactName: string;
+    contactEmail: string;
     logoUrl: string;
     businessInfo: string;
     verificationStatus: "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
@@ -42,11 +50,26 @@ type BrandMeta = {
     id: string;
     sku: string;
     name: string;
+    description: string;
+    imageUrl: string;
     stockQty: number;
     voucherStock: number;
     campaignEligibility: boolean;
+    suggestedPriceVnd: number;
+    costPriceVnd: number;
     priceVnd: number;
     pricePoints: number;
+    returnPolicy: string;
+    batches: Array<{
+      id: string;
+      quantity: number;
+      expiryDate: string;
+      fulfillmentType: "NONE_WAREHOUSE" | "BRAND_FULFILLMENT";
+      opsStatus: "DRAFT" | "PENDING_REVIEW" | "APPROVED" | "REJECTED";
+      appraisedValueVnd: number;
+      viableMarginPercent: number;
+      opsNote: string;
+    }>;
   }>;
 };
 
@@ -56,6 +79,8 @@ function parseBrandMeta(value: unknown): BrandMeta {
   const fallback: BrandMeta = {
     brandProfile: {
       brandName: "",
+      contactName: "",
+      contactEmail: "",
       logoUrl: "",
       businessInfo: "",
       verificationStatus: "UNVERIFIED"
@@ -72,6 +97,8 @@ function parseBrandMeta(value: unknown): BrandMeta {
     profile && typeof profile === "object"
       ? {
           brandName: typeof (profile as { brandName?: unknown }).brandName === "string" ? (profile as { brandName: string }).brandName : "",
+          contactName: typeof (profile as { contactName?: unknown }).contactName === "string" ? (profile as { contactName: string }).contactName : "",
+          contactEmail: typeof (profile as { contactEmail?: unknown }).contactEmail === "string" ? (profile as { contactEmail: string }).contactEmail : "",
           logoUrl: typeof (profile as { logoUrl?: unknown }).logoUrl === "string" ? (profile as { logoUrl: string }).logoUrl : "",
           businessInfo: typeof (profile as { businessInfo?: unknown }).businessInfo === "string" ? (profile as { businessInfo: string }).businessInfo : "",
           verificationStatus: ((): VerificationStatus => {
@@ -85,19 +112,51 @@ function parseBrandMeta(value: unknown): BrandMeta {
   const parsedProducts = Array.isArray(products)
     ? products
         .filter((p) => p && typeof p === "object")
-        .map((p) => ({
-          id: typeof (p as { id?: unknown }).id === "string" ? (p as { id: string }).id : randomUUID(),
-          sku: typeof (p as { sku?: unknown }).sku === "string" ? (p as { sku: string }).sku : "",
-          name: typeof (p as { name?: unknown }).name === "string" ? (p as { name: string }).name : "",
-          stockQty: typeof (p as { stockQty?: unknown }).stockQty === "number" ? (p as { stockQty: number }).stockQty : 0,
-          voucherStock: typeof (p as { voucherStock?: unknown }).voucherStock === "number" ? (p as { voucherStock: number }).voucherStock : 0,
-          campaignEligibility:
-            typeof (p as { campaignEligibility?: unknown }).campaignEligibility === "boolean"
-              ? (p as { campaignEligibility: boolean }).campaignEligibility
-              : true,
-          priceVnd: typeof (p as { priceVnd?: unknown }).priceVnd === "number" ? (p as { priceVnd: number }).priceVnd : 0,
-          pricePoints: typeof (p as { pricePoints?: unknown }).pricePoints === "number" ? (p as { pricePoints: number }).pricePoints : 0
-        }))
+        .map((p) => {
+          const rawProduct = p as Record<string, unknown>;
+          const batches = Array.isArray(rawProduct.batches)
+            ? rawProduct.batches
+                .filter((batch) => batch && typeof batch === "object")
+                .map((batch) => {
+                  const rawBatch = batch as Record<string, unknown>;
+                  const fulfillmentType: "NONE_WAREHOUSE" | "BRAND_FULFILLMENT" =
+                    rawBatch.fulfillmentType === "NONE_WAREHOUSE" || rawBatch.fulfillmentType === "BRAND_FULFILLMENT"
+                      ? rawBatch.fulfillmentType
+                      : "BRAND_FULFILLMENT";
+                  const opsStatus: "DRAFT" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" =
+                    rawBatch.opsStatus === "PENDING_REVIEW" || rawBatch.opsStatus === "APPROVED" || rawBatch.opsStatus === "REJECTED" || rawBatch.opsStatus === "DRAFT"
+                      ? rawBatch.opsStatus
+                      : "DRAFT";
+                  return {
+                    id: typeof rawBatch.id === "string" ? rawBatch.id : randomUUID(),
+                    quantity: typeof rawBatch.quantity === "number" ? rawBatch.quantity : 0,
+                    expiryDate: typeof rawBatch.expiryDate === "string" ? rawBatch.expiryDate : "",
+                    fulfillmentType,
+                    opsStatus,
+                    appraisedValueVnd: typeof rawBatch.appraisedValueVnd === "number" ? rawBatch.appraisedValueVnd : 0,
+                    viableMarginPercent: typeof rawBatch.viableMarginPercent === "number" ? rawBatch.viableMarginPercent : 0,
+                    opsNote: typeof rawBatch.opsNote === "string" ? rawBatch.opsNote : ""
+                  };
+                })
+            : [];
+
+          return {
+            id: typeof rawProduct.id === "string" ? rawProduct.id : randomUUID(),
+            sku: typeof rawProduct.sku === "string" ? rawProduct.sku : "",
+            name: typeof rawProduct.name === "string" ? rawProduct.name : "",
+            description: typeof rawProduct.description === "string" ? rawProduct.description : "",
+            imageUrl: typeof rawProduct.imageUrl === "string" ? rawProduct.imageUrl : "",
+            stockQty: typeof rawProduct.stockQty === "number" ? rawProduct.stockQty : 0,
+            voucherStock: typeof rawProduct.voucherStock === "number" ? rawProduct.voucherStock : 0,
+            campaignEligibility: typeof rawProduct.campaignEligibility === "boolean" ? rawProduct.campaignEligibility : true,
+            suggestedPriceVnd: typeof rawProduct.suggestedPriceVnd === "number" ? rawProduct.suggestedPriceVnd : typeof rawProduct.priceVnd === "number" ? rawProduct.priceVnd : 0,
+            costPriceVnd: typeof rawProduct.costPriceVnd === "number" ? rawProduct.costPriceVnd : 0,
+            priceVnd: typeof rawProduct.priceVnd === "number" ? rawProduct.priceVnd : typeof rawProduct.suggestedPriceVnd === "number" ? rawProduct.suggestedPriceVnd : 0,
+            pricePoints: typeof rawProduct.pricePoints === "number" ? rawProduct.pricePoints : 0,
+            returnPolicy: typeof rawProduct.returnPolicy === "string" ? rawProduct.returnPolicy : "",
+            batches
+          };
+        })
     : [];
 
   return { brandProfile: parsedProfile, products: parsedProducts };
@@ -108,6 +167,51 @@ async function getBrandScopedCampaign(campaignId: string, brandId: string) {
   if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
   if (campaign.brandId !== brandId) throw new AppError("Forbidden", 403, "BRAND_FORBIDDEN");
   return campaign;
+}
+
+function getBrandProductData(input: ProductInput) {
+  return {
+    sku: input.sku,
+    name: input.name,
+    description: input.description || null,
+    imageUrl: input.imageUrl || null,
+    stockQty: input.stockQty,
+    voucherStock: input.voucherStock,
+    campaignEligibility: input.campaignEligibility,
+    suggestedPriceVnd: input.suggestedPriceVnd ?? input.priceVnd ?? 0,
+    costPriceVnd: input.costPriceVnd ?? 0,
+    priceVnd: input.priceVnd ?? input.suggestedPriceVnd ?? 0,
+    pricePoints: input.pricePoints ?? 0,
+    returnPolicy: input.returnPolicy || null
+  };
+}
+
+function toBrandProductDto(product: BrandProductWithBatches) {
+  return {
+    id: product.id,
+    sku: product.sku,
+    name: product.name,
+    description: product.description ?? "",
+    imageUrl: product.imageUrl ?? "",
+    stockQty: product.stockQty,
+    voucherStock: product.voucherStock,
+    campaignEligibility: product.campaignEligibility,
+    suggestedPriceVnd: product.suggestedPriceVnd,
+    costPriceVnd: product.costPriceVnd,
+    priceVnd: product.priceVnd,
+    pricePoints: product.pricePoints,
+    returnPolicy: product.returnPolicy ?? "",
+    batches: product.batches.map((batch) => ({
+      id: batch.id,
+      quantity: batch.quantity,
+      expiryDate: batch.expiryDate ? batch.expiryDate.toISOString().slice(0, 10) : "",
+      fulfillmentType: batch.fulfillmentType,
+      opsStatus: batch.opsStatus,
+      appraisedValueVnd: batch.appraisedValueVnd,
+      viableMarginPercent: batch.viableMarginPercent,
+      opsNote: batch.opsNote ?? ""
+    }))
+  };
 }
 
 export async function getBrandOverview(accountId: string) {
@@ -133,7 +237,16 @@ export async function getBrandOverview(accountId: string) {
   };
 }
 
-function toOnboardingStatus(brand: Brand | null) {
+function toOnboardingStatus(
+  brand: Brand | null,
+  latestApplication?: { bccAgreementAccepted: boolean; status: ApplicationStatus; reviewNote?: string | null } | null
+) {
+  const supplementaryBccReviewApproved =
+    latestApplication?.status === ApplicationStatus.APPROVED &&
+    latestApplication?.reviewNote === "Brand requested onboarding/BCC update and admin review.";
+  const bccAgreementAccepted = Boolean(
+    latestApplication?.bccAgreementAccepted || (brand?.bccAgreementTerms && brand.contractSignedAt && brand.legalResponsibilityAccepted)
+  );
   const completed = Boolean(
     brand?.legalName &&
       brand.industry &&
@@ -141,7 +254,9 @@ function toOnboardingStatus(brand: Brand | null) {
       brand.productCategories &&
       brand.inventoryDescription &&
       brand.bccAgreementVersion &&
+      bccAgreementAccepted &&
       brand.legalResponsibilityAccepted &&
+      brand.contractSignedAt &&
       brand.revenueSharePercent !== null &&
       brand.commissionRatePercent !== null
   );
@@ -157,11 +272,14 @@ function toOnboardingStatus(brand: Brand | null) {
     revenueSharePercent: brand?.revenueSharePercent ?? 70,
     commissionRatePercent: brand?.commissionRatePercent ?? 10,
     bccAgreementVersion: brand?.bccAgreementVersion ?? "BCC-dCreator-v1",
+    bccAgreementAccepted,
     bccAgreementTerms: brand?.bccAgreementTerms ?? "",
     legalResponsibilityAccepted: brand?.legalResponsibilityAccepted ?? false,
     contractFileUrl: brand?.contractFileUrl ?? "",
     contractSignedAt: brand?.contractSignedAt?.toISOString() ?? null,
-    status: brand?.status ?? null
+    supplementaryBccReviewApproved,
+    status: brand?.status ?? null,
+    reviewStatus: latestApplication?.status ?? null
   };
 }
 
@@ -213,7 +331,12 @@ async function ensureBrandForOwner(accountId: string) {
 
 export async function getBrandOnboarding(accountId: string) {
   const brand = await ensureBrandForOwner(accountId);
-  return toOnboardingStatus(brand);
+  const latestApplication = await prisma.brandApplication.findFirst({
+    where: { accountId },
+    orderBy: { createdAt: "desc" },
+    select: { bccAgreementAccepted: true, status: true, reviewNote: true }
+  });
+  return toOnboardingStatus(brand, latestApplication);
 }
 
 export async function updateBrandOnboarding(accountId: string, input: BrandOnboardingInput) {
@@ -309,7 +432,10 @@ export async function updateBrandOnboarding(accountId: string, input: BrandOnboa
     }
   }
 
-  return toOnboardingStatus(updated);
+  return toOnboardingStatus(updated, {
+    bccAgreementAccepted: input.bccAgreementAccepted,
+    status: isRequestReview ? ApplicationStatus.PENDING_REVIEW : ApplicationStatus.APPROVED
+  });
 }
 
 export async function getBrandProfile(accountId: string) {
@@ -323,6 +449,9 @@ export async function getBrandProfile(accountId: string) {
   const bccSource = brand ?? latestApplication;
   return {
     ...meta.brandProfile,
+    brandName: meta.brandProfile.brandName || brand?.name || latestApplication?.brandName || account.displayName || "",
+    contactName: meta.brandProfile.contactName || brand?.contactName || latestApplication?.contactName || account.displayName || "",
+    contactEmail: meta.brandProfile.contactEmail || brand?.contactEmail || latestApplication?.contactEmail || account.email || "",
     bccAgreement: bccSource
       ? {
           revenueSharePercent: bccSource.revenueSharePercent,
@@ -346,6 +475,17 @@ export async function updateBrandProfile(accountId: string, input: BrandProfileI
     data: { displayName: input.brandName, avatarUrl: input.logoUrl || null }
   });
 
+  await prisma.brand.updateMany({
+    where: { ownerAccountId: accountId },
+    data: {
+      name: input.brandName,
+      contactName: input.contactName || input.brandName,
+      contactEmail: input.contactEmail || undefined,
+      logoUrl: input.logoUrl || null,
+      description: input.businessInfo || null
+    }
+  });
+
   await prisma.profile.upsert({
     where: { accountId },
     create: {
@@ -363,34 +503,61 @@ export async function updateBrandProfile(accountId: string, input: BrandProfileI
 }
 
 export async function listProducts(accountId: string) {
+  const brand = await ensureBrandForOwner(accountId);
+  const products = await prisma.brandProduct.findMany({
+    where: { brandId: brand.id },
+    include: { batches: { orderBy: { createdAt: "desc" } } },
+    orderBy: { createdAt: "desc" }
+  });
+
+  if (products.length > 0) return products.map(toBrandProductDto);
+
   const profile = await prisma.profile.findUnique({ where: { accountId } });
   return parseBrandMeta(profile?.socialLinks).products;
 }
 
 export async function upsertProduct(accountId: string, input: ProductInput) {
-  const profile = await prisma.profile.findUnique({ where: { accountId } });
-  const meta = parseBrandMeta(profile?.socialLinks);
+  const brand = await ensureBrandForOwner(accountId);
+  const existing = input.id
+    ? await prisma.brandProduct.findFirst({ where: { id: input.id, brandId: brand.id }, select: { id: true } })
+    : await prisma.brandProduct.findUnique({ where: { brandId_sku: { brandId: brand.id, sku: input.sku } }, select: { id: true } });
 
-  const product = {
-    id: input.id ?? randomUUID(),
-    sku: input.sku,
-    name: input.name,
-    stockQty: input.stockQty,
-    voucherStock: input.voucherStock,
-    campaignEligibility: input.campaignEligibility,
-    priceVnd: input.priceVnd ?? 0,
-    pricePoints: input.pricePoints ?? 0
-  };
+  const product = await prisma.$transaction(async (tx) => {
+    const savedProduct = existing
+      ? await tx.brandProduct.update({
+          where: { id: existing.id },
+          data: getBrandProductData(input)
+        })
+      : await tx.brandProduct.create({
+          data: {
+            brandId: brand.id,
+            ...getBrandProductData(input)
+          }
+        });
 
-  const nextProducts = [...meta.products.filter((p) => p.id !== product.id), product];
+    await tx.brandInventoryBatch.deleteMany({ where: { productId: savedProduct.id } });
+    if (input.batches.length > 0) {
+      await tx.brandInventoryBatch.createMany({
+        data: input.batches.map((batch) => ({
+          productId: savedProduct.id,
+          quantity: batch.quantity,
+          expiryDate: batch.expiryDate ? new Date(batch.expiryDate) : null,
+          fulfillmentType: batch.fulfillmentType,
+          opsStatus: batch.opsStatus,
+          appraisedValueVnd: batch.appraisedValueVnd ?? 0,
+          viableMarginPercent: batch.viableMarginPercent ?? 0,
+          opsNote: batch.opsNote || null
+        }))
+      });
+    }
 
-  await prisma.profile.upsert({
-    where: { accountId },
-    create: { accountId, socialLinks: { ...meta, products: nextProducts } },
-    update: { socialLinks: { ...meta, products: nextProducts } }
+    return tx.brandProduct.findUniqueOrThrow({
+      where: { id: savedProduct.id },
+      include: { batches: { orderBy: { createdAt: "desc" } } }
+    });
   });
 
-  return product;
+  return toBrandProductDto(product);
 }
 
 export async function createBrandCampaign(accountId: string, input: CampaignInput) {
@@ -404,9 +571,18 @@ export async function createBrandCampaign(accountId: string, input: CampaignInpu
       targetAmountVnd: input.targetAmountVnd ?? input.budgetVnd,
       category: input.category,
       campaignType: input.campaignType,
+      setupSource: input.setupSource,
+      objective: input.objective || null,
+      priorityChannels: input.priorityChannels || null,
+      missionTypes: input.missionTypes || null,
+      creatorCommissionPercent: input.creatorCommissionPercent,
+      userCommissionPercent: input.userCommissionPercent,
+      bonusBudgetVnd: input.bonusBudgetVnd,
+      feasibilityStatus: "PENDING_REVIEW",
+      brandApprovalStatus: "WAITING_DCREATOR_REVIEW",
       startsAt: input.startsAt ? new Date(input.startsAt) : null,
       endsAt: input.endsAt ? new Date(input.endsAt) : null,
-      status: "DRAFT"
+      status: "PAUSED"
     }
   });
 
@@ -437,6 +613,13 @@ export async function editDraftCampaign(accountId: string, campaignId: string, i
       targetAmountVnd: input.targetAmountVnd ?? input.budgetVnd,
       category: input.category,
       campaignType: input.campaignType,
+      setupSource: input.setupSource,
+      objective: input.objective || null,
+      priorityChannels: input.priorityChannels || null,
+      missionTypes: input.missionTypes || null,
+      creatorCommissionPercent: input.creatorCommissionPercent,
+      userCommissionPercent: input.userCommissionPercent,
+      bonusBudgetVnd: input.bonusBudgetVnd,
       startsAt: input.startsAt ? new Date(input.startsAt) : null,
       endsAt: input.endsAt ? new Date(input.endsAt) : null
     }
@@ -455,7 +638,12 @@ export async function submitCampaignForAdminReview(accountId: string, campaignId
 
   const updated = await prisma.campaign.update({
     where: { id: campaignId },
-    data: { status: "PAUSED" }
+    data: {
+      status: "PAUSED",
+      feasibilityStatus: "PENDING_REVIEW",
+      brandApprovalStatus: "WAITING_DCREATOR_REVIEW",
+      brandFeedback: null
+    }
   });
 
   await prisma.auditLog.create({
@@ -471,8 +659,88 @@ export async function submitCampaignForAdminReview(accountId: string, campaignId
   return updated;
 }
 
+export async function approveCampaignForPublish(accountId: string, campaignId: string) {
+  const campaign = await getBrandScopedCampaign(campaignId, accountId);
+  if (campaign.status !== "PAUSED") throw new AppError("Campaign is not waiting for approval", 409, "CAMPAIGN_NOT_WAITING_APPROVAL");
+  if (campaign.feasibilityStatus !== "APPROVED") throw new AppError("Admin has not approved feasibility yet", 409, "CAMPAIGN_FEASIBILITY_NOT_APPROVED");
+
+  return prisma.campaign.update({
+    where: { id: campaignId },
+    data: {
+      status: "ACTIVE",
+      brandApprovalStatus: "APPROVED",
+      brandFeedback: null
+    }
+  });
+}
+
+export async function requestCampaignAdjustment(accountId: string, campaignId: string, input: CampaignBrandFeedbackInput) {
+  const campaign = await getBrandScopedCampaign(campaignId, accountId);
+  if (campaign.status !== "PAUSED" && campaign.status !== "DRAFT") throw new AppError("Campaign is not waiting for feedback", 409, "CAMPAIGN_NOT_WAITING_FEEDBACK");
+
+  return prisma.campaign.update({
+    where: { id: campaignId },
+    data: {
+      status: "PAUSED",
+      feasibilityStatus: "PENDING_REVIEW",
+      brandApprovalStatus: "WAITING_DCREATOR_REVIEW",
+      brandFeedback: input.feedback
+    }
+  });
+}
+
 export async function listBrandCampaigns(accountId: string) {
   return prisma.campaign.findMany({ where: { brandId: accountId }, orderBy: { createdAt: "desc" } });
+}
+
+export async function listBrandCampaignRequests(accountId: string) {
+  const brand = await ensureBrandForOwner(accountId);
+  return prisma.brandCampaignRequest.findMany({
+    where: { brandId: brand.id },
+    include: { createdCampaign: { select: { id: true, slug: true, title: true, status: true } } },
+    orderBy: { createdAt: "desc" }
+  });
+}
+
+export async function createBrandCampaignRequest(accountId: string, input: CampaignRequestInput) {
+  const brand = await ensureBrandForOwner(accountId);
+  return prisma.brandCampaignRequest.create({
+    data: {
+      brandId: brand.id,
+      requestedSlug: input.requestedSlug,
+      title: input.title,
+      brief: input.brief,
+      setupSource: input.setupSource,
+      objective: input.objective || null,
+      priorityChannels: input.priorityChannels || null,
+      missionTypes: input.missionTypes || null,
+      creatorCommissionPercent: input.creatorCommissionPercent,
+      userCommissionPercent: input.userCommissionPercent,
+      bonusBudgetVnd: input.bonusBudgetVnd,
+      budgetVnd: input.budgetVnd,
+      targetAmountVnd: input.targetAmountVnd ?? input.budgetVnd,
+      category: input.category,
+      campaignType: input.campaignType,
+      startsAt: input.startsAt ? new Date(input.startsAt) : null,
+      endsAt: input.endsAt ? new Date(input.endsAt) : null,
+      status: "PENDING_REVIEW"
+    }
+  });
+}
+
+export async function respondBrandCampaignRequest(accountId: string, requestId: string, input: CampaignBrandFeedbackInput) {
+  const brand = await ensureBrandForOwner(accountId);
+  const request = await prisma.brandCampaignRequest.findFirst({ where: { id: requestId, brandId: brand.id } });
+  if (!request) throw new AppError("Campaign request not found", 404, "CAMPAIGN_REQUEST_NOT_FOUND");
+  if (request.status !== "NEEDS_REVISION") throw new AppError("Campaign request is not waiting for Brand feedback", 409, "CAMPAIGN_REQUEST_NOT_WAITING_FEEDBACK");
+
+  return prisma.brandCampaignRequest.update({
+    where: { id: requestId },
+    data: {
+      status: "PENDING_REVIEW",
+      brandFeedback: input.feedback
+    }
+  });
 }
 
 export async function addRewardTier(accountId: string, input: RewardInput) {
