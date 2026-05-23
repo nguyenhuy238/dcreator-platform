@@ -5,6 +5,8 @@ import { BrandOnboardingCard } from "@/app/dashboard/brand/_components/BrandOnbo
 const nav = [
   { href: "/dashboard/brand", label: "Brand Dashboard" },
   { href: "/dashboard/brand/onboarding", label: "Onboarding / BCC" },
+  { href: "/dashboard/brand/products", label: "Sản phẩm & lô hàng" },
+  { href: "/dashboard/brand/campaign-setup", label: "Yêu cầu campaign" },
   { href: "/dashboard/brand/profile", label: "Brand Profile" },
   { href: "/brand", label: "Chiến dịch" },
   { href: "/brand/proofs", label: "Duyệt proof" },
