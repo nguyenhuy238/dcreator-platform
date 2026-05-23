@@ -13,7 +13,7 @@ export const adminNav = [
   { href: "/admin/campaigns", label: "Campaign Review", description: "Campaign moderation" },
   { href: "/admin/campaign-applications", label: "Creator Applications", description: "Creator apply campaign queue" },
   { href: "/admin/products", label: "Product/Inventory Review", description: "Product and stock verification" },
-  { href: "/admin/proofs", label: "Content Review", description: "Proof/content moderation" },
+  { href: "/admin/content-review", label: "Content Review", description: "Proof/content moderation" },
   { href: "/admin/fulfillment", label: "Fulfillment", description: "Ops shipment workflow", isComingSoon: true },
   { href: "/admin/finance", label: "Finance/Payout", description: "Finance controls and payouts" },
   { href: "/admin/support", label: "Support", description: "Brand/Creator support queue", isComingSoon: true },

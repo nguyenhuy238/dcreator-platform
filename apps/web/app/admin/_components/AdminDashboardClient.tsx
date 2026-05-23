@@ -50,7 +50,7 @@ const queueCards: Array<{ key: keyof AdminOverview["queues"]; title: string; hre
   { key: "creatorPendingReview", title: "Creator chờ duyệt", href: "/admin/creator-applications" },
   { key: "campaignPendingReview", title: "Campaign chờ duyệt", href: "/admin/campaigns" },
   { key: "creatorApplicationsPendingReview", title: "Creator applications", href: "/admin/creator-applications" },
-  { key: "contentSubmissionsPendingReview", title: "Content submissions", href: "/admin/proofs" },
+  { key: "contentSubmissionsPendingReview", title: "Content submissions", href: "/admin/content-review" },
   { key: "productInventoryPendingReview", title: "Product/Inventory review", href: "/admin/product-inventory" },
   { key: "fulfillmentPendingIssues", title: "Fulfillment lỗi/chờ xử lý", href: "/admin/fulfillment" },
   { key: "payoutPendingReview", title: "Payout/commission chờ duyệt", href: "/admin/finance" }
