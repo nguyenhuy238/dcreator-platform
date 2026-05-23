@@ -101,7 +101,16 @@ export default function AdminCampaignDetailPage() {
 
   return (
     <>
-      <PageHeader title={item.title} subtitle={`Brand: ${item.brand.displayName}`} action={<button className="dc-btn-secondary" onClick={() => router.push("/admin/campaigns")}>Back</button>} />
+      <PageHeader
+        title={item.title}
+        subtitle={`Brand: ${item.brand.displayName}`}
+        action={
+          <div className="flex gap-2">
+            <button className="dc-btn-secondary" onClick={() => router.push(`/admin/campaigns/${item.id}/applications`)}>Applications</button>
+            <button className="dc-btn-secondary" onClick={() => router.push("/admin/campaigns")}>Back</button>
+          </div>
+        }
+      />
       {error ? <div className="mb-4"><ErrorState title="Có lỗi thao tác" description={error} onRetry={() => void load()} /></div> : null}
 
       <section className="dc-card p-4">
