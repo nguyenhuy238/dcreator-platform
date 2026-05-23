@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { approveProof, rejectProof } from "@/lib/services/mission.service";
 import { getBrandKpis } from "@/lib/services/analytics.service";
+import { ensureCreatorMissionFromApprovedApplication } from "@/lib/services/creator-mission.service";
 import { createTopupPayment, ensureWalletByAccountId, getWalletTransactions } from "@/lib/services/wallet.service";
 import type { z } from "zod";
 import type {
@@ -494,11 +495,27 @@ export async function addRewardTier(accountId: string, input: RewardInput) {
 export async function listCreatorApplications(accountId: string) {
   return prisma.missionSubmission.findMany({
     where: {
-      mission: { campaign: { brandId: accountId }, audience: MissionAudience.CREATOR },
+      mission: {
+        campaign: { brandId: accountId },
+        audience: { in: [MissionAudience.CREATOR, MissionAudience.USER] }
+      },
       lifecycleStatus: { in: ["ACCEPTED", "DOING"] }
     },
     include: {
-      account: { select: { id: true, displayName: true, email: true } },
+      account: {
+        select: {
+          id: true,
+          displayName: true,
+          email: true,
+          creatorProfile: {
+            select: {
+              mainPlatform: true,
+              socialUrl: true,
+              followerCount: true
+            }
+          }
+        }
+      },
       mission: { select: { id: true, title: true, campaign: { select: { id: true, title: true } } } }
     },
     orderBy: { createdAt: "desc" }
@@ -514,7 +531,21 @@ export async function decideCreatorApplication(accountId: string, input: Creator
   if (submission.mission.campaign.brandId !== accountId) throw new AppError("Forbidden", 403, "BRAND_FORBIDDEN");
 
   if (input.decision === "APPROVED") {
-    return prisma.missionSubmission.update({ where: { id: input.submissionId }, data: { lifecycleStatus: "DOING", note: input.note } });
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.missionSubmission.update({
+        where: { id: input.submissionId },
+        data: { lifecycleStatus: "DOING", note: input.note, rejectReason: null, reviewedAt: new Date(), reviewedById: accountId }
+      });
+
+      await ensureCreatorMissionFromApprovedApplication(tx, {
+        missionId: submission.missionId,
+        campaignId: submission.mission.campaignId,
+        accountId: submission.accountId,
+        applicationId: submission.id
+      });
+
+      return updated;
+    });
   }
 
   return prisma.missionSubmission.update({

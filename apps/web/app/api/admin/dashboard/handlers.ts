@@ -3,6 +3,8 @@ import { ok } from "@/lib/api-response";
 import { requireAdminOps } from "@/lib/auth/admin-guard";
 import { toErrorResponse } from "@/lib/errors";
 import {
+  decideCreatorCampaignApplicationByAdmin,
+  decideCreatorMissionWorkflowByAdmin,
   approveRoleRequestByAdmin,
   decideCampaignReview,
   decideProofByAdmin,
@@ -14,8 +16,10 @@ import {
   getFulfillmentSnapshot,
   getVoucherManagement,
   getProductInventorySnapshot,
+  listCreatorMissionWorkflowForAdmin,
   listPendingCampaignReviews,
   listPendingProofs,
+  listCreatorCampaignApplicationsForAdmin,
   listRoleRequests,
   listUsersForAdmin,
   lockUserByAdmin,
@@ -25,6 +29,9 @@ import {
 import {
   adminAuditQuerySchema,
   adminCampaignDecisionSchema,
+  adminCreatorCampaignApplicationQuerySchema,
+  adminCreatorCampaignDecisionSchema,
+  adminCreatorMissionDecisionSchema,
   adminProofDecisionSchema,
   adminRejectSchema,
   adminUserQuerySchema
@@ -175,4 +182,46 @@ export async function GET_fulfillment(request: NextRequest) {
   const page = Number(request.nextUrl.searchParams.get("page") ?? "1");
   const limit = Number(request.nextUrl.searchParams.get("limit") ?? "20");
   return ok(await getFulfillmentSnapshot({ page: Number.isFinite(page) && page > 0 ? page : 1, limit: Number.isFinite(limit) && limit > 0 ? limit : 20 }));
+}
+
+export async function GET_creator_campaign_applications(request: NextRequest) {
+  await requireAdminOps(request);
+  const parsed = adminCreatorCampaignApplicationQuerySchema.parse({
+    status: optionalQueryParam(request, "status"),
+    query: optionalQueryParam(request, "query")
+  });
+  return ok(await listCreatorCampaignApplicationsForAdmin(parsed.status, parsed.query));
+}
+
+export async function POST_creator_campaign_application_decision(request: NextRequest, submissionId: string) {
+  const actor = await requireAdminOps(request);
+  const payload = adminCreatorCampaignDecisionSchema.parse(await request.json());
+  return ok(
+    await decideCreatorCampaignApplicationByAdmin(
+      actor.id,
+      submissionId,
+      payload.decision,
+      payload.rejectReason,
+      payload.note
+    )
+  );
+}
+
+export async function GET_creator_missions(request: NextRequest) {
+  await requireAdminOps(request);
+  return ok(await listCreatorMissionWorkflowForAdmin());
+}
+
+export async function POST_creator_mission_decision(request: NextRequest, creatorMissionId: string) {
+  const actor = await requireAdminOps(request);
+  const payload = adminCreatorMissionDecisionSchema.parse(await request.json());
+  return ok(
+    await decideCreatorMissionWorkflowByAdmin(
+      actor.id,
+      creatorMissionId,
+      payload.action,
+      payload.reason,
+      payload.purchaseAmountVnd
+    )
+  );
 }
