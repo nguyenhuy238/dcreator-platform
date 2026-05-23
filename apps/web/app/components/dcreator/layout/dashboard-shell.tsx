@@ -48,6 +48,13 @@ function toBreadcrumb(pathname: string, nav: readonly DashboardNavItem[]) {
   return trails;
 }
 
+function getActiveHref(pathname: string, nav: readonly DashboardNavItem[]) {
+  const candidates = nav
+    .filter((item) => isCurrent(pathname, item.href))
+    .sort((a, b) => b.href.length - a.href.length);
+  return candidates[0]?.href ?? null;
+}
+
 export function DashboardShell({
   children,
   navItems,
@@ -67,7 +74,8 @@ export function DashboardShell({
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const crumbs = useMemo(() => toBreadcrumb(pathname, navItems), [pathname, navItems]);
-  const activeTitle = navItems.find((item) => isCurrent(pathname, item.href))?.label ?? workspaceTitle;
+  const activeHref = useMemo(() => getActiveHref(pathname, navItems), [pathname, navItems]);
+  const activeTitle = navItems.find((item) => item.href === activeHref)?.label ?? workspaceTitle;
   const userInitials = initials(user.displayName || user.email || "U");
 
   async function onLogout() {
@@ -88,22 +96,24 @@ export function DashboardShell({
           </div>
           <nav className="h-[calc(100vh-73px)] overflow-y-auto p-3">
             {navItems.map((item) => {
-              const active = isCurrent(pathname, item.href);
+              const active = item.href === activeHref;
+              const label = item.label?.trim() || "Đi tới trang";
               return (
                 <Link
                   key={`${item.href}-${item.label}`}
                   href={item.href}
-                  className={`mb-1 block rounded-xl border px-3 py-2.5 transition ${active ? "border-zinc-900 bg-zinc-900 text-white" : "border-transparent text-zinc-700 hover:border-zinc-200 hover:bg-zinc-100"}`}
+                  aria-current={active ? "page" : undefined}
+                  className={`dc-focus relative mb-1 block min-h-11 rounded-xl border px-3 py-2.5 transition ${active ? "border-zinc-900 bg-zinc-900 shadow-sm hover:bg-zinc-900" : "border-transparent bg-transparent hover:border-zinc-200 hover:bg-zinc-100"}`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold">{item.label}</p>
+                    <p className={`relative z-10 text-sm font-semibold leading-5 ${active ? "text-white" : "text-zinc-900"}`}>{label}</p>
                     {item.isComingSoon ? (
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${active ? "bg-white/20 text-white" : "bg-zinc-200 text-zinc-700"}`}>
+                      <span className={`relative z-10 rounded-full border px-2 py-0.5 text-[10px] font-bold ${active ? "border-white/20 bg-white/10 text-white" : "border-zinc-200 bg-zinc-200 text-zinc-700"}`}>
                         SOON
                       </span>
                     ) : null}
                   </div>
-                  {item.description ? <p className={`mt-0.5 text-xs ${active ? "text-zinc-200" : "text-zinc-500"}`}>{item.description}</p> : null}
+                  {item.description ? <p className={`relative z-10 mt-0.5 text-xs leading-4 ${active ? "text-zinc-300" : "text-zinc-500"}`}>{item.description}</p> : null}
                 </Link>
               );
             })}
@@ -170,8 +180,16 @@ export function DashboardShell({
             </div>
             <nav>
               {navItems.map((item) => (
-                <Link key={`${item.href}-${item.label}-mobile`} href={item.href} className={`mb-1 block rounded-xl px-3 py-2.5 text-sm font-semibold ${isCurrent(pathname, item.href) ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100"}`} onClick={() => setMobileOpen(false)}>
-                  {item.label}
+                <Link
+                  key={`${item.href}-${item.label}-mobile`}
+                  href={item.href}
+                  aria-current={item.href === activeHref ? "page" : undefined}
+                  className={`dc-focus mb-1 block min-h-11 rounded-xl px-3 py-2.5 text-sm font-semibold leading-5 ${item.href === activeHref ? "bg-zinc-900 hover:bg-zinc-900" : "text-zinc-700 hover:bg-zinc-100"}`}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <span className={`relative z-10 block ${item.href === activeHref ? "text-white" : "text-zinc-900"}`}>
+                    {item.label?.trim() || "Đi tới trang"}
+                  </span>
                 </Link>
               ))}
             </nav>

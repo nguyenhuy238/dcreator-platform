@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Role } from "@prisma/client";
 import { PublicHeader } from "@/app/components/dcreator/layout/shell";
@@ -36,7 +36,7 @@ async function resolveTargetPath(roles: Role[], nextPath: string | null) {
   return nextPath;
 }
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -122,5 +122,13 @@ export default function LoginPage() {
         </form>
       </main>
     </>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<><PublicHeader /><main className="mx-auto w-full max-w-7xl px-4 py-10 md:px-6"><div className="h-80 animate-pulse rounded-[28px] bg-zinc-100" /></main></>}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

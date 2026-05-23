@@ -209,6 +209,9 @@ export function PublicFooter() {
 
 export function DashboardSidebar({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
+  const activeItem = items
+    .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0];
   return (
     <aside className="hidden w-64 shrink-0 border-r border-zinc-200 bg-white p-4 lg:block">
       <p className="mb-4 px-3 text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">Workspace</p>
@@ -216,7 +219,8 @@ export function DashboardSidebar({ items }: { items: NavItem[] }) {
         <Link
           key={item.href}
           href={item.href}
-          className={`dc-focus mb-2 block rounded-2xl px-3 py-2.5 text-sm font-semibold transition ${pathname === item.href ? "!bg-zinc-900 !text-white" : "text-zinc-600 hover:!bg-zinc-900 hover:!text-white"}`}
+          aria-current={activeItem?.href === item.href ? "page" : undefined}
+          className={`dc-focus mb-2 block min-h-11 rounded-2xl px-3 py-2.5 text-sm font-semibold leading-5 transition ${activeItem?.href === item.href ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"}`}
         >
           {item.label}
         </Link>
@@ -227,13 +231,17 @@ export function DashboardSidebar({ items }: { items: NavItem[] }) {
 
 export function MobileBottomNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
+  const activeItem = items
+    .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0];
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 grid grid-cols-4 border-t border-zinc-200 bg-white lg:hidden">
       {items.slice(0, 4).map((item) => (
         <Link
           key={item.href}
           href={item.href}
-          className={`dc-focus px-2 py-3 text-center text-xs font-semibold ${pathname === item.href ? "text-zinc-900" : "text-zinc-500"}`}
+          aria-current={activeItem?.href === item.href ? "page" : undefined}
+          className={`dc-focus min-h-11 px-2 py-3 text-center text-xs font-semibold leading-4 ${activeItem?.href === item.href ? "bg-zinc-900 text-white" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"}`}
         >
           {item.label}
         </Link>

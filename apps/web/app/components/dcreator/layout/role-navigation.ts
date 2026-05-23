@@ -14,9 +14,7 @@ export const navigationGroups: NavGroup[] = [
       { label: "Chiến dịch", href: "/campaigns" },
       { label: "Ví / N-Points", href: "/wallet" },
       { label: "Voucher của tôi", href: "/vouchers" },
-      { label: "Hồ sơ", href: "/dashboard/user/profile" },
-      { label: "Đăng ký Creator", href: "/dashboard/user/profile" },
-      { label: "Đăng ký Brand", href: "/dashboard/user/profile" }
+      { label: "Hồ sơ", href: "/dashboard/user/profile" }
     ]
   },
   {
@@ -24,9 +22,7 @@ export const navigationGroups: NavGroup[] = [
     roles: DASHBOARD_ACCESS.creator,
     items: [
       { label: "Bảng điều khiển Nhà sáng tạo", href: "/dashboard/creator" },
-      { label: "Nhiệm vụ của tôi", href: "/me/mission" },
-      { label: "Bài nộp minh chứng", href: "/dashboard/creator" },
-      { label: "Hoa hồng", href: "/dashboard/creator" }
+      { label: "Nhiệm vụ của tôi", href: "/me/mission" }
     ]
   },
   {
