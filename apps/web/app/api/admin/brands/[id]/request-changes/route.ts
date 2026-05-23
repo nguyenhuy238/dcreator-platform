@@ -1,4 +1,3 @@
-import { ApplicationStatus } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { ok } from "@/lib/api-response";
 import { requireAdminOps } from "@/lib/auth/admin-guard";
@@ -18,7 +17,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
     if (!payload.reason) {
       return Response.json({ success: false, error: "reason is required" }, { status: 422 });
     }
-    return ok(await reviewBrandApplication(actor.id, id, ApplicationStatus.NEEDS_REVISION, payload.reason, payload.note));
+    return ok(await reviewBrandApplication(actor.id, id, "NEEDS_REVISION", payload.reason, payload.note));
   } catch (error) {
     return toErrorResponse(error);
   }

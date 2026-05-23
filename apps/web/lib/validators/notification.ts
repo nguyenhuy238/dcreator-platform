@@ -1,5 +1,5 @@
-import { NotificationChannel } from "@prisma/client";
 import { z } from "zod";
+import { NOTIFICATION_CHANNEL } from "@/lib/constants/enums";
 
 const notificationEvents = [
   "USER_CONTRIBUTION_SUCCESS",
@@ -29,5 +29,5 @@ export const sendNotificationSchema = z.object({
   title: z.string().min(1).max(200),
   content: z.string().min(1).max(2000),
   metadata: z.record(z.string(), z.unknown()).optional(),
-  channels: z.array(z.nativeEnum(NotificationChannel)).min(1).max(3).optional()
+  channels: z.array(z.enum(NOTIFICATION_CHANNEL)).min(1).max(3).optional()
 });

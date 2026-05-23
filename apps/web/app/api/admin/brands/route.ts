@@ -1,10 +1,11 @@
-import { ApplicationStatus } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { ok } from "@/lib/api-response";
 import { requireAdminOps } from "@/lib/auth/admin-guard";
 import { toErrorResponse } from "@/lib/errors";
 import { listBrandApplications } from "@/lib/services/role-upgrade.service";
 import { adminBrandListQuerySchema } from "@/lib/validators/admin-brand";
+
+const APPLICATION_STATUSES = ["DRAFT", "PENDING_REVIEW", "APPROVED", "REJECTED", "NEEDS_REVISION"] as const;
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
     const industry = request.nextUrl.searchParams.get("industry") ?? undefined;
     const sort = request.nextUrl.searchParams.get("sort") ?? undefined;
     const parsed = adminBrandListQuerySchema.parse({
-      status: statusRaw && Object.values(ApplicationStatus).includes(statusRaw as ApplicationStatus) ? (statusRaw as ApplicationStatus) : undefined,
+      status: statusRaw && APPLICATION_STATUSES.includes(statusRaw as (typeof APPLICATION_STATUSES)[number]) ? statusRaw : undefined,
       query,
       industry,
       sort

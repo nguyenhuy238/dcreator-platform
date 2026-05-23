@@ -1,8 +1,9 @@
-import { ApplicationStatus } from "@prisma/client";
 import { z } from "zod";
 
+const applicationStatuses = ["DRAFT", "PENDING_REVIEW", "APPROVED", "REJECTED", "NEEDS_REVISION"] as const;
+
 export const adminBrandListQuerySchema = z.object({
-  status: z.nativeEnum(ApplicationStatus).optional(),
+  status: z.enum(applicationStatuses).optional(),
   query: z.string().trim().max(200).optional(),
   industry: z.string().trim().max(120).optional(),
   sort: z.enum(["newest", "oldest"]).default("newest")

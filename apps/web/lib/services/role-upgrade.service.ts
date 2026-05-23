@@ -1,11 +1,13 @@
-import { ApplicationStatus, BrandMemberRole, BrandStatus, NotificationEvent, Prisma, Role } from "@prisma/client";
+import { BrandMemberRole, BrandStatus, NotificationEvent, Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { APPLICATION_STATUS } from "@/lib/constants/enums";
 import { AppError } from "@/lib/errors";
 import { hasSomeRole } from "@/lib/auth/roles";
 import { resolvePrimaryRole } from "@/lib/auth/role-constants";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
 import { createNotification, createNotificationForAdminOps } from "@/lib/services/notification.service";
 import type { BrandApplicationInput, CreatorApplicationInput } from "@/lib/validators/role-upgrade";
+type ApplicationStatusValue = (typeof APPLICATION_STATUS)[number];
 
 function normalizeOptional(value?: string) {
   if (!value) return null;
@@ -13,8 +15,8 @@ function normalizeOptional(value?: string) {
   return next.length > 0 ? next : null;
 }
 
-function ensureCanEdit(status: ApplicationStatus) {
-  if (status === ApplicationStatus.PENDING_REVIEW || status === ApplicationStatus.APPROVED) {
+function ensureCanEdit(status: ApplicationStatusValue) {
+  if (status === "PENDING_REVIEW" || status === "APPROVED") {
     throw new AppError("Application is not editable", 409, "APPLICATION_NOT_EDITABLE");
   }
 }
@@ -62,7 +64,7 @@ export async function applyCreator(accountId: string, input: CreatorApplicationI
   }
 
   const pending = await prisma.creatorApplication.findFirst({
-    where: { accountId, status: ApplicationStatus.PENDING_REVIEW },
+    where: { accountId, status: "PENDING_REVIEW" },
     select: { id: true }
   });
   if (pending) throw new AppError("Creator application is pending review", 409, "APPLICATION_PENDING");
@@ -70,7 +72,7 @@ export async function applyCreator(accountId: string, input: CreatorApplicationI
   const created = await prisma.creatorApplication.create({
     data: {
       accountId,
-      status: ApplicationStatus.PENDING_REVIEW,
+      status: "PENDING_REVIEW",
       displayName: input.displayName,
       avatarUrl: normalizeOptional(input.avatarUrl),
       bio: normalizeOptional(input.bio),
@@ -133,7 +135,7 @@ export async function getMyCreatorApplication(accountId: string) {
   ]);
 
   return {
-    status: latest?.status ?? ApplicationStatus.DRAFT,
+    status: latest?.status ?? "DRAFT",
     application: latest,
     creatorProfile
   };
@@ -147,7 +149,7 @@ export async function updateCreatorApplication(accountId: string, applicationId:
   const updated = await prisma.creatorApplication.update({
     where: { id: applicationId },
     data: {
-      status: ApplicationStatus.PENDING_REVIEW,
+      status: "PENDING_REVIEW",
       rejectReason: null,
       reviewNote: null,
       reviewedAt: null,
@@ -195,7 +197,7 @@ export async function updateCreatorApplication(accountId: string, applicationId:
 
 export async function applyBrand(accountId: string, input: BrandApplicationInput) {
   const pending = await prisma.brandApplication.findFirst({
-    where: { accountId, status: ApplicationStatus.PENDING_REVIEW },
+    where: { accountId, status: "PENDING_REVIEW" },
     select: { id: true }
   });
   if (pending) throw new AppError("Brand application is pending review", 409, "APPLICATION_PENDING");
@@ -203,7 +205,7 @@ export async function applyBrand(accountId: string, input: BrandApplicationInput
   return prisma.brandApplication.create({
     data: {
       accountId,
-      status: ApplicationStatus.PENDING_REVIEW,
+      status: "PENDING_REVIEW",
       brandName: input.brandName,
       logoUrl: normalizeOptional(input.logoUrl),
       legalName: normalizeOptional(input.legalName),
@@ -248,7 +250,7 @@ export async function updateBrandApplication(accountId: string, applicationId: s
   return prisma.brandApplication.update({
     where: { id: applicationId },
     data: {
-      status: ApplicationStatus.PENDING_REVIEW,
+      status: "PENDING_REVIEW",
       rejectReason: null,
       reviewNote: null,
       reviewedAt: null,
@@ -290,7 +292,7 @@ export async function updateBrandApplication(accountId: string, applicationId: s
 }
 
 type ListCreatorApplicationsOptions = {
-  status?: ApplicationStatus;
+  status?: ApplicationStatusValue;
   query?: string;
   platform?: "TIKTOK" | "INSTAGRAM" | "YOUTUBE" | "FACEBOOK" | "OTHER";
   contentCategory?: string;
@@ -298,7 +300,7 @@ type ListCreatorApplicationsOptions = {
 };
 
 type ListBrandApplicationsOptions = {
-  status?: ApplicationStatus;
+  status?: ApplicationStatusValue;
   query?: string;
   industry?: string;
   sort?: "newest" | "oldest";
@@ -441,10 +443,10 @@ export async function getBrandApplicationDetail(applicationId: string) {
   return { ...application, statusHistory };
 }
 
-export async function reviewCreatorApplication(actorId: string, applicationId: string, status: ApplicationStatus, rejectReason?: string, reviewNote?: string) {
+export async function reviewCreatorApplication(actorId: string, applicationId: string, status: ApplicationStatusValue, rejectReason?: string, reviewNote?: string) {
   const current = await prisma.creatorApplication.findUnique({ where: { id: applicationId } });
   if (!current) throw new AppError("Application not found", 404, "APPLICATION_NOT_FOUND");
-  if (current.status !== ApplicationStatus.PENDING_REVIEW) throw new AppError("Application already processed", 409, "APPLICATION_PROCESSED");
+  if (current.status !== "PENDING_REVIEW") throw new AppError("Application already processed", 409, "APPLICATION_PROCESSED");
 
   const updated = await prisma.$transaction(async (tx) => {
     const app = await tx.creatorApplication.update({
@@ -452,7 +454,7 @@ export async function reviewCreatorApplication(actorId: string, applicationId: s
       data: { status, rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null, reviewedById: actorId, reviewedAt: new Date() }
     });
 
-    if (status === ApplicationStatus.APPROVED) {
+    if (status === "APPROVED") {
       await tx.creatorProfile.upsert({
         where: { accountId: app.accountId },
         create: {
@@ -513,18 +515,18 @@ export async function reviewCreatorApplication(actorId: string, applicationId: s
   });
   await createNotification({
     accountId: updated.accountId,
-    event: status === ApplicationStatus.APPROVED ? NotificationEvent.CREATOR_APPLICATION_APPROVED : NotificationEvent.CAMPAIGN_REJECTED,
-    title: status === ApplicationStatus.APPROVED ? "Creator application approved" : "Creator application updated",
-    content: status === ApplicationStatus.APPROVED ? "Yêu cầu Creator của bạn đã được duyệt." : `Yêu cầu Creator: ${status}`,
+    event: status === "APPROVED" ? NotificationEvent.CREATOR_APPLICATION_APPROVED : NotificationEvent.CAMPAIGN_REJECTED,
+    title: status === "APPROVED" ? "Creator application approved" : "Creator application updated",
+    content: status === "APPROVED" ? "Yêu cầu Creator của bạn đã được duyệt." : `Yêu cầu Creator: ${status}`,
     metadata: { status, rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null }
   });
   return updated;
 }
 
-export async function reviewBrandApplication(actorId: string, applicationId: string, status: ApplicationStatus, rejectReason?: string, reviewNote?: string) {
+export async function reviewBrandApplication(actorId: string, applicationId: string, status: ApplicationStatusValue, rejectReason?: string, reviewNote?: string) {
   const current = await prisma.brandApplication.findUnique({ where: { id: applicationId } });
   if (!current) throw new AppError("Application not found", 404, "APPLICATION_NOT_FOUND");
-  if (current.status !== ApplicationStatus.PENDING_REVIEW) throw new AppError("Application already processed", 409, "APPLICATION_PROCESSED");
+  if (current.status !== "PENDING_REVIEW") throw new AppError("Application already processed", 409, "APPLICATION_PROCESSED");
   const isOnboardingBccUpdate = current.reviewNote === "Brand requested onboarding/BCC update and admin review.";
   const reviewedAt = new Date();
 
@@ -534,7 +536,7 @@ export async function reviewBrandApplication(actorId: string, applicationId: str
       data: { status, rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? current.reviewNote, reviewedById: actorId, reviewedAt }
     });
 
-    if (status === ApplicationStatus.APPROVED) {
+    if (status === "APPROVED") {
       const existingBrand = await tx.brand.findFirst({
         where: { ownerAccountId: app.accountId },
         orderBy: { createdAt: "desc" }
@@ -631,9 +633,9 @@ export async function reviewBrandApplication(actorId: string, applicationId: str
   });
   await createNotification({
     accountId: updated.accountId,
-    event: status === ApplicationStatus.APPROVED ? NotificationEvent.BRAND_APPLICATION_APPROVED : NotificationEvent.CAMPAIGN_REJECTED,
-    title: status === ApplicationStatus.APPROVED ? "Brand application approved" : "Brand application updated",
-    content: status === ApplicationStatus.APPROVED ? "Yêu cầu Brand của bạn đã được duyệt." : `Yêu cầu Brand: ${status}`,
+    event: status === "APPROVED" ? NotificationEvent.BRAND_APPLICATION_APPROVED : NotificationEvent.CAMPAIGN_REJECTED,
+    title: status === "APPROVED" ? "Brand application approved" : "Brand application updated",
+    content: status === "APPROVED" ? "Yêu cầu Brand của bạn đã được duyệt." : `Yêu cầu Brand: ${status}`,
     metadata: { status, rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null }
   });
   return updated;
