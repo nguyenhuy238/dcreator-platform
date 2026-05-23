@@ -17,10 +17,10 @@ export function HeroSection({ hero }: { hero: CampaignDetailDTO["hero"] }) {
       <p className={styles.heroDescription}>{hero.description}</p>
       <div className={styles.meta}>
         <span className={styles.chip}>Brand: {hero.brand}</span>
-        <span className={styles.chip}>Creator: {hero.creator ?? "N/A"}</span>
-        <span className={styles.chip}>Type: {hero.campaignType}</span>
-        <span className={styles.chip}>Status: {hero.status}</span>
-        <span className={styles.chip}>Deadline: {formatDateTime(hero.deadline)}</span>
+        <span className={styles.chip}>Creator: {hero.creator ?? "Chưa có"}</span>
+        <span className={styles.chip}>Loại: {hero.campaignType}</span>
+        <span className={styles.chip}>Trạng thái: {hero.status}</span>
+        <span className={styles.chip}>Hạn chót: {formatDateTime(hero.deadline)}</span>
       </div>
     </section>
   );
@@ -29,14 +29,14 @@ export function HeroSection({ hero }: { hero: CampaignDetailDTO["hero"] }) {
 export function FundingSection({ funding }: { funding: CampaignDetailDTO["funding"] }) {
   return (
     <section className={`${styles.panel} ${styles.stickyPanel} ${styles.fundingPanel}`}>
-      <h2 className={styles.sectionTitle}>Funding</h2>
+      <h2 className={styles.sectionTitle}>Tiến độ ủng hộ</h2>
       <div className={styles.fundingGrid}>
         <div className={styles.fundingKpiCard}>
-          <p className={styles.kpiLabel}>Target</p>
+          <p className={styles.kpiLabel}>Mục tiêu</p>
           <p className={styles.kpiValue}>{formatCurrencyVnd(funding.targetAmountVnd)}</p>
         </div>
         <div className={styles.fundingKpiCard}>
-          <p className={styles.kpiLabel}>Funded</p>
+          <p className={styles.kpiLabel}>Đã ủng hộ</p>
           <p className={styles.kpiValue}>{formatCurrencyVnd(funding.fundedAmountVnd)}</p>
         </div>
       </div>
@@ -46,7 +46,7 @@ export function FundingSection({ funding }: { funding: CampaignDetailDTO["fundin
       <p className={styles.progressValue}>{funding.progressPercent}%</p>
       <div className={styles.fundingMeta}>
         <p>{funding.backerCount} backers</p>
-        <p>Remaining: {funding.remainingTimeLabel}</p>
+        <p>Còn lại: {funding.remainingTimeLabel}</p>
       </div>
     </section>
   );
@@ -59,26 +59,26 @@ export function CampaignStatsSection({ data }: { data: CampaignDetailDTO }) {
 
   return (
     <section className={styles.panel}>
-      <h2 className={styles.sectionTitle}>Campaign stats</h2>
+      <h2 className={styles.sectionTitle}>Chỉ số campaign</h2>
       <div className={styles.statsGrid}>
         <article className={styles.statCard}>
           <p className={styles.kpiLabel}>Backers</p>
           <p className={styles.statValue}>{data.funding.backerCount}</p>
         </article>
         <article className={styles.statCard}>
-          <p className={styles.kpiLabel}>Progress</p>
+          <p className={styles.kpiLabel}>Tiến độ</p>
           <p className={styles.statValue}>{data.funding.progressPercent}%</p>
         </article>
         <article className={styles.statCard}>
-          <p className={styles.kpiLabel}>Open missions</p>
+          <p className={styles.kpiLabel}>Mission đang mở</p>
           <p className={styles.statValue}>{openMissionCount}</p>
         </article>
         <article className={styles.statCard}>
-          <p className={styles.kpiLabel}>Reward stock out</p>
+          <p className={styles.kpiLabel}>Reward hết lượt</p>
           <p className={styles.statValue}>{outOfStockCount}</p>
         </article>
       </div>
-      <p className={styles.inlineMuted}>Tong mission points: {missionRewardPoints.toLocaleString("vi-VN")} points</p>
+      <p className={styles.inlineMuted}>Tổng điểm mission: {missionRewardPoints.toLocaleString("vi-VN")} points</p>
     </section>
   );
 }
@@ -100,8 +100,8 @@ export function RewardsSection({
 }) {
   return (
     <section className={`${styles.panel} ${styles.rewardPanel}`}>
-      <h2 className={styles.sectionTitle}>Reward tiers</h2>
-      <p className={`${styles.inlineMuted} ${styles.rewardIntro}`}>Chon 1 reward de ung ho campaign {campaignTitle}.</p>
+      <h2 className={styles.sectionTitle}>Các mức reward</h2>
+      <p className={`${styles.inlineMuted} ${styles.rewardIntro}`}>Chọn 1 reward để ủng hộ campaign {campaignTitle}.</p>
       <div className={styles.grid}>
         {rewards.map((reward) => {
           const selected = reward.id === selectedRewardId;
@@ -110,16 +110,16 @@ export function RewardsSection({
               key={reward.id}
               className={`${styles.rewardCard} ${selected ? styles.rewardCardSelected : ""}`}
             >
-              {reward.isOutOfStock ? <span className={styles.outOfStockBadge}>Het luot</span> : null}
+              {reward.isOutOfStock ? <span className={styles.outOfStockBadge}>Hết lượt</span> : null}
               <h3 className={styles.rewardTitle}>{reward.title}</h3>
               <p className={styles.rewardDescription}>{reward.description}</p>
               <p className={styles.rewardMeta}>
-                Gia: {reward.priceVnd ? formatCurrencyVnd(reward.priceVnd) : `${reward.pricePoints} points`}
+                Giá: {reward.priceVnd ? formatCurrencyVnd(reward.priceVnd) : `${reward.pricePoints} points`}
               </p>
               <p className={styles.rewardMeta}>
-                Stock: {reward.stockRemaining}/{reward.stockTotal}
+                Tồn kho: {reward.stockRemaining}/{reward.stockTotal}
               </p>
-              <p className={styles.rewardMeta}>Estimated delivery: {reward.estimatedDelivery}</p>
+              <p className={styles.rewardMeta}>Dự kiến giao: {reward.estimatedDelivery}</p>
               <div className={styles.actions}>
                 <button
                   type="button"
@@ -127,7 +127,7 @@ export function RewardsSection({
                   onClick={() => onSelect(reward.id)}
                   disabled={reward.isOutOfStock}
                 >
-                  {reward.isOutOfStock ? "Het luot" : selected ? "Da chon" : "Chon reward"}
+                  {reward.isOutOfStock ? "Hết lượt" : selected ? "Đã chọn" : "Chọn reward"}
                 </button>
               </div>
             </article>
@@ -152,9 +152,9 @@ export function MissionsSection({ missions }: { missions: CampaignDetailDTO["mis
         {missions.map((mission) => (
           <article key={mission.id} className={styles.rewardCard}>
             <h3>{mission.title}</h3>
-            <p>Reward points: {mission.rewardPoints}</p>
-            <p>Deadline: {formatDateTime(mission.deadline)}</p>
-            <p>Eligibility: {mission.eligibility}</p>
+            <p>Điểm thưởng: {mission.rewardPoints}</p>
+            <p>Hạn chót: {formatDateTime(mission.deadline)}</p>
+            <p>Điều kiện: {mission.eligibility}</p>
           </article>
         ))}
       </div>
@@ -165,9 +165,9 @@ export function MissionsSection({ missions }: { missions: CampaignDetailDTO["mis
 export function TimelineSection({ timeline }: { timeline: CampaignDetailDTO["timeline"] }) {
   return (
     <section className={styles.panel}>
-      <h2 className={styles.sectionTitle}>Timeline</h2>
-      <p>Campaign created: {formatDateTime(timeline.createdAt)}</p>
-      <p>Campaign approved: {formatDateTime(timeline.approvedAt)}</p>
+      <h2 className={styles.sectionTitle}>Mốc thời gian</h2>
+      <p>Tạo campaign: {formatDateTime(timeline.createdAt)}</p>
+      <p>Duyệt campaign: {formatDateTime(timeline.approvedAt)}</p>
       <div className={styles.grid}>
         {timeline.milestoneUpdates.map((item, index) => (
           <article key={`${item.at}-${index}`} className={styles.rewardCard}>
@@ -184,7 +184,7 @@ export function BackersSection({ socialProof }: { socialProof: CampaignDetailDTO
   return (
     <section className={styles.panel}>
       <h2 className={styles.sectionTitle}>Backers & social proof</h2>
-      <p>Tong nguoi ung ho: {socialProof.totalBackers}</p>
+      <p>Tổng người ủng hộ: {socialProof.totalBackers}</p>
       <div className={styles.grid}>
         {socialProof.recentContributions.map((contribution) => (
           <article key={contribution.id} className={styles.rewardCard}>
@@ -201,11 +201,11 @@ export function BackersSection({ socialProof }: { socialProof: CampaignDetailDTO
 export function FaqPolicySection({ faqPolicy }: { faqPolicy: CampaignDetailDTO["faqPolicy"] }) {
   return (
     <section className={styles.panel}>
-      <h2 className={styles.sectionTitle}>FAQ/Policy</h2>
-      <p>Reward policy: {faqPolicy.rewardPolicy}</p>
-      <p>Refund policy: {faqPolicy.refundPolicy}</p>
-      <p>Voucher usage: {faqPolicy.voucherUsage}</p>
-      <p>Campaign failure policy: {faqPolicy.campaignFailurePolicy}</p>
+      <h2 className={styles.sectionTitle}>FAQ/Chính sách</h2>
+      <p>Chính sách reward: {faqPolicy.rewardPolicy}</p>
+      <p>Chính sách hoàn tiền: {faqPolicy.refundPolicy}</p>
+      <p>Cách dùng voucher: {faqPolicy.voucherUsage}</p>
+      <p>Chính sách khi campaign thất bại: {faqPolicy.campaignFailurePolicy}</p>
     </section>
   );
 }

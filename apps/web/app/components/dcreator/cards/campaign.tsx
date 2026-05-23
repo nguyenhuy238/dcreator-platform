@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { CampaignItem } from "../data/mock";
 import { StatusBadge } from "../ui/base";
 
@@ -10,7 +11,7 @@ export function CampaignProgress({ fundedAmount, targetAmount }: { fundedAmount:
 }
 
 export function CampaignCard({ campaign }: { campaign: CampaignItem }) {
-  return <article className="dc-card dc-hover-lift overflow-hidden"><img src={campaign.cover} alt={campaign.title} className="h-44 w-full object-cover" /><div className="space-y-3 p-4"><div className="flex flex-wrap gap-2"><StatusBadge status={campaign.status} /><span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs font-semibold">{campaign.campaignType}</span></div><h3 className="text-lg font-bold">{campaign.title}</h3><p className="text-sm text-zinc-600">{campaign.description}</p><p className="text-sm text-zinc-500">{campaign.brand} • {campaign.creator}</p><CampaignProgress fundedAmount={campaign.fundedAmount} targetAmount={campaign.targetAmount} /><div className="grid grid-cols-3 gap-2 text-xs text-zinc-500"><p>{campaign.backers} backers</p><p>{campaign.daysLeft} ngày</p><p>{campaign.rewardsLeft} rewards</p></div><Link href={`/campaigns/${campaign.slug}`} className="dc-btn-primary">Xem chi tiết</Link></div></article>;
+  return <article className="dc-card dc-hover-lift overflow-hidden"><Image src={campaign.cover} alt={campaign.title} width={1200} height={675} className="h-44 w-full object-cover" /><div className="space-y-3 p-4"><div className="flex flex-wrap gap-2"><StatusBadge status={campaign.status} /><span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs font-semibold">{campaign.campaignType}</span></div><h3 className="text-lg font-bold">{campaign.title}</h3><p className="text-sm text-zinc-600">{campaign.description}</p><p className="text-sm text-zinc-500">{campaign.brand} • {campaign.creator}</p><CampaignProgress fundedAmount={campaign.fundedAmount} targetAmount={campaign.targetAmount} /><div className="grid grid-cols-3 gap-2 text-xs text-zinc-500"><p>{campaign.backers} backers</p><p>{campaign.daysLeft} ngày</p><p>{campaign.rewardsLeft} rewards</p></div><Link href={`/campaigns/${campaign.slug}`} className="dc-btn-primary">Xem chi tiết</Link></div></article>;
 }
 
 export function RewardCard({ title, description, price, stock, benefits, eta }: { title: string; description: string; price: string; stock: number; benefits: string[]; eta: string }) {

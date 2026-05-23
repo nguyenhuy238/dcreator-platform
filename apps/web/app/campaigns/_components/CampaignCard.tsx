@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import styles from "../campaigns.module.css";
 import { CreatorCampaignApplyButton } from "./CreatorCampaignApplyButton";
 
@@ -20,10 +21,12 @@ export type CampaignCardData = {
 export function CampaignCard({ campaign }: { campaign: CampaignCardData }) {
   return (
     <article className={styles.card}>
-      <img
+      <Image
         className={styles.cover}
         src={campaign.coverImageUrl ?? "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200"}
         alt={campaign.title}
+        width={1200}
+        height={675}
       />
       <div className={styles.cardBody}>
         <h3>{campaign.title}</h3>
@@ -42,7 +45,7 @@ export function CampaignCard({ campaign }: { campaign: CampaignCardData }) {
           Deadline: {campaign.deadline ? new Date(campaign.deadline).toLocaleDateString("vi-VN") : "N/A"}
         </p>
         <Link href={`/campaigns/${campaign.slug}`} className={styles.cta}>
-          Xem chi tiết
+          Ủng hộ
         </Link>
         <CreatorCampaignApplyButton slug={campaign.slug} compact />
       </div>

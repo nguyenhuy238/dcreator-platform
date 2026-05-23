@@ -27,7 +27,7 @@ type ApiResponse = {
 
 function getCampaignCTA(data: CampaignDetailDTO, selectedRewardId: string | null) {
   if (data.viewer.hasSupported) {
-    return { label: "Xem voucher của tôi", disabled: false };
+    return { label: "Nhận voucher", disabled: false };
   }
   if (data.funding.isEnded) {
     return { label: "Campaign da ket thuc", disabled: true };
@@ -155,7 +155,13 @@ export function CampaignDetailContainer({ slug }: Props) {
           selectedRewardId={selectedRewardId}
           onSelect={setSelectedRewardId}
           cta={cta}
-          onSupport={() => setIsSupportOpen(true)}
+          onSupport={() => {
+            if (data.viewer.hasSupported) {
+              window.location.href = "/vouchers";
+              return;
+            }
+            setIsSupportOpen(true);
+          }}
         />
         <SupportModal
           open={isSupportOpen}

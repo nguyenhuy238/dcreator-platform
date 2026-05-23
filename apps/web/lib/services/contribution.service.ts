@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import type { z } from "zod";
 import { prisma } from "@/lib/db";
 import type { ContributionResultDTO } from "@/lib/dto/contribution";
@@ -13,6 +14,27 @@ import { assertNonNegativeBalance } from "./wallet.service";
 
 type CreateContributionInput = z.infer<typeof contributionCreateSchema>;
 type ContributionWebhookPayload = z.infer<typeof contributionPayosWebhookSchema>;
+
+function buildInAppNotification(input: {
+  accountId: string;
+  event:
+    | "USER_CONTRIBUTION_SUCCESS"
+    | "USER_RECEIVED_VOUCHER";
+    title: string;
+    content: string;
+    metadata?: Prisma.InputJsonValue;
+  }) {
+  return {
+    accountId: input.accountId,
+    event: input.event,
+    title: input.title,
+    content: input.content,
+    metadata: input.metadata,
+    channel: "IN_APP" as const,
+    deliveryStatus: "SENT" as const,
+    sentAt: new Date()
+  };
+}
 
 
 function toPaymentUrl(orderCode: string) {
@@ -208,6 +230,25 @@ export async function createCampaignContribution(
         }
       });
 
+      await tx.notification.createMany({
+        data: [
+          buildInAppNotification({
+            accountId: supporterId,
+            event: "USER_CONTRIBUTION_SUCCESS",
+            title: "Ủng hộ thành công",
+            content: `Bạn đã ủng hộ campaign thành công và nhận reward ${reward.title}.`,
+            metadata: { campaignId: campaign.id, contributionId: contribution.id, amountVnd: input.amount }
+          }),
+          buildInAppNotification({
+            accountId: supporterId,
+            event: "USER_RECEIVED_VOUCHER",
+            title: "Bạn vừa nhận voucher",
+            content: `Voucher cho reward ${reward.title} đã được cấp vào tài khoản của bạn.`,
+            metadata: { campaignId: campaign.id, contributionId: contribution.id, rewardId: reward.id, voucherCode: claim.voucherCode }
+          })
+        ]
+      });
+
       return {
         contributionId: contribution.id,
         status: "SUCCESS",
@@ -292,6 +333,16 @@ export async function createCampaignContribution(
           metadata: { rewardId: input.rewardId }
         }
       ]
+    });
+
+    await tx.notification.create({
+      data: buildInAppNotification({
+        accountId: supporterId,
+        event: "USER_CONTRIBUTION_SUCCESS",
+        title: "Đang chờ xác nhận thanh toán",
+        content: "Yêu cầu ủng hộ đã được tạo. Hệ thống sẽ cập nhật ngay khi thanh toán thành công.",
+        metadata: { campaignId: campaign.id, contributionId: contribution.id, paymentTransactionId: paymentTx.id }
+      })
     });
 
     return {
@@ -402,6 +453,45 @@ export async function handleContributionPayosWebhook(payload: ContributionWebhoo
       ]
     });
 
+    await tx.notification.createMany({
+      data: [
+        buildInAppNotification({
+          accountId: contribution.supporterId,
+          event: "USER_CONTRIBUTION_SUCCESS",
+          title: "Ủng hộ thành công",
+          content: "Thanh toán đã được xác nhận. Cảm ơn bạn đã ủng hộ campaign.",
+          metadata: { campaignId: contribution.campaignId, contributionId: contribution.id, amountVnd: contribution.amountVnd }
+        }),
+        buildInAppNotification({
+          accountId: contribution.supporterId,
+          event: "USER_RECEIVED_VOUCHER",
+          title: "Voucher đã được cấp",
+          content: `Bạn đã nhận voucher reward ${contribution.reward?.title ?? ""}.`,
+          metadata: { campaignId: contribution.campaignId, contributionId: contribution.id, rewardId: contribution.rewardId, voucherCode: claim.voucherCode }
+        })
+      ]
+    });
+
     return { contributionId: contribution.id, status: "SUCCESS", idempotent: false, voucherCode: claim.voucherCode };
+  });
+}
+
+export async function listMyContributions(accountId: string) {
+  return prisma.contribution.findMany({
+    where: { supporterId: accountId },
+    orderBy: { createdAt: "desc" },
+    include: {
+      campaign: {
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          brand: { select: { displayName: true } },
+          creator: { select: { displayName: true } }
+        }
+      },
+      reward: { select: { id: true, title: true, pointsCost: true } },
+      rewardClaim: { select: { voucherCode: true, status: true } }
+    }
   });
 }
