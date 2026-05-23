@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppShell, PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
+import { CreatorWorkspaceGate } from "@/app/dashboard/creator/_components/CreatorWorkspaceGate";
 
 type CreatorMissionStatus = "PRODUCT_PENDING" | "DRAFT_PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 type ProductReceiveOption = "CREATOR_BUY_FIRST" | "NO_PRODUCT_REQUIRED" | string;
@@ -485,14 +486,23 @@ export default function MyCreatorMissionPage() {
     );
   })();
 
-  return (
+  const pageContent = (
+    <>
+      <PageHeader title="Nhiệm vụ Creator" subtitle="Danh sách gọn để theo dõi nhanh, mở chi tiết để thao tác theo từng bước." />
+      {content}
+    </>
+  );
+
+  const fallbackLayout = (
     <>
       <PublicHeader />
-      <AppShell sidebarItems={nav}>
-        <PageHeader title="Nhiệm vụ Creator" subtitle="Danh sách gọn để theo dõi nhanh, mở chi tiết để thao tác theo từng bước." />
-        {content}
-      </AppShell>
+      <AppShell sidebarItems={nav}>{pageContent}</AppShell>
+    </>
+  );
 
+  return (
+    <CreatorWorkspaceGate fallback={fallbackLayout}>
+      {pageContent}
       {detailModal}
 
       {alertModal.open ? (
@@ -514,6 +524,6 @@ export default function MyCreatorMissionPage() {
           </div>
         </div>
       ) : null}
-    </>
+    </CreatorWorkspaceGate>
   );
 }

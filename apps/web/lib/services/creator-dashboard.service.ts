@@ -55,22 +55,27 @@ function parseProfileMeta(value: unknown): {
 
 export async function getCreatorDashboardOverview(accountId: string) {
   const wallet = await ensureWalletByAccountId(accountId);
-  const [totalJobs, pendingProofs, approvedVideos, totalCommission] = await prisma.$transaction([
+  const [totalJobs, pendingProofs, approvedVideos, completedSubmissions] = await prisma.$transaction([
     prisma.missionSubmission.count({ where: { accountId } }),
     prisma.missionSubmission.count({ where: { accountId, lifecycleStatus: "PENDING_REVIEW" } }),
     prisma.missionSubmission.count({ where: { accountId, lifecycleStatus: { in: ["APPROVED", "DONE"] } } }),
-    prisma.walletTransaction.aggregate({
-      _sum: { cashDeltaVnd: true },
-      where: { accountId, type: "COMMISSION_CREDIT" }
+    prisma.missionSubmission.findMany({
+      where: { accountId, lifecycleStatus: "DONE" },
+      select: { mission: { select: { rewardPoints: true } } }
     })
   ]);
+
+  const totalCommission = completedSubmissions.reduce(
+    (sum, item) => sum + (item.mission.rewardPoints ?? 0),
+    0
+  );
 
   return {
     totalJobs,
     pendingProofs,
     approvedVideos,
-    totalCommission: totalCommission._sum.cashDeltaVnd ?? 0,
-    availablePayoutBalance: wallet.cashBalanceVnd
+    totalCommission,
+    nPointsBalance: wallet.pointsBalance
   };
 }
 
