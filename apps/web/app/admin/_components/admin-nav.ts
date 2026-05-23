@@ -18,7 +18,8 @@ export const adminNav = [
   { href: "/admin/finance", label: "Finance/Payout", description: "Finance controls and payouts" },
   { href: "/admin/payouts", label: "Payout Requests", description: "Review creator payout queue" },
   { href: "/admin/support", label: "Support", description: "Brand/Creator support queue" },
-  { href: "/admin/reports", label: "Reports", description: "KPI and performance reports", isComingSoon: true },
+  { href: "/admin/reports", label: "Reports", description: "KPI and performance reports" },
+  { href: "/admin/analytics", label: "Analytics", description: "Analytics snapshot and trends" },
   { href: "/admin/audit", label: "Audit Logs", description: "Admin action tracing" },
   { href: "/admin/settings", label: "Settings", description: "Admin module settings", isComingSoon: true }
 ] as const satisfies readonly AdminNavItem[];
