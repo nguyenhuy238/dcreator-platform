@@ -156,7 +156,9 @@ export async function adminApproveCampaignApplication(actorId: string, applicati
     actorId,
     action: "CREATOR_CAMPAIGN_APPLICATION_ADMIN_APPROVED",
     targetType: "MissionSubmission",
-    targetId: applicationId
+    targetId: applicationId,
+    oldStatus: current.lifecycleStatus,
+    newStatus: "DOING"
   });
 
   await Promise.all([
@@ -199,6 +201,9 @@ export async function adminRejectCampaignApplication(actorId: string, applicatio
     action: "CREATOR_CAMPAIGN_APPLICATION_ADMIN_REJECTED",
     targetType: "MissionSubmission",
     targetId: applicationId,
+    oldStatus: current.lifecycleStatus,
+    newStatus: "REJECTED",
+    reason,
     metadata: { reason }
   });
 

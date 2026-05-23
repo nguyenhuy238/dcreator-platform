@@ -2,7 +2,7 @@ import { NotificationEvent, PayoutRequestStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
-import { createNotification } from "@/lib/services/notification.service";
+import { createNotification, createNotificationForAdminOps } from "@/lib/services/notification.service";
 
 function ensureTransition(current: PayoutRequestStatus, next: PayoutRequestStatus) {
   if (next === "APPROVED" && current !== "PENDING") throw new AppError("Only pending payout can be approved", 409, "INVALID_STATUS_TRANSITION");
@@ -114,7 +114,9 @@ export async function approvePayoutRequestByAdmin(actorId: string, payoutId: str
     actorId,
     action: "PAYOUT_APPROVED",
     targetType: "PayoutRequest",
-    targetId: payoutId
+    targetId: payoutId,
+    oldStatus: payout.status,
+    newStatus: "APPROVED"
   });
 
   await createNotification({
@@ -171,6 +173,9 @@ export async function rejectPayoutRequestByAdmin(actorId: string, payoutId: stri
     action: "PAYOUT_REJECTED",
     targetType: "PayoutRequest",
     targetId: payoutId,
+    oldStatus: payout.status,
+    newStatus: "REJECTED",
+    reason,
     metadata: { reason, refundedAmountVnd: payout.amountVnd }
   });
 
@@ -180,6 +185,13 @@ export async function rejectPayoutRequestByAdmin(actorId: string, payoutId: stri
     title: "Yêu cầu payout bị từ chối",
     content: `Yêu cầu payout bị từ chối: ${reason}. Số tiền đã được hoàn lại ví commission.`,
     metadata: { payoutId, reason }
+  });
+  await createNotificationForAdminOps({
+    event: NotificationEvent.PAYOUT_REJECTED,
+    title: "Payout bị từ chối",
+    content: `Payout ${payout.id} của ${payout.account.displayName} đã bị từ chối.`,
+    metadata: { payoutId: payout.id, reason },
+    excludeAccountId: actorId
   });
 
   return updated;
@@ -198,7 +210,9 @@ export async function markPayoutAsPaidByAdmin(actorId: string, payoutId: string)
     actorId,
     action: "PAYOUT_MARKED_PAID",
     targetType: "PayoutRequest",
-    targetId: payoutId
+    targetId: payoutId,
+    oldStatus: payout.status,
+    newStatus: "PAID"
   });
 
   await createNotification({
@@ -211,4 +225,3 @@ export async function markPayoutAsPaidByAdmin(actorId: string, payoutId: string)
 
   return updated;
 }
-

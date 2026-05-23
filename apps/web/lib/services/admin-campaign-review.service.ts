@@ -240,9 +240,10 @@ export async function decideCampaignByAdmin(input: {
     action,
     targetType: "Campaign",
     targetId: campaign.id,
+    oldStatus: campaign.status,
+    newStatus: nextStatus,
+    reason: input.reason ?? null,
     metadata: {
-      fromStatus: campaign.status,
-      toStatus: nextStatus,
       reason: input.reason ?? null
     }
   });

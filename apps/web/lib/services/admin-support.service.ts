@@ -85,6 +85,8 @@ export async function updateSupportTicketByAdmin(input: {
     action: "SUPPORT_TICKET_UPDATED",
     targetType: "SupportTicket",
     targetId: current.id,
+    oldStatus: current.status,
+    newStatus: input.status ?? current.status,
     metadata: {
       status: input.status ?? null,
       priority: input.priority ?? null,
@@ -143,4 +145,3 @@ export async function addSupportTicketReplyByAdmin(input: {
 
   return comment;
 }
-

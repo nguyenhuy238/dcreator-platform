@@ -229,6 +229,8 @@ export async function adminApproveContentSubmission(input: {
     action: input.markReadyToPublish ? "CONTENT_READY_TO_PUBLISH" : "CONTENT_ADMIN_APPROVED",
     targetType: "MissionSubmission",
     targetId: current.id,
+    oldStatus: current.lifecycleStatus,
+    newStatus: "APPROVED",
     metadata: { feedback: input.feedback }
   });
 
@@ -291,6 +293,9 @@ export async function adminRejectContentSubmission(input: {
     action: input.isChangesRequested ? "CONTENT_CHANGES_REQUESTED" : "CONTENT_ADMIN_REJECTED",
     targetType: "MissionSubmission",
     targetId: current.id,
+    oldStatus: current.lifecycleStatus,
+    newStatus: "REJECTED",
+    reason: input.feedback,
     metadata: { feedback: input.feedback }
   });
 
@@ -373,4 +378,3 @@ export async function adminSendContentToBrandReview(input: {
 
   return updated;
 }
-

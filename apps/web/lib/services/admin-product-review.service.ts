@@ -118,6 +118,9 @@ export async function decideProductSubmissionByAdmin(input: {
     action: `PRODUCT_SUBMISSION_${input.decision}`,
     targetType: "ProductSubmission",
     targetId: input.productId,
+    oldStatus: current.reviewStatus,
+    newStatus: input.decision,
+    reason: input.reason ?? null,
     metadata: {
       reason: input.reason ?? null,
       proposedCommissionPercent: input.proposedCommissionPercent ?? null,

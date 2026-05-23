@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { Role } from "@prisma/client";
 
 export const AUDIT_ACTIONS = {
   ADMIN_CAMPAIGN_APPROVED: "CAMPAIGN_REVIEW_APPROVED",
@@ -19,20 +20,49 @@ export const AUDIT_ACTIONS = {
   USER_UNLOCKED: "USER_UNLOCKED"
 } as const;
 
-export async function writeAuditLog(input: {
+export async function createAuditLog(input: {
   actorId?: string | null;
+  actorRole?: Role | null;
   action: string;
   targetType: string;
   targetId: string;
+  oldStatus?: string | null;
+  newStatus?: string | null;
+  reason?: string | null;
   metadata?: unknown;
 }) {
-  return prisma.auditLog.create({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const prismaAny = prisma as any;
+  let actorRole = input.actorRole ?? null;
+  if (!actorRole && input.actorId) {
+    const actor = await prisma.account.findUnique({ where: { id: input.actorId }, select: { role: true } });
+    actorRole = actor?.role ?? null;
+  }
+  return prismaAny.auditLog.create({
     data: {
       actorId: input.actorId ?? null,
+      actorRole,
       action: input.action,
       targetType: input.targetType,
       targetId: input.targetId,
+      oldStatus: input.oldStatus ?? null,
+      newStatus: input.newStatus ?? null,
+      reason: input.reason ?? null,
       metadata: input.metadata as object | undefined
     }
   });
+}
+
+export async function writeAuditLog(input: {
+  actorId?: string | null;
+  actorRole?: Role | null;
+  action: string;
+  targetType: string;
+  targetId: string;
+  oldStatus?: string | null;
+  newStatus?: string | null;
+  reason?: string | null;
+  metadata?: unknown;
+}) {
+  return createAuditLog(input);
 }

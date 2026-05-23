@@ -2,7 +2,7 @@ import { FulfillmentStatus, InventoryStockStatus, NotificationEvent } from "@pri
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
-import { createNotification } from "@/lib/services/notification.service";
+import { createNotification, createNotificationForAdminOps } from "@/lib/services/notification.service";
 
 type OpsStatus = "pending" | "preparing" | "shipped" | "delivered" | "failed" | "cancelled";
 type FulfillmentMethod = "CREATOR_SELF_BUY_REFUND" | "CREATOR_DEPOSIT" | "BRAND_WAREHOUSE_SHIP";
@@ -158,6 +158,9 @@ export async function updateFulfillmentByAdmin(input: {
     action: "FULFILLMENT_STATUS_UPDATED",
     targetType: "FulfillmentOrder",
     targetId: current.id,
+    oldStatus: meta.opsStatus,
+    newStatus: input.status,
+    reason: input.failureReason ?? null,
     metadata: { status: input.status, trackingCode: input.trackingCode ?? null, paymentStatus: input.paymentStatus ?? null, fulfillmentMethod: input.fulfillmentMethod ?? null }
   });
 
@@ -168,6 +171,15 @@ export async function updateFulfillmentByAdmin(input: {
       title: "Cập nhật đơn hàng sản phẩm",
       content: `Đơn fulfillment cho campaign "${current.campaign?.title ?? "N/A"}" đã cập nhật trạng thái: ${input.status}.`,
       metadata: { fulfillmentOrderId: current.id, status: input.status, trackingCode: input.trackingCode ?? null }
+    });
+  }
+  if (input.status === "failed" || input.status === "cancelled") {
+    await createNotificationForAdminOps({
+      event: NotificationEvent.CAMPAIGN_REJECTED,
+      title: "Fulfillment issue",
+      content: `Fulfillment ${current.id} gặp lỗi trạng thái ${input.status}.`,
+      metadata: { fulfillmentOrderId: current.id, status: input.status, failureReason: input.failureReason ?? null },
+      excludeAccountId: input.actorId
     });
   }
 
@@ -259,4 +271,3 @@ export async function createFulfillmentExportRequest(input: {
 
   return created;
 }
-

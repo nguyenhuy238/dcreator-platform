@@ -376,10 +376,19 @@ export async function reviewCreatorApplication(actorId: string, applicationId: s
     return app;
   });
 
-  await writeAuditLog({ actorId, action: `CREATOR_APPLICATION_${status}`, targetType: "CreatorApplication", targetId: updated.id, metadata: { rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null } });
+  await writeAuditLog({
+    actorId,
+    action: `CREATOR_APPLICATION_${status}`,
+    targetType: "CreatorApplication",
+    targetId: updated.id,
+    oldStatus: current.status,
+    newStatus: status,
+    reason: rejectReason ?? null,
+    metadata: { rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null }
+  });
   await createNotification({
     accountId: updated.accountId,
-    event: NotificationEvent.CREATOR_APPLICATION_APPROVED,
+    event: status === ApplicationStatus.APPROVED ? NotificationEvent.CREATOR_APPLICATION_APPROVED : NotificationEvent.CAMPAIGN_REJECTED,
     title: status === ApplicationStatus.APPROVED ? "Creator application approved" : "Creator application updated",
     content: status === ApplicationStatus.APPROVED ? "Yêu cầu Creator của bạn đã được duyệt." : `Yêu cầu Creator: ${status}`,
     metadata: { status, rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null }
@@ -483,10 +492,19 @@ export async function reviewBrandApplication(actorId: string, applicationId: str
     return app;
   });
 
-  await writeAuditLog({ actorId, action: `BRAND_APPLICATION_${status}`, targetType: "BrandApplication", targetId: updated.id, metadata: { rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null } });
+  await writeAuditLog({
+    actorId,
+    action: `BRAND_APPLICATION_${status}`,
+    targetType: "BrandApplication",
+    targetId: updated.id,
+    oldStatus: current.status,
+    newStatus: status,
+    reason: rejectReason ?? null,
+    metadata: { rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null }
+  });
   await createNotification({
     accountId: updated.accountId,
-    event: NotificationEvent.BRAND_APPLICATION_APPROVED,
+    event: status === ApplicationStatus.APPROVED ? NotificationEvent.BRAND_APPLICATION_APPROVED : NotificationEvent.CAMPAIGN_REJECTED,
     title: status === ApplicationStatus.APPROVED ? "Brand application approved" : "Brand application updated",
     content: status === ApplicationStatus.APPROVED ? "Yêu cầu Brand của bạn đã được duyệt." : `Yêu cầu Brand: ${status}`,
     metadata: { status, rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null }

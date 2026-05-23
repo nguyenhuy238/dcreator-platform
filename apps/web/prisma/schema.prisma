@@ -921,9 +921,13 @@ model AnalyticsDaily {
 model AuditLog {
   id             String   @id @default(cuid())
   actorId        String?
+  actorRole      Role?
   action         String
   targetType     String
   targetId       String
+  oldStatus      String?
+  newStatus      String?
+  reason         String?
   metadata       Json?
   createdAt      DateTime @default(now())
 
