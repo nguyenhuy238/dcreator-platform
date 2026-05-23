@@ -9,7 +9,7 @@ export const adminNav = [
   { href: "/admin", label: "Overview", description: "System snapshot" },
   { href: "/admin/users", label: "Account Review", description: "User access and lock/unlock" },
   { href: "/admin/brands", label: "Brand Requests", description: "Brand onboarding reviews" },
-  { href: "/admin/creator-applications", label: "Creator Requests", description: "Creator onboarding reviews" },
+  { href: "/admin/creators", label: "Creator Requests", description: "Creator onboarding reviews" },
   { href: "/admin/campaigns", label: "Campaign Review", description: "Campaign moderation" },
   { href: "/admin/creator-applications", label: "Creator Applications", description: "Creator application queue" },
   { href: "/admin/product-inventory", label: "Product/Inventory Review", description: "Product and stock verification", isComingSoon: true },

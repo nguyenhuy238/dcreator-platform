@@ -228,16 +228,24 @@ export async function updateBrandApplication(accountId: string, applicationId: s
   });
 }
 
-export async function listCreatorApplications(status?: ApplicationStatus, query?: string) {
+export async function listCreatorApplications(
+  status?: ApplicationStatus,
+  query?: string,
+  platform?: "TIKTOK" | "INSTAGRAM" | "YOUTUBE" | "FACEBOOK" | "OTHER",
+  contentCategory?: string
+) {
   return prisma.creatorApplication.findMany({
     where: {
       ...(status ? { status } : {}),
+      ...(platform ? { mainPlatform: platform } : {}),
+      ...(contentCategory ? { contentCategory: { contains: contentCategory, mode: "insensitive" } } : {}),
       ...(query
         ? {
             OR: [
               { displayName: { contains: query, mode: "insensitive" } },
               { socialUrl: { contains: query, mode: "insensitive" } },
-              { account: { email: { contains: query, mode: "insensitive" } } }
+              { account: { email: { contains: query, mode: "insensitive" } } },
+              { account: { displayName: { contains: query, mode: "insensitive" } } }
             ]
           }
         : {})
@@ -266,6 +274,34 @@ export async function listBrandApplications(status?: ApplicationStatus, query?: 
     include: { account: { select: { id: true, email: true, displayName: true } }, reviewedBy: { select: { id: true, displayName: true } } },
     orderBy: { createdAt: "desc" }
   });
+}
+
+export async function getCreatorApplicationDetail(applicationId: string) {
+  const application = await prisma.creatorApplication.findUnique({
+    where: { id: applicationId },
+    include: {
+      account: {
+        select: {
+          id: true,
+          email: true,
+          displayName: true,
+          creatorProfile: {
+            select: {
+              id: true,
+              mainPlatform: true,
+              socialUrl: true,
+              handle: true,
+              followerCount: true,
+              contentCategory: true
+            }
+          }
+        }
+      },
+      reviewedBy: { select: { id: true, email: true, displayName: true } }
+    }
+  });
+  if (!application) throw new AppError("Application not found", 404, "APPLICATION_NOT_FOUND");
+  return application;
 }
 
 export async function getBrandApplicationDetail(applicationId: string) {
