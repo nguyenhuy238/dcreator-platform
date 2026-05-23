@@ -25,7 +25,7 @@ export function AdminShell({
     <DashboardShell
       navItems={navItems}
       user={user}
-      workspaceTitle="dCreator Admin"
+      workspaceTitle="Bảng điều khiển Admin"
       workspaceDescription="Trung tâm vận hành và kiểm duyệt"
       loginRedirect="/admin"
     >

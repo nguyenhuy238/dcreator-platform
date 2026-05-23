@@ -2,15 +2,12 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { getNavigationItemsByRoles } from "@/app/components/dcreator/layout/role-navigation";
+import { useSearchParams } from "next/navigation";
 import { AppShell, PublicHeader } from "@/app/components/dcreator/layout/shell";
 import type { Role } from "@prisma/client";
-import { ROLE } from "@/lib/auth/role-constants";
+import { getNavItemsForWorkspace } from "@/lib/navigation";
 
-const nav = [
-  { href: "/dashboard/user/profile", label: "Hồ sơ" }
-];
+const nav = getNavItemsForWorkspace("user", ["USER", "CREATOR", "BRAND_OWNER", "BRAND_STAFF", "ADMIN", "OPS"]);
 
 type Snapshot = {
   account: {
@@ -53,7 +50,6 @@ function statusText(value?: unknown) {
 }
 
 export default function UserProfilePage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -90,11 +86,6 @@ export default function UserProfilePage() {
           void load();
           return;
         }
-        const roles = payload.data?.user?.roles as Role[] | undefined;
-        if (roles?.includes(ROLE.BRAND_OWNER) || roles?.includes(ROLE.BRAND_STAFF)) {
-          router.replace("/dashboard/brand/profile");
-          return;
-        }
         void load();
       })
       .catch(() => {
@@ -103,14 +94,11 @@ export default function UserProfilePage() {
     return () => {
       active = false;
     };
-  }, [router, searchParams]);
+  }, [searchParams]);
 
   const sidebarItems = useMemo(() => {
-    if (!data) return nav;
-    const map = new Map(getNavigationItemsByRoles(data.account.roles).map((item) => [item.href, item]));
-    map.set("/dashboard/user/profile", { href: "/dashboard/user/profile", label: "Hồ sơ" });
-    return Array.from(map.values());
-  }, [data]);
+    return nav;
+  }, []);
 
   async function submitCreator(event: FormEvent) {
     event.preventDefault();
@@ -192,7 +180,7 @@ export default function UserProfilePage() {
     <>
       <PublicHeader />
       <AppShell sidebarItems={sidebarItems}>
-        <h1 className="text-3xl font-black">Hồ sơ người dùng</h1>
+        <h1 className="text-3xl font-black">Hồ sơ cá nhân</h1>
         <p className="mt-2 text-sm text-zinc-600">Đăng ký nâng cấp Creator/Brand tại đây và theo dõi trạng thái duyệt.</p>
         {error ? <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
         {success ? <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p> : null}

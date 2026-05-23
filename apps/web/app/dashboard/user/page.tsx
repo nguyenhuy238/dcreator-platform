@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { Role } from "@prisma/client";
 import { AppShell, PublicHeader } from "@/app/components/dcreator/layout/shell";
@@ -79,6 +79,7 @@ function contributionStatusLabel(status: MyContribution["status"]) {
 
 export default function UserDashboardPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [wallet, setWallet] = useState<WalletMe | null>(null);
@@ -88,6 +89,8 @@ export default function UserDashboardPage() {
 
   useEffect(() => {
     let active = true;
+    const denied = searchParams.get("denied");
+    if (denied) setError(denied);
     fetch("/api/auth/me", { cache: "no-store" })
       .then(async (response) => {
         const payload = await response.json();
@@ -135,7 +138,7 @@ export default function UserDashboardPage() {
     return () => {
       active = false;
     };
-  }, [router]);
+  }, [router, searchParams]);
 
   const weeklyPoints = useMemo(() => {
     if (!wallet) return 0;

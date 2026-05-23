@@ -17,7 +17,11 @@ export type CurrentUser = {
   roles: Role[];
   isActive: boolean;
   creatorProfile: { id: string } | null;
-  brands: Array<{ id: string; name: string; role: "OWNER" | "STAFF" }>;
+  brandMemberships: Array<{ id: string; name: string; role: "OWNER" | "STAFF" }>;
+  activeBrandId: string | null;
+  permissions: string[];
+  creatorRequestStatus: string | null;
+  brandRequestStatus: string | null;
 };
 
 export async function getCurrentUser(request: NextRequest): Promise<CurrentUser | null> {
@@ -34,6 +38,8 @@ export async function getCurrentUser(request: NextRequest): Promise<CurrentUser 
       isActive: true,
       roleAssignments: { select: { role: true } },
       creatorProfile: { select: { id: true } },
+      creatorApplications: { orderBy: { createdAt: "desc" }, take: 1, select: { status: true } },
+      brandApplications: { orderBy: { createdAt: "desc" }, take: 1, select: { status: true } },
       ownedBrandMemberships: {
         include: { brand: { select: { id: true, name: true } } }
       }
@@ -54,7 +60,11 @@ export async function getCurrentUser(request: NextRequest): Promise<CurrentUser 
     roles,
     isActive: account.isActive,
     creatorProfile: account.creatorProfile,
-    brands: account.ownedBrandMemberships.map((item) => ({ id: item.brand.id, name: item.brand.name, role: item.role }))
+    brandMemberships: account.ownedBrandMemberships.map((item) => ({ id: item.brand.id, name: item.brand.name, role: item.role })),
+    activeBrandId: account.ownedBrandMemberships[0]?.brand.id ?? null,
+    permissions: roles.map((role) => `role:${role.toLowerCase()}`),
+    creatorRequestStatus: account.creatorApplications[0]?.status ?? null,
+    brandRequestStatus: account.brandApplications[0]?.status ?? null
   };
 }
 
@@ -77,6 +87,8 @@ export async function getCurrentUserFromServer() {
         isActive: true,
         roleAssignments: { select: { role: true } },
         creatorProfile: { select: { id: true } },
+        creatorApplications: { orderBy: { createdAt: "desc" }, take: 1, select: { status: true } },
+        brandApplications: { orderBy: { createdAt: "desc" }, take: 1, select: { status: true } },
         ownedBrandMemberships: { include: { brand: { select: { id: true, name: true } } } }
       }
     });
@@ -94,7 +106,11 @@ export async function getCurrentUserFromServer() {
       roles,
       isActive: account.isActive,
       creatorProfile: account.creatorProfile,
-      brands: account.ownedBrandMemberships.map((item) => ({ id: item.brand.id, name: item.brand.name, role: item.role }))
+      brandMemberships: account.ownedBrandMemberships.map((item) => ({ id: item.brand.id, name: item.brand.name, role: item.role })),
+      activeBrandId: account.ownedBrandMemberships[0]?.brand.id ?? null,
+      permissions: roles.map((role) => `role:${role.toLowerCase()}`),
+      creatorRequestStatus: account.creatorApplications[0]?.status ?? null,
+      brandRequestStatus: account.brandApplications[0]?.status ?? null
     } satisfies CurrentUser;
   } catch {
     return null;

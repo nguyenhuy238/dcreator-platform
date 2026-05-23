@@ -1,13 +1,8 @@
-import { redirect } from "next/navigation";
 import { getCurrentUserFromServer } from "@/lib/auth/current-user";
-import { DASHBOARD_ACCESS } from "@/lib/auth/role-constants";
-import { hasRole } from "@/lib/auth/dashboard-access";
+import { enforceWorkspaceAccess } from "@/lib/auth/workspace-guard";
 
 export default async function UserDashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUserFromServer();
-  if (!user) redirect("/auth/login?next=/dashboard/user");
-  if (!hasRole(user.roles, DASHBOARD_ACCESS.user)) {
-    redirect("/dashboard/user/profile?denied=Ban khong co quyen truy cap User Dashboard.");
-  }
+  enforceWorkspaceAccess("user", user, "/dashboard/user");
   return children;
 }

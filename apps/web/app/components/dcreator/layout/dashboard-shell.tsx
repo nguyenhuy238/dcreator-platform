@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { Role } from "@prisma/client";
+import { getBreadcrumbsForPath, getWorkspaceForPath } from "@/lib/navigation";
 
 export type DashboardNavItem = {
   href: string;
@@ -34,20 +35,6 @@ function isCurrent(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function toBreadcrumb(pathname: string, nav: readonly DashboardNavItem[]) {
-  const segments = pathname.split("/").filter(Boolean);
-  const trails: Array<{ href: string; label: string }> = [];
-  for (let i = 0; i < segments.length; i += 1) {
-    const href = `/${segments.slice(0, i + 1).join("/")}`;
-    const navLabel = nav.find((item) => item.href === href)?.label;
-    trails.push({
-      href,
-      label: navLabel ?? segments[i]!.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-    });
-  }
-  return trails;
-}
-
 function getActiveHref(pathname: string, nav: readonly DashboardNavItem[]) {
   const candidates = nav
     .filter((item) => isCurrent(pathname, item.href))
@@ -73,7 +60,8 @@ export function DashboardShell({
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const crumbs = useMemo(() => toBreadcrumb(pathname, navItems), [pathname, navItems]);
+  const workspace = useMemo(() => getWorkspaceForPath(pathname), [pathname]);
+  const crumbs = useMemo(() => getBreadcrumbsForPath(pathname, workspace), [pathname, workspace]);
   const activeHref = useMemo(() => getActiveHref(pathname, navItems), [pathname, navItems]);
   const activeTitle = navItems.find((item) => item.href === activeHref)?.label ?? workspaceTitle;
   const userInitials = initials(user.displayName || user.email || "U");

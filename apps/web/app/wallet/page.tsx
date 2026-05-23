@@ -1,5 +1,5 @@
-import { WalletPageClient } from "./_components/WalletPageClient";
+import { redirect } from "next/navigation";
 
-export default function WalletPage() {
-  return <WalletPageClient />;
+export default function WalletLegacyPage() {
+  redirect("/dashboard/user/wallet");
 }

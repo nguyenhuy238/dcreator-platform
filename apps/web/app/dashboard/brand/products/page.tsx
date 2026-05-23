@@ -1,19 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { AppShell, PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
-
-const nav = [
-  { href: "/dashboard/brand", label: "Bảng điều khiển Nhãn hàng" },
-  { href: "/dashboard/brand/onboarding", label: "Onboarding / BCC" },
-  { href: "/dashboard/brand/products", label: "Sản phẩm & lô hàng" },
-  { href: "/dashboard/brand/campaign-setup", label: "Yêu cầu campaign" },
-  { href: "/dashboard/brand/profile", label: "Hồ sơ Nhãn hàng" },
-  { href: "/brand", label: "Chiến dịch" },
-  { href: "/brand/proofs", label: "Duyệt proof" },
-  { href: "/wallet", label: "Quỹ" }
-];
 
 type FulfillmentType = "NONE_WAREHOUSE" | "BRAND_FULFILLMENT";
 type OpsStatus = "DRAFT" | "PENDING_REVIEW" | "APPROVED" | "REJECTED";
@@ -164,8 +152,8 @@ export default function BrandProductsPage() {
 
   return (
     <>
-      <PublicHeader />
-      <AppShell sidebarItems={nav}>
+      
+      <>
         <PageHeader
           title="Sản phẩm & lô hàng"
           subtitle="Khai báo sản phẩm, lô hàng, giá vốn và hình thức fulfillment để OPS thẩm định trước khi tạo campaign."
@@ -277,7 +265,12 @@ export default function BrandProductsPage() {
             </div>
           )}
         </section>
-      </AppShell>
+      </>
     </>
   );
 }
+
+
+
+
+

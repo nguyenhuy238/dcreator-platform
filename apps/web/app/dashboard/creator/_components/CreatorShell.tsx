@@ -25,7 +25,7 @@ export function CreatorShell({
     <DashboardShell
       navItems={navItems}
       user={user}
-      workspaceTitle="Không gian Creator"
+      workspaceTitle="Bảng điều khiển Creator"
       workspaceDescription="Quản lý nhiệm vụ, minh chứng và hoa hồng"
       loginRedirect="/dashboard/creator"
     >
