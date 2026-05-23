@@ -13,7 +13,9 @@ import {
   getAuditLogs,
   getFinanceSnapshot,
   getFraudRiskSnapshot,
+  getFulfillmentSnapshot,
   getVoucherManagement,
+  getProductInventorySnapshot,
   listCreatorMissionWorkflowForAdmin,
   listPendingCampaignReviews,
   listPendingProofs,
@@ -166,6 +168,20 @@ export async function GET_audit_logs(request: NextRequest) {
 export async function GET_analytics(request: NextRequest) {
   await requireAdminOps(request);
   return ok(await getAdminAnalytics());
+}
+
+export async function GET_product_inventory(request: NextRequest) {
+  await requireAdminOps(request);
+  const page = Number(request.nextUrl.searchParams.get("page") ?? "1");
+  const limit = Number(request.nextUrl.searchParams.get("limit") ?? "20");
+  return ok(await getProductInventorySnapshot({ page: Number.isFinite(page) && page > 0 ? page : 1, limit: Number.isFinite(limit) && limit > 0 ? limit : 20 }));
+}
+
+export async function GET_fulfillment(request: NextRequest) {
+  await requireAdminOps(request);
+  const page = Number(request.nextUrl.searchParams.get("page") ?? "1");
+  const limit = Number(request.nextUrl.searchParams.get("limit") ?? "20");
+  return ok(await getFulfillmentSnapshot({ page: Number.isFinite(page) && page > 0 ? page : 1, limit: Number.isFinite(limit) && limit > 0 ? limit : 20 }));
 }
 
 export async function GET_creator_campaign_applications(request: NextRequest) {

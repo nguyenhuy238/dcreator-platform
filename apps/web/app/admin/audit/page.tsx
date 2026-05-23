@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
 
 type LogItem = { id: string; action: string; targetType: string; targetId: string; createdAt: string; metadata?: unknown };
@@ -12,7 +12,7 @@ export default function AdminAuditPage() {
   const [targetType, setTargetType] = useState("");
   const [items, setItems] = useState<LogItem[]>([]);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -30,11 +30,11 @@ export default function AdminAuditPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [action, targetType]);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
