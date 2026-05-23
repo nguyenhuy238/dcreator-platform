@@ -4,6 +4,7 @@ import { requireAdminOps } from "@/lib/auth/admin-guard";
 import { toErrorResponse } from "@/lib/errors";
 import {
   decideCreatorCampaignApplicationByAdmin,
+  decideCreatorMissionWorkflowByAdmin,
   approveRoleRequestByAdmin,
   decideCampaignReview,
   decideProofByAdmin,
@@ -13,6 +14,7 @@ import {
   getFinanceSnapshot,
   getFraudRiskSnapshot,
   getVoucherManagement,
+  listCreatorMissionWorkflowForAdmin,
   listPendingCampaignReviews,
   listPendingProofs,
   listCreatorCampaignApplicationsForAdmin,
@@ -27,6 +29,7 @@ import {
   adminCampaignDecisionSchema,
   adminCreatorCampaignApplicationQuerySchema,
   adminCreatorCampaignDecisionSchema,
+  adminCreatorMissionDecisionSchema,
   adminProofDecisionSchema,
   adminRejectSchema,
   adminUserQuerySchema
@@ -184,6 +187,25 @@ export async function POST_creator_campaign_application_decision(request: NextRe
       payload.decision,
       payload.rejectReason,
       payload.note
+    )
+  );
+}
+
+export async function GET_creator_missions(request: NextRequest) {
+  await requireAdminOps(request);
+  return ok(await listCreatorMissionWorkflowForAdmin());
+}
+
+export async function POST_creator_mission_decision(request: NextRequest, creatorMissionId: string) {
+  const actor = await requireAdminOps(request);
+  const payload = adminCreatorMissionDecisionSchema.parse(await request.json());
+  return ok(
+    await decideCreatorMissionWorkflowByAdmin(
+      actor.id,
+      creatorMissionId,
+      payload.action,
+      payload.reason,
+      payload.purchaseAmountVnd
     )
   );
 }

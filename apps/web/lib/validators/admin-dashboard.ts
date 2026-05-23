@@ -51,3 +51,26 @@ export const adminCreatorCampaignDecisionSchema = z
       ctx.addIssue({ code: "custom", path: ["rejectReason"], message: "rejectReason is required" });
     }
   });
+
+export const adminCreatorMissionDecisionSchema = z
+  .object({
+    action: z.enum([
+      "CONFIRM_DEPOSIT_AND_PRODUCT_RECEIVED",
+      "APPROVE_PURCHASE_PROOF",
+      "REJECT_PURCHASE_PROOF",
+      "APPROVE_VIDEO_REVIEW",
+      "REJECT_VIDEO_REVIEW",
+      "APPROVE_PUBLISH_REPORT",
+      "REJECT_PUBLISH_REPORT"
+    ]),
+    reason: z.string().trim().max(500).optional(),
+    purchaseAmountVnd: z.number().int().min(0).max(2_000_000_000).optional()
+  })
+  .superRefine((value, ctx) => {
+    if ((value.action === "REJECT_PURCHASE_PROOF" || value.action === "REJECT_VIDEO_REVIEW" || value.action === "REJECT_PUBLISH_REPORT") && !value.reason) {
+      ctx.addIssue({ code: "custom", path: ["reason"], message: "reason is required" });
+    }
+    if (value.action === "APPROVE_PUBLISH_REPORT" && typeof value.purchaseAmountVnd !== "number") {
+      ctx.addIssue({ code: "custom", path: ["purchaseAmountVnd"], message: "purchaseAmountVnd is required" });
+    }
+  });

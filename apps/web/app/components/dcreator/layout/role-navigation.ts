@@ -24,7 +24,7 @@ export const navigationGroups: NavGroup[] = [
     roles: DASHBOARD_ACCESS.creator,
     items: [
       { label: "Creator Dashboard", href: "/dashboard/creator" },
-      { label: "Jobs / Missions", href: "/me/missions" },
+      { label: "Jobs / Missions", href: "/me/mission" },
       { label: "Proof submissions", href: "/dashboard/creator" },
       { label: "Earnings", href: "/dashboard/creator" }
     ]

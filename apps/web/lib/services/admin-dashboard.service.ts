@@ -2,6 +2,17 @@ import { CampaignStatus, MissionAudience, MissionLifecycleStatus, Role, RoleRequ
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { approveProof, rejectProof } from "@/lib/services/mission.service";
+import {
+  approvePublishReportByAdmin,
+  approveVideoReviewByAdmin,
+  approvePurchaseProofByAdmin,
+  confirmDepositAndProductReceivedByAdmin,
+  ensureCreatorMissionFromApprovedApplication,
+  listCreatorMissionsForAdmin,
+  rejectPublishReportByAdmin,
+  rejectVideoReviewByAdmin,
+  rejectPurchaseProofByAdmin
+} from "@/lib/services/creator-mission.service";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
 import { listAdminVouchers } from "@/lib/services/voucher.service";
 import { scanFraudRiskSignals } from "@/lib/services/fraud-flag.service";
@@ -257,28 +268,41 @@ export async function decideCreatorCampaignApplicationByAdmin(
   if (!current) throw new AppError("Submission not found", 404, "SUBMISSION_NOT_FOUND");
   if (current.lifecycleStatus === "DONE") throw new AppError("Submission already finalized", 409, "SUBMISSION_FINALIZED");
 
-  const updated = decision === "APPROVED"
-    ? await prisma.missionSubmission.update({
-        where: { id: submissionId },
-        data: {
-          lifecycleStatus: "DOING",
-          note: note ?? current.note,
-          rejectReason: null,
-          reviewedAt: new Date(),
-          reviewedById: actorId
-        }
-      })
-    : await prisma.missionSubmission.update({
-        where: { id: submissionId },
-        data: {
-          lifecycleStatus: "REJECTED",
-          status: "REJECTED",
-          rejectReason: rejectReason ?? "Rejected by admin",
-          note: note ?? current.note,
-          reviewedAt: new Date(),
-          reviewedById: actorId
-        }
+  const updated = await prisma.$transaction(async (tx) => {
+    const next = decision === "APPROVED"
+      ? await tx.missionSubmission.update({
+          where: { id: submissionId },
+          data: {
+            lifecycleStatus: "DOING",
+            note: note ?? current.note,
+            rejectReason: null,
+            reviewedAt: new Date(),
+            reviewedById: actorId
+          }
+        })
+      : await tx.missionSubmission.update({
+          where: { id: submissionId },
+          data: {
+            lifecycleStatus: "REJECTED",
+            status: "REJECTED",
+            rejectReason: rejectReason ?? "Rejected by admin",
+            note: note ?? current.note,
+            reviewedAt: new Date(),
+            reviewedById: actorId
+          }
+        });
+
+    if (decision === "APPROVED") {
+      await ensureCreatorMissionFromApprovedApplication(tx, {
+        missionId: current.missionId,
+        campaignId: current.mission.campaignId,
+        accountId: current.accountId,
+        applicationId: current.id
       });
+    }
+
+    return next;
+  });
 
   await writeAuditLog({
     actorId,
@@ -294,4 +318,43 @@ export async function decideCreatorCampaignApplicationByAdmin(
   });
 
   return updated;
+}
+
+export async function listCreatorMissionWorkflowForAdmin() {
+  return listCreatorMissionsForAdmin();
+}
+
+export async function decideCreatorMissionWorkflowByAdmin(
+  actorId: string,
+  creatorMissionId: string,
+  action:
+    | "CONFIRM_DEPOSIT_AND_PRODUCT_RECEIVED"
+    | "APPROVE_PURCHASE_PROOF"
+    | "REJECT_PURCHASE_PROOF"
+    | "APPROVE_VIDEO_REVIEW"
+    | "REJECT_VIDEO_REVIEW"
+    | "APPROVE_PUBLISH_REPORT"
+    | "REJECT_PUBLISH_REPORT",
+  reason?: string,
+  purchaseAmountVnd?: number
+) {
+  if (action === "CONFIRM_DEPOSIT_AND_PRODUCT_RECEIVED") {
+    return confirmDepositAndProductReceivedByAdmin(actorId, creatorMissionId);
+  }
+  if (action === "APPROVE_PURCHASE_PROOF") {
+    return approvePurchaseProofByAdmin(actorId, creatorMissionId);
+  }
+  if (action === "REJECT_PURCHASE_PROOF") {
+    return rejectPurchaseProofByAdmin(actorId, creatorMissionId, reason);
+  }
+  if (action === "APPROVE_VIDEO_REVIEW") {
+    return approveVideoReviewByAdmin(actorId, creatorMissionId);
+  }
+  if (action === "REJECT_VIDEO_REVIEW") {
+    return rejectVideoReviewByAdmin(actorId, creatorMissionId, reason ?? "Video review rejected");
+  }
+  if (action === "APPROVE_PUBLISH_REPORT") {
+    return approvePublishReportByAdmin(actorId, creatorMissionId, purchaseAmountVnd ?? 0);
+  }
+  return rejectPublishReportByAdmin(actorId, creatorMissionId, reason ?? "Publish report rejected");
 }
