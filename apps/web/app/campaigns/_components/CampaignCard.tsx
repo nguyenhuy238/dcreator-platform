@@ -1,5 +1,6 @@
 import Link from "next/link";
 import styles from "../campaigns.module.css";
+import { CreatorCampaignApplyButton } from "./CreatorCampaignApplyButton";
 
 export type CampaignCardData = {
   slug: string;
@@ -43,6 +44,7 @@ export function CampaignCard({ campaign }: { campaign: CampaignCardData }) {
         <Link href={`/campaigns/${campaign.slug}`} className={styles.cta}>
           Xem chi tiết
         </Link>
+        <CreatorCampaignApplyButton slug={campaign.slug} compact />
       </div>
     </article>
   );

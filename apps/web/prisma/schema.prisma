@@ -131,6 +131,12 @@ enum MissionAudience {
   CREATOR
 }
 
+enum ProductReceiveOption {
+  DEPOSIT_PRODUCT
+  CREATOR_BUY_FIRST
+  NO_PRODUCT_REQUIRED
+}
+
 enum MissionLifecycleStatus {
   OPEN
   ACCEPTED
@@ -142,6 +148,53 @@ enum MissionLifecycleStatus {
   REJECTED
   EXPIRED
   CANCELLED
+}
+
+enum CreatorMissionStatus {
+  PRODUCT_PENDING
+  DRAFT_PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ProductStatus {
+  NOT_REQUIRED
+  WAITING_DEPOSIT
+  WAITING_PURCHASE
+  RECEIVED
+}
+
+enum DepositStatus {
+  NOT_REQUIRED
+  PENDING
+  PAID
+  REFUND_PENDING
+  REFUNDED
+}
+
+enum ReimbursementStatus {
+  NOT_REQUIRED
+  PENDING
+  PURCHASE_SUBMITTED
+  APPROVED
+  PAYOUT_PENDING
+  PAID
+  REJECTED
+}
+
+enum CreatorMissionVideoReviewStatus {
+  NOT_SUBMITTED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum CreatorMissionPublishStatus {
+  NOT_SUBMITTED
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum ReviewDecision {
@@ -357,6 +410,7 @@ model Account {
   supportTicketsRequested SupportTicket[] @relation("SupportTicketRequester")
   supportTicketsAssigned SupportTicket[] @relation("SupportTicketAssignee")
   supportTicketComments SupportTicketComment[] @relation("SupportTicketCommentAuthor")
+  creatorMissions CreatorMission[]
 }
 
 model AccountRole {
@@ -792,9 +846,11 @@ model Mission {
   campaignId     String
   title          String
   description    String
+  productLink    String?
   rewardPoints   Int
   rewardCommissionVnd Int            @default(0)
   audience       MissionAudience     @default(USER)
+  productReceiveOption ProductReceiveOption @default(NO_PRODUCT_REQUIRED)
   allowRepeat    Boolean             @default(false)
   deadlineAt     DateTime?
   status         MissionStatus       @default(OPEN)
@@ -804,6 +860,7 @@ model Mission {
   campaign       Campaign            @relation(fields: [campaignId], references: [id])
   proofReviews   ProofReview[]
   submissions    MissionSubmission[]
+  creatorMissions CreatorMission[]
 }
 
 model MissionSubmission {
@@ -830,9 +887,54 @@ model MissionSubmission {
   mission        Mission       @relation(fields: [missionId], references: [id])
   account        Account       @relation(fields: [accountId], references: [id])
   reviews        ProofReview[]
+  creatorMission CreatorMission?
 
   @@unique([missionId, accountId])
   @@index([accountId, lifecycleStatus, createdAt])
+}
+
+model CreatorMission {
+  id                   String                @id @default(cuid())
+  missionId            String
+  campaignId           String
+  accountId            String
+  applicationId        String?               @unique
+  status               CreatorMissionStatus
+  productReceiveOption ProductReceiveOption
+  productStatus        ProductStatus
+  depositStatus        DepositStatus
+  reimbursementStatus  ReimbursementStatus
+  purchaseProofTextNote String?
+  purchaseProofScreenshotUrl String?
+  purchaseProofNote    String?
+  purchaseProofSubmittedAt DateTime?
+  purchaseProofReviewedAt DateTime?
+  purchaseProofRejectReason String?
+  productPurchasedConfirmedAt DateTime?
+  videoReviewStatus    CreatorMissionVideoReviewStatus @default(NOT_SUBMITTED)
+  videoReviewFeedback  String?
+  videoSubmittedAt     DateTime?
+  videoReviewedAt      DateTime?
+  publishStatus        CreatorMissionPublishStatus @default(NOT_SUBMITTED)
+  publishFeedback      String?
+  publishSubmittedAt   DateTime?
+  publishReviewedAt    DateTime?
+  publishPurchaseAmountVnd Int?
+  rewardCreditedAt     DateTime?
+  assignedAt           DateTime              @default(now())
+  startedAt            DateTime?
+  completedAt          DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  mission              Mission               @relation(fields: [missionId], references: [id], onDelete: Restrict)
+  campaign             Campaign              @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  account              Account               @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  application          MissionSubmission?    @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  @@unique([missionId, accountId])
+  @@index([accountId, status, createdAt])
+  @@index([campaignId, status, createdAt])
 }
 
 model ProofReview {

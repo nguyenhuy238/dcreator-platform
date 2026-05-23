@@ -5,8 +5,7 @@ import { PageHeader, SectionHeader, StatsCard } from "@/app/components/dcreator/
 const nav = [
   { href: "/dashboard/creator", label: "Overview" },
   { href: "/campaigns", label: "Marketplace" },
-  { href: "/me/missions", label: "My Jobs" },
-  { href: "/creator", label: "Profile" }
+  { href: "/me/mission", label: "My Jobs" },
 ];
 
 export default function CreatorDashboardPage() {
