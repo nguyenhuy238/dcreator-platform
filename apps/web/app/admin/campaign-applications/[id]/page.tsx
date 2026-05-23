@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -48,7 +48,6 @@ export default function AdminCampaignApplicationDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
-  const [reason, setReason] = useState("");
   const [item, setItem] = useState<Detail | null>(null);
   const [acting, setActing] = useState(false);
 
@@ -72,19 +71,15 @@ export default function AdminCampaignApplicationDetailPage() {
     void load();
   }, [load]);
 
-  async function act(action: "approve" | "reject" | "send-to-brand-review" | "assign-task") {
+  async function confirmAllowCreatorTask() {
     if (!item) return;
-    if (action === "reject" && !reason.trim()) {
-      setError("Reject reason is required.");
-      return;
-    }
     setActing(true);
     setError("");
     try {
-      const res = await fetch(`/api/admin/campaign-applications/${item.id}/${action}`, {
+      const res = await fetch(`/api/admin/campaign-applications/${item.id}/approve`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: action === "reject" ? JSON.stringify({ reason: reason.trim() }) : JSON.stringify({})
+        body: JSON.stringify({})
       });
       const body = (await res.json()) as ApiResult<unknown>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Action failed");
@@ -113,7 +108,11 @@ export default function AdminCampaignApplicationDetailPage() {
 
   return (
     <>
-      <PageHeader title={item.account.displayName} subtitle={`Campaign: ${item.mission.campaign.title}`} action={<button className="dc-btn-secondary" onClick={() => router.push("/admin/campaign-applications")}>Back</button>} />
+      <PageHeader
+        title={item.account.displayName}
+        subtitle={`Campaign: ${item.mission.campaign.title}`}
+        action={<button className="dc-btn-secondary" onClick={() => router.push("/admin/campaign-applications")}>Back</button>}
+      />
       {error ? <div className="mb-4"><ErrorState title="Có lỗi thao tác" description={error} onRetry={() => void load()} /></div> : null}
 
       <section className="dc-card p-4">
@@ -150,12 +149,10 @@ export default function AdminCampaignApplicationDetailPage() {
 
       <section className="mt-4 dc-card p-4">
         <p className="font-semibold">Decision</p>
-        <textarea className="dc-input mt-3 min-h-24" placeholder="Reject reason (required for reject)" value={reason} onChange={(e) => setReason(e.target.value)} />
         <div className="mt-3 flex flex-wrap gap-2">
-          <button className="dc-btn-primary" disabled={acting} onClick={() => void act("approve")}>Admin approve sơ bộ</button>
-          <button className="dc-btn-secondary" disabled={acting} onClick={() => void act("send-to-brand-review")}>Send to Brand review</button>
-          <button className="dc-btn-secondary" disabled={acting} onClick={() => void act("assign-task")}>Assign task</button>
-          <button className="dc-btn-secondary" disabled={acting} onClick={() => void act("reject")}>Reject</button>
+          <button className="dc-btn-primary" disabled={acting} onClick={() => void confirmAllowCreatorTask()}>
+            Xác nhận cho phép creator làm nhiệm vụ
+          </button>
         </div>
       </section>
 

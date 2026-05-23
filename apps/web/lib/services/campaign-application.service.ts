@@ -1,4 +1,5 @@
 import { CampaignStatus, MissionAudience, MissionLifecycleStatus, Role } from "@prisma/client";
+import { appendCreatorCampaignApplicationTag } from "@/lib/constants/campaign-application";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { acceptMission } from "@/lib/services/mission.service";
@@ -229,6 +230,11 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
 
   const missionRole = firstMission.audience === MissionAudience.USER ? Role.USER : Role.CREATOR;
   const submission = await acceptMission(firstMission.id, accountId, missionRole);
+
+  await prisma.missionSubmission.update({
+    where: { id: submission.id },
+    data: { note: appendCreatorCampaignApplicationTag(submission.note, slug) }
+  });
 
   await prisma.auditLog.create({
     data: {
