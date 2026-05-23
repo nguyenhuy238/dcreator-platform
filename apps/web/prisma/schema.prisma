@@ -639,6 +639,7 @@ model Campaign {
   analyticsEvents AnalyticsEvent[]
   fulfillmentOrders FulfillmentOrder[]
   productSubmissions ProductSubmission[]
+  creatorMissions CreatorMission[]
 }
 
 model ProductSubmission {
