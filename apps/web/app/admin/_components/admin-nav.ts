@@ -8,7 +8,7 @@ export type AdminNavItem = {
 export const adminNav = [
   { href: "/admin", label: "Overview", description: "System snapshot" },
   { href: "/admin/users", label: "Account Review", description: "User access and lock/unlock" },
-  { href: "/admin/brand-applications", label: "Brand Requests", description: "Brand onboarding reviews" },
+  { href: "/admin/brands", label: "Brand Requests", description: "Brand onboarding reviews" },
   { href: "/admin/creator-applications", label: "Creator Requests", description: "Creator onboarding reviews" },
   { href: "/admin/campaigns", label: "Campaign Review", description: "Campaign moderation" },
   { href: "/admin/creator-applications", label: "Creator Applications", description: "Creator application queue" },

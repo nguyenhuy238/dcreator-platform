@@ -255,8 +255,10 @@ export async function listBrandApplications(status?: ApplicationStatus, query?: 
         ? {
             OR: [
               { brandName: { contains: query, mode: "insensitive" } },
+              { industry: { contains: query, mode: "insensitive" } },
               { contactEmail: { contains: query, mode: "insensitive" } },
-              { taxCode: { contains: query, mode: "insensitive" } }
+              { taxCode: { contains: query, mode: "insensitive" } },
+              { account: { email: { contains: query, mode: "insensitive" } } }
             ]
           }
         : {})
@@ -264,6 +266,18 @@ export async function listBrandApplications(status?: ApplicationStatus, query?: 
     include: { account: { select: { id: true, email: true, displayName: true } }, reviewedBy: { select: { id: true, displayName: true } } },
     orderBy: { createdAt: "desc" }
   });
+}
+
+export async function getBrandApplicationDetail(applicationId: string) {
+  const application = await prisma.brandApplication.findUnique({
+    where: { id: applicationId },
+    include: {
+      account: { select: { id: true, email: true, displayName: true } },
+      reviewedBy: { select: { id: true, displayName: true, email: true } }
+    }
+  });
+  if (!application) throw new AppError("Application not found", 404, "APPLICATION_NOT_FOUND");
+  return application;
 }
 
 export async function reviewCreatorApplication(actorId: string, applicationId: string, status: ApplicationStatus, rejectReason?: string, reviewNote?: string) {
