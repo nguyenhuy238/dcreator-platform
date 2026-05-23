@@ -14,7 +14,7 @@ export const adminNav = [
   { href: "/admin/campaign-applications", label: "Creator Applications", description: "Creator apply campaign queue" },
   { href: "/admin/products", label: "Product/Inventory Review", description: "Product and stock verification" },
   { href: "/admin/content-review", label: "Content Review", description: "Proof/content moderation" },
-  { href: "/admin/fulfillment", label: "Fulfillment", description: "Ops shipment workflow", isComingSoon: true },
+  { href: "/admin/fulfillment", label: "Fulfillment", description: "Ops shipment workflow" },
   { href: "/admin/finance", label: "Finance/Payout", description: "Finance controls and payouts" },
   { href: "/admin/support", label: "Support", description: "Brand/Creator support queue", isComingSoon: true },
   { href: "/admin/reports", label: "Reports", description: "KPI and performance reports", isComingSoon: true },
