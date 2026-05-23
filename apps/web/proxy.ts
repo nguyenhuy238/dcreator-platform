@@ -9,7 +9,7 @@ function deny(request: NextRequest) {
 }
 
 function authorize(pathname: string, role: ReturnType<typeof decodeSession>["role"]) {
-  if (pathname.startsWith("/admin")) {
+  if (pathname.startsWith("/admin") || pathname.startsWith("/ops")) {
     return role === "ADMIN" || role === "OPS";
   }
   if (pathname.startsWith("/dashboard/brand") || pathname.startsWith("/brand")) {
@@ -45,7 +45,7 @@ export async function proxy(request: NextRequest) {
         url.searchParams.set("denied", "Bạn cần đăng ký và được duyệt Creator trước khi sử dụng dashboard này.");
       } else if (request.nextUrl.pathname.startsWith("/dashboard/brand")) {
         url.searchParams.set("denied", "Bạn cần đăng ký và được duyệt Brand trước khi sử dụng dashboard này.");
-      } else if (request.nextUrl.pathname.startsWith("/admin")) {
+      } else if (request.nextUrl.pathname.startsWith("/admin") || request.nextUrl.pathname.startsWith("/ops")) {
         url.searchParams.set("denied", "Bạn không có quyền truy cập khu vực quản trị.");
       }
       return NextResponse.redirect(url);
@@ -75,5 +75,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/:path*", "/brand/:path*", "/wallet/:path*"]
+  matcher: ["/dashboard/:path*", "/admin/:path*", "/ops/:path*", "/brand/:path*", "/wallet/:path*"]
 };

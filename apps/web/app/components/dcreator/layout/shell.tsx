@@ -244,10 +244,14 @@ export function MobileBottomNav({ items }: { items: NavItem[] }) {
 export function AppShell({ children, sidebarItems }: { children: React.ReactNode; sidebarItems: NavItem[] }) {
   const pathname = usePathname();
   const [roles, setRoles] = useState<Role[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(true);
+  const [rolesError, setRolesError] = useState("");
 
   useEffect(() => {
     let active = true;
     async function loadRoles() {
+      setRolesLoading(true);
+      setRolesError("");
       try {
         const response = await fetch("/api/auth/me", { cache: "no-store" });
         const payload = await response.json();
@@ -256,9 +260,17 @@ export function AppShell({ children, sidebarItems }: { children: React.ReactNode
           setRoles(payload.data.user.roles as Role[]);
         } else {
           setRoles([]);
+          setRolesError("Không thể tải quyền truy cập hiện tại.");
         }
       } catch {
-        if (active) setRoles([]);
+        if (active) {
+          setRoles([]);
+          setRolesError("Không thể tải quyền truy cập hiện tại.");
+        }
+      } finally {
+        if (active) {
+          setRolesLoading(false);
+        }
       }
     }
     void loadRoles();
@@ -274,6 +286,12 @@ export function AppShell({ children, sidebarItems }: { children: React.ReactNode
     <div className="mx-auto flex w-full max-w-7xl">
       <DashboardSidebar items={effectiveSidebarItems} />
       <main className="min-h-screen flex-1 px-4 pb-24 pt-6 md:px-6">
+        {rolesLoading ? <div className="mb-4 h-10 w-56 animate-pulse rounded-xl bg-zinc-200" /> : null}
+        {!rolesLoading && rolesError ? (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+            {rolesError}
+          </div>
+        ) : null}
         <DashboardSwitcher roles={roles} />
         {children}
       </main>
