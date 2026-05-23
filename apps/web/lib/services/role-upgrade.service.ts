@@ -233,16 +233,24 @@ export async function updateBrandApplication(accountId: string, applicationId: s
   });
 }
 
-export async function listCreatorApplications(status?: ApplicationStatus, query?: string) {
+export async function listCreatorApplications(
+  status?: ApplicationStatus,
+  query?: string,
+  platform?: "TIKTOK" | "INSTAGRAM" | "YOUTUBE" | "FACEBOOK" | "OTHER",
+  contentCategory?: string
+) {
   return prisma.creatorApplication.findMany({
     where: {
       ...(status ? { status } : {}),
+      ...(platform ? { mainPlatform: platform } : {}),
+      ...(contentCategory ? { contentCategory: { contains: contentCategory, mode: "insensitive" } } : {}),
       ...(query
         ? {
             OR: [
               { displayName: { contains: query, mode: "insensitive" } },
               { socialUrl: { contains: query, mode: "insensitive" } },
-              { account: { email: { contains: query, mode: "insensitive" } } }
+              { account: { email: { contains: query, mode: "insensitive" } } },
+              { account: { displayName: { contains: query, mode: "insensitive" } } }
             ]
           }
         : {})
@@ -260,8 +268,10 @@ export async function listBrandApplications(status?: ApplicationStatus, query?: 
         ? {
             OR: [
               { brandName: { contains: query, mode: "insensitive" } },
+              { industry: { contains: query, mode: "insensitive" } },
               { contactEmail: { contains: query, mode: "insensitive" } },
-              { taxCode: { contains: query, mode: "insensitive" } }
+              { taxCode: { contains: query, mode: "insensitive" } },
+              { account: { email: { contains: query, mode: "insensitive" } } }
             ]
           }
         : {})
@@ -269,6 +279,46 @@ export async function listBrandApplications(status?: ApplicationStatus, query?: 
     include: { account: { select: { id: true, email: true, displayName: true } }, reviewedBy: { select: { id: true, displayName: true } } },
     orderBy: { createdAt: "desc" }
   });
+}
+
+export async function getCreatorApplicationDetail(applicationId: string) {
+  const application = await prisma.creatorApplication.findUnique({
+    where: { id: applicationId },
+    include: {
+      account: {
+        select: {
+          id: true,
+          email: true,
+          displayName: true,
+          creatorProfile: {
+            select: {
+              id: true,
+              mainPlatform: true,
+              socialUrl: true,
+              handle: true,
+              followerCount: true,
+              contentCategory: true
+            }
+          }
+        }
+      },
+      reviewedBy: { select: { id: true, email: true, displayName: true } }
+    }
+  });
+  if (!application) throw new AppError("Application not found", 404, "APPLICATION_NOT_FOUND");
+  return application;
+}
+
+export async function getBrandApplicationDetail(applicationId: string) {
+  const application = await prisma.brandApplication.findUnique({
+    where: { id: applicationId },
+    include: {
+      account: { select: { id: true, email: true, displayName: true } },
+      reviewedBy: { select: { id: true, displayName: true, email: true } }
+    }
+  });
+  if (!application) throw new AppError("Application not found", 404, "APPLICATION_NOT_FOUND");
+  return application;
 }
 
 export async function reviewCreatorApplication(actorId: string, applicationId: string, status: ApplicationStatus, rejectReason?: string, reviewNote?: string) {
@@ -331,10 +381,19 @@ export async function reviewCreatorApplication(actorId: string, applicationId: s
     return app;
   });
 
-  await writeAuditLog({ actorId, action: `CREATOR_APPLICATION_${status}`, targetType: "CreatorApplication", targetId: updated.id, metadata: { rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null } });
+  await writeAuditLog({
+    actorId,
+    action: `CREATOR_APPLICATION_${status}`,
+    targetType: "CreatorApplication",
+    targetId: updated.id,
+    oldStatus: current.status,
+    newStatus: status,
+    reason: rejectReason ?? null,
+    metadata: { rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null }
+  });
   await createNotification({
     accountId: updated.accountId,
-    event: NotificationEvent.CREATOR_APPLICATION_APPROVED,
+    event: status === ApplicationStatus.APPROVED ? NotificationEvent.CREATOR_APPLICATION_APPROVED : NotificationEvent.CAMPAIGN_REJECTED,
     title: status === ApplicationStatus.APPROVED ? "Creator application approved" : "Creator application updated",
     content: status === ApplicationStatus.APPROVED ? "Yêu cầu Creator của bạn đã được duyệt." : `Yêu cầu Creator: ${status}`,
     metadata: { status, rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null }
@@ -438,10 +497,19 @@ export async function reviewBrandApplication(actorId: string, applicationId: str
     return app;
   });
 
-  await writeAuditLog({ actorId, action: `BRAND_APPLICATION_${status}`, targetType: "BrandApplication", targetId: updated.id, metadata: { rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null } });
+  await writeAuditLog({
+    actorId,
+    action: `BRAND_APPLICATION_${status}`,
+    targetType: "BrandApplication",
+    targetId: updated.id,
+    oldStatus: current.status,
+    newStatus: status,
+    reason: rejectReason ?? null,
+    metadata: { rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null }
+  });
   await createNotification({
     accountId: updated.accountId,
-    event: NotificationEvent.BRAND_APPLICATION_APPROVED,
+    event: status === ApplicationStatus.APPROVED ? NotificationEvent.BRAND_APPLICATION_APPROVED : NotificationEvent.CAMPAIGN_REJECTED,
     title: status === ApplicationStatus.APPROVED ? "Brand application approved" : "Brand application updated",
     content: status === ApplicationStatus.APPROVED ? "Yêu cầu Brand của bạn đã được duyệt." : `Yêu cầu Brand: ${status}`,
     metadata: { status, rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null }

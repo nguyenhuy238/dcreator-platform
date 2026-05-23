@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 
-type Campaign = {
+type ApiResult<T> = { success: boolean; data: T; error?: string };
+type CampaignRequestItem = {
   id: string;
   requestedSlug: string;
   title: string;
@@ -15,39 +16,50 @@ type Campaign = {
   creatorCommissionPercent: number;
   userCommissionPercent: number;
   bonusBudgetVnd: number;
-  feasibilityStatus: string;
-  brandApprovalStatus: string;
-  brandFeedback: string | null;
   adminNote: string | null;
+  brandFeedback: string | null;
   budgetVnd: number;
   targetAmountVnd: number;
   brand: { name: string; contactEmail: string };
   createdCampaign: { id: string; slug: string; title: string; status: string } | null;
 };
 
+const statusOptions = [
+  { value: "", label: "Tất cả" },
+  { value: "PENDING_REVIEW", label: "Chờ duyệt" },
+  { value: "NEEDS_REVISION", label: "Cần chỉnh sửa" },
+  { value: "APPROVED", label: "Đã duyệt" },
+  { value: "REJECTED", label: "Từ chối" }
+];
+
 export default function AdminCampaignsPage() {
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [items, setItems] = useState<Campaign[]>([]);
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("PENDING_REVIEW");
+  const [query, setQuery] = useState("");
+  const [items, setItems] = useState<CampaignRequestItem[]>([]);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setError("");
     try {
-      const res = await fetch("/api/admin/dashboard/campaign-reviews", { cache: "no-store" });
-      const body = await res.json();
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Không tải được campaign");
+      const params = new URLSearchParams();
+      if (status) params.set("status", status);
+      if (query.trim()) params.set("query", query.trim());
+      const res = await fetch(`/api/admin/dashboard/campaign-reviews?${params.toString()}`, { cache: "no-store" });
+      const body = (await res.json()) as ApiResult<CampaignRequestItem[]>;
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Không tải được yêu cầu campaign");
       setItems(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Không tải được campaign");
+      setError(e instanceof Error ? e.message : "Không tải được yêu cầu campaign");
     } finally {
       setLoading(false);
     }
-  }
+  }, [query, status]);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
   async function review(id: string, decision: "APPROVED" | "REJECTED" | "CHANGES_REQUESTED") {
     let reason: string | undefined;
@@ -62,7 +74,7 @@ export default function AdminCampaignsPage() {
     });
     const body = await res.json();
     if (!res.ok || !body.success) {
-      setError(body.error ?? "Không xử lý được campaign");
+      setError(body.error ?? "Không xử lý được yêu cầu campaign");
       return;
     }
     await load();
@@ -70,21 +82,34 @@ export default function AdminCampaignsPage() {
 
   return (
     <>
-      <PageHeader title="Campaign CMS" subtitle="Nhận yêu cầu từ Brand; khi duyệt, Admin tạo campaign thật và publish lên hệ thống." />
-      {error ? <ErrorState title="Không tải được campaign" description={error} onRetry={() => void load()} /> : null}
-      {loading ? <LoadingSkeleton rows={4} /> : null}
+      <PageHeader title="Campaign CMS" subtitle="Nhận yêu cầu từ Brand; khi duyệt, Admin tạo campaign thật và publish lên hệ thống." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
+      <section className="dc-card p-4">
+        <div className="flex flex-wrap gap-2">
+          <select className="dc-input max-w-72" value={status} onChange={(e) => setStatus(e.target.value)}>
+            {statusOptions.map((option) => (
+              <option key={option.value || "all"} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          <input className="dc-input max-w-96" placeholder="Tìm campaign/brand" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <button className="dc-btn-primary" onClick={() => void load()}>Lọc</button>
+        </div>
+      </section>
+
+      {loading ? <div className="mt-4"><LoadingSkeleton rows={4} /></div> : null}
+      {error ? <div className="mt-4"><ErrorState title="Không tải được yêu cầu campaign" description={error} onRetry={() => void load()} /></div> : null}
+
       {!loading && !error ? (
-        <section>
+        <section className="mt-4">
           <SectionHeader title="Yêu cầu campaign chờ Admin" subtitle={`Tổng ${items.length} yêu cầu`} />
           {items.length === 0 ? (
-            <EmptyState title="Không có campaign chờ duyệt" description="Hiện tại chưa có Brand gửi yêu cầu campaign." />
+            <EmptyState title="Không có yêu cầu phù hợp" description="Không có dữ liệu theo bộ lọc hiện tại." />
           ) : (
             <div className="grid gap-3">
               {items.map((item) => (
                 <article key={item.id} className="dc-card p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="font-semibold">{item.title}</p>
+                      <p className="font-semibold text-zinc-900">{item.title}</p>
                       <p className="text-sm text-zinc-600">/{item.requestedSlug} - #{item.id.slice(0, 8)}</p>
                       <p className="text-sm text-zinc-600">Brand: {item.brand.name} - {item.brand.contactEmail}</p>
                     </div>

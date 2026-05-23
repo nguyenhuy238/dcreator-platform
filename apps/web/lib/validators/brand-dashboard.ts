@@ -166,3 +166,13 @@ export const budgetTopupSchema = z.object({
   amountVnd: z.number().int().positive(),
   idempotencyKey: z.string().trim().min(6).max(120)
 });
+
+export const productSubmissionSchema = z.object({
+  campaignId: z.string().trim().min(3).optional(),
+  name: z.string().trim().min(1).max(160),
+  sku: z.string().trim().max(80).optional(),
+  description: z.string().trim().max(1000).optional(),
+  unitPriceVnd: z.number().int().min(0).default(0),
+  batchCode: z.string().trim().max(80).optional(),
+  quantityTotal: z.number().int().positive()
+});

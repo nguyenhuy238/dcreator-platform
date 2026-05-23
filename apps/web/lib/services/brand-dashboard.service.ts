@@ -15,6 +15,7 @@ import type {
   campaignCreateSchema,
   campaignRequestSchema,
   creatorApplicationDecisionSchema,
+  productSubmissionSchema,
   productSchema,
   proofReviewDecisionSchema,
   rewardTierSchema
@@ -31,6 +32,7 @@ type CreatorApplicationDecisionInput = z.infer<typeof creatorApplicationDecision
 type ProofReviewDecisionInput = z.infer<typeof proofReviewDecisionSchema>;
 type BudgetLockInput = z.infer<typeof budgetLockSchema>;
 type BudgetTopupInput = z.infer<typeof budgetTopupSchema>;
+type ProductSubmissionInput = z.infer<typeof productSubmissionSchema>;
 
 type BrandProductWithBatches = BrandProduct & { batches: BrandInventoryBatch[] };
 
@@ -892,4 +894,45 @@ export async function getBrandAnalytics(accountId: string) {
     conversionRate: conversionRaw._count._all > 0 ? Number(((conversionRaw._sum.amountVnd ?? 0) / conversionRaw._count._all).toFixed(2)) : 0,
     kpis
   };
+}
+
+export async function createProductSubmissionForReview(accountId: string, input: ProductSubmissionInput) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const prismaAny = prisma as any;
+  const brand = await ensureBrandForOwner(accountId);
+  if (input.campaignId) {
+    await getBrandScopedCampaign(input.campaignId, accountId);
+  }
+
+  return prismaAny.productSubmission.create({
+    data: {
+      brandId: brand.id,
+      campaignId: input.campaignId ?? null,
+      name: input.name,
+      sku: input.sku ?? null,
+      description: input.description ?? null,
+      unitPriceVnd: input.unitPriceVnd,
+      reviewStatus: "PENDING_REVIEW",
+      inventoryBatches: {
+        create: {
+          batchCode: input.batchCode ?? null,
+          quantityTotal: input.quantityTotal,
+          quantityRemaining: input.quantityTotal,
+          stockStatus: "IN_STOCK"
+        }
+      }
+    },
+    include: { inventoryBatches: true }
+  });
+}
+
+export async function listProductSubmissionsForBrand(accountId: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const prismaAny = prisma as any;
+  const brand = await ensureBrandForOwner(accountId);
+  return prismaAny.productSubmission.findMany({
+    where: { brandId: brand.id },
+    orderBy: { createdAt: "desc" },
+    include: { inventoryBatches: true }
+  });
 }

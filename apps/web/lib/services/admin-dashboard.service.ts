@@ -8,15 +8,77 @@ import { scanFraudRiskSignals } from "@/lib/services/fraud-flag.service";
 import { getAdminKpis } from "@/lib/services/analytics.service";
 
 export async function getAdminOverview() {
-  const [totalUsers, totalCreators, totalBrands, activeCampaigns, pendingReviews, totalContributions, fraudAlerts] = await Promise.all([
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const prismaAny = prisma as any;
+  const [
+    totalUsers,
+    totalCreators,
+    totalBrands,
+    activeCampaigns,
+    pendingReviews,
+    totalContributions,
+    fraudAlerts,
+    pendingBrandRequests,
+    pendingCreatorRequests,
+    pendingCampaignReviews,
+    pendingCreatorApplications,
+    pendingContentSubmissions,
+    pendingPayouts,
+    activeBrands,
+    activeCreators,
+    pendingProductInventoryReviews,
+    pendingFulfillmentIssues,
+    totalCommissionPaid,
+    failedPayments24h
+  ] = await Promise.all([
     prisma.account.count(),
     prisma.account.count({ where: { role: Role.CREATOR } }),
     prisma.account.count({ where: { role: { in: [Role.BRAND_OWNER, Role.BRAND_STAFF] } } }),
     prisma.campaign.count({ where: { status: CampaignStatus.ACTIVE } }),
     prisma.roleRequest.count({ where: { status: RoleRequestStatus.PENDING } }),
     prisma.contribution.aggregate({ _sum: { amountVnd: true }, where: { status: "SUCCESS" } }),
-    prisma.riskFlag.count()
+    prisma.riskFlag.count(),
+    prisma.brandApplication.count({ where: { status: "PENDING_REVIEW" } }),
+    prisma.creatorApplication.count({ where: { status: "PENDING_REVIEW" } }),
+    prisma.campaign.count({ where: { status: CampaignStatus.PAUSED } }),
+    prisma.missionSubmission.count({
+      where: {
+        mission: { audience: "CREATOR" },
+        lifecycleStatus: { in: ["ACCEPTED", "DOING"] }
+      }
+    }),
+    prisma.missionSubmission.count({ where: { lifecycleStatus: "PENDING_REVIEW" } }),
+    prisma.payoutRequest.count({ where: { status: "PENDING" } }),
+    prisma.brand.count({ where: { status: "ACTIVE" } }),
+    prisma.account.count({ where: { role: Role.CREATOR, isActive: true } }),
+    prismaAny.productSubmission.count({
+      where: { reviewStatus: { in: ["PENDING_REVIEW", "CHANGES_REQUESTED"] } }
+    }),
+    prismaAny.fulfillmentOrder.count({
+      where: { status: { in: ["PENDING", "FAILED"] } }
+    }),
+    prisma.walletTransaction.aggregate({
+      _sum: { cashDeltaVnd: true },
+      where: { type: "COMMISSION_PAYOUT" }
+    }),
+    prisma.paymentTransaction.count({
+      where: {
+        status: "FAILED",
+        updatedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+      }
+    })
   ]);
+
+  const systemAlerts: string[] = [];
+  if (failedPayments24h >= 10) {
+    systemAlerts.push(`High failed payments in 24h: ${failedPayments24h}`);
+  }
+  if (fraudAlerts > 0) {
+    systemAlerts.push(`Fraud flags detected: ${fraudAlerts}`);
+  }
+  if (pendingPayouts >= 20) {
+    systemAlerts.push(`Large payout queue: ${pendingPayouts}`);
+  }
 
   return {
     totalUsers,
@@ -25,7 +87,113 @@ export async function getAdminOverview() {
     activeCampaigns,
     pendingReviews,
     totalContributions: totalContributions._sum.amountVnd ?? 0,
-    fraudAlerts
+    fraudAlerts,
+    queues: {
+      brandPendingReview: pendingBrandRequests,
+      creatorPendingReview: pendingCreatorRequests,
+      campaignPendingReview: pendingCampaignReviews,
+      creatorApplicationsPendingReview: pendingCreatorApplications,
+      contentSubmissionsPendingReview: pendingContentSubmissions,
+      productInventoryPendingReview: pendingProductInventoryReviews,
+      fulfillmentPendingIssues: pendingFulfillmentIssues,
+      payoutPendingReview: pendingPayouts
+    },
+    totals: {
+      activeCampaigns,
+      activeBrands,
+      activeCreators,
+      grossRevenueVnd: totalContributions._sum.amountVnd ?? 0,
+      commissionPayoutVnd: Math.abs(totalCommissionPaid._sum.cashDeltaVnd ?? 0)
+    },
+    systemAlerts
+  };
+}
+
+export async function getProductInventorySnapshot(input: { page: number; limit: number }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const prismaAny = prisma as any;
+  const [total, products] = await prisma.$transaction([
+    prismaAny.productSubmission.count({
+      where: { reviewStatus: { in: ["PENDING_REVIEW", "CHANGES_REQUESTED"] } }
+    }),
+    prismaAny.productSubmission.findMany({
+      where: { reviewStatus: { in: ["PENDING_REVIEW", "CHANGES_REQUESTED"] } },
+      orderBy: { updatedAt: "asc" },
+      skip: (input.page - 1) * input.limit,
+      take: input.limit,
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        reviewStatus: true,
+        reviewNote: true,
+        updatedAt: true,
+        brand: { select: { id: true, name: true } },
+        inventoryBatches: {
+          select: {
+            id: true,
+            batchCode: true,
+            quantityTotal: true,
+            quantityRemaining: true,
+            stockStatus: true
+          }
+        }
+      }
+    })
+  ]);
+
+  return {
+    items: products,
+    pagination: {
+      page: input.page,
+      limit: input.limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / input.limit))
+    }
+  };
+}
+
+export async function getFulfillmentSnapshot(input: { page: number; limit: number }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const prismaAny = prisma as any;
+  const [total, orders] = await prisma.$transaction([
+    prismaAny.fulfillmentOrder.count({
+      where: { status: { in: ["PENDING", "FAILED"] } }
+    }),
+    prismaAny.fulfillmentOrder.findMany({
+      where: { status: { in: ["PENDING", "FAILED"] } },
+      orderBy: { updatedAt: "asc" },
+      skip: (input.page - 1) * input.limit,
+      take: input.limit,
+      select: {
+        id: true,
+        status: true,
+        failureReason: true,
+        recipientName: true,
+        recipientPhone: true,
+        shippingAddress: true,
+        updatedAt: true,
+        campaign: { select: { id: true, title: true } },
+        inventoryBatch: {
+          select: {
+            id: true,
+            batchCode: true,
+            productSubmission: { select: { id: true, name: true } }
+          }
+        },
+        creatorAccount: { select: { id: true, displayName: true, email: true } }
+      }
+    })
+  ]);
+
+  return {
+    items: orders,
+    pagination: {
+      page: input.page,
+      limit: input.limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / input.limit))
+    }
   };
 }
 

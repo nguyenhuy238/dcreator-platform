@@ -1,13 +1,18 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatsCard } from "@/app/components/dcreator/ui/base";
 
-type FinanceData = {
-  paymentTransactions: Array<{ id: string; provider: string; requestedAmountVnd: number; status: string; createdAt?: string }>;
-  walletTransactions: Array<{ id: string; type: string; pointsDelta: number; cashDeltaVnd: number; createdAt?: string }>;
-  payoutRequests: Array<{ id: string; amountVnd: number; status: string; createdAt?: string }>;
-  brandPrepaidFunds: Array<{ userId: string; pointsBalance: number; cashBalanceVnd: number }>;
+type FinanceOverview = {
+  campaignRevenueVnd: number;
+  creatorCommissionVnd: number;
+  payoutPendingCount: number;
+  payoutApprovedCount: number;
+  payoutRejectedCount: number;
+  payoutPaidCount: number;
+  payoutPendingAmountVnd: number;
+  paymentFailedCount: number;
 };
 
 type FraudData = {
@@ -20,7 +25,7 @@ type FraudData = {
 export default function AdminFinancePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [finance, setFinance] = useState<FinanceData | null>(null);
+  const [finance, setFinance] = useState<FinanceOverview | null>(null);
   const [fraud, setFraud] = useState<FraudData | null>(null);
 
   async function load() {
@@ -28,7 +33,7 @@ export default function AdminFinancePage() {
     setError(null);
     try {
       const [fRes, rRes] = await Promise.all([
-        fetch("/api/admin/dashboard/finance", { cache: "no-store" }),
+        fetch("/api/admin/finance/overview", { cache: "no-store" }),
         fetch("/api/admin/dashboard/fraud-risk", { cache: "no-store" })
       ]);
       const fBody = await fRes.json();
@@ -51,16 +56,17 @@ export default function AdminFinancePage() {
   if (loading) return <><PageHeader title="Finance CMS" subtitle="Theo dõi tài chính và rủi ro hệ thống." /><LoadingSkeleton rows={4} /></>;
   if (error || !finance || !fraud) return <ErrorState title="Không tải được dữ liệu finance" description={error ?? "Unknown error"} onRetry={() => void load()} />;
 
-  const totalPayout = finance.payoutRequests.reduce((sum, p) => sum + p.amountVnd, 0);
-  const totalBrandFund = finance.brandPrepaidFunds.reduce((sum, b) => sum + b.cashBalanceVnd, 0);
-
   return (
     <>
-      <PageHeader title="Finance CMS" subtitle="Theo dõi thanh toán, payout và tín hiệu fraud." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
+      <PageHeader title="Finance CMS" subtitle="Theo dõi doanh thu, commission, payout và tín hiệu fraud." action={<div className="flex gap-2"><Link className="dc-btn-primary" href="/admin/payouts">Open payouts</Link><button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button></div>} />
       <section className="dc-grid-dashboard">
-        <StatsCard title="Payment Tx" value={`${finance.paymentTransactions.length}`} />
-        <StatsCard title="Payout Requests" value={`${finance.payoutRequests.length}`} hint={`${totalPayout.toLocaleString("vi-VN")} VND`} />
-        <StatsCard title="Brand Funds" value={`${totalBrandFund.toLocaleString("vi-VN")} VND`} />
+        <StatsCard title="Campaign revenue" value={`${finance.campaignRevenueVnd.toLocaleString("vi-VN")} VND`} />
+        <StatsCard title="Creator commission" value={`${finance.creatorCommissionVnd.toLocaleString("vi-VN")} VND`} />
+        <StatsCard title="Payout pending" value={`${finance.payoutPendingCount}`} hint={`${finance.payoutPendingAmountVnd.toLocaleString("vi-VN")} VND`} />
+        <StatsCard title="Payout approved" value={`${finance.payoutApprovedCount}`} />
+        <StatsCard title="Payout paid" value={`${finance.payoutPaidCount}`} />
+        <StatsCard title="Payout rejected" value={`${finance.payoutRejectedCount}`} />
+        <StatsCard title="Payment failed" value={`${finance.paymentFailedCount}`} />
         <StatsCard title="Flagged Accounts" value={`${fraud.flaggedAccounts.length}`} />
       </section>
 
