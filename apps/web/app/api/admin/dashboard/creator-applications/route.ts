@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const statusRaw = request.nextUrl.searchParams.get("status");
     const query = request.nextUrl.searchParams.get("query") ?? undefined;
     const status = statusRaw && Object.values(ApplicationStatus).includes(statusRaw as ApplicationStatus) ? (statusRaw as ApplicationStatus) : undefined;
-    return ok(await listCreatorApplications(status, query));
+    return ok(await listCreatorApplications({ status, query }));
   } catch (error) {
     return toErrorResponse(error);
   }

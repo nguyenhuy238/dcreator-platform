@@ -3,7 +3,9 @@ import { z } from "zod";
 
 export const adminBrandListQuerySchema = z.object({
   status: z.nativeEnum(ApplicationStatus).optional(),
-  query: z.string().trim().max(200).optional()
+  query: z.string().trim().max(200).optional(),
+  industry: z.string().trim().max(120).optional(),
+  sort: z.enum(["newest", "oldest"]).default("newest")
 });
 
 export const adminBrandDecisionSchema = z.object({

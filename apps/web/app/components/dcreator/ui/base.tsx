@@ -7,6 +7,7 @@ export function StatusBadge({ status }: { status: string }) {
     PENDING_REVIEW: "Chờ duyệt",
     APPROVED: "Đã duyệt",
     REJECTED: "Đã từ chối",
+    NEEDS_REVISION: "Cần bổ sung",
     ACTIVE: "Đang hoạt động",
     INACTIVE: "Không hoạt động",
     COMPLETED: "Đã hoàn thành",
@@ -33,6 +34,7 @@ export function StatusBadge({ status }: { status: string }) {
     cancelled: "bg-red-50 text-red-700 border-red-200",
     approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
     rejected: "bg-red-50 text-red-700 border-red-200",
+    needs_revision: "bg-amber-50 text-amber-700 border-amber-200",
     pending: "bg-blue-50 text-blue-700 border-blue-200"
   };
 

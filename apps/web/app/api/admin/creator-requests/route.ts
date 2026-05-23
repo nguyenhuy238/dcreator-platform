@@ -22,16 +22,7 @@ export async function GET(request: NextRequest) {
       contentCategory,
       sort
     });
-
-    return ok(
-      await listCreatorApplications({
-        status: parsed.status,
-        query: parsed.query,
-        platform: parsed.platform,
-        contentCategory: parsed.contentCategory,
-        sort: parsed.sort
-      })
-    );
+    return ok(await listCreatorApplications(parsed));
   } catch (error) {
     return toErrorResponse(error);
   }
