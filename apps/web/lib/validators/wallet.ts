@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { paginationSchema } from "./common";
+import { paginationSchema } from "./common.ts";
 
 export const walletTransactionQuerySchema = paginationSchema;
 

@@ -10,6 +10,7 @@ import {
   contributionPayosWebhookSchema
 } from "@/lib/validators/contribution";
 import { flagContributionSpam, flagDuplicateWebhook } from "@/lib/services/fraud-flag.service";
+import { shouldProcessPaymentWebhook } from "@/lib/payments/idempotency";
 import { assertNonNegativeBalance } from "./wallet.service";
 
 type CreateContributionInput = z.infer<typeof contributionCreateSchema>;
@@ -364,30 +365,52 @@ export async function handleContributionPayosWebhook(payload: ContributionWebhoo
     throw new AppError("Payment amount mismatch", 409, "PAYMENT_AMOUNT_MISMATCH");
   }
 
+  const nextPaymentStatus = payload.status === "FAILED" ? "FAILED" : "SUCCESS";
+
   return prisma.$transaction(async (tx) => {
+    if (!shouldProcessPaymentWebhook(paymentTx.status)) {
+      await flagDuplicateWebhook(payload.orderCode, payload.idempotencyKey);
+      return { contributionId: null, status: paymentTx.status, idempotent: true };
+    }
+
+    const paymentUpdated = await tx.paymentTransaction.updateMany({
+      where: { id: paymentTx.id, status: "PENDING" },
+      data: {
+        status: nextPaymentStatus,
+        gatewayTransactionId: payload.transactionId,
+        rawPayload: rawPayload as Prisma.JsonObject
+      }
+    });
+
+    if (paymentUpdated.count === 0) {
+      const latest = await tx.paymentTransaction.findUniqueOrThrow({ where: { id: paymentTx.id } });
+      await flagDuplicateWebhook(payload.orderCode, payload.idempotencyKey);
+      return { contributionId: null, status: latest.status, idempotent: true };
+    }
+
     const contribution = await tx.contribution.findFirst({
       where: { paymentTransactionId: paymentTx.id },
       include: { reward: true }
     });
     if (!contribution) throw new AppError("Contribution not found", 404, "CONTRIBUTION_NOT_FOUND");
 
-    if (contribution.status !== "PENDING") {
-      await flagDuplicateWebhook(payload.orderCode, payload.idempotencyKey);
-      return { contributionId: contribution.id, status: contribution.status, idempotent: true };
-    }
-
     if (payload.status === "FAILED") {
-      await tx.paymentTransaction.update({
-        where: { id: paymentTx.id },
-        data: { status: "FAILED", gatewayTransactionId: payload.transactionId, rawPayload: rawPayload as object }
-      });
-      await tx.contribution.update({
-        where: { id: contribution.id },
+      const contributionUpdated = await tx.contribution.updateMany({
+        where: { id: contribution.id, status: "PENDING" },
         data: { status: "FAILED" }
       });
-      if (contribution.rewardId) {
+      if (contributionUpdated.count > 0 && contribution.rewardId) {
         await tx.reward.update({ where: { id: contribution.rewardId }, data: { stockRemaining: { increment: 1 } } });
       }
+      await tx.auditLog.create({
+        data: {
+          actorId: contribution.supporterId,
+          action: "CONTRIBUTION_WEBHOOK_FAILED",
+          targetType: "Campaign",
+          targetId: contribution.campaignId,
+          metadata: { contributionId: contribution.id, paymentTransactionId: paymentTx.id, transactionId: payload.transactionId }
+        }
+      });
       await tx.analyticsEvent.create({
         data: {
           eventName: "payment_failed",
@@ -399,19 +422,24 @@ export async function handleContributionPayosWebhook(payload: ContributionWebhoo
       return { contributionId: contribution.id, status: "FAILED", idempotent: false };
     }
 
-    await tx.paymentTransaction.update({
-      where: { id: paymentTx.id },
-      data: { status: "SUCCESS", gatewayTransactionId: payload.transactionId, rawPayload: rawPayload as object }
+    const contributionUpdated = await tx.contribution.updateMany({
+      where: { id: contribution.id, status: "PENDING" },
+      data: { status: "SUCCESS" }
     });
-    await tx.contribution.update({ where: { id: contribution.id }, data: { status: "SUCCESS" } });
+    if (contributionUpdated.count === 0) {
+      await flagDuplicateWebhook(payload.orderCode, payload.idempotencyKey);
+      return { contributionId: contribution.id, status: "SUCCESS", idempotent: true };
+    }
 
-    const claim = await tx.rewardClaim.create({
-      data: {
+    const claim = await tx.rewardClaim.upsert({
+      where: { contributionId: contribution.id },
+      create: {
         rewardId: contribution.rewardId!,
         contributionId: contribution.id,
         accountId: contribution.supporterId,
         voucherCode: generateVoucherCode()
-      }
+      },
+      update: {}
     });
 
     await tx.campaign.update({
