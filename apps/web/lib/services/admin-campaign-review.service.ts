@@ -3,16 +3,16 @@ import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
 import { createNotification } from "@/lib/services/notification.service";
+import { assertStateTransition } from "@/lib/services/admin-transition.service";
 
 type AdminDecision = "APPROVE" | "REJECT" | "REQUEST_CHANGES" | "PAUSE";
 
-function canTransition(current: CampaignStatus, decision: AdminDecision) {
-  if (decision === "APPROVE") return current === "DRAFT" || current === "PAUSED";
-  if (decision === "REJECT") return current === "DRAFT" || current === "PAUSED";
-  if (decision === "REQUEST_CHANGES") return current === "DRAFT" || current === "PAUSED";
-  if (decision === "PAUSE") return current === "ACTIVE";
-  return false;
-}
+const campaignTransitionMap: Record<AdminDecision, readonly CampaignStatus[]> = {
+  APPROVE: ["DRAFT", "PAUSED"],
+  REJECT: ["DRAFT", "PAUSED"],
+  REQUEST_CHANGES: ["DRAFT", "PAUSED"],
+  PAUSE: ["ACTIVE"]
+};
 
 function isPendingReview(campaign: { status: CampaignStatus; reviewTag?: string | null }) {
   return campaign.status === "PAUSED" && campaign.reviewTag === "SUBMITTED_FOR_REVIEW";
@@ -197,9 +197,7 @@ export async function decideCampaignByAdmin(input: {
     include: { brand: { select: { id: true, displayName: true, email: true } }, creator: { select: { id: true } } }
   });
   if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
-  if (!canTransition(campaign.status, input.decision)) {
-    throw new AppError("Invalid campaign status transition", 409, "INVALID_STATUS_TRANSITION");
-  }
+  assertStateTransition(campaign.status, input.decision, campaignTransitionMap, { message: "Invalid campaign status transition" });
   if ((input.decision === "REJECT" || input.decision === "REQUEST_CHANGES" || input.decision === "PAUSE") && !input.reason?.trim()) {
     throw new AppError("reason is required", 422, "REASON_REQUIRED");
   }

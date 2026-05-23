@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type Item = {
   id: string;
@@ -54,6 +55,8 @@ export default function BrandApplicationsAdminPage() {
   }, [load]);
 
   async function decide(id: string, decision: "APPROVED" | "REJECTED" | "NEEDS_REVISION") {
+    const actionLabel = decision === "APPROVED" ? "duyệt" : decision === "REJECTED" ? "từ chối" : "yêu cầu bổ sung";
+    if (!window.confirm(`Xác nhận ${actionLabel} hồ sơ Brand này?`)) return;
     let rejectReason: string | undefined;
     if (decision !== "APPROVED") {
       rejectReason = window.prompt("Nhập lý do (>=10 ký tự):", "Thiếu thông tin doanh nghiệp") ?? "";
@@ -73,8 +76,8 @@ export default function BrandApplicationsAdminPage() {
   }
 
   return (
-    <main>
-      <h1 className="text-2xl font-black">Brand Applications</h1>
+    <>
+      <PageHeader title="Brand Applications" subtitle="Duyệt hồ sơ Brand/KYB với lý do và trạng thái rõ ràng." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
       <div className="mt-4 flex flex-wrap gap-2">
         <select className="dc-input max-w-56" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">All</option>
@@ -86,14 +89,19 @@ export default function BrandApplicationsAdminPage() {
         <input className="dc-input max-w-80" placeholder="Search brand/email/taxCode" value={query} onChange={(e) => setQuery(e.target.value)} />
         <button className="dc-btn-primary" onClick={() => void load()}>Filter</button>
       </div>
-      {loading ? <p className="mt-4">Loading...</p> : null}
-      {error ? <p className="mt-4 text-red-700">{error}</p> : null}
-      <div className="mt-4 grid gap-3">
+      {loading ? <div className="mt-4"><LoadingSkeleton rows={4} /></div> : null}
+      {error ? <div className="mt-4"><ErrorState title="Không tải được brand applications" description={error} onRetry={() => void load()} /></div> : null}
+      {!loading && !error && items.length === 0 ? (
+        <div className="mt-4"><EmptyState title="Không có brand applications" description="Không có dữ liệu phù hợp bộ lọc." /></div>
+      ) : null}
+      {!loading && !error ? <div className="mt-4 grid gap-3">
         {items.map((item) => (
           <article key={item.id} className="dc-card p-4">
-            <p className="font-semibold">{item.brandName} ({item.contactEmail})</p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-semibold">{item.brandName} ({item.contactEmail})</p>
+              <StatusBadge status={item.status.toLowerCase()} />
+            </div>
             <p className="text-sm">Applicant: {item.account.displayName} - {item.account.email}</p>
-            <p className="text-sm">Status: {item.status}</p>
             {item.legalName ? <p className="text-sm">Legal name: {item.legalName}</p> : null}
             {item.industry ? <p className="text-sm">Industry: {item.industry}</p> : null}
             {item.taxCode ? <p className="text-sm">Tax code: {item.taxCode}</p> : null}
@@ -119,7 +127,7 @@ export default function BrandApplicationsAdminPage() {
             </div>
           </article>
         ))}
-      </div>
-    </main>
+      </div> : null}
+    </>
   );
 }

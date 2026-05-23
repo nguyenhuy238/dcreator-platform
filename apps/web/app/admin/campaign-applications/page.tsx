@@ -129,6 +129,15 @@ export default function AdminCampaignApplicationsPage() {
   ) {
     setError("");
     setNotice("");
+    const actionLabel =
+      action === "APPROVE_PURCHASE_PROOF"
+        ? "duyệt bằng chứng mua hàng"
+        : action === "REJECT_PURCHASE_PROOF"
+          ? "từ chối bằng chứng mua hàng"
+          : action === "APPROVE_PUBLISH_REPORT"
+            ? "duyệt báo cáo đăng bài và cộng điểm"
+            : "từ chối báo cáo đăng bài";
+    if (!window.confirm(`Xác nhận ${actionLabel}?`)) return;
 
     let reason: string | undefined;
     let purchaseAmountVnd: number | undefined;

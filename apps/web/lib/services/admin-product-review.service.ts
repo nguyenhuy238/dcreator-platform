@@ -3,13 +3,15 @@ import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
 import { createNotification } from "@/lib/services/notification.service";
+import { assertStateTransition } from "@/lib/services/admin-transition.service";
 
-function canTransition(current: ProductReviewStatus, next: ProductReviewStatus) {
-  if (current === "PENDING_REVIEW" || current === "CHANGES_REQUESTED") {
-    return next === "APPROVED" || next === "REJECTED" || next === "CHANGES_REQUESTED";
-  }
-  return false;
-}
+const productTransitionMap: Record<ProductReviewStatus, readonly ProductReviewStatus[]> = {
+  DRAFT: [],
+  PENDING_REVIEW: ["APPROVED", "REJECTED", "CHANGES_REQUESTED"],
+  APPROVED: [],
+  REJECTED: [],
+  CHANGES_REQUESTED: ["APPROVED", "REJECTED", "CHANGES_REQUESTED"]
+};
 
 function buildReviewNote(input: {
   previous?: string | null;
@@ -89,9 +91,7 @@ export async function decideProductSubmissionByAdmin(input: {
     include: { brand: { select: { ownerAccountId: true, name: true } } }
   });
   if (!current) throw new AppError("Product submission not found", 404, "PRODUCT_SUBMISSION_NOT_FOUND");
-  if (!canTransition(current.reviewStatus, input.decision)) {
-    throw new AppError("Invalid status transition", 409, "INVALID_STATUS_TRANSITION");
-  }
+  assertStateTransition(current.reviewStatus, input.decision, productTransitionMap, { message: "Invalid status transition" });
   if ((input.decision === "REJECTED" || input.decision === "CHANGES_REQUESTED") && !input.reason?.trim()) {
     throw new AppError("reason is required", 422, "REASON_REQUIRED");
   }

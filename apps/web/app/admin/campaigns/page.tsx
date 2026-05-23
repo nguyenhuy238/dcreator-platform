@@ -62,6 +62,8 @@ export default function AdminCampaignsPage() {
   }, [load]);
 
   async function review(id: string, decision: "APPROVED" | "REJECTED" | "CHANGES_REQUESTED") {
+    const actionLabel = decision === "APPROVED" ? "duyệt & publish" : decision === "REJECTED" ? "từ chối" : "yêu cầu chỉnh sửa";
+    if (!window.confirm(`Xác nhận ${actionLabel} yêu cầu campaign này?`)) return;
     let reason: string | undefined;
     if (decision !== "APPROVED") {
       reason = window.prompt("Nhập lý do:", decision === "REJECTED" ? "Không phù hợp policy" : "Cần chỉnh sửa giá, hoa hồng hoặc KPI")?.trim();

@@ -105,6 +105,8 @@ export default function AdminContentReviewPage() {
   async function decideVideoReview(id: string, action: "APPROVE_VIDEO_REVIEW" | "REJECT_VIDEO_REVIEW") {
     setError("");
     setNotice("");
+    const actionLabel = action === "APPROVE_VIDEO_REVIEW" ? "duyệt video review" : "từ chối video review";
+    if (!window.confirm(`Xác nhận ${actionLabel} cho creator mission này?`)) return;
 
     let reason: string | undefined;
     if (action === "REJECT_VIDEO_REVIEW") {
