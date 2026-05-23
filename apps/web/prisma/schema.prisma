@@ -425,6 +425,7 @@ model Brand {
   revenueSharePercent Int?
   commissionRatePercent Int?
   bccAgreementVersion String?
+  bccAgreementTerms   String?
   legalResponsibilityAccepted Boolean @default(false)
   contractFileUrl     String?
   contractSignedAt    DateTime?
