@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { Brand, CampaignStatus, MissionAudience, Role } from "@prisma/client";
+import { ApplicationStatus, Brand, CampaignStatus, MissionAudience, Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { approveProof, rejectProof } from "@/lib/services/mission.service";
@@ -162,34 +162,149 @@ function toOnboardingStatus(brand: Brand | null) {
   };
 }
 
+async function ensureBrandForOwner(accountId: string) {
+  const existing = await prisma.brand.findFirst({
+    where: { ownerAccountId: accountId },
+    orderBy: { createdAt: "desc" }
+  });
+  if (existing) return existing;
+
+  const [account, latestApplication] = await Promise.all([
+    prisma.account.findUnique({ where: { id: accountId }, select: { email: true, displayName: true } }),
+    prisma.brandApplication.findFirst({ where: { accountId }, orderBy: { createdAt: "desc" } })
+  ]);
+
+  if (!account) throw new AppError("Account not found", 404, "ACCOUNT_NOT_FOUND");
+
+  return prisma.brand.create({
+    data: {
+      ownerAccountId: accountId,
+      name: latestApplication?.brandName ?? account.displayName ?? "Brand",
+      logoUrl: latestApplication?.logoUrl ?? null,
+      legalName: latestApplication?.legalName ?? null,
+      industry: latestApplication?.industry ?? null,
+      website: latestApplication?.website ?? null,
+      fanpage: latestApplication?.fanpage ?? null,
+      address: latestApplication?.address ?? null,
+      contactName: latestApplication?.contactName ?? account.displayName ?? "Brand Owner",
+      contactPhone: latestApplication?.contactPhone ?? "",
+      contactEmail: latestApplication?.contactEmail ?? account.email,
+      description: latestApplication?.description ?? null,
+      businessGoal: latestApplication?.businessGoal ?? null,
+      taxCode: latestApplication?.taxCode ?? null,
+      businessLicenseUrl: latestApplication?.businessLicenseUrl ?? null,
+      representativeName: latestApplication?.representativeName ?? null,
+      representativePhone: latestApplication?.representativePhone ?? null,
+      representativeEmail: latestApplication?.representativeEmail ?? null,
+      productCategories: latestApplication?.productCategories ?? null,
+      inventoryDescription: latestApplication?.inventoryDescription ?? null,
+      revenueSharePercent: latestApplication?.revenueSharePercent ?? null,
+      commissionRatePercent: latestApplication?.commissionRatePercent ?? null,
+      bccAgreementVersion: latestApplication?.bccAgreementVersion ?? null,
+      legalResponsibilityAccepted: latestApplication?.legalResponsibilityAccepted ?? false,
+      contractFileUrl: latestApplication?.contractFileUrl ?? null,
+      contractSignedAt: latestApplication?.contractSignedAt ?? null
+    }
+  });
+}
+
 export async function getBrandOnboarding(accountId: string) {
-  const brand = await prisma.brand.findFirst({ where: { ownerAccountId: accountId }, orderBy: { createdAt: "desc" } });
-  if (!brand) throw new AppError("Brand not found", 404, "BRAND_NOT_FOUND");
+  const brand = await ensureBrandForOwner(accountId);
   return toOnboardingStatus(brand);
 }
 
 export async function updateBrandOnboarding(accountId: string, input: BrandOnboardingInput) {
-  const brand = await prisma.brand.findFirst({ where: { ownerAccountId: accountId }, orderBy: { createdAt: "desc" } });
-  if (!brand) throw new AppError("Brand not found", 404, "BRAND_NOT_FOUND");
+  const brand = await ensureBrandForOwner(accountId);
+  const isRequestReview = Boolean(input.requestAdminReview);
+  const account = await prisma.account.findUnique({
+    where: { id: accountId },
+    select: { email: true, displayName: true, profile: { select: { phone: true } } }
+  });
+  if (!account) throw new AppError("Account not found", 404, "ACCOUNT_NOT_FOUND");
 
   const updated = await prisma.brand.update({
     where: { id: brand.id },
     data: {
-      legalName: input.legalName,
-      industry: input.industry,
-      taxCode: input.taxCode,
-      businessLicenseUrl: input.businessLicenseUrl || null,
-      productCategories: input.productCategories,
-      inventoryDescription: input.inventoryDescription,
-      revenueSharePercent: input.revenueSharePercent,
-      commissionRatePercent: input.commissionRatePercent,
-      bccAgreementVersion: input.bccAgreementVersion,
-      bccAgreementTerms: input.bccAgreementTerms || null,
+      legalName: input.legalName ?? brand.legalName,
+      industry: input.industry ?? brand.industry,
+      taxCode: input.taxCode ?? brand.taxCode,
+      businessLicenseUrl: input.businessLicenseUrl === undefined ? brand.businessLicenseUrl : input.businessLicenseUrl || null,
+      productCategories: input.productCategories ?? brand.productCategories,
+      inventoryDescription: input.inventoryDescription ?? brand.inventoryDescription,
+      revenueSharePercent: input.revenueSharePercent ?? brand.revenueSharePercent,
+      commissionRatePercent: input.commissionRatePercent ?? brand.commissionRatePercent,
+      bccAgreementVersion: input.bccAgreementVersion ?? brand.bccAgreementVersion,
+      bccAgreementTerms: input.bccAgreementTerms ?? brand.bccAgreementTerms,
       legalResponsibilityAccepted: input.legalResponsibilityAccepted,
-      contractFileUrl: input.contractFileUrl || null,
-      contractSignedAt: input.requestAdminReview ? null : new Date()
+      contractFileUrl: input.contractFileUrl === undefined ? brand.contractFileUrl : input.contractFileUrl || null,
+      contractSignedAt: isRequestReview ? null : new Date()
     }
   });
+
+  if (isRequestReview) {
+    const latestApplication = await prisma.brandApplication.findFirst({
+      where: { accountId },
+      orderBy: { createdAt: "desc" }
+    });
+
+    const applicationData = {
+      brandName: brand.name,
+      logoUrl: brand.logoUrl,
+      legalName: input.legalName ?? brand.legalName ?? "",
+      industry: input.industry ?? brand.industry ?? "",
+      website: brand.website,
+      fanpage: brand.fanpage,
+      address: brand.address,
+      contactName: brand.contactName || account.displayName || "Brand Owner",
+      contactPhone: brand.contactPhone || account.profile?.phone || "000000",
+      contactEmail: brand.contactEmail || account.email,
+      description: brand.description,
+      businessGoal: brand.businessGoal,
+      taxCode: input.taxCode ?? brand.taxCode ?? "",
+      businessLicenseUrl: input.businessLicenseUrl ?? brand.businessLicenseUrl ?? "",
+      representativeName: brand.representativeName,
+      representativePhone: brand.representativePhone,
+      representativeEmail: brand.representativeEmail,
+      representativeIdentityNumber: latestApplication?.representativeIdentityNumber ?? null,
+      bankAccountName: latestApplication?.bankAccountName ?? null,
+      bankAccountNumber: latestApplication?.bankAccountNumber ?? null,
+      bankName: latestApplication?.bankName ?? null,
+      productCategories: input.productCategories ?? brand.productCategories ?? "",
+      inventoryDescription: input.inventoryDescription ?? brand.inventoryDescription ?? "",
+      expectedCampaignBudget: latestApplication?.expectedCampaignBudget ?? null,
+      expectedCreatorCount: latestApplication?.expectedCreatorCount ?? null,
+      revenueSharePercent: input.revenueSharePercent ?? brand.revenueSharePercent ?? null,
+      commissionRatePercent: input.commissionRatePercent ?? brand.commissionRatePercent ?? null,
+      bccAgreementAccepted: input.bccAgreementAccepted ?? false,
+      bccAgreementVersion: input.bccAgreementVersion ?? brand.bccAgreementVersion ?? null,
+      bccAgreementTerms: input.bccAgreementTerms ?? brand.bccAgreementTerms ?? null,
+      legalResponsibilityAccepted: input.legalResponsibilityAccepted,
+      contractFileUrl: input.contractFileUrl ?? brand.contractFileUrl ?? "",
+      contractSignedAt: null,
+      rejectReason: null,
+      reviewNote: "Brand requested onboarding/BCC update and admin review.",
+      reviewedById: null,
+      reviewedAt: null
+    };
+
+    if (latestApplication && latestApplication.status === ApplicationStatus.PENDING_REVIEW) {
+      await prisma.brandApplication.update({
+        where: { id: latestApplication.id },
+        data: {
+          ...applicationData,
+          status: ApplicationStatus.PENDING_REVIEW
+        }
+      });
+    } else {
+      await prisma.brandApplication.create({
+        data: {
+          accountId,
+          status: ApplicationStatus.PENDING_REVIEW,
+          ...applicationData
+        }
+      });
+    }
+  }
 
   return toOnboardingStatus(updated);
 }

@@ -191,28 +191,30 @@ export default function BrandOnboardingPage() {
   async function submitForm(requestAdminReview: boolean) {
     // Client-side validation to give immediate feedback
     const errors: Record<string, string> = {};
-    if (!form.legalName || !form.legalName.trim()) {
-      errors.legalName = "Vui lòng nhập Pháp nhân / tên công ty.";
-    } else if (form.legalName.trim().length < 2) {
-      errors.legalName = "Pháp nhân / tên công ty phải ít nhất 2 ký tự.";
+    if (!requestAdminReview) {
+      if (!form.legalName || !form.legalName.trim()) {
+        errors.legalName = "Vui lòng nhập Pháp nhân / tên công ty.";
+      } else if (form.legalName.trim().length < 2) {
+        errors.legalName = "Pháp nhân / tên công ty phải ít nhất 2 ký tự.";
+      }
+      if (!form.industry || !form.industry.trim()) {
+        errors.industry = "Vui lòng nhập Ngành hàng.";
+      } else if (form.industry.trim().length < 2) {
+        errors.industry = "Ngành hàng phải ít nhất 2 ký tự.";
+      }
+      if (!form.taxCode || !form.taxCode.trim()) {
+        errors.taxCode = "Vui lòng nhập Mã số thuế.";
+      } else if (form.taxCode.trim().length < 3) {
+        errors.taxCode = "Mã số thuế phải ít nhất 3 ký tự.";
+      }
+      if (!form.productCategories || !form.productCategories.trim()) {
+        errors.productCategories = "Vui lòng nhập Danh mục sản phẩm.";
+      } else if (form.productCategories.trim().length < 2) {
+        errors.productCategories = "Danh mục sản phẩm phải ít nhất 2 ký tự.";
+      }
+      if (!form.inventoryDescription || form.inventoryDescription.trim().length < 10)
+        errors.inventoryDescription = "Mô tả tồn kho phải ít nhất 10 ký tự.";
     }
-    if (!form.industry || !form.industry.trim()) {
-      errors.industry = "Vui lòng nhập Ngành hàng.";
-    } else if (form.industry.trim().length < 2) {
-      errors.industry = "Ngành hàng phải ít nhất 2 ký tự.";
-    }
-    if (!form.taxCode || !form.taxCode.trim()) {
-      errors.taxCode = "Vui lòng nhập Mã số thuế.";
-    } else if (form.taxCode.trim().length < 3) {
-      errors.taxCode = "Mã số thuế phải ít nhất 3 ký tự.";
-    }
-    if (!form.productCategories || !form.productCategories.trim()) {
-      errors.productCategories = "Vui lòng nhập Danh mục sản phẩm.";
-    } else if (form.productCategories.trim().length < 2) {
-      errors.productCategories = "Danh mục sản phẩm phải ít nhất 2 ký tự.";
-    }
-    if (!form.inventoryDescription || form.inventoryDescription.trim().length < 10)
-      errors.inventoryDescription = "Mô tả tồn kho phải ít nhất 10 ký tự.";
     if (contractUploadError) {
       errors.contractFileUrl = contractUploadError;
     }
@@ -269,7 +271,8 @@ export default function BrandOnboardingPage() {
           const serverErrors: Record<string, string> = {};
           for (const [key, messages] of Object.entries(fieldErrorsFromBody)) {
             if (Array.isArray(messages) && messages.length > 0) {
-              serverErrors[key] = messages[0];
+              const firstMessage = messages[0];
+              if (typeof firstMessage === "string") serverErrors[key] = firstMessage;
             }
           }
           if (Object.keys(serverErrors).length > 0) {
