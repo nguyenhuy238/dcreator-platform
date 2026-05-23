@@ -5,6 +5,7 @@ import { toErrorResponse } from "@/lib/errors";
 import {
   addRewardTier,
   createBrandCampaign,
+  createProductSubmissionForReview,
   decideCreatorApplication,
   editDraftCampaign,
   getBrandAnalytics,
@@ -16,6 +17,7 @@ import {
   listBrandProofs,
   listCreatorApplications,
   listProducts,
+  listProductSubmissionsForBrand,
   lockCampaignBudget,
   reviewBrandProof,
   submitCampaignForAdminReview,
@@ -32,6 +34,7 @@ import {
   campaignCreateSchema,
   creatorApplicationDecisionSchema,
   productSchema,
+  productSubmissionSchema,
   proofReviewDecisionSchema,
   rewardTierSchema
 } from "@/lib/validators/brand-dashboard";
@@ -72,6 +75,17 @@ export async function POST_products(request: NextRequest) {
   const account = await requireBrandActor(request);
   const payload = productSchema.parse(await request.json());
   return ok(await upsertProduct(account.id, payload), 201);
+}
+
+export async function GET_product_submissions(request: NextRequest) {
+  const account = await requireBrandActor(request);
+  return ok(await listProductSubmissionsForBrand(account.id));
+}
+
+export async function POST_product_submissions(request: NextRequest) {
+  const account = await requireBrandActor(request);
+  const payload = productSubmissionSchema.parse(await request.json());
+  return ok(await createProductSubmissionForReview(account.id, payload), 201);
 }
 
 export async function GET_campaigns(request: NextRequest) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type Item = {
   id: string;
@@ -32,7 +32,7 @@ export default function BrandApplicationsAdminPage() {
   const [status, setStatus] = useState("PENDING_REVIEW");
   const [query, setQuery] = useState("");
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
     if (status) params.set("status", status);
@@ -47,11 +47,11 @@ export default function BrandApplicationsAdminPage() {
     setItems(body.data as Item[]);
     setError("");
     setLoading(false);
-  }
+  }, [status, query]);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
   async function decide(id: string, decision: "APPROVED" | "REJECTED" | "NEEDS_REVISION") {
     let rejectReason: string | undefined;

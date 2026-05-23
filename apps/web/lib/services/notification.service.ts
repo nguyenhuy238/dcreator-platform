@@ -1,4 +1,4 @@
-import { NotificationChannel, NotificationEvent, Prisma } from "@prisma/client";
+import { NotificationChannel, NotificationEvent, Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { getEmailNotificationProvider } from "@/lib/notifications/email-provider";
@@ -113,4 +113,32 @@ export async function sendEmailNotification(notificationId?: string) {
     });
     throw error;
   }
+}
+
+export async function createNotificationForAdminOps(input: {
+  event: NotificationEvent;
+  title: string;
+  content: string;
+  metadata?: Record<string, unknown>;
+  excludeAccountId?: string;
+}) {
+  const targets = await prisma.account.findMany({
+    where: {
+      OR: [{ role: Role.ADMIN }, { role: Role.OPS }],
+      ...(input.excludeAccountId ? { id: { not: input.excludeAccountId } } : {})
+    },
+    select: { id: true }
+  });
+
+  await Promise.all(
+    targets.map((target) =>
+      createNotification({
+        accountId: target.id,
+        event: input.event,
+        title: input.title,
+        content: input.content,
+        metadata: input.metadata
+      })
+    )
+  );
 }

@@ -146,6 +146,27 @@ enum PayoutRequestStatus {
   PAID
 }
 
+enum ProductReviewStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+}
+
+enum InventoryStockStatus {
+  IN_STOCK
+  RESERVED
+  OUT_OF_STOCK
+}
+
+enum FulfillmentStatus {
+  PENDING
+  PROCESSING
+  FAILED
+  COMPLETED
+}
+
 enum ContributionStatus {
   PENDING
   SUCCESS
@@ -208,6 +229,32 @@ enum NotificationEvent {
   PAYOUT_REJECTED
 }
 
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_USER
+  RESOLVED
+  CLOSED
+}
+
+enum SupportTicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum SupportTicketCategory {
+  CONTENT
+  REVENUE
+  PAYOUT
+  CAMPAIGN
+  APPLICATION
+  FULFILLMENT
+  ACCOUNT
+  OTHER
+}
+
 enum AnalyticsEventName {
   campaign_view
   campaign_cta_click
@@ -264,6 +311,11 @@ model Account {
   reviewedBrandApplications BrandApplication[] @relation("BrandApplicationReviewer")
   reviewedBrands Brand[] @relation("BrandReviewer")
   ownedBrands Brand[] @relation("BrandOwner")
+  reviewedProductSubmissions ProductSubmission[] @relation("ProductSubmissionReviewer")
+  creatorFulfillmentOrders FulfillmentOrder[] @relation("FulfillmentCreator")
+  supportTicketsRequested SupportTicket[] @relation("SupportTicketRequester")
+  supportTicketsAssigned SupportTicket[] @relation("SupportTicketAssignee")
+  supportTicketComments SupportTicketComment[] @relation("SupportTicketCommentAuthor")
 }
 
 model AccountRole {
@@ -438,6 +490,7 @@ model Brand {
   owner               Account     @relation("BrandOwner", fields: [ownerAccountId], references: [id], onDelete: Restrict)
   reviewedBy          Account?    @relation("BrandReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   members             BrandMember[]
+  productSubmissions  ProductSubmission[]
 }
 
 model BrandMember {
@@ -530,6 +583,71 @@ model Campaign {
   paymentOrders  PaymentOrder[]
   analytics      AnalyticsDaily[]
   analyticsEvents AnalyticsEvent[]
+  fulfillmentOrders FulfillmentOrder[]
+  productSubmissions ProductSubmission[]
+}
+
+model ProductSubmission {
+  id              String              @id @default(cuid())
+  brandId         String
+  campaignId      String?
+  name            String
+  sku             String?
+  description     String?
+  unitPriceVnd    Int                 @default(0)
+  reviewStatus    ProductReviewStatus @default(DRAFT)
+  reviewNote      String?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  brand           Brand               @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  campaign        Campaign?           @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  reviewedBy      Account?            @relation("ProductSubmissionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  inventoryBatches InventoryBatch[]
+
+  @@index([brandId, reviewStatus, createdAt])
+  @@index([campaignId, reviewStatus, createdAt])
+}
+
+model InventoryBatch {
+  id                  String               @id @default(cuid())
+  productSubmissionId String
+  batchCode           String?
+  quantityTotal       Int
+  quantityReserved    Int                  @default(0)
+  quantityRemaining   Int
+  stockStatus         InventoryStockStatus @default(IN_STOCK)
+  expiresAt           DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  productSubmission ProductSubmission @relation(fields: [productSubmissionId], references: [id], onDelete: Cascade)
+  fulfillmentOrders FulfillmentOrder[]
+
+  @@index([productSubmissionId, stockStatus, createdAt])
+}
+
+model FulfillmentOrder {
+  id                String            @id @default(cuid())
+  campaignId        String?
+  inventoryBatchId  String?
+  creatorAccountId  String?
+  recipientName     String?
+  recipientPhone    String?
+  shippingAddress   String?
+  status            FulfillmentStatus @default(PENDING)
+  failureReason     String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  campaign        Campaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  inventoryBatch  InventoryBatch? @relation(fields: [inventoryBatchId], references: [id], onDelete: SetNull)
+  creatorAccount  Account?       @relation("FulfillmentCreator", fields: [creatorAccountId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([campaignId, status, createdAt])
 }
 
 model Mission {
@@ -803,9 +921,13 @@ model AnalyticsDaily {
 model AuditLog {
   id             String   @id @default(cuid())
   actorId        String?
+  actorRole      Role?
   action         String
   targetType     String
   targetId       String
+  oldStatus      String?
+  newStatus      String?
+  reason         String?
   metadata       Json?
   createdAt      DateTime @default(now())
 
@@ -823,6 +945,49 @@ model RiskFlag {
   createdAt      DateTime @default(now())
 
   account        Account? @relation("RiskFlagAccount", fields: [accountId], references: [id])
+}
+
+model SupportTicket {
+  id                  String               @id @default(cuid())
+  requesterAccountId  String
+  assigneeAccountId   String?
+  title               String
+  description         String
+  status              SupportTicketStatus  @default(OPEN)
+  priority            SupportTicketPriority @default(MEDIUM)
+  category            SupportTicketCategory @default(OTHER)
+  responseSummary     String?
+  internalNote        String?
+  relatedBrandId      String?
+  relatedCreatorId    String?
+  relatedCampaignId   String?
+  relatedOrderId      String?
+  relatedPayoutId     String?
+  relatedSubmissionId String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  requester           Account              @relation("SupportTicketRequester", fields: [requesterAccountId], references: [id], onDelete: Cascade)
+  assignee            Account?             @relation("SupportTicketAssignee", fields: [assigneeAccountId], references: [id], onDelete: SetNull)
+  comments            SupportTicketComment[]
+
+  @@index([status, priority, createdAt])
+  @@index([requesterAccountId, createdAt])
+  @@index([assigneeAccountId, status, createdAt])
+}
+
+model SupportTicketComment {
+  id              String        @id @default(cuid())
+  ticketId        String
+  authorId        String
+  message         String
+  isInternal      Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+
+  ticket          SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author          Account       @relation("SupportTicketCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
 }
 
 model AnalyticsEvent {

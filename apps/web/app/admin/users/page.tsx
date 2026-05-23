@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type UserItem = {
@@ -18,7 +18,7 @@ export default function AdminUsersPage() {
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<UserItem[]>([]);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -32,11 +32,11 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [query]);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
   async function toggleLock(userId: string, isActive: boolean) {
     const endpoint = isActive ? "lock" : "unlock";
