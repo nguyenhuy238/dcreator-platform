@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { CREATOR_CAMPAIGN_APPLICATION_TAG } from "@/lib/constants/campaign-application";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 
@@ -528,6 +529,7 @@ const creatorMissionWorkflowSelect = {
   campaign: {
     select: {
       id: true,
+      brandId: true,
       title: true,
       slug: true
     }
@@ -536,7 +538,14 @@ const creatorMissionWorkflowSelect = {
     select: {
       id: true,
       displayName: true,
-      email: true
+      email: true,
+      creatorProfile: {
+        select: {
+          mainPlatform: true,
+          socialUrl: true,
+          followerCount: true
+        }
+      }
     }
   },
   application: {
@@ -617,19 +626,56 @@ function mapCreatorMissionWorkflow(entity: CreatorMissionWorkflowEntity) {
     },
     campaign: {
       id: entity.campaign.id,
+      brandId: entity.campaign.brandId,
       title: entity.campaign.title,
       slug: entity.campaign.slug
     },
     account: {
       id: entity.account.id,
       displayName: entity.account.displayName,
-      email: entity.account.email
+      email: entity.account.email,
+      creatorProfile: entity.account.creatorProfile
+        ? {
+            mainPlatform: entity.account.creatorProfile.mainPlatform,
+            socialUrl: entity.account.creatorProfile.socialUrl,
+            followerCount: entity.account.creatorProfile.followerCount
+          }
+        : null
     },
     guidance: getCreatorMissionGuidanceByOption(entity.productReceiveOption)
   };
 }
 
 export async function getMyCreatorMissions(accountId: string) {
+  const legacyNotes = ["[ADMIN_APPROVED]", "[ADMIN_ASSIGNED_TASK]", "[SENT_TO_BRAND_REVIEW]"];
+  const pendingBackfill = await prisma.missionSubmission.findMany({
+    where: {
+      accountId,
+      OR: [
+        { mission: { audience: "CREATOR" } },
+        { note: { contains: CREATOR_CAMPAIGN_APPLICATION_TAG } },
+        ...legacyNotes.map((tag) => ({ note: { contains: tag } }))
+      ]
+    },
+    select: {
+      id: true,
+      missionId: true,
+      accountId: true,
+      mission: { select: { campaignId: true } }
+    },
+    orderBy: { createdAt: "desc" },
+    take: 50
+  });
+
+  for (const row of pendingBackfill) {
+    await ensureCreatorMissionFromApprovedApplication(prisma, {
+      missionId: row.missionId,
+      campaignId: row.mission.campaignId,
+      accountId: row.accountId,
+      applicationId: row.id
+    });
+  }
+
   const items = await prisma.creatorMission.findMany({
     where: { accountId },
     orderBy: { createdAt: "desc" },

@@ -1,7 +1,9 @@
-import { MissionLifecycleStatus, MissionStatus, NotificationEvent } from "@prisma/client";
+import { MissionLifecycleStatus, MissionStatus, NotificationEvent, Prisma } from "@prisma/client";
+import { CREATOR_CAMPAIGN_APPLICATION_TAG, hasCreatorCampaignApplicationTag } from "@/lib/constants/campaign-application";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
+import { ensureCreatorMissionFromApprovedApplication } from "@/lib/services/creator-mission.service";
 import { createNotification } from "@/lib/services/notification.service";
 
 function ensureReviewable(status: MissionLifecycleStatus) {
@@ -20,6 +22,16 @@ function buildAdminNote(currentNote: string | null, next: string) {
   return lines.join("\n");
 }
 
+function isCreatorApplicationRecord(item: {
+  mission: { audience: string };
+  note: string | null;
+  account?: { creatorProfile: unknown | null };
+}) {
+  if (item.mission.audience === "CREATOR") return true;
+  if (hasCreatorCampaignApplicationTag(item.note)) return true;
+  return item.mission.audience === "USER" && Boolean(item.account?.creatorProfile);
+}
+
 export async function listCampaignApplicationsForAdmin(input: {
   campaignId?: string;
   brandId?: string;
@@ -29,27 +41,44 @@ export async function listCampaignApplicationsForAdmin(input: {
   followerMax?: number;
   query?: string;
 }) {
+  const creatorProfileFilter: Prisma.CreatorProfileWhereInput = {};
+  if (input.platform) creatorProfileFilter.mainPlatform = input.platform;
+  if (input.followerMin !== undefined || input.followerMax !== undefined) {
+    creatorProfileFilter.followerCount = {
+      ...(input.followerMin !== undefined ? { gte: input.followerMin } : {}),
+      ...(input.followerMax !== undefined ? { lte: input.followerMax } : {})
+    };
+  }
+
+  const queryFilter: Prisma.MissionSubmissionWhereInput | null = input.query
+    ? {
+        OR: [
+          { account: { is: { displayName: { contains: input.query, mode: "insensitive" } } } },
+          { account: { is: { email: { contains: input.query, mode: "insensitive" } } } },
+          { account: { is: { creatorProfile: { is: { socialUrl: { contains: input.query, mode: "insensitive" } } } } } },
+          { note: { contains: input.query, mode: "insensitive" } }
+        ]
+      }
+    : null;
+
   return prisma.missionSubmission.findMany({
     where: {
       mission: {
-        audience: "CREATOR",
         ...(input.campaignId ? { campaignId: input.campaignId } : {}),
         ...(input.brandId ? { campaign: { brandId: input.brandId } } : {})
       },
       ...(input.status ? { lifecycleStatus: input.status } : {}),
-      ...(input.query
-        ? {
-            OR: [
-              { account: { displayName: { contains: input.query, mode: "insensitive" } } },
-              { account: { email: { contains: input.query, mode: "insensitive" } } },
-              { account: { creatorProfile: { socialUrl: { contains: input.query, mode: "insensitive" } } } },
-              { note: { contains: input.query, mode: "insensitive" } }
-            ]
-          }
-        : {}),
-      ...(input.platform ? { account: { creatorProfile: { mainPlatform: input.platform } } } : {}),
-      ...(input.followerMin !== undefined ? { account: { creatorProfile: { followerCount: { gte: input.followerMin } } } } : {}),
-      ...(input.followerMax !== undefined ? { account: { creatorProfile: { followerCount: { lte: input.followerMax } } } } : {})
+      ...(Object.keys(creatorProfileFilter).length > 0 ? { account: { is: { creatorProfile: { is: creatorProfileFilter } } } } : {}),
+      AND: [
+        {
+          OR: [
+            { mission: { audience: "CREATOR" } },
+            { note: { contains: CREATOR_CAMPAIGN_APPLICATION_TAG } },
+            { mission: { audience: "USER" }, account: { creatorProfile: { isNot: null } } }
+          ]
+        },
+        ...(queryFilter ? [queryFilter] : [])
+      ]
     },
     orderBy: { createdAt: "desc" },
     include: {
@@ -130,7 +159,7 @@ export async function getCampaignApplicationDetailForAdmin(applicationId: string
     }
   });
   if (!item) throw new AppError("Application not found", 404, "APPLICATION_NOT_FOUND");
-  if (item.mission.audience !== "CREATOR") throw new AppError("Not a creator application", 400, "NOT_CREATOR_APPLICATION");
+  if (!isCreatorApplicationRecord(item)) throw new AppError("Not a creator application", 400, "NOT_CREATOR_APPLICATION");
   return item;
 }
 
@@ -140,16 +169,27 @@ export async function adminApproveCampaignApplication(actorId: string, applicati
   if (!canMoveToDoing(current.lifecycleStatus)) {
     throw new AppError("Cannot approve in current status", 409, "INVALID_STATUS_TRANSITION");
   }
-  const updated = await prisma.missionSubmission.update({
-    where: { id: applicationId },
-    data: {
-      lifecycleStatus: "DOING",
-      status: MissionStatus.OPEN,
-      reviewedById: actorId,
-      reviewedAt: new Date(),
-      rejectReason: null,
-      note: buildAdminNote(current.note, `[ADMIN_APPROVED] ${new Date().toISOString()}`)
-    }
+  const updated = await prisma.$transaction(async (tx) => {
+    const next = await tx.missionSubmission.update({
+      where: { id: applicationId },
+      data: {
+        lifecycleStatus: "DOING",
+        status: MissionStatus.OPEN,
+        reviewedById: actorId,
+        reviewedAt: new Date(),
+        rejectReason: null,
+        note: buildAdminNote(current.note, `[ADMIN_APPROVED] ${new Date().toISOString()}`)
+      }
+    });
+
+    await ensureCreatorMissionFromApprovedApplication(tx, {
+      missionId: current.missionId,
+      campaignId: current.mission.campaign.id,
+      accountId: current.account.id,
+      applicationId: current.id
+    });
+
+    return next;
   });
 
   await writeAuditLog({
@@ -261,15 +301,26 @@ export async function adminSendToBrandReview(actorId: string, applicationId: str
 export async function adminAssignTask(actorId: string, applicationId: string) {
   const current = await getCampaignApplicationDetailForAdmin(applicationId);
   ensureReviewable(current.lifecycleStatus);
-  const updated = await prisma.missionSubmission.update({
-    where: { id: applicationId },
-    data: {
-      lifecycleStatus: "DOING",
-      status: MissionStatus.OPEN,
-      reviewedById: actorId,
-      reviewedAt: new Date(),
-      note: buildAdminNote(current.note, `[ADMIN_ASSIGNED_TASK] ${new Date().toISOString()}`)
-    }
+  const updated = await prisma.$transaction(async (tx) => {
+    const next = await tx.missionSubmission.update({
+      where: { id: applicationId },
+      data: {
+        lifecycleStatus: "DOING",
+        status: MissionStatus.OPEN,
+        reviewedById: actorId,
+        reviewedAt: new Date(),
+        note: buildAdminNote(current.note, `[ADMIN_ASSIGNED_TASK] ${new Date().toISOString()}`)
+      }
+    });
+
+    await ensureCreatorMissionFromApprovedApplication(tx, {
+      missionId: current.missionId,
+      campaignId: current.mission.campaign.id,
+      accountId: current.account.id,
+      applicationId: current.id
+    });
+
+    return next;
   });
 
   await writeAuditLog({
