@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, useEffect, useState } from "react";
 import { AppShell, PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
 
@@ -51,6 +51,8 @@ Brand xác nhận đã đọc, hiểu và đồng ý với nội dung hợp đ�
 const nav = [
   { href: "/dashboard/brand", label: "Brand Dashboard" },
   { href: "/dashboard/brand/onboarding", label: "Onboarding / BCC" },
+  { href: "/dashboard/brand/products", label: "Sản phẩm & lô hàng" },
+  { href: "/dashboard/brand/campaign-setup", label: "Yêu cầu campaign" },
   { href: "/dashboard/brand/profile", label: "Brand Profile" },
   { href: "/brand", label: "Chiến dịch" },
   { href: "/brand/proofs", label: "Duyệt proof" },
@@ -72,9 +74,18 @@ type Onboarding = {
   bccAgreementTerms: string;
   legalResponsibilityAccepted: boolean;
   contractFileUrl: string;
+  contractSignedAt: string | null;
+  reviewStatus: "DRAFT" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_REVISION" | null;
 };
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string };
+type ApiErrorResponse = {
+  details?: {
+    fieldErrors?: Record<string, string[] | undefined>;
+    formErrors?: string[];
+  };
+  fieldErrors?: Record<string, string[] | undefined>;
+};
 
 const defaultForm: Onboarding = {
   completed: false,
@@ -90,7 +101,9 @@ const defaultForm: Onboarding = {
   bccAgreementAccepted: false,
   bccAgreementTerms: BCC_AGREEMENT_TERMS,
   legalResponsibilityAccepted: false,
-  contractFileUrl: ""
+  contractFileUrl: "",
+  contractSignedAt: null,
+  reviewStatus: null
 };
 
 export default function BrandOnboardingPage() {
@@ -103,6 +116,9 @@ export default function BrandOnboardingPage() {
   const [contractFile, setContractFile] = useState<File | null>(null);
   const [uploadingContractFile, setUploadingContractFile] = useState(false);
   const [contractUploadError, setContractUploadError] = useState("");
+  const isWaitingReview = form.reviewStatus === "PENDING_REVIEW";
+  const isReviewApproved = form.reviewStatus === "APPROVED";
+  const isSigned = Boolean(form.contractSignedAt);
 
   function setField<K extends keyof Onboarding>(name: K, value: Onboarding[K]) {
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -140,7 +156,7 @@ export default function BrandOnboardingPage() {
         throw new Error(payload.error || "Không thể tải tài liệu lên");
       }
       const url = payload.data.contractDocumentUrl as string;
-      setField("contractFileUrl", url as any);
+      setField("contractFileUrl", url);
       return url;
     } catch (error) {
       setContractUploadError((error as Error).message || "Lỗi tải file");
@@ -179,6 +195,8 @@ export default function BrandOnboardingPage() {
     setForm({
       ...defaultForm,
       ...payload.data,
+      bccAgreementAccepted: false,
+      legalResponsibilityAccepted: false,
       bccAgreementTerms: payload.data.bccAgreementTerms || BCC_AGREEMENT_TERMS
     });
     setLoading(false);
@@ -236,7 +254,7 @@ export default function BrandOnboardingPage() {
     if (contractFile && !form.contractFileUrl) {
       try {
         await uploadContractDocument(contractFile);
-      } catch (uploadError) {
+      } catch {
         setSaving(false);
         return;
       }
@@ -257,41 +275,44 @@ export default function BrandOnboardingPage() {
     let payload: ApiResponse<Onboarding> | null = null;
     try {
       payload = (await response.json()) as ApiResponse<Onboarding>;
-    } catch (err) {
+    } catch {
       setSaving(false);
       setError("Lỗi phản hồi từ server.");
       return;
     }
     setSaving(false);
     if (!response.ok || !payload.success) {
-      try {
-        const body = (payload as any) || {};
-        const fieldErrorsFromBody = (body?.details?.fieldErrors || body?.fieldErrors) as Record<string, string[] | undefined> | undefined;
-        if (fieldErrorsFromBody && typeof fieldErrorsFromBody === "object") {
-          const serverErrors: Record<string, string> = {};
-          for (const [key, messages] of Object.entries(fieldErrorsFromBody)) {
-            if (Array.isArray(messages) && messages.length > 0) {
-              const firstMessage = messages[0];
-              if (typeof firstMessage === "string") serverErrors[key] = firstMessage;
-            }
-          }
-          if (Object.keys(serverErrors).length > 0) {
-            setFieldErrors(serverErrors);
-            setError("");
-            focusFirstInvalidField(serverErrors);
-            return;
+      const body = payload as (ApiResponse<Onboarding> & ApiErrorResponse) | null;
+      const fieldErrorsFromBody = body?.details?.fieldErrors || body?.fieldErrors;
+      if (fieldErrorsFromBody && typeof fieldErrorsFromBody === "object") {
+        const serverErrors: Record<string, string> = {};
+        for (const [key, messages] of Object.entries(fieldErrorsFromBody)) {
+          if (Array.isArray(messages) && messages.length > 0) {
+            const firstMessage = messages[0];
+            if (typeof firstMessage === "string") serverErrors[key] = firstMessage;
           }
         }
-        if (Array.isArray(body?.details?.formErrors) && body.details.formErrors.length > 0) {
-          setError(body.details.formErrors[0]);
+        if (Object.keys(serverErrors).length > 0) {
+          setFieldErrors(serverErrors);
+          setError("");
+          focusFirstInvalidField(serverErrors);
           return;
         }
-      } catch (e) {
+      }
+      const firstFormError = body?.details?.formErrors?.[0];
+      if (firstFormError) {
+        setError(firstFormError);
+        return;
       }
       setError(payload && !payload.success ? payload.error : "Không thể lưu onboarding");
       return;
     }
-    setForm({ ...defaultForm, ...payload.data });
+    setForm({
+      ...defaultForm,
+      ...payload.data,
+      bccAgreementAccepted: requestAdminReview ? false : payload.data.bccAgreementAccepted,
+      legalResponsibilityAccepted: requestAdminReview ? false : payload.data.legalResponsibilityAccepted
+    });
     if (requestAdminReview) {
       setSuccess("Đã gửi yêu cầu thay đổi/bổ sung. Vui lòng chờ admin duyệt.");
     } else {
@@ -306,6 +327,16 @@ export default function BrandOnboardingPage() {
         <PageHeader title="Onboarding / BCC" subtitle="Hoàn tất yêu cầu sau khi Brand được duyệt trước khi vận hành campaign." />
         {error ? <ErrorState title="Không thể xử lý onboarding" description={error} onRetry={() => void load()} /> : null}
         {success ? <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p> : null}
+        {isWaitingReview ? (
+          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700">
+            Đang chờ admin duyệt yêu cầu sửa/bổ sung BCC.
+          </p>
+        ) : null}
+        {isSigned ? (
+          <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+            Đã ký hợp đồng BCC.
+          </p>
+        ) : null}
         {loading ? (
           <LoadingSkeleton rows={5} />
         ) : (
@@ -360,8 +391,10 @@ export default function BrandOnboardingPage() {
                   type="file"
                   accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
                   className={`dc-input bg-white ${fieldErrors.contractFileUrl ? "border-red-500 ring-1 ring-red-300" : ""}`}
+                  disabled={uploadingContractFile}
                   onChange={handleContractFileChange}
                 />
+                {uploadingContractFile ? <p className="text-sm text-zinc-500">Đang tải file lên...</p> : null}
                 {contractFile ? <p className="text-sm text-zinc-500">Tệp đã chọn: {contractFile.name}</p> : null}
                 {form.contractFileUrl ? (
                   <p className="text-sm text-zinc-500">
@@ -390,13 +423,13 @@ export default function BrandOnboardingPage() {
               <div className="grid gap-2">
                 <label className={`flex gap-3 text-sm ${fieldErrors.bccAgreementAccepted || fieldErrors.legalResponsibilityAccepted ? "text-red-700" : "text-zinc-700"}`}>
                   <input
-                    id="legalResponsibilityAccepted"
+                    id="bccAgreementAccepted"
                     type="checkbox"
                     className="mt-1"
-                    checked={form.legalResponsibilityAccepted}
+                    checked={form.bccAgreementAccepted}
                     onChange={(e) => {
-                      setField("legalResponsibilityAccepted", e.target.checked);
                       setField("bccAgreementAccepted", e.target.checked);
+                      setField("legalResponsibilityAccepted", e.target.checked);
                     }}
                   />
                   <span>Brand xác nhận đã đọc và đồng ý với nội dung hợp đồng BCC hiện hành, đồng thời chấp thuận gửi yêu cầu bổ sung hoặc hợp đồng sửa đổi cho admin xem xét.</span>
@@ -404,25 +437,29 @@ export default function BrandOnboardingPage() {
                 {fieldErrors.bccAgreementAccepted ? <p className="text-sm text-red-600">{fieldErrors.bccAgreementAccepted}</p> : null}
                 {fieldErrors.legalResponsibilityAccepted ? <p className="text-sm text-red-600">{fieldErrors.legalResponsibilityAccepted}</p> : null}
               </div>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  className="dc-btn-primary"
-                  disabled={saving}
-                  onClick={() => void submitForm(false)}
-                >
-                  {saving ? "Đang xử lý..." : "Ký ngay (không có ý kiến)"}
-                </button>
+              {!isWaitingReview && !isSigned ? (
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    className="dc-btn-primary"
+                    disabled={saving}
+                    onClick={() => void submitForm(false)}
+                  >
+                    {saving ? "Đang xử lý..." : "Ký ngay (không có ý kiến)"}
+                  </button>
 
-                <button
-                  type="button"
-                  className="dc-btn-outline"
-                  disabled={saving}
-                  onClick={() => void submitForm(true)}
-                >
-                  {saving ? "Đang gửi..." : "Gửi yêu cầu sửa/bổ sung & chờ duyệt"}
-                </button>
-              </div>
+                  {!isReviewApproved ? (
+                    <button
+                      type="button"
+                      className="dc-btn-outline"
+                      disabled={saving}
+                      onClick={() => void submitForm(true)}
+                    >
+                      {saving ? "Đang gửi..." : "Gửi yêu cầu sửa/bổ sung & chờ duyệt"}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
             </section>
           </form>
         )}

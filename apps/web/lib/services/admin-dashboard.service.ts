@@ -122,7 +122,14 @@ export async function rejectRoleRequestByAdmin(actorId: string, requestId: strin
 }
 
 export async function listPendingCampaignReviews() {
-  return prisma.campaign.findMany({ where: { status: CampaignStatus.PAUSED }, orderBy: { updatedAt: "asc" } });
+  return prisma.brandCampaignRequest.findMany({
+    where: { status: { in: ["PENDING_REVIEW", "NEEDS_REVISION"] } },
+    include: {
+      brand: { select: { id: true, name: true, ownerAccountId: true, contactEmail: true } },
+      createdCampaign: { select: { id: true, slug: true, title: true, status: true } }
+    },
+    orderBy: { updatedAt: "asc" }
+  });
 }
 
 export async function decideCampaignReview(actorId: string, campaignId: string, decision: "APPROVED" | "REJECTED" | "CHANGES_REQUESTED", reason?: string) {
@@ -130,13 +137,63 @@ export async function decideCampaignReview(actorId: string, campaignId: string, 
     throw new AppError("Reject reason is required", 422, "REJECT_REASON_REQUIRED");
   }
 
-  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
-  if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
+  const request = await prisma.brandCampaignRequest.findUnique({ where: { id: campaignId }, include: { brand: true } });
+  if (!request) throw new AppError("Campaign request not found", 404, "CAMPAIGN_REQUEST_NOT_FOUND");
 
-  const nextStatus = decision === "APPROVED" ? CampaignStatus.ACTIVE : decision === "REJECTED" ? CampaignStatus.ARCHIVED : CampaignStatus.DRAFT;
+  const updated = await prisma.$transaction(async (tx) => {
+    if (decision === "APPROVED") {
+      const campaign = await tx.campaign.create({
+        data: {
+          brandId: request.brand.ownerAccountId,
+          slug: request.requestedSlug,
+          title: request.title,
+          brief: request.brief,
+          budgetVnd: request.budgetVnd,
+          targetAmountVnd: request.targetAmountVnd,
+          category: request.category,
+          campaignType: request.campaignType,
+          setupSource: request.setupSource,
+          objective: request.objective,
+          priorityChannels: request.priorityChannels,
+          missionTypes: request.missionTypes,
+          creatorCommissionPercent: request.creatorCommissionPercent,
+          userCommissionPercent: request.userCommissionPercent,
+          bonusBudgetVnd: request.bonusBudgetVnd,
+          feasibilityStatus: "APPROVED",
+          feasibilityNote: reason ?? null,
+          brandApprovalStatus: "APPROVED",
+          startsAt: request.startsAt,
+          endsAt: request.endsAt,
+          status: CampaignStatus.ACTIVE
+        }
+      });
 
-  const updated = await prisma.campaign.update({ where: { id: campaignId }, data: { status: nextStatus } });
-  await writeAuditLog({ actorId, action: `CAMPAIGN_REVIEW_${decision}`, targetType: "Campaign", targetId: campaignId, metadata: { reason: reason ?? null } });
+      return tx.brandCampaignRequest.update({
+        where: { id: request.id },
+        data: {
+          status: "APPROVED",
+          adminNote: reason ?? null,
+          reviewedById: actorId,
+          reviewedAt: new Date(),
+          createdCampaignId: campaign.id
+        },
+        include: { createdCampaign: true, brand: true }
+      });
+    }
+
+    return tx.brandCampaignRequest.update({
+      where: { id: request.id },
+      data: {
+        status: decision === "REJECTED" ? "REJECTED" : "NEEDS_REVISION",
+        adminNote: reason ?? null,
+        reviewedById: actorId,
+        reviewedAt: new Date()
+      },
+      include: { createdCampaign: true, brand: true }
+    });
+  });
+
+  await writeAuditLog({ actorId, action: `CAMPAIGN_REQUEST_${decision}`, targetType: "BrandCampaignRequest", targetId: campaignId, metadata: { reason: reason ?? null } });
   return updated;
 }
 

@@ -4,7 +4,9 @@ import { requireBrandActor } from "@/lib/auth/brand-guard";
 import { toErrorResponse } from "@/lib/errors";
 import {
   addRewardTier,
+  approveCampaignForPublish,
   createBrandCampaign,
+  createBrandCampaignRequest,
   decideCreatorApplication,
   editDraftCampaign,
   getBrandAnalytics,
@@ -13,11 +15,14 @@ import {
   getBrandOverview,
   getBrandProfile,
   listBrandCampaigns,
+  listBrandCampaignRequests,
   listBrandProofs,
   listCreatorApplications,
   listProducts,
   lockCampaignBudget,
   reviewBrandProof,
+  requestCampaignAdjustment,
+  respondBrandCampaignRequest,
   submitCampaignForAdminReview,
   topupBrandFund,
   updateBrandOnboarding,
@@ -29,7 +34,9 @@ import {
   brandProfileSchema,
   budgetLockSchema,
   budgetTopupSchema,
+  campaignBrandFeedbackSchema,
   campaignCreateSchema,
+  campaignRequestSchema,
   creatorApplicationDecisionSchema,
   productSchema,
   proofReviewDecisionSchema,
@@ -94,6 +101,34 @@ export async function PUT_campaign(request: NextRequest, campaignId: string) {
 export async function POST_campaign_submit(request: NextRequest, campaignId: string) {
   const account = await requireBrandActor(request);
   return ok(await submitCampaignForAdminReview(account.id, campaignId));
+}
+
+export async function GET_campaign_requests(request: NextRequest) {
+  const account = await requireBrandActor(request);
+  return ok(await listBrandCampaignRequests(account.id));
+}
+
+export async function POST_campaign_requests(request: NextRequest) {
+  const account = await requireBrandActor(request);
+  const payload = campaignRequestSchema.parse(await request.json());
+  return ok(await createBrandCampaignRequest(account.id, payload), 201);
+}
+
+export async function POST_campaign_request_feedback(request: NextRequest, requestId: string) {
+  const account = await requireBrandActor(request);
+  const payload = campaignBrandFeedbackSchema.parse(await request.json());
+  return ok(await respondBrandCampaignRequest(account.id, requestId, payload));
+}
+
+export async function POST_campaign_brand_approve(request: NextRequest, campaignId: string) {
+  const account = await requireBrandActor(request);
+  return ok(await approveCampaignForPublish(account.id, campaignId));
+}
+
+export async function POST_campaign_brand_feedback(request: NextRequest, campaignId: string) {
+  const account = await requireBrandActor(request);
+  const payload = campaignBrandFeedbackSchema.parse(await request.json());
+  return ok(await requestCampaignAdjustment(account.id, campaignId, payload));
 }
 
 export async function POST_rewards(request: NextRequest) {

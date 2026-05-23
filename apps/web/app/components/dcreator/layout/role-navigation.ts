@@ -35,6 +35,8 @@ export const navigationGroups: NavGroup[] = [
     items: [
       { label: "Brand Dashboard", href: "/dashboard/brand" },
       { label: "Onboarding / BCC", href: "/dashboard/brand/onboarding" },
+      { label: "Sản phẩm & lô hàng", href: "/dashboard/brand/products" },
+      { label: "Yêu cầu campaign", href: "/dashboard/brand/campaign-setup" },
       { label: "Brand Profile", href: "/dashboard/brand/profile" },
       { label: "Chiến dịch", href: "/brand" },
       { label: "Duyệt proof", href: "/brand/proofs" },

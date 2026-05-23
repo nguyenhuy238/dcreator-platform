@@ -19,6 +19,11 @@ function ensureCanEdit(status: ApplicationStatus) {
   }
 }
 
+function resolveContractSignedAt(input: BrandApplicationInput) {
+  if (!input.bccAgreementAccepted || !input.legalResponsibilityAccepted) return null;
+  return input.contractSignedAt ? new Date(input.contractSignedAt) : new Date();
+}
+
 async function assignRole(tx: Prisma.TransactionClient, accountId: string, role: Role) {
   await tx.accountRole.upsert({
     where: { accountId_role: { accountId, role } },
@@ -174,7 +179,7 @@ export async function applyBrand(accountId: string, input: BrandApplicationInput
       bccAgreementVersion: normalizeOptional(input.bccAgreementVersion),
       legalResponsibilityAccepted: input.legalResponsibilityAccepted ?? false,
       contractFileUrl: normalizeOptional(input.contractFileUrl),
-      contractSignedAt: input.contractSignedAt ? new Date(input.contractSignedAt) : new Date()
+      contractSignedAt: resolveContractSignedAt(input)
     }
   });
 }
@@ -223,7 +228,7 @@ export async function updateBrandApplication(accountId: string, applicationId: s
       bccAgreementVersion: normalizeOptional(input.bccAgreementVersion),
       legalResponsibilityAccepted: input.legalResponsibilityAccepted ?? false,
       contractFileUrl: normalizeOptional(input.contractFileUrl),
-      contractSignedAt: input.contractSignedAt ? new Date(input.contractSignedAt) : new Date()
+      contractSignedAt: resolveContractSignedAt(input)
     }
   });
 }
