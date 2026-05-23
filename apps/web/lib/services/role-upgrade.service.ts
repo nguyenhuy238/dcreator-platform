@@ -19,9 +19,8 @@ function ensureCanEdit(status: ApplicationStatus) {
   }
 }
 
-function resolveContractSignedAt(input: BrandApplicationInput) {
-  if (!input.bccAgreementAccepted || !input.legalResponsibilityAccepted) return null;
-  return input.contractSignedAt ? new Date(input.contractSignedAt) : new Date();
+function resolveContractSignedAt() {
+  return null;
 }
 
 async function assignRole(tx: Prisma.TransactionClient, accountId: string, role: Role) {
@@ -179,7 +178,7 @@ export async function applyBrand(accountId: string, input: BrandApplicationInput
       bccAgreementVersion: normalizeOptional(input.bccAgreementVersion),
       legalResponsibilityAccepted: input.legalResponsibilityAccepted ?? false,
       contractFileUrl: normalizeOptional(input.contractFileUrl),
-      contractSignedAt: resolveContractSignedAt(input)
+      contractSignedAt: resolveContractSignedAt()
     }
   });
 }
@@ -228,7 +227,7 @@ export async function updateBrandApplication(accountId: string, applicationId: s
       bccAgreementVersion: normalizeOptional(input.bccAgreementVersion),
       legalResponsibilityAccepted: input.legalResponsibilityAccepted ?? false,
       contractFileUrl: normalizeOptional(input.contractFileUrl),
-      contractSignedAt: resolveContractSignedAt(input)
+      contractSignedAt: resolveContractSignedAt()
     }
   });
 }
@@ -405,11 +404,13 @@ export async function reviewBrandApplication(actorId: string, applicationId: str
   const current = await prisma.brandApplication.findUnique({ where: { id: applicationId } });
   if (!current) throw new AppError("Application not found", 404, "APPLICATION_NOT_FOUND");
   if (current.status !== ApplicationStatus.PENDING_REVIEW) throw new AppError("Application already processed", 409, "APPLICATION_PROCESSED");
+  const isOnboardingBccUpdate = current.reviewNote === "Brand requested onboarding/BCC update and admin review.";
+  const reviewedAt = new Date();
 
   const updated = await prisma.$transaction(async (tx) => {
     const app = await tx.brandApplication.update({
       where: { id: applicationId },
-      data: { status, rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null, reviewedById: actorId, reviewedAt: new Date() }
+      data: { status, rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? current.reviewNote, reviewedById: actorId, reviewedAt }
     });
 
     if (status === ApplicationStatus.APPROVED) {
@@ -444,12 +445,12 @@ export async function reviewBrandApplication(actorId: string, applicationId: str
               commissionRatePercent: app.commissionRatePercent,
               bccAgreementVersion: app.bccAgreementVersion,
               bccAgreementTerms: app.bccAgreementTerms,
-              legalResponsibilityAccepted: app.legalResponsibilityAccepted,
+              legalResponsibilityAccepted: isOnboardingBccUpdate ? false : app.legalResponsibilityAccepted,
               contractFileUrl: app.contractFileUrl,
-              contractSignedAt: app.contractSignedAt,
+              contractSignedAt: isOnboardingBccUpdate ? null : app.contractSignedAt,
               status: BrandStatus.ACTIVE,
               reviewedById: actorId,
-              reviewedAt: new Date()
+              reviewedAt
             }
           })
         : await tx.brand.create({
@@ -478,12 +479,12 @@ export async function reviewBrandApplication(actorId: string, applicationId: str
               commissionRatePercent: app.commissionRatePercent,
               bccAgreementVersion: app.bccAgreementVersion,
               bccAgreementTerms: app.bccAgreementTerms,
-              legalResponsibilityAccepted: app.legalResponsibilityAccepted,
+              legalResponsibilityAccepted: isOnboardingBccUpdate ? false : app.legalResponsibilityAccepted,
               contractFileUrl: app.contractFileUrl,
-              contractSignedAt: app.contractSignedAt,
+              contractSignedAt: isOnboardingBccUpdate ? null : app.contractSignedAt,
               status: BrandStatus.ACTIVE,
               reviewedById: actorId,
-              reviewedAt: new Date()
+              reviewedAt
             }
           });
       await tx.brandMember.upsert({

@@ -776,6 +776,7 @@ model Campaign {
   sourceBrandRequests BrandCampaignRequest[] @relation("CampaignFromBrandRequest")
   fulfillmentOrders FulfillmentOrder[]
   productSubmissions ProductSubmission[]
+  creatorMissions CreatorMission[]
 }
 
 model ProductSubmission {

@@ -75,6 +75,7 @@ type Onboarding = {
   legalResponsibilityAccepted: boolean;
   contractFileUrl: string;
   contractSignedAt: string | null;
+  supplementaryBccReviewApproved: boolean;
   reviewStatus: "DRAFT" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_REVISION" | null;
 };
 
@@ -103,6 +104,7 @@ const defaultForm: Onboarding = {
   legalResponsibilityAccepted: false,
   contractFileUrl: "",
   contractSignedAt: null,
+  supplementaryBccReviewApproved: false,
   reviewStatus: null
 };
 
@@ -117,8 +119,8 @@ export default function BrandOnboardingPage() {
   const [uploadingContractFile, setUploadingContractFile] = useState(false);
   const [contractUploadError, setContractUploadError] = useState("");
   const isWaitingReview = form.reviewStatus === "PENDING_REVIEW";
-  const isReviewApproved = form.reviewStatus === "APPROVED";
-  const isSigned = Boolean(form.contractSignedAt);
+  const isSupplementaryBccApproved = form.supplementaryBccReviewApproved;
+  const isSigned = form.completed && Boolean(form.contractSignedAt);
 
   function setField<K extends keyof Onboarding>(name: K, value: Onboarding[K]) {
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -197,6 +199,7 @@ export default function BrandOnboardingPage() {
       ...payload.data,
       bccAgreementAccepted: false,
       legalResponsibilityAccepted: false,
+      supplementaryBccReviewApproved: Boolean(payload.data.supplementaryBccReviewApproved),
       bccAgreementTerms: payload.data.bccAgreementTerms || BCC_AGREEMENT_TERMS
     });
     setLoading(false);
@@ -315,8 +318,6 @@ export default function BrandOnboardingPage() {
     });
     if (requestAdminReview) {
       setSuccess("Đã gửi yêu cầu thay đổi/bổ sung. Vui lòng chờ admin duyệt.");
-    } else {
-      setSuccess("Đã ký hợp đồng BCC.");
     }
   }
 
@@ -327,14 +328,23 @@ export default function BrandOnboardingPage() {
         <PageHeader title="Onboarding / BCC" subtitle="Hoàn tất yêu cầu sau khi Brand được duyệt trước khi vận hành campaign." />
         {error ? <ErrorState title="Không thể xử lý onboarding" description={error} onRetry={() => void load()} /> : null}
         {success ? <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p> : null}
-        {isWaitingReview ? (
-          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700">
-            Đang chờ admin duyệt yêu cầu sửa/bổ sung BCC.
-          </p>
-        ) : null}
         {isSigned ? (
           <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
             Đã ký hợp đồng BCC.
+          </p>
+        ) : (
+          <p className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm font-semibold text-zinc-700">
+            Chưa ký BCC.
+          </p>
+        )}
+        {!isSigned && isWaitingReview ? (
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700">
+            Đang chờ admin duyệt yêu cầu sửa/bổ sung BCC.
+          </p>
+        ) : null}
+        {!isSigned && isSupplementaryBccApproved ? (
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700">
+            Admin đã duyệt nội dung bổ sung. Vui lòng ký lại BCC để hoàn tất.
           </p>
         ) : null}
         {loading ? (
@@ -447,17 +457,14 @@ export default function BrandOnboardingPage() {
                   >
                     {saving ? "Đang xử lý..." : "Ký ngay (không có ý kiến)"}
                   </button>
-
-                  {!isReviewApproved ? (
-                    <button
-                      type="button"
-                      className="dc-btn-outline"
-                      disabled={saving}
-                      onClick={() => void submitForm(true)}
-                    >
-                      {saving ? "Đang gửi..." : "Gửi yêu cầu sửa/bổ sung & chờ duyệt"}
-                    </button>
-                  ) : null}
+                  <button
+                    type="button"
+                    className="dc-btn-outline"
+                    disabled={saving}
+                    onClick={() => void submitForm(true)}
+                  >
+                    {saving ? "Đang gửi..." : "Gửi nội dung bổ sung & chờ admin duyệt"}
+                  </button>
                 </div>
               ) : null}
             </section>
@@ -467,3 +474,5 @@ export default function BrandOnboardingPage() {
     </>
   );
 }
+
+

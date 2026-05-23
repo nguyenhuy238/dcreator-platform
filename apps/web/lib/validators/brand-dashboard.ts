@@ -44,11 +44,11 @@ export const brandOnboardingSchema = z.object({
   inventoryDescription: z.string().trim().max(1200, { message: "Mô tả tồn kho tối đa 1200 ký tự." }).optional().or(z.literal("")),
   revenueSharePercent: z.number().int().min(0, { message: "Phần trăm doanh thu phải từ 0 đến 100." }).max(100, { message: "Phần trăm doanh thu phải từ 0 đến 100." }).default(70),
   commissionRatePercent: z.number().int().min(0, { message: "Commission phải từ 0 đến 100." }).max(100, { message: "Commission phải từ 0 đến 100." }).default(10),
-  bccAgreementAccepted: z.boolean().refine((value) => value === true, { message: "Bạn phải đồng ý với nội dung hợp đồng BCC." }),
+  bccAgreementAccepted: z.boolean(),
   bccAgreementVersion: z.string().trim().min(1).max(60).default("BCC-dCreator-v1"),
   bccAgreementTerms: z.string().trim().min(10, { message: "Nội dung hợp đồng BCC phải có ít nhất 10 ký tự." }).max(10000, { message: "Nội dung hợp đồng BCC tối đa 10000 ký tự." }),
   requestAdminReview: z.boolean().optional(),
-  legalResponsibilityAccepted: z.boolean().refine((value) => value === true, { message: "Bạn phải xác nhận chịu trách nhiệm pháp lý." }),
+  legalResponsibilityAccepted: z.boolean(),
   contractFileUrl: z.string().trim().max(400, { message: "Ghi chú hợp đồng / tài liệu bổ sung tối đa 400 ký tự." }).optional().or(z.literal(""))
 }).superRefine((value, ctx) => {
   const hasValidBusinessLicenseUrl = (() => {
@@ -62,7 +62,16 @@ export const brandOnboardingSchema = z.object({
   })();
 
   if (value.requestAdminReview) {
-    return;
+    if (!value.contractFileUrl) {
+      ctx.addIssue({ code: "custom", path: ["contractFileUrl"], message: "Vui lòng tải file hợp đồng / tài liệu bổ sung." });
+    }
+  }
+
+  if (!value.requestAdminReview && !value.bccAgreementAccepted) {
+    ctx.addIssue({ code: "custom", path: ["bccAgreementAccepted"], message: "Bạn phải đồng ý với nội dung hợp đồng BCC." });
+  }
+  if (!value.requestAdminReview && !value.legalResponsibilityAccepted) {
+    ctx.addIssue({ code: "custom", path: ["legalResponsibilityAccepted"], message: "Bạn phải xác nhận chịu trách nhiệm pháp lý." });
   }
 
   if (!hasValidBusinessLicenseUrl) {

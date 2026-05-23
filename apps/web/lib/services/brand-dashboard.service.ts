@@ -237,7 +237,13 @@ export async function getBrandOverview(accountId: string) {
   };
 }
 
-function toOnboardingStatus(brand: Brand | null, latestApplication?: { bccAgreementAccepted: boolean; status: ApplicationStatus } | null) {
+function toOnboardingStatus(
+  brand: Brand | null,
+  latestApplication?: { bccAgreementAccepted: boolean; status: ApplicationStatus; reviewNote?: string | null } | null
+) {
+  const supplementaryBccReviewApproved =
+    latestApplication?.status === ApplicationStatus.APPROVED &&
+    latestApplication?.reviewNote === "Brand requested onboarding/BCC update and admin review.";
   const bccAgreementAccepted = Boolean(
     latestApplication?.bccAgreementAccepted || (brand?.bccAgreementTerms && brand.contractSignedAt && brand.legalResponsibilityAccepted)
   );
@@ -250,6 +256,7 @@ function toOnboardingStatus(brand: Brand | null, latestApplication?: { bccAgreem
       brand.bccAgreementVersion &&
       bccAgreementAccepted &&
       brand.legalResponsibilityAccepted &&
+      brand.contractSignedAt &&
       brand.revenueSharePercent !== null &&
       brand.commissionRatePercent !== null
   );
@@ -270,6 +277,7 @@ function toOnboardingStatus(brand: Brand | null, latestApplication?: { bccAgreem
     legalResponsibilityAccepted: brand?.legalResponsibilityAccepted ?? false,
     contractFileUrl: brand?.contractFileUrl ?? "",
     contractSignedAt: brand?.contractSignedAt?.toISOString() ?? null,
+    supplementaryBccReviewApproved,
     status: brand?.status ?? null,
     reviewStatus: latestApplication?.status ?? null
   };
@@ -326,7 +334,7 @@ export async function getBrandOnboarding(accountId: string) {
   const latestApplication = await prisma.brandApplication.findFirst({
     where: { accountId },
     orderBy: { createdAt: "desc" },
-    select: { bccAgreementAccepted: true, status: true }
+    select: { bccAgreementAccepted: true, status: true, reviewNote: true }
   });
   return toOnboardingStatus(brand, latestApplication);
 }
