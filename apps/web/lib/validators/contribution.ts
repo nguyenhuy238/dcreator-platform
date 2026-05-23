@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const contributionCreateSchema = z.object({
-  rewardId: z.string().cuid(),
+  rewardId: z.string().trim().min(3).max(120),
   paymentMethod: z.enum(["N_POINTS", "PAYOS"]),
   amount: z.number().int().min(1000),
   idempotencyKey: z.string().min(8).max(120)
