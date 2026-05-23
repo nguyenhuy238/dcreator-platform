@@ -58,7 +58,7 @@ export default function AdminBrandsPage() {
             <option value="NEEDS_REVISION">CHANGES_REQUESTED</option>
           </select>
           <input className="dc-input max-w-80" placeholder="Search brand/email/industry" value={query} onChange={(e) => setQuery(e.target.value)} />
-          <button className="dc-btn-primary" onClick={() => void load()}>Filter</button>
+          <button className="dc-btn-primary" onClick={() => void load()}>Lọc</button>
         </div>
       </section>
 
@@ -81,7 +81,7 @@ export default function AdminBrandsPage() {
                   <StatusBadge status={item.status.toLowerCase()} />
                 </div>
                 <div className="mt-3">
-                  <Link className="dc-btn-primary" href={`/admin/brands/${item.id}`}>View detail</Link>
+                  <Link className="dc-btn-primary" href={`/admin/brands/${item.id}`}>Xem chi tiết</Link>
                 </div>
               </article>
             ))}
@@ -91,3 +91,4 @@ export default function AdminBrandsPage() {
     </>
   );
 }
+

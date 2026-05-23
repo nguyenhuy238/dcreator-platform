@@ -174,7 +174,7 @@ export default function AdminContentReviewPage() {
   return (
     <>
       <PageHeader
-        title="Content Review"
+        title="Duyệt nội dung"
         subtitle="Kiểm duyệt nội dung Creator. Bao gồm queue duyệt video review trước khi đăng công khai."
         action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>}
       />
@@ -184,20 +184,20 @@ export default function AdminContentReviewPage() {
           <input className="dc-input" placeholder="Creator ID" value={creatorId} onChange={(e) => setCreatorId(e.target.value)} />
           <input className="dc-input" placeholder="Brand ID" value={brandId} onChange={(e) => setBrandId(e.target.value)} />
           <select className="dc-input" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">All status</option>
+            <option value="">Tất cả trạng thái</option>
             {statusOptions.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
           <select className="dc-input" value={platform} onChange={(e) => setPlatform(e.target.value)}>
-            <option value="">All platform</option>
+            <option value="">Tất cả nền tảng</option>
             <option value="TIKTOK">TIKTOK</option>
             <option value="INSTAGRAM">INSTAGRAM</option>
             <option value="YOUTUBE">YOUTUBE</option>
             <option value="FACEBOOK">FACEBOOK</option>
             <option value="OTHER">OTHER</option>
           </select>
-          <input className="dc-input md:col-span-3" placeholder="Search campaign/creator/brand/note" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input className="dc-input md:col-span-3" placeholder="Tìm campaign/creator/brand/ghi chú" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
-        <button className="dc-btn-primary mt-3" onClick={() => void load()}>Filter</button>
+        <button className="dc-btn-primary mt-3" onClick={() => void load()}>Lọc</button>
       </section>
 
       {notice ? <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</p> : null}
@@ -252,7 +252,7 @@ export default function AdminContentReviewPage() {
                     <p className="mt-2 text-sm text-zinc-700 line-clamp-2">{item.proofTextNote ?? "Chưa có chú thích/ghi chú"}</p>
                     <p className="mt-1 text-xs text-zinc-500">Draft link: {item.videoUrl ?? item.socialPostUrl ?? "Không có"}</p>
                     <div className="mt-3">
-                      <Link className="dc-btn-primary" href={`/admin/content-review/${item.id}`}>Review detail</Link>
+                      <Link className="dc-btn-primary" href={`/admin/content-review/${item.id}`}>Xem chi tiết</Link>
                     </div>
                   </article>
                 );
@@ -264,3 +264,4 @@ export default function AdminContentReviewPage() {
     </>
   );
 }
+

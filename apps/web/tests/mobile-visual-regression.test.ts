@@ -17,6 +17,9 @@ const viewports: Viewport[] = [
 
 const routes = [
   "/",
+  "/auth/login",
+  "/auth/register",
+  "/auth/forgot-password",
   "/campaigns",
   "/campaigns/spring-ugc-2026",
   "/dashboard/user",

@@ -21,5 +21,5 @@ export const adminNav = [
   { href: "/admin/reports", label: "Báo cáo", description: "Báo cáo KPI và hiệu suất" },
   { href: "/admin/analytics", label: "Phân tích", description: "Tổng quan xu hướng và phân tích" },
   { href: "/admin/audit", label: "Nhật ký kiểm toán", description: "Theo dõi thao tác quản trị" },
-  { href: "/admin/settings", label: "Cài đặt", description: "Cấu hình mô-đun quản trị", isComingSoon: true }
+  { href: "/admin/settings", label: "Cài đặt", description: "Cấu hình mô-đun quản trị" }
 ] as const satisfies readonly AdminNavItem[];

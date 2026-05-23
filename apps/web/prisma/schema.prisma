@@ -1251,3 +1251,16 @@ model AnalyticsEvent {
   @@index([brandId, createdAt])
   @@index([creatorId, createdAt])
 }
+
+model AdminSetting {
+  id                          String   @id @default(cuid())
+  scope                       String   @unique @default("global")
+  reviewSlaHours              Int      @default(24)
+  payoutAutoThresholdVnd      Int      @default(5000000)
+  fraudScoreThreshold         Int      @default(70)
+  requireRejectReason         Boolean  @default(true)
+  requireRequestChangesReason Boolean  @default(true)
+  maintenanceMessage          String   @default("")
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+}

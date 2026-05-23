@@ -87,7 +87,7 @@ export default function BrandApplicationsAdminPage() {
           <option value="NEEDS_REVISION">NEEDS_REVISION</option>
         </select>
         <input className="dc-input max-w-80" placeholder="Search brand/email/taxCode" value={query} onChange={(e) => setQuery(e.target.value)} />
-        <button className="dc-btn-primary" onClick={() => void load()}>Filter</button>
+        <button className="dc-btn-primary" onClick={() => void load()}>Lọc</button>
       </div>
       {loading ? <div className="mt-4"><LoadingSkeleton rows={4} /></div> : null}
       {error ? <div className="mt-4"><ErrorState title="Không tải được brand applications" description={error} onRetry={() => void load()} /></div> : null}
@@ -131,3 +131,4 @@ export default function BrandApplicationsAdminPage() {
     </>
   );
 }
+

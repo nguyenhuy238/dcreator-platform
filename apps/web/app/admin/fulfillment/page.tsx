@@ -81,11 +81,11 @@ export default function AdminFulfillmentPage() {
 
   return (
     <>
-      <PageHeader title="Fulfillment Queue" subtitle="Đơn fulfillment pending/failed cần xử lý." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
+      <PageHeader title="Hàng đợi giao nhận" subtitle="Đơn fulfillment pending/failed cần xử lý." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
       <section className="dc-card mb-4 p-4">
         <div className="grid gap-2 md:grid-cols-4">
           <select className="dc-input" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">All status</option>
+            <option value="">Tất cả trạng thái</option>
             <option value="pending">pending</option>
             <option value="preparing">preparing</option>
             <option value="shipped">shipped</option>
@@ -96,9 +96,9 @@ export default function AdminFulfillmentPage() {
           <input className="dc-input" placeholder="Campaign ID" value={campaignId} onChange={(e) => setCampaignId(e.target.value)} />
           <input className="dc-input" placeholder="Creator ID" value={creatorId} onChange={(e) => setCreatorId(e.target.value)} />
           <input className="dc-input" placeholder="Brand ID" value={brandId} onChange={(e) => setBrandId(e.target.value)} />
-          <input className="dc-input md:col-span-4" placeholder="Search recipient/product/campaign/creator" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input className="dc-input md:col-span-4" placeholder="Tìm người nhận/sản phẩm/campaign/creator" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
-        <button className="dc-btn-primary mt-3" onClick={() => void load()}>Filter</button>
+        <button className="dc-btn-primary mt-3" onClick={() => void load()}>Lọc</button>
       </section>
       <section className="dc-card mb-4 p-4">
         <p className="font-semibold">Tạo yêu cầu xuất kho (phiên bản tối giản theo model hiện có)</p>
@@ -123,13 +123,13 @@ export default function AdminFulfillmentPage() {
           </select>
           <input className="dc-input" placeholder="Ghi chú vận hành" value={createForm.opsNote} onChange={(e) => setCreateForm((p) => ({ ...p, opsNote: e.target.value }))} />
         </div>
-        <button className="dc-btn-primary mt-3" onClick={() => void createExportRequest()}>Create export request</button>
+        <button className="dc-btn-primary mt-3" onClick={() => void createExportRequest()}>Tạo yêu cầu xuất kho</button>
       </section>
       {loading ? <LoadingSkeleton rows={4} /> : null}
       {error ? <ErrorState title="Không tải được Fulfillment queue" description={error} onRetry={() => void load()} /> : null}
       {!loading && !error ? (
         <section>
-          <SectionHeader title="Fulfillment orders" subtitle={`Tổng ${items.length} orders`} />
+          <SectionHeader title="Đơn giao nhận" subtitle={`Tổng ${items.length} đơn`} />
           {items.length === 0 ? (
             <EmptyState title="Không có fulfillment lỗi/chờ xử lý" description="Queue hiện đang trống." />
           ) : (
@@ -146,13 +146,13 @@ export default function AdminFulfillmentPage() {
                     <StatusBadge status={(item.opsMeta.opsStatus || item.status).toLowerCase()} />
                   </div>
                   <div className="mt-2 text-sm text-zinc-600">
-                    <p>Recipient: {item.recipientName ?? "Không có"} • {item.recipientPhone ?? "Không có"}</p>
-                    <p>Address: {item.shippingAddress ?? "Không có"}</p>
-                    <p>Batch: {item.inventoryBatch?.batchCode ?? "Không có"}</p>
-                    <p>Method: {item.opsMeta.fulfillmentMethod ?? "Không có"} • Payment: {item.opsMeta.paymentStatus ?? "Không có"}</p>
-                    {item.opsMeta.trackingCode ? <p>Tracking: {item.opsMeta.trackingCode}</p> : null}
-                    {item.opsMeta.failureReason ? <p className="text-red-700">Failure: {item.opsMeta.failureReason}</p> : null}
-                    <Link className="dc-btn-primary mt-2 inline-flex" href={`/admin/fulfillment/${item.id}`}>Open detail</Link>
+                    <p>Người nhận: {item.recipientName ?? "Không có"} • {item.recipientPhone ?? "Không có"}</p>
+                    <p>Địa chỉ: {item.shippingAddress ?? "Không có"}</p>
+                    <p>Mã lô: {item.inventoryBatch?.batchCode ?? "Không có"}</p>
+                    <p>Phương thức: {item.opsMeta.fulfillmentMethod ?? "Không có"} • Thanh toán: {item.opsMeta.paymentStatus ?? "Không có"}</p>
+                    {item.opsMeta.trackingCode ? <p>Mã vận đơn: {item.opsMeta.trackingCode}</p> : null}
+                    {item.opsMeta.failureReason ? <p className="text-red-700">Lỗi: {item.opsMeta.failureReason}</p> : null}
+                    <Link className="dc-btn-primary mt-2 inline-flex" href={`/admin/fulfillment/${item.id}`}>Xem chi tiết</Link>
                   </div>
                 </article>
               ))}

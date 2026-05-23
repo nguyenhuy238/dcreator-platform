@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { CampaignDetailDTO } from "@/lib/dto/campaign-detail";
-import styles from "../campaign-detail.module.css";
 import {
   BackersSection,
   CampaignStatsSection,
@@ -39,7 +38,7 @@ function getCampaignCTA(data: CampaignDetailDTO, selectedRewardId: string | null
   }
   const selectedReward = data.rewards.find((reward) => reward.id === selectedRewardId);
   if (!selectedReward || selectedReward.isOutOfStock) {
-    return { label: "Het luot", disabled: true };
+    return { label: "Hết lượt", disabled: true };
   }
   if (!data.viewer.isLoggedIn) {
     return { label: "Đăng nhập để ủng hộ", disabled: false };
@@ -104,10 +103,10 @@ export function CampaignDetailContainer({ slug }: Props) {
 
   if (loading) {
     return (
-      <main className={`container ${styles.page}`}>
-        <div className={styles.skeleton} />
-        <div className={styles.skeleton} />
-        <div className={styles.skeleton} />
+      <main className="container grid gap-4 py-6">
+        <div className="h-36 animate-pulse rounded-3xl bg-zinc-100" />
+        <div className="h-36 animate-pulse rounded-3xl bg-zinc-100" />
+        <div className="h-36 animate-pulse rounded-3xl bg-zinc-100" />
       </main>
     );
   }
@@ -135,10 +134,10 @@ export function CampaignDetailContainer({ slug }: Props) {
   }
 
   return (
-    <main className={`container ${styles.page}`}>
-      <div className={styles.leftColumn}>
+    <main className="container grid gap-4 py-6 lg:grid-cols-[1.5fr_1fr]">
+      <div className="grid gap-4">
         <HeroSection hero={data.hero} />
-        <div className={styles.full}>
+        <div className="grid gap-4">
           <CampaignStatsSection data={data} />
           <MissionsSection missions={data.missions} />
           <TimelineSection timeline={data.timeline} />
@@ -146,11 +145,11 @@ export function CampaignDetailContainer({ slug }: Props) {
           <FaqPolicySection faqPolicy={data.faqPolicy} />
         </div>
       </div>
-      <div className={styles.rightColumn}>
+      <div className="grid gap-4">
         <FundingSection funding={data.funding} />
-        <section className={styles.panel}>
-          <h2 className={styles.sectionTitle}>Đăng ký chiến dịch Creator</h2>
-          <p className={styles.inlineMuted}>Nộp đơn để Brand/Admin duyệt trước khi nhận nhiệm vụ.</p>
+        <section className="dc-card p-4 md:p-5">
+          <h2 className="text-2xl font-black text-zinc-900">Đăng ký chiến dịch Creator</h2>
+          <p className="mt-1 text-sm text-slate-600">Nộp đơn để Brand/Admin duyệt trước khi nhận nhiệm vụ.</p>
           <CreatorCampaignApplyButton slug={data.hero.slug} />
         </section>
         <RewardsSection

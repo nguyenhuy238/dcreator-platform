@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { Role } from "@prisma/client";
 import { PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { FormField } from "@/app/components/dcreator/ui/base";
+import { PasswordInput } from "@/app/components/dcreator/ui/PasswordInput";
 import { getDefaultDashboardPath } from "@/lib/auth/dashboard-access";
 import { ROLE } from "@/lib/auth/role-constants";
 
@@ -40,6 +41,7 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
 
   useEffect(() => {
     let alive = true;
@@ -62,11 +64,22 @@ export default function LoginPage() {
     event.preventDefault();
     setLoading(true);
     setError("");
+    setFieldErrors({});
     const formData = new FormData(event.currentTarget);
+    const email = String(formData.get("email") ?? "");
+    const password = String(formData.get("password") ?? "");
+    const nextFieldErrors: { email?: string; password?: string } = {};
+    if (!email.includes("@")) nextFieldErrors.email = "Email không hợp lệ.";
+    if (password.length < 8) nextFieldErrors.password = "Mật khẩu cần tối thiểu 8 ký tự.";
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors);
+      setLoading(false);
+      return;
+    }
     const response = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: formData.get("email"), password: formData.get("password") })
+      body: JSON.stringify({ email, password })
     });
     const payload = await response.json();
     setLoading(false);
@@ -81,21 +94,24 @@ export default function LoginPage() {
     <>
       <PublicHeader />
       <main className="mx-auto grid min-h-[calc(100vh-80px)] w-full max-w-7xl items-center px-4 py-8 md:grid-cols-2 md:px-6">
-        <section className="hidden rounded-3xl border border-zinc-200 bg-white p-8 md:block">
+        <section className="hidden rounded-[28px] border border-zinc-200 bg-white/90 p-8 shadow-[0_30px_90px_-50px_rgba(24,24,27,0.45)] backdrop-blur md:block">
           <p className="text-xs font-bold uppercase tracking-[0.15em] text-zinc-500">dCreator</p>
           <h1 className="mt-3 text-4xl font-black tracking-tight">Kết nối ảnh hưởng, mở rộng doanh thu.</h1>
           <p className="mt-3 text-zinc-600">
             Đăng nhập tài khoản cơ bản, sau đó nâng cấp Creator/Brand tại User profile để gửi hồ sơ duyệt.
           </p>
         </section>
-        <form className="dc-card mx-auto w-full max-w-md space-y-4 p-6" onSubmit={onSubmit}>
+        <form className="mx-auto w-full max-w-md space-y-4 rounded-[28px] border border-zinc-200 bg-white p-6 shadow-[0_40px_120px_-60px_rgba(24,24,27,0.55)]" onSubmit={onSubmit}>
           <h2 className="text-2xl font-black">Đăng nhập</h2>
-          <FormField label="Email" error="">
+          <FormField label="Email" error={fieldErrors.email}>
             <input name="email" type="email" className="dc-input" placeholder="example@email.com" required />
           </FormField>
-          <FormField label="Mật khẩu" error="">
-            <input name="password" type="password" className="dc-input" placeholder="Nhập mật khẩu của bạn" required minLength={8} />
+          <FormField label="Mật khẩu" error={fieldErrors.password}>
+            <PasswordInput name="password" className={fieldErrors.password ? "border-red-500 ring-1 ring-red-300" : ""} placeholder="Nhập mật khẩu của bạn" required minLength={8} />
           </FormField>
+          <div className="text-right">
+            <Link href="/auth/forgot-password" className="text-sm font-semibold text-zinc-600 hover:text-zinc-900">Quên mật khẩu?</Link>
+          </div>
           {error ? <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
           <button className="dc-btn-primary w-full" disabled={loading}>
             {loading ? "Đang xử lý..." : "Đăng nhập"}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import styles from "../campaigns.module.css";
+import { EmptyState, ErrorState, LoadingSkeleton } from "@/app/components/dcreator/ui/base";
 import { CampaignCard, type CampaignCardData } from "./CampaignCard";
 import { CampaignFilters, type CampaignFilterState } from "./CampaignFilters";
 
@@ -78,35 +78,31 @@ export function CampaignList() {
   }
 
   return (
-    <section className={styles.page}>
+    <section className="grid gap-4">
       <CampaignFilters value={filters} onChange={onFilterChange} />
 
       {loading ? (
-        <div className={styles.grid}>
-          {Array.from({ length: 6 }).map((_, idx) => (
-            <div className={styles.skeleton} key={idx} />
-          ))}
-        </div>
+        <LoadingSkeleton rows={6} />
       ) : null}
 
-      {!loading && error ? <p className={styles.error}>Không thể tải chiến dịch: {error}</p> : null}
-      {!loading && !error && items.length === 0 ? <p className={styles.empty}>Không có chiến dịch phù hợp bộ lọc.</p> : null}
+      {!loading && error ? <ErrorState title="Không thể tải chiến dịch" description={error} /> : null}
+      {!loading && !error && items.length === 0 ? <EmptyState title="Chưa có chiến dịch phù hợp" description="Thử nới bộ lọc hoặc đổi từ khóa tìm kiếm." /> : null}
 
       {!loading && !error && items.length > 0 ? (
         <>
-          <div className={styles.grid}>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {items.map((campaign) => (
               <CampaignCard key={campaign.slug} campaign={campaign} />
             ))}
           </div>
-          <div className={styles.pager}>
-            <button className={styles.pagerBtn} disabled={page <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-3">
+            <button className="dc-btn-secondary" disabled={page <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
               Trang trước
             </button>
-            <span className={styles.pagerText}>
+            <span className="text-sm text-zinc-600">
               Trang {page}/{totalPages}
             </span>
-            <button className={styles.pagerBtn} disabled={page >= totalPages} onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}>
+            <button className="dc-btn-secondary" disabled={page >= totalPages} onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}>
               Trang sau
             </button>
           </div>

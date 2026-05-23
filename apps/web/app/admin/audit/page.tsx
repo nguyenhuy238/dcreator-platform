@@ -48,7 +48,7 @@ export default function AdminAuditPage() {
         <form className="grid gap-3 md:grid-cols-3" onSubmit={onSubmit}>
           <input className="dc-input" placeholder="Action" value={action} onChange={(e) => setAction(e.target.value)} />
           <input className="dc-input" placeholder="Target type" value={targetType} onChange={(e) => setTargetType(e.target.value)} />
-          <button className="dc-btn-primary" type="submit">Filter</button>
+          <button className="dc-btn-primary" type="submit">Lọc</button>
         </form>
       </section>
       {error ? <div className="mt-4"><ErrorState title="Không tải được audit logs" description={error} onRetry={() => void load()} /></div> : null}
@@ -87,3 +87,4 @@ export default function AdminAuditPage() {
     </>
   );
 }
+

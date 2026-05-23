@@ -63,7 +63,7 @@ export default function AdminCampaignScopedApplicationsPage() {
                   <StatusBadge status={item.lifecycleStatus.toLowerCase()} />
                 </div>
                 <div className="mt-3">
-                  <Link className="dc-btn-primary" href={`/admin/campaign-applications/${item.id}`}>Review detail</Link>
+                  <Link className="dc-btn-primary" href={`/admin/campaign-applications/${item.id}`}>Xem chi tiết</Link>
                 </div>
               </article>
             ))}

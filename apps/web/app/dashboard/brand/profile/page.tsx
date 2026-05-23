@@ -56,11 +56,11 @@ export default function BrandProfilePage() {
       const response = await fetch("/api/brand/dashboard/profile", { cache: "no-store" });
       const payload = (await response.json()) as ApiResponse<BrandProfile>;
       if (!response.ok || !payload.success) {
-        throw new Error(payload.success ? "Không thể tải Brand Profile" : payload.error);
+        throw new Error(payload.success ? "Không thể tải hồ sơ Brand" : payload.error);
       }
       setForm({ ...defaultForm, ...payload.data });
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Không thể tải Brand Profile");
+      setError(requestError instanceof Error ? requestError.message : "Không thể tải hồ sơ Brand");
     } finally {
       setLoading(false);
     }
@@ -83,12 +83,12 @@ export default function BrandProfilePage() {
       });
       const payload = (await response.json()) as ApiResponse<BrandProfile>;
       if (!response.ok || !payload.success) {
-        throw new Error(payload.success ? "Cập nhật Brand Profile thất bại" : payload.error);
+        throw new Error(payload.success ? "Cập nhật hồ sơ Brand thất bại" : payload.error);
       }
       setForm({ ...defaultForm, ...payload.data });
-      setSuccess("Đã cập nhật Brand Profile.");
+      setSuccess("Đã cập nhật hồ sơ Brand.");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Cập nhật Brand Profile thất bại");
+      setError(requestError instanceof Error ? requestError.message : "Cập nhật hồ sơ Brand thất bại");
     } finally {
       setSaving(false);
     }

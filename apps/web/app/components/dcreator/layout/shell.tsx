@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import type { Role } from "@prisma/client";
 import { getNavigationItemsByRoles, isAdminRoles } from "@/app/components/dcreator/layout/role-navigation";
 import { DashboardSwitcher } from "@/app/components/dcreator/layout/dashboard-switcher";
+import { DashboardShell } from "@/app/components/dcreator/layout/dashboard-shell";
 import { getPrimaryDashboard } from "@/lib/auth/dashboard-access";
 import { ROLE } from "@/lib/auth/role-constants";
 
@@ -283,19 +284,27 @@ export function AppShell({ children, sidebarItems }: { children: React.ReactNode
   const effectiveSidebarItems = roleSidebarItems.length > 0 ? roleSidebarItems : sidebarItems;
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl">
-      <DashboardSidebar items={effectiveSidebarItems} />
-      <main className="min-h-screen flex-1 px-4 pb-24 pt-6 md:px-6">
-        {rolesLoading ? <div className="mb-4 h-10 w-56 animate-pulse rounded-xl bg-zinc-200" /> : null}
-        {!rolesLoading && rolesError ? (
-          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-            {rolesError}
-          </div>
-        ) : null}
-        <DashboardSwitcher roles={roles} />
-        {children}
-      </main>
-      <MobileBottomNav items={effectiveSidebarItems} />
-    </div>
+    <DashboardShell
+      navItems={effectiveSidebarItems}
+      user={{
+        id: "client-user",
+        email: "user@dcreator.local",
+        displayName: "Người dùng dCreator",
+        avatarUrl: null,
+        roles
+      }}
+      workspaceTitle="Workspace dCreator"
+      workspaceDescription="Theo dõi campaign, nhiệm vụ, ví và vận hành theo vai trò"
+      loginRedirect="/dashboard/user"
+    >
+      {rolesLoading ? <div className="mb-4 h-10 w-56 animate-pulse rounded-xl bg-zinc-200" /> : null}
+      {!rolesLoading && rolesError ? (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+          {rolesError}
+        </div>
+      ) : null}
+      <DashboardSwitcher roles={roles} />
+      {children}
+    </DashboardShell>
   );
 }
