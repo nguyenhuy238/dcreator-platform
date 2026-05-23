@@ -1,17 +1,15 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { getNavigationItemsByRoles } from "@/app/components/dcreator/layout/role-navigation";
 import { AppShell, PublicHeader } from "@/app/components/dcreator/layout/shell";
 import type { Role } from "@prisma/client";
+import { ROLE } from "@/lib/auth/role-constants";
 
 const nav = [
-  { href: "/dashboard/user", label: "Tổng quan" },
-  { href: "/dashboard/user/profile", label: "User profile" },
-  { href: "/campaigns", label: "Campaign" },
-  { href: "/wallet", label: "Wallet" },
-  { href: "/vouchers", label: "Voucher" }
+  { href: "/dashboard/user/profile", label: "Profile" }
 ];
 
 type Snapshot = {
@@ -44,6 +42,8 @@ const defaultBrand = {
   website: ""
 };
 
+const BRAND_BCC_VERSION = "BCC-dCreator-v1";
+
 function statusText(value?: unknown) {
   if (value === "PENDING_REVIEW") return "Đang chờ duyệt";
   if (value === "APPROVED") return "Đã duyệt";
@@ -53,6 +53,7 @@ function statusText(value?: unknown) {
 }
 
 export default function UserProfilePage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -78,10 +79,38 @@ export default function UserProfilePage() {
   }
 
   useEffect(() => {
+    let active = true;
     const denied = searchParams.get("denied");
     if (denied) setError(denied);
-    void load();
-  }, [searchParams]);
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!active) return;
+        if (!response.ok || !payload?.success) {
+          void load();
+          return;
+        }
+        const roles = payload.data?.user?.roles as Role[] | undefined;
+        if (roles?.includes(ROLE.BRAND_OWNER) || roles?.includes(ROLE.BRAND_STAFF)) {
+          router.replace("/dashboard/brand/profile");
+          return;
+        }
+        void load();
+      })
+      .catch(() => {
+        if (active) void load();
+      });
+    return () => {
+      active = false;
+    };
+  }, [router, searchParams]);
+
+  const sidebarItems = useMemo(() => {
+    if (!data) return nav;
+    const map = new Map(getNavigationItemsByRoles(data.account.roles).map((item) => [item.href, item]));
+    map.set("/dashboard/user/profile", { href: "/dashboard/user/profile", label: "Profile" });
+    return Array.from(map.values());
+  }, [data]);
 
   async function submitCreator(event: FormEvent) {
     event.preventDefault();
@@ -125,6 +154,13 @@ export default function UserProfilePage() {
     const endpoint = "/api/profile/brand-application";
     const body = {
       ...brandForm,
+      legalName: brandForm.brandName,
+      revenueSharePercent: 70,
+      commissionRatePercent: 10,
+      bccAgreementAccepted: true,
+      bccAgreementVersion: BRAND_BCC_VERSION,
+      legalResponsibilityAccepted: true,
+      contractSignedAt: new Date().toISOString(),
       applicationId: isResubmit ? data.brandApplication?.id : undefined
     };
     const response = await fetch(endpoint, {
@@ -143,11 +179,11 @@ export default function UserProfilePage() {
   }
 
   if (loading) {
-    return <><PublicHeader /><AppShell sidebarItems={nav}><div className="dc-card p-6">Loading profile...</div></AppShell></>;
+    return <><PublicHeader /><AppShell sidebarItems={sidebarItems}><div className="dc-card p-6">Loading profile...</div></AppShell></>;
   }
 
   if (!data) {
-    return <><PublicHeader /><AppShell sidebarItems={nav}><div className="dc-card p-6 text-red-700">{error || "Profile not found"}</div></AppShell></>;
+    return <><PublicHeader /><AppShell sidebarItems={sidebarItems}><div className="dc-card p-6 text-red-700">{error || "Profile not found"}</div></AppShell></>;
   }
 
   const creatorStatus = data.creatorApplication?.status as string | undefined;
@@ -156,7 +192,7 @@ export default function UserProfilePage() {
   return (
     <>
       <PublicHeader />
-      <AppShell sidebarItems={nav}>
+      <AppShell sidebarItems={sidebarItems}>
         <h1 className="text-3xl font-black">User Profile</h1>
         <p className="mt-2 text-sm text-zinc-600">Đăng ký nâng cấp Creator/Brand tại đây và theo dõi trạng thái duyệt.</p>
         {error ? <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
@@ -212,6 +248,7 @@ export default function UserProfilePage() {
                 <input className="dc-input" placeholder="Contact phone" value={brandForm.contactPhone} onChange={(e) => setBrandForm((x) => ({ ...x, contactPhone: e.target.value }))} required />
                 <input className="dc-input" placeholder="Contact email" type="email" value={brandForm.contactEmail} onChange={(e) => setBrandForm((x) => ({ ...x, contactEmail: e.target.value }))} required />
                 <input className="dc-input" placeholder="Website" type="url" value={brandForm.website} onChange={(e) => setBrandForm((x) => ({ ...x, website: e.target.value }))} />
+                <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">Khi gửi hồ sơ Brand, bạn xác nhận BCC {BRAND_BCC_VERSION}: Brand chịu trách nhiệm pháp lý về sản phẩm/tồn kho/voucher, chia doanh thu Brand 70% và commission nền tảng 10%.</p>
                 <button className="dc-btn-primary" disabled={submittingBrand} type="submit">{submittingBrand ? "Đang gửi..." : brandStatus ? "Gửi lại hồ sơ Brand" : "Đăng ký Brand"}</button>
               </form>
             ) : null}

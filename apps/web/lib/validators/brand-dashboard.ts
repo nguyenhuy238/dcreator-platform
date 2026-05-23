@@ -18,6 +18,57 @@ export const productSchema = z.object({
   pricePoints: z.number().int().min(0).optional()
 });
 
+export const brandOnboardingSchema = z.object({
+  legalName: z.string().trim().max(160, { message: "Pháp nhân / tên công ty tối đa 160 ký tự." }).optional().or(z.literal("")),
+  industry: z.string().trim().max(120, { message: "Ngành hàng tối đa 120 ký tự." }).optional().or(z.literal("")),
+  taxCode: z.string().trim().max(60, { message: "Mã số thuế tối đa 60 ký tự." }).optional().or(z.literal("")),
+  businessLicenseUrl: z.string().trim().max(400, { message: "URL giấy phép kinh doanh tối đa 400 ký tự." }).optional().or(z.literal("")),
+  productCategories: z.string().trim().max(600, { message: "Danh mục sản phẩm tối đa 600 ký tự." }).optional().or(z.literal("")),
+  inventoryDescription: z.string().trim().max(1200, { message: "Mô tả tồn kho tối đa 1200 ký tự." }).optional().or(z.literal("")),
+  revenueSharePercent: z.number().int().min(0, { message: "Phần trăm doanh thu phải từ 0 đến 100." }).max(100, { message: "Phần trăm doanh thu phải từ 0 đến 100." }).default(70),
+  commissionRatePercent: z.number().int().min(0, { message: "Commission phải từ 0 đến 100." }).max(100, { message: "Commission phải từ 0 đến 100." }).default(10),
+  bccAgreementAccepted: z.boolean().refine((value) => value === true, { message: "Bạn phải đồng ý với nội dung hợp đồng BCC." }),
+  bccAgreementVersion: z.string().trim().min(1).max(60).default("BCC-dCreator-v1"),
+  bccAgreementTerms: z.string().trim().min(10, { message: "Nội dung hợp đồng BCC phải có ít nhất 10 ký tự." }).max(10000, { message: "Nội dung hợp đồng BCC tối đa 10000 ký tự." }),
+  requestAdminReview: z.boolean().optional(),
+  legalResponsibilityAccepted: z.boolean().refine((value) => value === true, { message: "Bạn phải xác nhận chịu trách nhiệm pháp lý." }),
+  contractFileUrl: z.string().trim().max(400, { message: "Ghi chú hợp đồng / tài liệu bổ sung tối đa 400 ký tự." }).optional().or(z.literal(""))
+}).superRefine((value, ctx) => {
+  const hasValidBusinessLicenseUrl = (() => {
+    if (!value.businessLicenseUrl) return true;
+    try {
+      const parsed = new URL(value.businessLicenseUrl);
+      return parsed.protocol === "http:" || parsed.protocol === "https:";
+    } catch {
+      return false;
+    }
+  })();
+
+  if (value.requestAdminReview) {
+    return;
+  }
+
+  if (!hasValidBusinessLicenseUrl) {
+    ctx.addIssue({ code: "custom", path: ["businessLicenseUrl"], message: "URL giấy phép kinh doanh không hợp lệ." });
+  }
+
+  if (!value.legalName || value.legalName.trim().length < 2) {
+    ctx.addIssue({ code: "custom", path: ["legalName"], message: "Vui lòng nhập Pháp nhân / tên công ty." });
+  }
+  if (!value.industry || value.industry.trim().length < 2) {
+    ctx.addIssue({ code: "custom", path: ["industry"], message: "Vui lòng nhập Ngành hàng." });
+  }
+  if (!value.taxCode || value.taxCode.trim().length < 3) {
+    ctx.addIssue({ code: "custom", path: ["taxCode"], message: "Vui lòng nhập Mã số thuế." });
+  }
+  if (!value.productCategories || value.productCategories.trim().length < 2) {
+    ctx.addIssue({ code: "custom", path: ["productCategories"], message: "Vui lòng nhập Danh mục sản phẩm." });
+  }
+  if (!value.inventoryDescription || value.inventoryDescription.trim().length < 10) {
+    ctx.addIssue({ code: "custom", path: ["inventoryDescription"], message: "Mô tả tồn kho phải ít nhất 10 ký tự." });
+  }
+});
+
 export const campaignCreateSchema = z.object({
   slug: z.string().trim().min(3).max(120),
   title: z.string().trim().min(3).max(200),

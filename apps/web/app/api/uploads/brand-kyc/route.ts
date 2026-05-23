@@ -32,6 +32,32 @@ async function saveImage(file: File, suffix: string) {
   return `/${relativeDir.replace(/\\/g, "/")}/${fileName}`;
 }
 
+const ALLOWED_DOC_TYPES = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "image/jpeg",
+  "image/png",
+  "text/plain"
+];
+
+async function saveDocument(file: File, suffix: string) {
+  if (!ALLOWED_DOC_TYPES.includes(file.type)) {
+    throw new AppError(`File phải là PDF, DOC, DOCX, JPG, PNG hoặc TXT`, 422, "INVALID_FILE_TYPE");
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    throw new AppError(`File vượt quá 10MB`, 422, "FILE_TOO_LARGE");
+  }
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const ext = file.type.split("/")[1]?.replace("vnd.openxmlformats-officedocument.wordprocessingml.document", "docx").replace("msword", "doc") || "bin";
+  const fileName = `${Date.now()}-${randomUUID()}-${suffix}.${ext}`;
+  const relativeDir = path.join("uploads", "brand-kyc");
+  const absoluteDir = path.join(process.cwd(), "public", relativeDir);
+  await mkdir(absoluteDir, { recursive: true });
+  await writeFile(path.join(absoluteDir, fileName), buffer);
+  return `/${relativeDir.replace(/\\/g, "/")}/${fileName}`;
+}
+
 export async function POST(request: NextRequest) {
   try {
     assertSameOrigin(request);
@@ -40,6 +66,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const representativeIdFrontImage = formData.get("representativeIdFrontImage");
     const representativeIdBackImage = formData.get("representativeIdBackImage");
+    const businessLicenseFile = formData.get("businessLicense");
 
     const representativeIdFrontFile = representativeIdFrontImage instanceof File ? representativeIdFrontImage : null;
     const representativeIdBackFile = representativeIdBackImage instanceof File ? representativeIdBackImage : null;
@@ -52,7 +79,12 @@ export async function POST(request: NextRequest) {
       saveImage(representativeIdBackFile, "representative-id-back")
     ]);
 
-    return ok({ idCardFrontImageUrl, idCardBackImageUrl }, 201);
+    let businessLicenseUrl: string | null = null;
+    if (businessLicenseFile instanceof File && businessLicenseFile.size > 0) {
+      businessLicenseUrl = await saveDocument(businessLicenseFile, "business-license");
+    }
+
+    return ok({ idCardFrontImageUrl, idCardBackImageUrl, businessLicenseUrl }, 201);
   } catch (error) {
     return toErrorResponse(error);
   }

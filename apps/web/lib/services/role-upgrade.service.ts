@@ -167,7 +167,14 @@ export async function applyBrand(accountId: string, input: BrandApplicationInput
       productCategories: normalizeOptional(input.productCategories),
       inventoryDescription: normalizeOptional(input.inventoryDescription),
       expectedCampaignBudget: input.expectedCampaignBudget,
-      expectedCreatorCount: input.expectedCreatorCount
+      expectedCreatorCount: input.expectedCreatorCount,
+      revenueSharePercent: input.revenueSharePercent,
+      commissionRatePercent: input.commissionRatePercent,
+      bccAgreementAccepted: input.bccAgreementAccepted ?? false,
+      bccAgreementVersion: normalizeOptional(input.bccAgreementVersion),
+      legalResponsibilityAccepted: input.legalResponsibilityAccepted ?? false,
+      contractFileUrl: normalizeOptional(input.contractFileUrl),
+      contractSignedAt: input.contractSignedAt ? new Date(input.contractSignedAt) : new Date()
     }
   });
 }
@@ -209,7 +216,14 @@ export async function updateBrandApplication(accountId: string, applicationId: s
       productCategories: normalizeOptional(input.productCategories),
       inventoryDescription: normalizeOptional(input.inventoryDescription),
       expectedCampaignBudget: input.expectedCampaignBudget,
-      expectedCreatorCount: input.expectedCreatorCount
+      expectedCreatorCount: input.expectedCreatorCount,
+      revenueSharePercent: input.revenueSharePercent,
+      commissionRatePercent: input.commissionRatePercent,
+      bccAgreementAccepted: input.bccAgreementAccepted ?? false,
+      bccAgreementVersion: normalizeOptional(input.bccAgreementVersion),
+      legalResponsibilityAccepted: input.legalResponsibilityAccepted ?? false,
+      contractFileUrl: normalizeOptional(input.contractFileUrl),
+      contractSignedAt: input.contractSignedAt ? new Date(input.contractSignedAt) : new Date()
     }
   });
 }
@@ -335,31 +349,79 @@ export async function reviewBrandApplication(actorId: string, applicationId: str
     });
 
     if (status === ApplicationStatus.APPROVED) {
-      const brand = await tx.brand.create({
-        data: {
-          ownerAccountId: app.accountId,
-          name: app.brandName,
-          logoUrl: app.logoUrl,
-          legalName: app.legalName,
-          industry: app.industry,
-          website: app.website,
-          fanpage: app.fanpage,
-          address: app.address,
-          contactName: app.contactName,
-          contactPhone: app.contactPhone,
-          contactEmail: app.contactEmail,
-          description: app.description,
-          businessGoal: app.businessGoal,
-          taxCode: app.taxCode,
-          businessLicenseUrl: app.businessLicenseUrl,
-          representativeName: app.representativeName,
-          representativePhone: app.representativePhone,
-          representativeEmail: app.representativeEmail,
-          status: BrandStatus.ACTIVE,
-          reviewedById: actorId,
-          reviewedAt: new Date()
-        }
+      const existingBrand = await tx.brand.findFirst({
+        where: { ownerAccountId: app.accountId },
+        orderBy: { createdAt: "desc" }
       });
+      const brand = existingBrand
+        ? await tx.brand.update({
+            where: { id: existingBrand.id },
+            data: {
+              name: app.brandName,
+              logoUrl: app.logoUrl,
+              legalName: app.legalName,
+              industry: app.industry,
+              website: app.website,
+              fanpage: app.fanpage,
+              address: app.address,
+              contactName: app.contactName,
+              contactPhone: app.contactPhone,
+              contactEmail: app.contactEmail,
+              description: app.description,
+              businessGoal: app.businessGoal,
+              taxCode: app.taxCode,
+              businessLicenseUrl: app.businessLicenseUrl,
+              representativeName: app.representativeName,
+              representativePhone: app.representativePhone,
+              representativeEmail: app.representativeEmail,
+              productCategories: app.productCategories,
+              inventoryDescription: app.inventoryDescription,
+              revenueSharePercent: app.revenueSharePercent,
+              commissionRatePercent: app.commissionRatePercent,
+              bccAgreementVersion: app.bccAgreementVersion,
+              bccAgreementTerms: app.bccAgreementTerms,
+              legalResponsibilityAccepted: app.legalResponsibilityAccepted,
+              contractFileUrl: app.contractFileUrl,
+              contractSignedAt: app.contractSignedAt,
+              status: BrandStatus.ACTIVE,
+              reviewedById: actorId,
+              reviewedAt: new Date()
+            }
+          })
+        : await tx.brand.create({
+            data: {
+              ownerAccountId: app.accountId,
+              name: app.brandName,
+              logoUrl: app.logoUrl,
+              legalName: app.legalName,
+              industry: app.industry,
+              website: app.website,
+              fanpage: app.fanpage,
+              address: app.address,
+              contactName: app.contactName,
+              contactPhone: app.contactPhone,
+              contactEmail: app.contactEmail,
+              description: app.description,
+              businessGoal: app.businessGoal,
+              taxCode: app.taxCode,
+              businessLicenseUrl: app.businessLicenseUrl,
+              representativeName: app.representativeName,
+              representativePhone: app.representativePhone,
+              representativeEmail: app.representativeEmail,
+              productCategories: app.productCategories,
+              inventoryDescription: app.inventoryDescription,
+              revenueSharePercent: app.revenueSharePercent,
+              commissionRatePercent: app.commissionRatePercent,
+              bccAgreementVersion: app.bccAgreementVersion,
+              bccAgreementTerms: app.bccAgreementTerms,
+              legalResponsibilityAccepted: app.legalResponsibilityAccepted,
+              contractFileUrl: app.contractFileUrl,
+              contractSignedAt: app.contractSignedAt,
+              status: BrandStatus.ACTIVE,
+              reviewedById: actorId,
+              reviewedAt: new Date()
+            }
+          });
       await tx.brandMember.upsert({
         where: { brandId_accountId: { brandId: brand.id, accountId: app.accountId } },
         create: { brandId: brand.id, accountId: app.accountId, role: BrandMemberRole.OWNER },
