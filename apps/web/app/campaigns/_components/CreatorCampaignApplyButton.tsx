@@ -18,6 +18,7 @@ type StatusPayload = {
   label: string;
   disabled: boolean;
   message: string;
+  rejectReason: string | null;
   submissionId: string | null;
   missionId: string | null;
   lifecycleStatus: string | null;
@@ -155,7 +156,12 @@ export function CreatorCampaignApplyButton({ slug, compact = false }: Props) {
           {notice.text}
         </p>
       ) : null}
-      {!compact && !notice && status?.message ? <p className="text-xs text-zinc-500">{status.message}</p> : null}
+      {!compact && !notice && status?.message ? (
+        <p className="text-xs text-zinc-500">
+          {status.message}
+          {status.state === "REJECTED" && status.rejectReason ? ` Lý do: ${status.rejectReason}` : ""}
+        </p>
+      ) : null}
     </div>
   );
 }

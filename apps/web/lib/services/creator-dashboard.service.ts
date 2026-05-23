@@ -4,6 +4,8 @@ import { AppError } from "@/lib/errors";
 import { acceptMission, submitMissionProof } from "@/lib/services/mission.service";
 import { createCreatorPayoutRequest, ensureWalletByAccountId } from "@/lib/services/wallet.service";
 import { getCreatorKpis } from "@/lib/services/analytics.service";
+import { createNotificationForAdminOps } from "@/lib/services/notification.service";
+import { writeAuditLog } from "@/lib/services/audit-log.service";
 import type { CreatorChannelsUpdateInput, CreatorProfileUpdateInput } from "@/lib/validators/creator-dashboard";
 
 function toJobStatus(status: MissionLifecycleStatus) {
@@ -79,7 +81,17 @@ export async function getCreatorDashboardOverview(accountId: string) {
   };
 }
 
-export async function listCreatorMarketplaceJobs(accountId: string) {
+export async function listCreatorMarketplaceJobs(
+  accountId: string,
+  filters?: {
+    category?: "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
+    campaignStatus?: "ACTIVE" | "PAUSED" | "COMPLETED";
+    minRewardPoints?: number;
+    minPayoutVnd?: number;
+    deadlineBefore?: string;
+    search?: string;
+  }
+) {
   const acceptedMissionIds = await prisma.missionSubmission.findMany({
     where: { accountId },
     select: { missionId: true }
@@ -89,10 +101,28 @@ export async function listCreatorMarketplaceJobs(accountId: string) {
     where: {
       audience: "CREATOR",
       status: "OPEN",
-      id: { notIn: acceptedMissionIds.map((item) => item.missionId) }
+      id: { notIn: acceptedMissionIds.map((item) => item.missionId) },
+      ...(typeof filters?.minRewardPoints === "number" ? { rewardPoints: { gte: filters.minRewardPoints } } : {}),
+      ...(typeof filters?.minPayoutVnd === "number" ? { rewardCommissionVnd: { gte: filters.minPayoutVnd } } : {}),
+      ...(filters?.deadlineBefore
+        ? { deadlineAt: { lte: new Date(filters.deadlineBefore) } }
+        : {}),
+      ...(filters?.search
+        ? {
+            OR: [
+              { title: { contains: filters.search, mode: "insensitive" } },
+              { description: { contains: filters.search, mode: "insensitive" } },
+              { campaign: { title: { contains: filters.search, mode: "insensitive" } } }
+            ]
+          }
+        : {}),
+      campaign: {
+        ...(filters?.category ? { category: filters.category } : {}),
+        ...(filters?.campaignStatus ? { status: filters.campaignStatus } : {})
+      }
     },
     orderBy: { createdAt: "desc" },
-    include: { campaign: { select: { id: true, title: true, slug: true, category: true } } }
+    include: { campaign: { select: { id: true, title: true, slug: true, category: true, status: true, endsAt: true } } }
   });
 }
 
@@ -123,13 +153,30 @@ export async function listCreatorMyJobs(accountId: string) {
 export async function submitCreatorProof(
   submissionId: string,
   accountId: string,
-  payload: { videoUrl: string; screenshotUrl?: string; note?: string }
+  payload: { videoUrl: string; screenshotUrl?: string; platform?: "TikTok" | "Instagram" | "YouTube" | "Facebook"; adCode?: string; note?: string }
 ) {
-  return submitMissionProof(submissionId, accountId, {
+  const updated = await submitMissionProof(submissionId, accountId, {
     videoUrl: payload.videoUrl,
     screenshotUrl: payload.screenshotUrl,
-    note: payload.note
+    proofTextNote: payload.adCode,
+    note: [payload.platform ? `Platform: ${payload.platform}` : "", payload.note ?? ""].filter(Boolean).join(" | ")
   });
+
+  await writeAuditLog({
+    actorId: accountId,
+    action: "CREATOR_PROOF_SUBMITTED",
+    targetType: "MissionSubmission",
+    targetId: updated.id,
+    metadata: { platform: payload.platform ?? null, adCode: payload.adCode ?? null }
+  });
+  await createNotificationForAdminOps({
+    event: "PROOF_SUBMITTED",
+    title: "Creator đã nộp proof",
+    content: `Creator vừa nộp proof cho mission submission ${updated.id}.`,
+    metadata: { submissionId: updated.id, accountId },
+    excludeAccountId: accountId
+  });
+  return updated;
 }
 
 export async function getCreatorCommission(accountId: string) {

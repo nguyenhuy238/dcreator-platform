@@ -3,8 +3,17 @@ import { ok } from "@/lib/api-response";
 import { assertSameOrigin } from "@/lib/auth/csrf";
 import { requireAuth } from "@/lib/auth/guard";
 import { toErrorResponse } from "@/lib/errors";
-import { applyCreator, updateCreatorApplication } from "@/lib/services/role-upgrade.service";
+import { applyCreator, getMyCreatorApplication, updateCreatorApplication } from "@/lib/services/role-upgrade.service";
 import { creatorApplicationSchema } from "@/lib/validators/role-upgrade";
+
+export async function GET(request: NextRequest) {
+  try {
+    const account = await requireAuth(request);
+    return ok(await getMyCreatorApplication(account.id));
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
