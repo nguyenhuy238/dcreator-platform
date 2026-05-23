@@ -97,7 +97,9 @@ test("workspace role matrix + mobile navigation smoke", async (t) => {
 
     const mobileContext = await browser.newContext({ viewport: { width: 375, height: 812 } });
     const mobilePage = await mobileContext.newPage();
+    // eslint-disable-next-line turbo/no-undeclared-env-vars
     const mobileEmail = process.env.E2E_MULTI_EMAIL ?? process.env.E2E_CREATOR_EMAIL ?? process.env.E2E_USER_EMAIL;
+    // eslint-disable-next-line turbo/no-undeclared-env-vars
     const mobilePassword = process.env.E2E_MULTI_PASSWORD ?? process.env.E2E_CREATOR_PASSWORD ?? process.env.E2E_USER_PASSWORD;
     if (!mobileEmail || !mobilePassword) {
       t.skip("missing mobile test credentials");

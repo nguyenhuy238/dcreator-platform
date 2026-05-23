@@ -10,6 +10,9 @@ import { createNotification, createNotificationForAdminOps } from "@/lib/service
 import { writeAuditLog } from "@/lib/services/audit-log.service";
 import type { z } from "zod";
 import type {
+  brandMemberInviteSchema,
+  brandMemberRemoveSchema,
+  brandMemberRoleUpdateSchema,
   brandProfileSchema,
   brandOnboardingSchema,
   budgetLockSchema,
@@ -36,6 +39,9 @@ type ProofReviewDecisionInput = z.infer<typeof proofReviewDecisionSchema>;
 type BudgetLockInput = z.infer<typeof budgetLockSchema>;
 type BudgetTopupInput = z.infer<typeof budgetTopupSchema>;
 type ProductSubmissionInput = z.infer<typeof productSubmissionSchema>;
+type BrandMemberInviteInput = z.infer<typeof brandMemberInviteSchema>;
+type BrandMemberRoleUpdateInput = z.infer<typeof brandMemberRoleUpdateSchema>;
+type BrandMemberRemoveInput = z.infer<typeof brandMemberRemoveSchema>;
 
 type BrandProductWithBatches = BrandProduct & { batches: BrandInventoryBatch[] };
 
@@ -195,7 +201,8 @@ async function resolveBrandActorContext(accountId: string, options?: { provision
     return { brand: membership.brand, brandOwnerAccountId: membership.brand.ownerAccountId, membershipRole: membership.role };
   }
 
-  if (options?.provisionIfOwner) {
+  const shouldProvision = options?.provisionIfOwner ?? true;
+  if (shouldProvision) {
     const created = await ensureBrandForOwner(accountId);
     return { brand: created, brandOwnerAccountId: created.ownerAccountId, membershipRole: "OWNER" };
   }
@@ -331,6 +338,17 @@ async function ensureBrandForOwner(accountId: string) {
   ]);
 
   if (!account) throw new AppError("Account not found", 404, "ACCOUNT_NOT_FOUND");
+
+  const ownerRole = await prisma.accountRole.findFirst({
+    where: {
+      accountId,
+      role: Role.BRAND_OWNER
+    },
+    select: { id: true }
+  });
+  if (!ownerRole) {
+    throw new AppError("Brand not found for actor", 404, "BRAND_NOT_FOUND");
+  }
 
   return prisma.brand.create({
     data: {
@@ -795,7 +813,40 @@ export async function requestCampaignAdjustment(accountId: string, campaignId: s
 
 export async function listBrandCampaigns(accountId: string) {
   const ctx = await resolveBrandActorContext(accountId);
-  return prisma.campaign.findMany({ where: { brandId: ctx.brandOwnerAccountId }, orderBy: { createdAt: "desc" } });
+  const campaigns = await prisma.campaign.findMany({
+    where: { brandId: ctx.brandOwnerAccountId },
+    orderBy: { createdAt: "desc" },
+    include: {
+      _count: {
+        select: {
+          contributions: true,
+          missions: true
+        }
+      }
+    }
+  });
+
+  const applicationsByCampaign = await prisma.missionSubmission.groupBy({
+    by: ["missionId"],
+    where: { mission: { campaign: { brandId: ctx.brandOwnerAccountId } } },
+    _count: { _all: true }
+  });
+  const missionIds = applicationsByCampaign.map((item) => item.missionId);
+  const missions = missionIds.length > 0
+    ? await prisma.mission.findMany({ where: { id: { in: missionIds } }, select: { id: true, campaignId: true } })
+    : [];
+
+  const campaignApplicationCountMap = new Map<string, number>();
+  for (const item of applicationsByCampaign) {
+    const mission = missions.find((x) => x.id === item.missionId);
+    if (!mission) continue;
+    campaignApplicationCountMap.set(mission.campaignId, (campaignApplicationCountMap.get(mission.campaignId) ?? 0) + item._count._all);
+  }
+
+  return campaigns.map((campaign) => ({
+    ...campaign,
+    applicationCount: campaignApplicationCountMap.get(campaign.id) ?? 0
+  }));
 }
 
 export async function listBrandCampaignRequests(accountId: string) {
@@ -877,7 +928,7 @@ export async function listCreatorApplications(accountId: string) {
         campaign: { brandId: ctx.brandOwnerAccountId },
         audience: { in: [MissionAudience.CREATOR, MissionAudience.USER] }
       },
-      lifecycleStatus: { in: ["ACCEPTED", "DOING"] }
+      lifecycleStatus: { in: ["ACCEPTED", "DOING", "REJECTED", "PENDING_REVIEW", "SUBMITTED", "APPROVED"] }
     },
     include: {
       account: {
@@ -894,7 +945,7 @@ export async function listCreatorApplications(accountId: string) {
           }
         }
       },
-      mission: { select: { id: true, title: true, campaign: { select: { id: true, title: true } } } }
+      mission: { select: { id: true, title: true, audience: true, campaign: { select: { id: true, title: true } } } }
     },
     orderBy: { createdAt: "desc" }
   });
@@ -968,10 +1019,16 @@ export async function listBrandProofs(accountId: string) {
   return prisma.missionSubmission.findMany({
     where: {
       mission: { campaign: { brandId: ctx.brandOwnerAccountId }, audience: MissionAudience.CREATOR },
-      lifecycleStatus: { in: ["PENDING_REVIEW", "REJECTED"] }
+      lifecycleStatus: { in: ["PENDING_REVIEW", "REJECTED", "SUBMITTED", "APPROVED", "DONE"] }
     },
     include: {
-      account: { select: { id: true, displayName: true } },
+      account: {
+        select: {
+          id: true,
+          displayName: true,
+          creatorProfile: { select: { mainPlatform: true, followerCount: true } }
+        }
+      },
       mission: { select: { id: true, title: true, campaign: { select: { id: true, title: true } } } }
     },
     orderBy: { updatedAt: "asc" }
@@ -1101,14 +1158,135 @@ export async function getBrandAnalytics(accountId: string) {
 
   const kpis = await getBrandKpis(ctx.brandOwnerAccountId);
 
+  const topCampaign = campaignPerformance
+    .slice()
+    .sort((a, b) => b.fundedAmountVnd - a.fundedAmountVnd)[0] ?? null;
+
   return {
     campaignPerformance,
     topCreator,
     topProduct: topProductRaw[0] ?? null,
     voucherRedemption,
     conversionRate: conversionRaw._count._all > 0 ? Number(((conversionRaw._sum.amountVnd ?? 0) / conversionRaw._count._all).toFixed(2)) : 0,
+    topCampaign,
     kpis
   };
+}
+
+export async function listBrandMembers(accountId: string) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true });
+  const canManage = ctx.membershipRole === "OWNER";
+  const members = await prisma.brandMember.findMany({
+    where: { brandId: ctx.brand.id },
+    include: {
+      account: {
+        select: {
+          id: true,
+          displayName: true,
+          email: true,
+          isActive: true
+        }
+      }
+    },
+    orderBy: { createdAt: "asc" }
+  });
+  return {
+    canManage,
+    brand: { id: ctx.brand.id, name: ctx.brand.name, ownerAccountId: ctx.brand.ownerAccountId },
+    members: members.map((item) => ({
+      id: item.id,
+      accountId: item.accountId,
+      role: item.role,
+      status: item.account.isActive ? "ACTIVE" : "DISABLED",
+      joinedAt: item.createdAt,
+      user: { displayName: item.account.displayName, email: item.account.email }
+    }))
+  };
+}
+
+export async function inviteBrandMember(accountId: string, input: BrandMemberInviteInput) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true });
+  if (ctx.membershipRole !== "OWNER") {
+    throw new AppError("Only brand owner can invite members", 403, "BRAND_MEMBER_FORBIDDEN");
+  }
+
+  const account = await prisma.account.findUnique({
+    where: { email: input.email },
+    select: { id: true, displayName: true, email: true }
+  });
+  if (!account) throw new AppError("Email chưa có tài khoản trong hệ thống", 404, "ACCOUNT_NOT_FOUND");
+  if (account.id === ctx.brand.ownerAccountId) {
+    throw new AppError("Không thể mời owner hiện tại", 409, "OWNER_INVITE_CONFLICT");
+  }
+
+  const membership = await prisma.brandMember.upsert({
+    where: { brandId_accountId: { brandId: ctx.brand.id, accountId: account.id } },
+    create: {
+      brandId: ctx.brand.id,
+      accountId: account.id,
+      role: input.role
+    },
+    update: { role: input.role }
+  });
+
+  await writeAuditLog({
+    actorId: accountId,
+    action: "BRAND_MEMBER_INVITED",
+    targetType: "BrandMember",
+    targetId: membership.id,
+    metadata: { invitedAccountId: account.id, role: input.role, note: input.note ?? null }
+  });
+  await createNotification({
+    accountId: account.id,
+    event: "CAMPAIGN_APPROVED",
+    title: "Bạn được thêm vào Nhãn hàng",
+    content: `Bạn vừa được thêm vào nhãn hàng "${ctx.brand.name}" với vai trò ${input.role}.`,
+    metadata: { brandId: ctx.brand.id, role: input.role }
+  });
+
+  return membership;
+}
+
+export async function updateBrandMemberRole(accountId: string, input: BrandMemberRoleUpdateInput) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true });
+  if (ctx.membershipRole !== "OWNER") {
+    throw new AppError("Only brand owner can update member role", 403, "BRAND_MEMBER_FORBIDDEN");
+  }
+  const member = await prisma.brandMember.findFirst({ where: { id: input.memberId, brandId: ctx.brand.id } });
+  if (!member) throw new AppError("Brand member not found", 404, "BRAND_MEMBER_NOT_FOUND");
+  if (member.accountId === ctx.brand.ownerAccountId) {
+    throw new AppError("Không thể thay đổi role owner cuối cùng", 409, "OWNER_LOCKED");
+  }
+
+  const updated = await prisma.brandMember.update({ where: { id: member.id }, data: { role: input.role } });
+  await writeAuditLog({
+    actorId: accountId,
+    action: "BRAND_MEMBER_ROLE_UPDATED",
+    targetType: "BrandMember",
+    targetId: member.id,
+    metadata: { role: input.role }
+  });
+  return updated;
+}
+
+export async function removeBrandMember(accountId: string, input: BrandMemberRemoveInput) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true });
+  if (ctx.membershipRole !== "OWNER") {
+    throw new AppError("Only brand owner can remove member", 403, "BRAND_MEMBER_FORBIDDEN");
+  }
+  const member = await prisma.brandMember.findFirst({ where: { id: input.memberId, brandId: ctx.brand.id } });
+  if (!member) throw new AppError("Brand member not found", 404, "BRAND_MEMBER_NOT_FOUND");
+  if (member.accountId === ctx.brand.ownerAccountId) {
+    throw new AppError("Không thể xoá owner cuối cùng", 409, "OWNER_LOCKED");
+  }
+  await prisma.brandMember.delete({ where: { id: member.id } });
+  await writeAuditLog({
+    actorId: accountId,
+    action: "BRAND_MEMBER_REMOVED",
+    targetType: "BrandMember",
+    targetId: member.id
+  });
+  return { id: member.id, removed: true };
 }
 
 export async function createProductSubmissionForReview(accountId: string, input: ProductSubmissionInput) {

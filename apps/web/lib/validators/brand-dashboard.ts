@@ -185,3 +185,18 @@ export const productSubmissionSchema = z.object({
   batchCode: z.string().trim().max(80).optional(),
   quantityTotal: z.number().int().positive()
 });
+
+export const brandMemberInviteSchema = z.object({
+  email: z.email().trim().toLowerCase(),
+  role: z.enum(["OWNER", "STAFF"]).default("STAFF"),
+  note: z.string().trim().max(500).optional().or(z.literal(""))
+});
+
+export const brandMemberRoleUpdateSchema = z.object({
+  memberId: z.string().trim().min(3),
+  role: z.enum(["OWNER", "STAFF"])
+});
+
+export const brandMemberRemoveSchema = z.object({
+  memberId: z.string().trim().min(3)
+});

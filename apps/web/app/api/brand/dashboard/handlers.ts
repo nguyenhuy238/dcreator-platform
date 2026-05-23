@@ -17,21 +17,28 @@ import {
   getBrandProfile,
   listBrandCampaigns,
   listBrandCampaignRequests,
+  listBrandMembers,
   listBrandProofs,
   listCreatorApplications,
   listProducts,
   listProductSubmissionsForBrand,
   lockCampaignBudget,
+  removeBrandMember,
   reviewBrandProof,
   requestCampaignAdjustment,
   respondBrandCampaignRequest,
   submitCampaignForAdminReview,
   topupBrandFund,
+  updateBrandMemberRole,
   updateBrandOnboarding,
   updateBrandProfile,
-  upsertProduct
+  upsertProduct,
+  inviteBrandMember
 } from "@/lib/services/brand-dashboard.service";
 import {
+  brandMemberInviteSchema,
+  brandMemberRemoveSchema,
+  brandMemberRoleUpdateSchema,
   brandOnboardingSchema,
   brandProfileSchema,
   budgetLockSchema,
@@ -193,6 +200,29 @@ export async function POST_budget_lock(request: NextRequest) {
 export async function GET_analytics(request: NextRequest) {
   const account = await requireBrandActor(request);
   return ok(await getBrandAnalytics(account.id));
+}
+
+export async function GET_members(request: NextRequest) {
+  const account = await requireBrandActor(request);
+  return ok(await listBrandMembers(account.id));
+}
+
+export async function POST_members(request: NextRequest) {
+  const account = await requireBrandActor(request);
+  const payload = brandMemberInviteSchema.parse(await request.json());
+  return ok(await inviteBrandMember(account.id, payload), 201);
+}
+
+export async function PATCH_members(request: NextRequest) {
+  const account = await requireBrandActor(request);
+  const payload = brandMemberRoleUpdateSchema.parse(await request.json());
+  return ok(await updateBrandMemberRole(account.id, payload));
+}
+
+export async function DELETE_members(request: NextRequest) {
+  const account = await requireBrandActor(request);
+  const payload = brandMemberRemoveSchema.parse(await request.json());
+  return ok(await removeBrandMember(account.id, payload));
 }
 
 export async function withHandler(handler: () => Promise<Response>) {
