@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { ActionToast, ConfirmDialog, ErrorState, LoadingSkeleton, PageHeader, SectionCard, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
 type Detail = {
@@ -35,6 +35,7 @@ export default function AdminPayoutDetailPage() {
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const [reason, setReason] = useState("");
+  const [confirmAction, setConfirmAction] = useState<null | "approve" | "mark-paid" | "reject">(null);
   const [item, setItem] = useState<Detail | null>(null);
 
   const load = useCallback(async () => {
@@ -99,9 +100,8 @@ export default function AdminPayoutDetailPage() {
     <>
       <PageHeader title={item.account.displayName} subtitle={`Payout: ${item.amountVnd.toLocaleString("vi-VN")} VND`} action={<button className="dc-btn-secondary" onClick={() => router.push("/admin/payouts")}>Back</button>} />
       {error ? <div className="mb-4"><ErrorState title="Có lỗi thao tác" description={error} onRetry={() => void load()} /></div> : null}
-      <section className="dc-card p-4">
+      <SectionCard title="Payout status">
         <div className="flex items-center justify-between">
-          <p className="font-semibold">Payout status</p>
           <StatusBadge status={item.status.toLowerCase()} />
         </div>
         <div className="mt-2 grid gap-2 text-sm text-zinc-700">
@@ -109,9 +109,9 @@ export default function AdminPayoutDetailPage() {
           <p>Bank: {item.account.creatorProfile?.bankName ?? "N/A"} • {item.account.creatorProfile?.bankAccountName ?? "N/A"} • {item.account.creatorProfile?.bankAccountNumber ?? "N/A"}</p>
           <p>Note: {item.note ?? "N/A"}</p>
         </div>
-      </section>
-      <section className="mt-4 dc-card p-4">
-        <p className="font-semibold">Evidence (credited submissions)</p>
+      </SectionCard>
+      <section className="mt-4">
+        <SectionCard title="Evidence (credited submissions)">
         {item.evidenceSubmissions.length === 0 ? (
           <p className="mt-2 text-sm text-zinc-600">No evidence found from current model.</p>
         ) : (
@@ -125,17 +125,55 @@ export default function AdminPayoutDetailPage() {
             ))}
           </div>
         )}
+        </SectionCard>
       </section>
-      <section className="mt-4 dc-card p-4">
-        <p className="font-semibold">Decision</p>
+      <section className="mt-4">
+        <SectionCard title="Decision">
         <textarea className="dc-input mt-3 min-h-24" placeholder="Reject reason..." value={reason} onChange={(e) => setReason(e.target.value)} />
         <div className="mt-3 flex flex-wrap gap-2">
-          <button className="dc-btn-primary" disabled={acting} onClick={() => void act("approve")}>Approve</button>
-          <button className="dc-btn-secondary" disabled={acting} onClick={() => void act("reject")}>Reject</button>
-          <button className="dc-btn-secondary" disabled={acting} onClick={() => void act("mark-paid")}>Mark as paid</button>
+          <button className="dc-btn-primary" disabled={acting} onClick={() => setConfirmAction("approve")}>Approve</button>
+          <button className="dc-btn-secondary" disabled={acting} onClick={() => setConfirmAction("reject")}>Reject</button>
+          <button className="dc-btn-secondary" disabled={acting} onClick={() => setConfirmAction("mark-paid")}>Mark as paid</button>
         </div>
+        </SectionCard>
       </section>
       {toast ? <ActionToast message={toast} /> : null}
+      <ConfirmDialog
+        open={confirmAction === "approve"}
+        title="Approve payout request?"
+        message="Hành động này xác nhận payout đã qua bước review."
+        confirmLabel="Approve payout"
+        tone="primary"
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => {
+          setConfirmAction(null);
+          void act("approve");
+        }}
+      />
+      <ConfirmDialog
+        open={confirmAction === "mark-paid"}
+        title="Mark payout as paid?"
+        message="Xác nhận rằng khoản payout đã được chuyển tiền thực tế."
+        confirmLabel="Mark paid"
+        tone="danger"
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => {
+          setConfirmAction(null);
+          void act("mark-paid");
+        }}
+      />
+      <ConfirmDialog
+        open={confirmAction === "reject"}
+        title="Reject payout request?"
+        message="Yêu cầu này sẽ bị từ chối và hoàn tiền về ví commission của creator."
+        confirmLabel="Reject payout"
+        tone="danger"
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => {
+          setConfirmAction(null);
+          void act("reject");
+        }}
+      />
     </>
   );
 }

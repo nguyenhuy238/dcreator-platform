@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { ActionToast, ConfirmDialog, ErrorState, LoadingSkeleton, PageHeader, SectionCard, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
 type CampaignDetail = {
@@ -39,6 +39,7 @@ export default function AdminCampaignDetailPage() {
   const [item, setItem] = useState<CampaignDetail | null>(null);
   const [acting, setActing] = useState(false);
   const [reason, setReason] = useState("");
+  const [confirmAction, setConfirmAction] = useState<null | "pause" | "reject" | "request-changes">(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -113,9 +114,8 @@ export default function AdminCampaignDetailPage() {
       />
       {error ? <div className="mb-4"><ErrorState title="Có lỗi thao tác" description={error} onRetry={() => void load()} /></div> : null}
 
-      <section className="dc-card p-4">
+      <SectionCard title="Campaign status">
         <div className="flex items-center justify-between">
-          <p className="font-semibold">Campaign status</p>
           <StatusBadge status={item.statusView.toLowerCase()} />
         </div>
         <div className="mt-3 grid gap-2 text-sm text-zinc-700">
@@ -127,7 +127,7 @@ export default function AdminCampaignDetailPage() {
           <p>Quota Creator/User: {item.quota.creator} / {item.quota.user}</p>
           <p>Brand approved: {item.brandProfile?.status === "ACTIVE" ? "Yes" : "No"}</p>
         </div>
-      </section>
+      </SectionCard>
 
       <section className="mt-4 dc-card p-4">
         <p className="font-semibold">Product / Inventory</p>
@@ -172,18 +172,55 @@ export default function AdminCampaignDetailPage() {
         </div>
       </section>
 
-      <section className="mt-4 dc-card p-4">
-        <p className="font-semibold">Decision</p>
+      <section className="mt-4">
+        <SectionCard title="Decision">
         <textarea className="dc-input mt-3 min-h-24" placeholder="Reason for reject/request changes/pause" value={reason} onChange={(e) => setReason(e.target.value)} />
         <div className="mt-3 flex flex-wrap gap-2">
           <button className="dc-btn-primary" disabled={acting} onClick={() => void act("approve")}>Approve & Publish</button>
-          <button className="dc-btn-secondary" disabled={acting} onClick={() => void act("request-changes")}>Request changes</button>
-          <button className="dc-btn-secondary" disabled={acting} onClick={() => void act("pause")}>Pause</button>
-          <button className="dc-btn-secondary" disabled={acting} onClick={() => void act("reject")}>Reject</button>
+          <button className="dc-btn-secondary" disabled={acting} onClick={() => setConfirmAction("request-changes")}>Request changes</button>
+          <button className="dc-btn-secondary" disabled={acting} onClick={() => setConfirmAction("pause")}>Pause</button>
+          <button className="dc-btn-secondary" disabled={acting} onClick={() => setConfirmAction("reject")}>Reject</button>
         </div>
+        </SectionCard>
       </section>
 
       {toast ? <ActionToast message={toast} /> : null}
+      <ConfirmDialog
+        open={confirmAction === "pause"}
+        title="Pause campaign?"
+        message="Campaign sẽ tạm dừng hiển thị và vận hành."
+        confirmLabel="Pause campaign"
+        tone="danger"
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => {
+          setConfirmAction(null);
+          void act("pause");
+        }}
+      />
+      <ConfirmDialog
+        open={confirmAction === "reject"}
+        title="Reject campaign?"
+        message="Campaign sẽ bị từ chối và cần tạo/chỉnh lại theo policy."
+        confirmLabel="Reject campaign"
+        tone="danger"
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => {
+          setConfirmAction(null);
+          void act("reject");
+        }}
+      />
+      <ConfirmDialog
+        open={confirmAction === "request-changes"}
+        title="Request campaign changes?"
+        message="Campaign sẽ được trả về trạng thái cần chỉnh sửa."
+        confirmLabel="Request changes"
+        tone="danger"
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => {
+          setConfirmAction(null);
+          void act("request-changes");
+        }}
+      />
     </>
   );
 }

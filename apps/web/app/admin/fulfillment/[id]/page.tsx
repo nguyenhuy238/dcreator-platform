@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { ActionToast, ConfirmDialog, ErrorState, LoadingSkeleton, PageHeader, SectionCard, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
 type Detail = {
@@ -44,6 +44,7 @@ export default function AdminFulfillmentDetailPage() {
   const [method, setMethod] = useState("BRAND_WAREHOUSE_SHIP");
   const [paymentStatus, setPaymentStatus] = useState("NONE");
   const [failureReason, setFailureReason] = useState("");
+  const [confirmSave, setConfirmSave] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -109,9 +110,8 @@ export default function AdminFulfillmentDetailPage() {
     <>
       <PageHeader title={item.inventoryBatch?.productSubmission.name ?? "Fulfillment"} subtitle={`Campaign: ${item.campaign?.title ?? "N/A"}`} action={<button className="dc-btn-secondary" onClick={() => router.push("/admin/fulfillment")}>Back</button>} />
       {error ? <div className="mb-4"><ErrorState title="Có lỗi thao tác" description={error} onRetry={() => void load()} /></div> : null}
-      <section className="dc-card p-4">
+      <SectionCard title="Current status">
         <div className="flex items-center justify-between">
-          <p className="font-semibold">Current status</p>
           <StatusBadge status={item.opsMeta.opsStatus.toLowerCase()} />
         </div>
         <div className="mt-2 grid gap-2 text-sm text-zinc-700">
@@ -121,9 +121,8 @@ export default function AdminFulfillmentDetailPage() {
           <p>Recipient: {item.recipientName ?? "N/A"} • {item.recipientPhone ?? "N/A"}</p>
           <p>Address: {item.shippingAddress ?? "N/A"}</p>
         </div>
-      </section>
-      <section className="mt-4 dc-card p-4">
-        <p className="font-semibold">Update operation</p>
+      </SectionCard>
+      <SectionCard title="Update operation" className="mt-4">
         <div className="mt-3 grid gap-2 md:grid-cols-2">
           <select className="dc-input" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="pending">pending</option>
@@ -149,10 +148,21 @@ export default function AdminFulfillmentDetailPage() {
           <input className="dc-input md:col-span-2" placeholder="Failure reason (if failed/cancelled)" value={failureReason} onChange={(e) => setFailureReason(e.target.value)} />
           <textarea className="dc-input md:col-span-2 min-h-24" placeholder="Ops note" value={opsNote} onChange={(e) => setOpsNote(e.target.value)} />
         </div>
-        <button className="dc-btn-primary mt-3" disabled={acting} onClick={() => void saveStatus()}>Save</button>
-      </section>
-      <section className="mt-4 dc-card p-4">
-        <p className="font-semibold">Operation history</p>
+        <button
+          className="dc-btn-primary mt-3"
+          disabled={acting}
+          onClick={() => {
+            if (status === "failed" || status === "cancelled") {
+              setConfirmSave(true);
+              return;
+            }
+            void saveStatus();
+          }}
+        >
+          Save
+        </button>
+      </SectionCard>
+      <SectionCard title="Operation history" className="mt-4">
         {!item.opsMeta.history?.length ? <p className="mt-2 text-sm text-zinc-600">No history</p> : (
           <div className="mt-2 grid gap-2">
             {item.opsMeta.history.map((h, idx) => (
@@ -164,9 +174,20 @@ export default function AdminFulfillmentDetailPage() {
             ))}
           </div>
         )}
-      </section>
+      </SectionCard>
+
+      <ConfirmDialog
+        open={confirmSave}
+        title={`Set fulfillment to ${status}?`}
+        description="Trạng thái này có thể ảnh hưởng payout/commission hoặc yêu cầu xử lý support tiếp theo."
+        confirmText="Confirm update"
+        onCancel={() => setConfirmSave(false)}
+        onConfirm={() => {
+          setConfirmSave(false);
+          void saveStatus();
+        }}
+      />
       {toast ? <ActionToast message={toast} /> : null}
     </>
   );
 }
-

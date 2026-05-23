@@ -48,3 +48,55 @@ export function ActionToast({ message }: { message: string }) {
 export function FormField({ label, error, children }: { label: ReactNode; error?: string; children: ReactNode }) {
   return <label className="grid gap-1.5 text-sm font-medium text-zinc-700"><span>{label}</span>{children}{error ? <span className="text-xs text-red-600">{error}</span> : null}</label>;
 }
+
+export function SectionCard({ title, children, action, className }: { title: string; children: ReactNode; action?: ReactNode; className?: string }) {
+  return (
+    <section className={`dc-card p-4 ${className ?? ""}`}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="font-semibold text-zinc-900">{title}</p>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+export function ConfirmDialog({
+  open,
+  title,
+  message,
+  description,
+  confirmLabel = "Confirm",
+  confirmText,
+  cancelLabel = "Cancel",
+  tone = "danger",
+  onConfirm,
+  onCancel
+}: {
+  open: boolean;
+  title: string;
+  message?: string;
+  description?: string;
+  confirmLabel?: string;
+  confirmText?: string;
+  cancelLabel?: string;
+  tone?: "danger" | "primary";
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  if (!open) return null;
+  const resolvedMessage = message || description || "";
+  const resolvedConfirm = confirmText || confirmLabel;
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4" onClick={onCancel}>
+      <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-lg font-bold text-zinc-900">{title}</h3>
+        <p className="mt-2 text-sm text-zinc-600">{resolvedMessage}</p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button className="dc-btn-secondary" onClick={onCancel}>{cancelLabel}</button>
+          <button className={tone === "danger" ? "dc-btn-secondary" : "dc-btn-primary"} onClick={onConfirm}>{resolvedConfirm}</button>
+        </div>
+      </div>
+    </div>
+  );
+}

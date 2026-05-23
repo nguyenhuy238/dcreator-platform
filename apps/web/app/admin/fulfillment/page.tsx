@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
@@ -38,7 +38,7 @@ export default function AdminFulfillmentPage() {
     opsNote: ""
   });
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -57,7 +57,7 @@ export default function AdminFulfillmentPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [status, campaignId, creatorId, brandId, query]);
 
   async function createExportRequest() {
     setError("");
@@ -77,7 +77,7 @@ export default function AdminFulfillmentPage() {
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
   return (
     <>

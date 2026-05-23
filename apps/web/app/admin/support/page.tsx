@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
@@ -26,7 +26,7 @@ export default function AdminSupportPage() {
   const [category, setCategory] = useState("");
   const [query, setQuery] = useState("");
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -44,11 +44,11 @@ export default function AdminSupportPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [status, priority, category, query]);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
   return (
     <>

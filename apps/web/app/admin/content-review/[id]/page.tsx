@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { ActionToast, ConfirmDialog, ErrorState, LoadingSkeleton, PageHeader, SectionCard, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
 type Review = { id: string; decision: string; rejectReason: string | null; note: string | null; createdAt: string; reviewer: { displayName: string; role: string } };
@@ -51,6 +51,7 @@ export default function AdminContentReviewDetailPage() {
   const [toast, setToast] = useState("");
   const [feedback, setFeedback] = useState("");
   const [item, setItem] = useState<Detail | null>(null);
+  const [pendingAction, setPendingAction] = useState<null | "reject" | "request-changes">(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -118,9 +119,8 @@ export default function AdminContentReviewDetailPage() {
       <PageHeader title={item.account.displayName} subtitle={`Campaign: ${item.mission.campaign.title}`} action={<button className="dc-btn-secondary" onClick={() => router.push("/admin/content-review")}>Back</button>} />
       {error ? <div className="mb-4"><ErrorState title="Có lỗi thao tác" description={error} onRetry={() => void load()} /></div> : null}
 
-      <section className="dc-card p-4">
+      <SectionCard title="Submission status">
         <div className="flex items-center justify-between">
-          <p className="font-semibold">Submission status</p>
           <StatusBadge status={item.statusView.toLowerCase()} />
         </div>
         <div className="mt-2 grid gap-2 text-sm text-zinc-700">
@@ -129,10 +129,9 @@ export default function AdminContentReviewDetailPage() {
           <p>Category: {item.account.creatorProfile?.contentCategory ?? "N/A"}</p>
           <p>Profile link: {item.account.creatorProfile?.socialUrl ?? "N/A"}</p>
         </div>
-      </section>
+      </SectionCard>
 
-      <section className="mt-4 dc-card p-4">
-        <p className="font-semibold">Content draft</p>
+      <SectionCard title="Content draft" className="mt-4">
         <div className="mt-2 grid gap-1 text-sm text-zinc-700">
           <p>Video/link draft: {item.videoUrl ?? item.socialPostUrl ?? "N/A"}</p>
           <p>Image/screenshot: {item.imageUrl ?? item.screenshotUrl ?? "N/A"}</p>
@@ -140,16 +139,14 @@ export default function AdminContentReviewDetailPage() {
           <p>Caption/description: {item.proofTextNote ?? "N/A"}</p>
           <p>Product link/social post: {item.socialPostUrl ?? "N/A"}</p>
         </div>
-      </section>
+      </SectionCard>
 
-      <section className="mt-4 dc-card p-4">
-        <p className="font-semibold">Campaign brief & brand guideline</p>
+      <SectionCard title="Campaign brief & brand guideline" className="mt-4">
         <p className="mt-2 text-sm text-zinc-700">Brief: {item.mission.campaign.brief}</p>
         <p className="mt-2 text-sm text-zinc-700">Brand guideline: {brandGuide?.description ?? brandGuide?.businessGoal ?? brandGuide?.bccAgreementTerms ?? "N/A"}</p>
-      </section>
+      </SectionCard>
 
-      <section className="mt-4 dc-card p-4">
-        <p className="font-semibold">Feedback history</p>
+      <SectionCard title="Feedback history" className="mt-4">
         {item.reviews.length === 0 ? (
           <p className="mt-2 text-sm text-zinc-600">Chưa có lịch sử duyệt.</p>
         ) : (
@@ -162,19 +159,31 @@ export default function AdminContentReviewDetailPage() {
             ))}
           </div>
         )}
-      </section>
+      </SectionCard>
 
-      <section className="mt-4 dc-card p-4">
-        <p className="font-semibold">Decision</p>
+      <SectionCard title="Decision" className="mt-4">
         <textarea className="dc-input mt-3 min-h-24" placeholder="Nhập feedback bắt buộc..." value={feedback} onChange={(e) => setFeedback(e.target.value)} />
         <div className="mt-3 flex flex-wrap gap-2">
           <button className="dc-btn-primary" disabled={acting} onClick={() => void act("approve", false)}>Approve</button>
           <button className="dc-btn-primary" disabled={acting} onClick={() => void act("approve", true)}>Mark READY_TO_PUBLISH</button>
           <button className="dc-btn-secondary" disabled={acting} onClick={() => void act("send-to-brand-review")}>Send to Brand review</button>
-          <button className="dc-btn-secondary" disabled={acting} onClick={() => void act("request-changes")}>Request changes</button>
-          <button className="dc-btn-secondary" disabled={acting} onClick={() => void act("reject")}>Reject</button>
+          <button className="dc-btn-secondary" disabled={acting} onClick={() => setPendingAction("request-changes")}>Request changes</button>
+          <button className="dc-btn-secondary" disabled={acting} onClick={() => setPendingAction("reject")}>Reject</button>
         </div>
-      </section>
+      </SectionCard>
+
+      <ConfirmDialog
+        open={pendingAction !== null}
+        title={pendingAction === "reject" ? "Reject submission?" : "Request changes?"}
+        description={pendingAction === "reject" ? "Submission sẽ bị từ chối và gửi feedback cho Creator." : "Creator sẽ nhận yêu cầu sửa theo feedback đã nhập."}
+        confirmText={pendingAction === "reject" ? "Reject" : "Request changes"}
+        onCancel={() => setPendingAction(null)}
+        onConfirm={() => {
+          if (!pendingAction) return;
+          void act(pendingAction);
+          setPendingAction(null);
+        }}
+      />
 
       {toast ? <ActionToast message={toast} /> : null}
     </>
