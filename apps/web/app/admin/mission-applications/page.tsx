@@ -18,7 +18,12 @@ type ListItem = {
     email: string;
     creatorProfile: { mainPlatform: string | null; socialUrl: string | null; followerCount: number | null } | null;
   };
-  campaign: { id: string; title: string; slug: string };
+  campaign: {
+    id: string;
+    title: string;
+    slug: string;
+    brand: { id: string; displayName: string; avatarUrl: string | null };
+  };
   mission: { id: string; title: string; rewardPoints: number; productReceiveOption: string; productLink: string | null };
 };
 
@@ -41,6 +46,36 @@ const statusOptions = [
 function fmtDate(value: string | null) {
   if (!value) return "-";
   return new Date(value).toLocaleString("vi-VN");
+}
+
+function normalizeImageUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("/")) return trimmed;
+  return `/${trimmed}`;
+}
+
+function BrandAvatar({ name, avatarUrl, className }: { name: string; avatarUrl: string | null; className: string }) {
+  const [hasError, setHasError] = useState(false);
+  const resolvedUrl = avatarUrl ? normalizeImageUrl(avatarUrl) : "";
+
+  if (!resolvedUrl || hasError) {
+    return (
+      <div className={`flex items-center justify-center rounded-lg bg-zinc-900 text-xs font-bold text-white ${className}`}>
+        {(name || "B").charAt(0).toUpperCase()}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={resolvedUrl}
+      alt={name || "Brand"}
+      className={`rounded-lg border border-zinc-200 object-cover ${className}`}
+      onError={() => setHasError(true)}
+    />
+  );
 }
 
 export default function AdminMissionApplicationsPage() {
@@ -180,6 +215,10 @@ export default function AdminMissionApplicationsPage() {
             ) : (
               items.map((item) => (
                 <article key={item.id} className={`dc-card p-4 ${selectedId === item.id ? "border-zinc-900" : ""}`}>
+                  <div className="mb-2 flex items-center gap-2">
+                    <BrandAvatar name={item.campaign.brand.displayName} avatarUrl={item.campaign.brand.avatarUrl} className="h-8 w-8" />
+                    <p className="text-sm text-zinc-600">Brand: <span className="font-semibold text-zinc-900">{item.campaign.brand.displayName}</span></p>
+                  </div>
                   <p className="font-semibold">{item.account.displayName}</p>
                   <p className="text-xs text-zinc-500">{item.account.email} · {item.account.creatorProfile?.mainPlatform ?? "-"}</p>
                   <p className="mt-1 text-sm">Campaign: {item.campaign.title}</p>
@@ -208,6 +247,10 @@ export default function AdminMissionApplicationsPage() {
             {detailLoading ? <div className="mt-3"><LoadingSkeleton rows={3} /></div> : null}
             {detail && !detailLoading ? (
               <div className="mt-3 grid gap-2 text-sm">
+                <div className="mb-1 flex items-center gap-2">
+                  <BrandAvatar name={detail.campaign.brand.displayName} avatarUrl={detail.campaign.brand.avatarUrl} className="h-9 w-9" />
+                  <p><strong>Brand:</strong> {detail.campaign.brand.displayName}</p>
+                </div>
                 <p><strong>Creator:</strong> {detail.account.displayName}</p>
                 <p><strong>Email:</strong> {detail.account.email}</p>
                 <p><strong>Nền tảng chính:</strong> {detail.account.creatorProfile?.mainPlatform ?? "-"}</p>

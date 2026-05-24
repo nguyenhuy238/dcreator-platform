@@ -59,6 +59,7 @@ export default function UserProfilePage() {
   const [brandForm, setBrandForm] = useState(defaultBrand);
   const [submittingCreator, setSubmittingCreator] = useState(false);
   const [submittingBrand, setSubmittingBrand] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -169,6 +170,47 @@ export default function UserProfilePage() {
     return <><AppShell sidebarItems={sidebarItems}><div className="dc-card p-6">Đang tải hồ sơ...</div></AppShell></>;
   }
 
+  async function uploadAvatar(file: File) {
+    setUploadingAvatar(true);
+    setError("");
+    setSuccess("");
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+      const uploadRes = await fetch("/api/uploads/avatar", { method: "POST", body: formData });
+      const uploadPayload = await uploadRes.json();
+      if (!uploadRes.ok || !uploadPayload.success || !uploadPayload.data?.avatarUrl) {
+        throw new Error(uploadPayload.error ?? "Không thể tải ảnh đại diện");
+      }
+
+      const patchRes = await fetch("/api/profile/account", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avatarUrl: uploadPayload.data.avatarUrl })
+      });
+      const patchPayload = await patchRes.json();
+      if (!patchRes.ok || !patchPayload.success) {
+        throw new Error(patchPayload.error ?? "Không thể cập nhật ảnh đại diện");
+      }
+
+      setData((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          account: {
+            ...current.account,
+            avatarUrl: patchPayload.data.avatarUrl
+          }
+        };
+      });
+      setSuccess("Đã cập nhật ảnh đại diện.");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Không thể tải ảnh đại diện");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
   if (!data) {
     return <><AppShell sidebarItems={sidebarItems}><div className="dc-card p-6 text-red-700">{error || "Không tìm thấy hồ sơ"}</div></AppShell></>;
   }
@@ -187,6 +229,29 @@ export default function UserProfilePage() {
         <section id="role-requests" className="mt-6 grid gap-4 md:grid-cols-2">
           <div className="dc-card p-5">
             <h2 className="text-xl font-bold">Thông tin cá nhân</h2>
+            <div className="mt-3 flex items-center gap-3">
+              {data.account.avatarUrl ? (
+                <div className="h-12 w-12 rounded-xl border border-zinc-200 bg-cover bg-center" style={{ backgroundImage: `url(${data.account.avatarUrl})` }} />
+              ) : (
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-900 text-sm font-bold text-white">
+                  {data.account.displayName.slice(0, 1).toUpperCase() || "U"}
+                </div>
+              )}
+              <label className="dc-btn-secondary cursor-pointer">
+                {uploadingAvatar ? "Đang tải..." : "Tải ảnh đại diện"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  disabled={uploadingAvatar}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    if (file) void uploadAvatar(file);
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
             <p className="mt-2 text-sm">Tên hiển thị: <span className="font-semibold">{data.account.displayName}</span></p>
             <p className="text-sm">Email: <span className="font-semibold">{data.account.email}</span></p>
             <p className="text-sm">Số điện thoại: <span className="font-semibold">{data.account.profile?.phone ?? "Chưa có"}</span></p>

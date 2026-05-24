@@ -778,7 +778,7 @@ export async function listMissionApplicationsForAdmin(input: {
       where,
       include: {
         account: { select: { id: true, displayName: true, email: true, creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true } } } },
-        campaign: { select: { id: true, title: true, slug: true } },
+        campaign: { select: { id: true, title: true, slug: true, brand: { select: { id: true, displayName: true, avatarUrl: true } } } },
         mission: { select: { id: true, title: true, rewardPoints: true, productReceiveOption: true, productLink: true } },
         reviewedBy: { select: { id: true, displayName: true, email: true } }
       },
@@ -795,7 +795,7 @@ export async function getMissionApplicationDetailForAdmin(id: string) {
     where: { id },
     include: {
       account: { select: { id: true, displayName: true, email: true, creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true, bio: true } } } },
-      campaign: { select: { id: true, title: true, slug: true, brandId: true } },
+      campaign: { select: { id: true, title: true, slug: true, brandId: true, brand: { select: { id: true, displayName: true, avatarUrl: true } } } },
       mission: { select: { id: true, title: true, description: true, rewardPoints: true, productReceiveOption: true, productLink: true, deadlineAt: true } },
       reviewedBy: { select: { id: true, displayName: true, email: true } }
     }
