@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { AppShell, PublicHeader } from "@/app/components/dcreator/layout/shell";
+import { AppShell } from "@/app/components/dcreator/layout/shell";
 import { EmptyState, ErrorState, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
 import type { Role } from "@prisma/client";
 
@@ -42,7 +42,6 @@ export default function UserRoleRequestsPage() {
 
   return (
     <>
-      <PublicHeader />
       <AppShell>
         <PageHeader title="Đăng ký nâng cấp vai trò" subtitle="Theo dõi trạng thái đăng ký Creator/Brand và hành động tiếp theo." />
         {error ? <ErrorState title="Không thể tải dữ liệu" description={error} /> : null}

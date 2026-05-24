@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AppShell, PublicHeader } from "@/app/components/dcreator/layout/shell";
+import { AppShell } from "@/app/components/dcreator/layout/shell";
 import { EmptyState, ErrorState, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type MissionItem = {
@@ -58,7 +58,6 @@ export default function UserMissionsPage() {
 
   return (
     <>
-      <PublicHeader />
       <AppShell>
         <PageHeader title="Nhiệm vụ của tôi" subtitle="Theo dõi trạng thái nhiệm vụ và proof đã nộp." />
         {error ? <ErrorState title="Không thể tải nhiệm vụ" description={error} /> : null}
