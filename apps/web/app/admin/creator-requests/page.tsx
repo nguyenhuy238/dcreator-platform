@@ -66,6 +66,7 @@ export default function AdminCreatorRequestsPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [reason, setReason] = useState("");
   const [dialogAction, setDialogAction] = useState<"approve" | "reject" | null>(null);
+  const [rejecting, setRejecting] = useState(false);
   const [acting, setActing] = useState(false);
 
   const load = useCallback(async () => {
@@ -143,6 +144,7 @@ export default function AdminCreatorRequestsPage() {
       const body = (await res.json()) as ApiResult<unknown>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Cập nhật thất bại");
       setDialogAction(null);
+      setRejecting(false);
       setReason("");
       setToast("Cập nhật trạng thái thành công");
       setTimeout(() => setToast(""), 1800);
@@ -253,11 +255,29 @@ export default function AdminCreatorRequestsPage() {
       ) : null}
 
       {detailId ? (
-        <div className="fixed inset-0 z-50 bg-black/50 p-3 sm:p-6" onClick={() => setDetailId(null)}>
+        <div
+          className="fixed inset-0 z-50 bg-black/50 p-3 sm:p-6"
+          onClick={() => {
+            setDetailId(null);
+            setDialogAction(null);
+            setRejecting(false);
+            setReason("");
+          }}
+        >
           <div className="mx-auto h-full w-full max-w-4xl overflow-auto rounded-2xl bg-white p-4 sm:p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-xl font-bold">Chi tiết yêu cầu kênh Creator</h2>
-              <button className="dc-btn-secondary" onClick={() => setDetailId(null)}>Đóng</button>
+              <button
+                className="dc-btn-secondary"
+                onClick={() => {
+                  setDetailId(null);
+                  setDialogAction(null);
+                  setRejecting(false);
+                  setReason("");
+                }}
+              >
+                Đóng
+              </button>
             </div>
             {detailLoading || !detail ? <div className="mt-4"><LoadingSkeleton rows={4} /></div> : (
               <div className="mt-4 grid gap-4">
@@ -293,10 +313,59 @@ export default function AdminCreatorRequestsPage() {
                 <section className="dc-card p-4">
                   <p className="font-semibold">Thao tác duyệt</p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button className="dc-btn-primary" disabled={acting || detail.status !== "PENDING"} onClick={() => { setReason(""); setDialogAction("approve"); }}>Đồng ý</button>
-                    <button className="dc-btn-secondary" disabled={acting || detail.status !== "PENDING"} onClick={() => { setReason(""); setDialogAction("reject"); }}>Từ chối</button>
+                    <button
+                      className="dc-btn-primary"
+                      disabled={acting || detail.status !== "PENDING"}
+                      onClick={() => {
+                        setRejecting(false);
+                        setReason("");
+                        setDialogAction("approve");
+                      }}
+                    >
+                      Đồng ý
+                    </button>
+                    <button
+                      className="dc-btn-secondary"
+                      disabled={acting || detail.status !== "PENDING"}
+                      onClick={() => {
+                        setReason("");
+                        setDialogAction(null);
+                        setRejecting(true);
+                      }}
+                    >
+                      Từ chối
+                    </button>
                   </div>
-                  {dialogAction === "reject" ? <textarea className="dc-input mt-3 min-h-24" placeholder="Nhập lý do từ chối (bắt buộc)..." value={reason} onChange={(e) => setReason(e.target.value)} /> : null}
+                  {rejecting ? (
+                    <>
+                      <textarea
+                        className="dc-input mt-3 min-h-24"
+                        placeholder="Nhập lý do từ chối (bắt buộc)..."
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                      />
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          className="dc-btn-secondary"
+                          type="button"
+                          onClick={() => {
+                            setReason("");
+                            setRejecting(false);
+                          }}
+                        >
+                          Hủy từ chối
+                        </button>
+                        <button
+                          className="dc-btn-primary"
+                          type="button"
+                          disabled={acting || reason.trim().length < 5}
+                          onClick={() => setDialogAction("reject")}
+                        >
+                          Xác nhận từ chối
+                        </button>
+                      </div>
+                    </>
+                  ) : null}
                 </section>
               </div>
             )}

@@ -236,6 +236,7 @@ export default function CreatorMissionsPage() {
                   const canSubmitVideo =
                     item.status !== "COMPLETED" &&
                     item.videoReviewStatus !== "PENDING" &&
+                    item.videoReviewStatus !== "APPROVED" &&
                     item.publishStatus !== "PENDING" &&
                     (item.productReceiveOption === "NO_PRODUCT_REQUIRED" || item.productStatus === "RECEIVED");
                   const canSubmitPublish = item.videoReviewStatus === "APPROVED" && item.status !== "COMPLETED";
