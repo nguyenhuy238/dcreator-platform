@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -107,6 +107,23 @@ function fmtDate(value: string | null) {
   return new Date(value).toLocaleDateString("vi-VN");
 }
 
+function asLink(value: string | null | undefined) {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+function UrlValue({ value, label }: { value: string | null | undefined; label?: string }) {
+  const href = asLink(value);
+  if (!href) return <span>-</span>;
+  return (
+    <a href={href} className="font-semibold text-zinc-900 underline break-all">
+      {label ?? value}
+    </a>
+  );
+}
+
 function workflowStatus(item: MissionItem) {
   if (item.status === "COMPLETED") return "Hoàn thành";
   if (item.publishStatus === "PENDING") return "Bài đăng đang chờ duyệt cuối";
@@ -136,6 +153,7 @@ export default function CreatorMissionsPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busyId, setBusyId] = useState("");
+  const [detailMissionId, setDetailMissionId] = useState("");
 
   const [billUrlMap, setBillUrlMap] = useState<FormMap>({});
   const [ratingUrlMap, setRatingUrlMap] = useState<FormMap>({});
@@ -307,6 +325,17 @@ export default function CreatorMissionsPage() {
     return { waitingProduct, waitingChoice, waitingTranscript, waitingVideo, reviewingVideo, waitingPublish, reviewingFinal, completed };
   }, [items]);
 
+  const activeMission = useMemo(
+    () => (detailMissionId ? items.find((item) => item.id === detailMissionId) ?? null : null),
+    [detailMissionId, items]
+  );
+
+  useEffect(() => {
+    if (detailMissionId && !items.some((item) => item.id === detailMissionId)) {
+      setDetailMissionId("");
+    }
+  }, [detailMissionId, items]);
+
   return (
     <>
       <PageHeader
@@ -341,8 +370,38 @@ export default function CreatorMissionsPage() {
                 action={<Link href="/dashboard/creator/jobs" className="dc-btn-primary">Xin làm nhiệm vụ</Link>}
               />
             ) : (
-              <div className="grid gap-4">
-                {items.map((item) => {
+              <>
+                <div className="grid gap-4">
+                  {items.map((item) => (
+                    <article key={item.id} className="dc-card p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <h2 className="text-lg font-semibold text-zinc-900">{item.mission.title}</h2>
+                          <p className="text-sm text-zinc-600">Campaign: {item.campaign.title}</p>
+                        </div>
+                        <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700">
+                          {workflowStatus(item)}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 grid gap-1 text-sm text-zinc-600 md:grid-cols-2">
+                        <p>Reward: <strong>{item.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</strong></p>
+                        <p>Deadline: <strong>{fmtDate(item.mission.deadlineAt)}</strong></p>
+                        <p>Duyệt video: <strong>{item.videoReviewStatus}</strong></p>
+                        <p>Duyệt bước cuối: <strong>{item.publishStatus}</strong></p>
+                      </div>
+
+                      {item.publishFeedback ? <p className="mt-2 text-sm text-red-700 line-clamp-2">Feedback mới nhất: {item.publishFeedback}</p> : null}
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button className="dc-btn-secondary" onClick={() => setDetailMissionId(item.id)}>Xem chi tiết</button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+
+                {activeMission ? (() => {
+                  const item = activeMission;
                   const canSubmitPurchase = item.productReceiveOption === "CREATOR_BUY_FIRST" && item.productStatus !== "RECEIVED";
                   const canSubmitVideoCandidate =
                     item.status !== "COMPLETED" &&
@@ -357,122 +416,123 @@ export default function CreatorMissionsPage() {
                   const selectedChoice = preVideoChoiceMap[item.id];
                   const showTranscriptComposer = isTranscriptFlow || (needsPreVideoChoice && selectedChoice === "TRANSCRIPT");
                   const showVideoComposer = canSubmitVideoCandidate && !isTranscriptFlow && (!needsPreVideoChoice || selectedChoice === "VIDEO");
-                  const canSubmitPublish = item.videoReviewStatus === "APPROVED" && item.status !== "COMPLETED";
+                  const canSubmitPublish = item.videoReviewStatus === "APPROVED" && item.status !== "COMPLETED" && item.publishStatus !== "PENDING";
 
                   return (
-                    <article key={item.id} className="dc-card p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div>
-                          <h2 className="text-lg font-semibold text-zinc-900">{item.mission.title}</h2>
-                          <p className="text-sm text-zinc-600">Campaign: {item.campaign.title}</p>
-                        </div>
-                        <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700">
-                          {workflowStatus(item)}
-                        </span>
-                      </div>
-
-                      <p className="mt-2 text-sm text-zinc-700">{item.mission.description}</p>
-                      <div className="mt-2 grid gap-1 text-sm text-zinc-600 md:grid-cols-2">
-                        <p>Reward: <strong>{item.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</strong></p>
-                        <p>Deadline: <strong>{fmtDate(item.mission.deadlineAt)}</strong></p>
-                        <p>Trạng thái duyệt video: <strong>{item.videoReviewStatus}</strong></p>
-                        <p>Trạng thái duyệt bước cuối: <strong>{item.publishStatus}</strong></p>
-                      </div>
-
-                      {item.status === "DRAFT_PENDING" && item.videoReviewFeedback ? <p className="mt-2 text-sm text-red-700">Feedback kịch bản: {item.videoReviewFeedback}</p> : null}
-                      {item.videoReviewStatus !== "NOT_SUBMITTED" && item.videoReviewFeedback ? <p className="mt-2 text-sm text-red-700">Feedback video: {item.videoReviewFeedback}</p> : null}
-                      {item.publishFeedback ? <p className="mt-1 text-sm text-red-700">Feedback bước cuối: {item.publishFeedback}</p> : null}
-
-                      {canSubmitPurchase ? (
-                        <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-                          <p className="font-medium">Bước 1 - Mua sản phẩm</p>
-                          <p className="text-sm text-zinc-600">Link sản phẩm: {item.mission.productLink ?? "-"}</p>
-                          <p className="text-sm text-zinc-600">Hướng dẫn: Đặt hàng đúng link, đánh giá 5 sao, upload ảnh bill và ảnh đánh giá.</p>
-                          <div className="mt-2 grid gap-2">
-                            <input className="dc-input" placeholder="URL ảnh bill mua hàng" value={billUrlMap[item.id] ?? ""} onChange={(e) => setBillUrlMap((s) => ({ ...s, [item.id]: e.target.value }))} />
-                            <input className="dc-input" placeholder="URL ảnh đã đánh giá 5 sao" value={ratingUrlMap[item.id] ?? ""} onChange={(e) => setRatingUrlMap((s) => ({ ...s, [item.id]: e.target.value }))} />
-                            <textarea className="dc-input" placeholder="Ghi chú (nếu có)" value={purchaseNoteMap[item.id] ?? ""} onChange={(e) => setPurchaseNoteMap((s) => ({ ...s, [item.id]: e.target.value }))} />
-                            <button className="dc-btn-primary" disabled={busyId === item.id} onClick={() => void submitPurchaseProof(item)}>Xác nhận đã mua hàng</button>
+                    <div className="fixed inset-0 z-50 bg-zinc-900/50 p-3 md:p-6" onClick={() => setDetailMissionId("")}>
+                      <div className="mx-auto max-h-[95vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 md:p-6" onClick={(event) => event.stopPropagation()}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-xl font-semibold text-zinc-900">{item.mission.title}</h3>
+                            <p className="text-sm text-zinc-600">Campaign: {item.campaign.title}</p>
                           </div>
+                          <button type="button" className="dc-btn-secondary" onClick={() => setDetailMissionId("")}>Đóng</button>
                         </div>
-                      ) : null}
 
-                      {needsPreVideoChoice ? (
-                        <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-                          <p className="font-medium">Chọn quy trình trước video review</p>
-                          <p className="text-sm text-zinc-600">Bạn có thể nộp kịch bản trước để được duyệt, hoặc nộp video review trực tiếp.</p>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <button className={selectedChoice === "TRANSCRIPT" ? "dc-btn-primary" : "dc-btn-secondary"} onClick={() => setPreVideoChoiceMap((s) => ({ ...s, [item.id]: "TRANSCRIPT" }))}>Nộp kịch bản trước</button>
-                            <button className={selectedChoice === "VIDEO" ? "dc-btn-primary" : "dc-btn-secondary"} onClick={() => setPreVideoChoiceMap((s) => ({ ...s, [item.id]: "VIDEO" }))}>Nộp video luôn</button>
+                        <div className="mt-3 grid gap-1 text-sm text-zinc-600 md:grid-cols-2">
+                          <p>Reward: <strong>{item.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</strong></p>
+                          <p>Deadline: <strong>{fmtDate(item.mission.deadlineAt)}</strong></p>
+                          <p>Trạng thái duyệt video: <strong>{item.videoReviewStatus}</strong></p>
+                          <p>Trạng thái duyệt bước cuối: <strong>{item.publishStatus}</strong></p>
+                          <p>Link sản phẩm: <UrlValue value={item.mission.productLink} /></p>
+                        </div>
+
+                        <p className="mt-2 text-sm text-zinc-700">{item.mission.description}</p>
+                        {item.status === "DRAFT_PENDING" && item.videoReviewFeedback ? <p className="mt-2 text-sm text-red-700">Feedback kịch bản: {item.videoReviewFeedback}</p> : null}
+                        {item.videoReviewStatus !== "NOT_SUBMITTED" && item.videoReviewFeedback ? <p className="mt-2 text-sm text-red-700">Feedback video: {item.videoReviewFeedback}</p> : null}
+                        {item.publishFeedback ? <p className="mt-1 text-sm text-red-700">Feedback bước cuối: {item.publishFeedback}</p> : null}
+
+                        {canSubmitPurchase ? (
+                          <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                            <p className="font-medium">Bước 1 - Mua sản phẩm</p>
+                            <p className="text-sm text-zinc-600">Link sản phẩm: <UrlValue value={item.mission.productLink} /></p>
+                            <p className="text-sm text-zinc-600">Hướng dẫn: Đặt hàng đúng link, đánh giá 5 sao, upload ảnh bill và ảnh đánh giá.</p>
+                            <div className="mt-2 grid gap-2">
+                              <input className="dc-input" placeholder="URL ảnh bill mua hàng" value={billUrlMap[item.id] ?? ""} onChange={(e) => setBillUrlMap((s) => ({ ...s, [item.id]: e.target.value }))} />
+                              <input className="dc-input" placeholder="URL ảnh đã đánh giá 5 sao" value={ratingUrlMap[item.id] ?? ""} onChange={(e) => setRatingUrlMap((s) => ({ ...s, [item.id]: e.target.value }))} />
+                              <textarea className="dc-input" placeholder="Ghi chú (nếu có)" value={purchaseNoteMap[item.id] ?? ""} onChange={(e) => setPurchaseNoteMap((s) => ({ ...s, [item.id]: e.target.value }))} />
+                              <button className="dc-btn-primary" disabled={busyId === item.id} onClick={() => void submitPurchaseProof(item)}>Xác nhận đã mua hàng</button>
+                            </div>
                           </div>
-                        </div>
-                      ) : null}
+                        ) : null}
 
-                      {showTranscriptComposer ? (
-                        <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-3">
-                          <p className="font-medium">Nộp kịch bản</p>
-                          {isTranscriptFlow && item.submission?.status === "SUBMITTED" ? <p className="mt-1 text-sm text-zinc-600">Kịch bản đã gửi, đang chờ duyệt.</p> : null}
-                          {item.submission?.fileUploadUrl ? (
-                            <a
-                              href={`/api/uploads/transcript-download?url=${encodeURIComponent(item.submission.fileUploadUrl)}`}
-                              className="mt-2 inline-flex text-sm font-semibold text-zinc-900 underline"
-                            >
-                              Tải file kịch bản (.txt)
-                            </a>
-                          ) : null}
-                          <div className="mt-2 grid gap-2">
-                            <TranscriptEditor
-                              editorId={`transcript-editor-${item.id}`}
-                              initialHtml={toTranscriptEditorHtml(transcriptMap[item.id] ?? item.submission?.proofTextNote ?? "")}
-                              disabled={isTranscriptFlow && item.submission?.status === "SUBMITTED"}
-                              onChange={(html) => setTranscriptMap((s) => ({ ...s, [item.id]: html }))}
-                            />
-                            {!(isTranscriptFlow && item.submission?.status === "SUBMITTED") ? (
-                              <button className="dc-btn-primary" disabled={busyId === item.id} onClick={() => void submitTranscript(item)}>
-                                {item.submission?.status === "REJECTED" ? "Gửi lại kịch bản" : "Gửi kịch bản"}
-                              </button>
+                        {needsPreVideoChoice ? (
+                          <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                            <p className="font-medium">Chọn quy trình trước video review</p>
+                            <p className="text-sm text-zinc-600">Bạn có thể nộp kịch bản trước để được duyệt, hoặc nộp video review trực tiếp.</p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <button className={selectedChoice === "TRANSCRIPT" ? "dc-btn-primary" : "dc-btn-secondary"} onClick={() => setPreVideoChoiceMap((s) => ({ ...s, [item.id]: "TRANSCRIPT" }))}>Nộp kịch bản trước</button>
+                              <button className={selectedChoice === "VIDEO" ? "dc-btn-primary" : "dc-btn-secondary"} onClick={() => setPreVideoChoiceMap((s) => ({ ...s, [item.id]: "VIDEO" }))}>Nộp video luôn</button>
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {showTranscriptComposer ? (
+                          <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-3">
+                            <p className="font-medium">Nộp kịch bản</p>
+                            {isTranscriptFlow && item.submission?.status === "SUBMITTED" ? <p className="mt-1 text-sm text-zinc-600">Kịch bản đã gửi, đang chờ duyệt.</p> : null}
+                            {item.submission?.fileUploadUrl ? (
+                              <a
+                                href={`/api/uploads/transcript-download?url=${encodeURIComponent(item.submission.fileUploadUrl)}`}
+                                className="mt-2 inline-flex text-sm font-semibold text-zinc-900 underline"
+                              >
+                                Tải file kịch bản (.txt)
+                              </a>
                             ) : null}
+                            <div className="mt-2 grid gap-2">
+                              <TranscriptEditor
+                                editorId={`transcript-editor-${item.id}`}
+                                initialHtml={toTranscriptEditorHtml(transcriptMap[item.id] ?? item.submission?.proofTextNote ?? "")}
+                                disabled={isTranscriptFlow && item.submission?.status === "SUBMITTED"}
+                                onChange={(html) => setTranscriptMap((s) => ({ ...s, [item.id]: html }))}
+                              />
+                              {!(isTranscriptFlow && item.submission?.status === "SUBMITTED") ? (
+                                <button className="dc-btn-primary" disabled={busyId === item.id} onClick={() => void submitTranscript(item)}>
+                                  {item.submission?.status === "REJECTED" ? "Gửi lại kịch bản" : "Gửi kịch bản"}
+                                </button>
+                              ) : null}
+                            </div>
                           </div>
-                        </div>
-                      ) : null}
+                        ) : null}
 
-                      {showVideoComposer ? (
-                        <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-3">
-                          <p className="font-medium">Nộp video review</p>
-                          <div className="mt-2 grid gap-2">
-                            <input className="dc-input" placeholder="Video URL" value={videoUrlMap[item.id] ?? item.submission?.videoUrl ?? ""} onChange={(e) => setVideoUrlMap((s) => ({ ...s, [item.id]: e.target.value }))} />
-                            <textarea className="dc-input" placeholder="Ghi chú video" value={videoNoteMap[item.id] ?? item.submission?.note ?? ""} onChange={(e) => setVideoNoteMap((s) => ({ ...s, [item.id]: e.target.value }))} />
-                            <button className="dc-btn-primary" disabled={busyId === item.id} onClick={() => void submitVideo(item)}>
-                              {item.videoReviewStatus === "REJECTED" ? "Gửi lại video review" : "Gửi video review"}
-                            </button>
+                        {showVideoComposer ? (
+                          <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-3">
+                            <p className="font-medium">Nộp video review</p>
+                            <div className="mt-2 grid gap-2">
+                              <input className="dc-input" placeholder="Video URL" value={videoUrlMap[item.id] ?? item.submission?.videoUrl ?? ""} onChange={(e) => setVideoUrlMap((s) => ({ ...s, [item.id]: e.target.value }))} />
+                              <textarea className="dc-input" placeholder="Ghi chú video" value={videoNoteMap[item.id] ?? item.submission?.note ?? ""} onChange={(e) => setVideoNoteMap((s) => ({ ...s, [item.id]: e.target.value }))} />
+                              <button className="dc-btn-primary" disabled={busyId === item.id} onClick={() => void submitVideo(item)}>
+                                {item.videoReviewStatus === "REJECTED" ? "Gửi lại video review" : "Gửi video review"}
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ) : null}
+                        ) : null}
 
-                      {canSubmitPublish ? (
-                        <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-3">
-                          <p className="font-medium">Bước 3 - Nộp link video social public</p>
-                          <div className="mt-2 grid gap-2">
-                            <input className="dc-input" placeholder="Link video social public" value={publicUrlMap[item.id] ?? item.submission?.publicVideoUrl ?? item.submission?.socialPostUrl ?? ""} onChange={(e) => setPublicUrlMap((s) => ({ ...s, [item.id]: e.target.value }))} />
-                            <input className="dc-input" placeholder="Mã quảng cáo (adCode)" value={adCodeMap[item.id] ?? item.submission?.adCode ?? ""} onChange={(e) => setAdCodeMap((s) => ({ ...s, [item.id]: e.target.value }))} />
-                            <input className="dc-input" placeholder="Screenshot URL (nếu cần)" value={screenshotMap[item.id] ?? item.submission?.screenshotUrl ?? ""} onChange={(e) => setScreenshotMap((s) => ({ ...s, [item.id]: e.target.value }))} />
-                            <textarea className="dc-input" placeholder="Ghi chú bước cuối" value={finalNoteMap[item.id] ?? item.submission?.finalProofNote ?? ""} onChange={(e) => setFinalNoteMap((s) => ({ ...s, [item.id]: e.target.value }))} />
-                            <button className="dc-btn-primary" disabled={busyId === item.id} onClick={() => void submitPublish(item)}>
-                              {item.publishStatus === "REJECTED" ? "Gửi lại link social public" : "Gửi link social public"}
-                            </button>
+                        {canSubmitPublish ? (
+                          <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-3">
+                            <p className="font-medium">Bước 3 - Nộp link video social public</p>
+                            <div className="mt-2 grid gap-2">
+                              <input className="dc-input" placeholder="Link video social public" value={publicUrlMap[item.id] ?? item.submission?.publicVideoUrl ?? item.submission?.socialPostUrl ?? ""} onChange={(e) => setPublicUrlMap((s) => ({ ...s, [item.id]: e.target.value }))} />
+                              <input className="dc-input" placeholder="Mã quảng cáo (adCode)" value={adCodeMap[item.id] ?? item.submission?.adCode ?? ""} onChange={(e) => setAdCodeMap((s) => ({ ...s, [item.id]: e.target.value }))} />
+                              <input className="dc-input" placeholder="Screenshot URL (nếu cần)" value={screenshotMap[item.id] ?? item.submission?.screenshotUrl ?? ""} onChange={(e) => setScreenshotMap((s) => ({ ...s, [item.id]: e.target.value }))} />
+                              <textarea className="dc-input" placeholder="Ghi chú bước cuối" value={finalNoteMap[item.id] ?? item.submission?.finalProofNote ?? ""} onChange={(e) => setFinalNoteMap((s) => ({ ...s, [item.id]: e.target.value }))} />
+                              <button className="dc-btn-primary" disabled={busyId === item.id} onClick={() => void submitPublish(item)}>
+                                {item.publishStatus === "REJECTED" ? "Gửi lại link social public" : "Gửi link social public"}
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ) : null}
+                        ) : null}
 
-                      {item.status === "COMPLETED" ? (
-                        <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                          Nhiệm vụ đã hoàn thành. N-Points đã được cộng theo kết quả duyệt.
-                        </p>
-                      ) : null}
-                    </article>
+                        {item.status === "COMPLETED" ? (
+                          <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                            Nhiệm vụ đã hoàn thành. N-Points đã được cộng theo kết quả duyệt.
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
                   );
-                })}
-              </div>
+                })() : null}
+              </>
             )}
           </section>
         </>

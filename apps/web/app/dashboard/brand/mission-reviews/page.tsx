@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader } from "@/app/components/dcreator/ui/base";
@@ -17,6 +17,23 @@ const tabs: Array<{ key: TabKey; label: string }> = [
 function fmtDate(value: string | null) {
   if (!value) return "-";
   return new Date(value).toLocaleString("vi-VN");
+}
+
+function asLink(value: string | null | undefined) {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+function UrlValue({ value, label }: { value: string | null | undefined; label?: string }) {
+  const href = asLink(value);
+  if (!href) return <span>-</span>;
+  return (
+    <a href={href} className="font-semibold text-zinc-900 underline break-all">
+      {label ?? value}
+    </a>
+  );
 }
 
 function transcriptPlainText(value: string | null | undefined) {
@@ -148,7 +165,14 @@ function BrandMissionTranscriptReviewsTab() {
     }
   }
 
-  async function loadDetail(id: string) {
+  async function loadDetail(id: string, options?: { force?: boolean }) {
+    if (!options?.force && selectedId === id) {
+      setSelectedId("");
+      setDetail(null);
+      setDetailLoading(false);
+      return;
+    }
+
     setSelectedId(id);
     setDetailLoading(true);
     try {
@@ -173,7 +197,7 @@ function BrandMissionTranscriptReviewsTab() {
       if (!res.ok || !body.success) throw new Error(body.error ?? "Duyệt thất bại");
       setNotice("Đã duyệt kịch bản. Creator có thể nộp video review.");
       await load();
-      if (selectedId === id) await loadDetail(id);
+      if (selectedId === id) await loadDetail(id, { force: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Duyệt thất bại");
     }
@@ -194,7 +218,7 @@ function BrandMissionTranscriptReviewsTab() {
       if (!res.ok || !body.success) throw new Error(body.error ?? "Từ chối thất bại");
       setNotice("Đã từ chối kịch bản. Creator có thể nộp lại.");
       await load();
-      if (selectedId === id) await loadDetail(id);
+      if (selectedId === id) await loadDetail(id, { force: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Từ chối thất bại");
     }
@@ -255,7 +279,9 @@ function BrandMissionTranscriptReviewsTab() {
                       </a>
                     ) : null}
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>Xem chi tiết</button>
+                      <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
+                        {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
+                      </button>
                       {statusLabel === "PENDING" ? <button className="dc-btn-primary" onClick={() => void approve(item.id)}>Duyệt</button> : null}
                       {statusLabel === "PENDING" ? <button className="dc-btn-secondary" onClick={() => void reject(item.id)}>Từ chối</button> : null}
                     </div>
@@ -279,13 +305,13 @@ function BrandMissionTranscriptReviewsTab() {
                 <p><strong>Creator:</strong> {detail.account.displayName}</p>
                 <p><strong>Email:</strong> {detail.account.email}</p>
                 <p><strong>Nền tảng chính:</strong> {detail.account.creatorProfile?.mainPlatform ?? "-"}</p>
-                <p><strong>Social URL:</strong> {detail.account.creatorProfile?.socialUrl ?? "-"}</p>
+                <p><strong>Social URL:</strong> <UrlValue value={detail.account.creatorProfile?.socialUrl} /></p>
                 <p><strong>Follower:</strong> {(detail.account.creatorProfile?.followerCount ?? 0).toLocaleString("vi-VN")}</p>
                 <p><strong>Campaign:</strong> {detail.campaign.title}</p>
                 <p><strong>Nhiệm vụ:</strong> {detail.mission.title}</p>
                 <p><strong>Mô tả nhiệm vụ:</strong> {detail.mission.description}</p>
                 <p><strong>Hình thức nhận sản phẩm:</strong> {detail.mission.productReceiveOption}</p>
-                <p><strong>Link sản phẩm:</strong> {detail.mission.productLink ?? "-"}</p>
+                <p><strong>Link sản phẩm:</strong> <UrlValue value={detail.mission.productLink} /></p>
                 <p><strong>Deadline:</strong> {fmtDate(detail.mission.deadlineAt)}</p>
                 <p><strong>Kịch bản:</strong></p>
                 <div
@@ -507,13 +533,13 @@ function BrandMissionApplicationsTab() {
                 <p><strong>Creator:</strong> {detail.account.displayName}</p>
                 <p><strong>Email:</strong> {detail.account.email}</p>
                 <p><strong>Nền tảng chính:</strong> {detail.account.creatorProfile?.mainPlatform ?? "-"}</p>
-                <p><strong>Social URL:</strong> {detail.account.creatorProfile?.socialUrl ?? "-"}</p>
+                <p><strong>Social URL:</strong> <UrlValue value={detail.account.creatorProfile?.socialUrl} /></p>
                 <p><strong>Follower:</strong> {(detail.account.creatorProfile?.followerCount ?? 0).toLocaleString("vi-VN")}</p>
                 <p><strong>Campaign:</strong> {detail.campaign.title}</p>
                 <p><strong>Mission:</strong> {detail.mission.title}</p>
                 <p><strong>Mô tả:</strong> {detail.mission.description}</p>
                 <p><strong>Hình thức nhận sản phẩm:</strong> {detail.mission.productReceiveOption}</p>
-                <p><strong>Link sản phẩm:</strong> {detail.mission.productLink ?? "-"}</p>
+                <p><strong>Link sản phẩm:</strong> <UrlValue value={detail.mission.productLink} /></p>
                 <p><strong>Ghi chú creator:</strong> {detail.note ?? "-"}</p>
                 <p><strong>Trạng thái:</strong> {detail.status}</p>
                 <p><strong>Lý do từ chối:</strong> {detail.rejectReason ?? "-"}</p>
@@ -551,6 +577,9 @@ function BrandMissionVideoReviewsTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [selectedId, setSelectedId] = useState<string>("");
+  const [detail, setDetail] = useState<VideoItem | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [query, setQuery] = useState("");
@@ -583,6 +612,27 @@ function BrandMissionVideoReviewsTab() {
     }
   }
 
+  async function loadDetail(id: string, options?: { force?: boolean }) {
+    if (!options?.force && selectedId === id) {
+      setSelectedId("");
+      setDetail(null);
+      setDetailLoading(false);
+      return;
+    }
+    setSelectedId(id);
+    setDetailLoading(true);
+    try {
+      const res = await fetch(`/api/brand/dashboard/mission-video-reviews/${id}`, { cache: "no-store" });
+      const body = (await res.json()) as ApiResult<VideoItem>;
+      if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? "Không thể tải chi tiết");
+      setDetail(body.data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không thể tải chi tiết");
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
   async function decide(id: string, action: "approve" | "reject") {
     setNotice("");
     setError("");
@@ -604,6 +654,7 @@ function BrandMissionVideoReviewsTab() {
       }
       setNotice(action === "approve" ? "Đã duyệt video." : "Đã từ chối video.");
       await load();
+      if (selectedId === id) await loadDetail(id, { force: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Thao tác thất bại");
     }
@@ -639,32 +690,55 @@ function BrandMissionVideoReviewsTab() {
       {loading ? <LoadingSkeleton rows={5} /> : null}
 
       {!loading && !error ? (
-        <section className="grid gap-3">
-          {items.length === 0 ? (
-            <EmptyState title="Không có video chờ duyệt" description="Không có item nào phù hợp bộ lọc hiện tại." />
-          ) : (
-            items.map((item) => (
-              <article key={item.id} className="dc-card p-4">
-                <p className="font-semibold">{item.account.displayName}</p>
-                <p className="text-xs text-zinc-500">{item.account.email}</p>
-                <p className="mt-1 text-sm">Campaign: {item.campaign.title}</p>
-                <p className="text-sm">Mission: {item.mission.title}</p>
-                <p className="text-sm">Video URL: {item.submission?.videoUrl ?? "-"}</p>
-                <p className="text-sm">Ghi chú creator: {item.submission?.note ?? "-"}</p>
-                <p className="text-xs text-zinc-500 mt-1">Nộp lúc: {fmtDate(item.videoSubmittedAt)} · Trạng thái: {item.videoReviewStatus}</p>
-                {item.submission?.rejectReason ? <p className="mt-1 text-sm text-red-700">Lý do từ chối gần nhất: {item.submission.rejectReason}</p> : null}
-                <div className="mt-3 flex gap-2">
-                  {item.videoReviewStatus === "PENDING" ? <button className="dc-btn-primary" onClick={() => void decide(item.id, "approve")}>Đồng ý video</button> : null}
-                  {item.videoReviewStatus === "PENDING" ? <button className="dc-btn-secondary" onClick={() => void decide(item.id, "reject")}>Từ chối video</button> : null}
-                </div>
-              </article>
-            ))
-          )}
-          <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white p-3">
-            <button className="dc-btn-secondary" disabled={pagination.page <= 1} onClick={() => setPage((x) => Math.max(1, x - 1))}>Trang trước</button>
-            <p className="text-sm text-zinc-500">Trang {pagination.page}/{pagination.totalPages}</p>
-            <button className="dc-btn-secondary" disabled={pagination.page >= pagination.totalPages} onClick={() => setPage((x) => Math.min(pagination.totalPages, x + 1))}>Trang sau</button>
+        <section className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+          <div className="grid gap-3">
+            {items.length === 0 ? (
+              <EmptyState title="Không có video chờ duyệt" description="Không có item nào phù hợp bộ lọc hiện tại." />
+            ) : (
+              items.map((item) => (
+                <article key={item.id} className={`dc-card p-4 ${selectedId === item.id ? "border-zinc-900" : ""}`}>
+                  <p className="font-semibold">{item.account.displayName}</p>
+                  <p className="text-xs text-zinc-500">{item.account.email}</p>
+                  <p className="mt-1 text-sm">Campaign: {item.campaign.title}</p>
+                  <p className="text-sm">Nhiệm vụ: {item.mission.title}</p>
+                  <p className="text-xs text-zinc-500 mt-1">Nộp lúc: {fmtDate(item.videoSubmittedAt)} · Trạng thái: {item.videoReviewStatus}</p>
+                  <p className="mt-2 line-clamp-2 text-sm text-zinc-700">{item.submission?.note || "Không có ghi chú từ Creator"}</p>
+                  {item.submission?.rejectReason ? <p className="mt-1 text-sm text-red-700 line-clamp-2">Lý do từ chối gần nhất: {item.submission.rejectReason}</p> : null}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
+                      {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
+                    </button>
+                    {item.videoReviewStatus === "PENDING" ? <button className="dc-btn-primary" onClick={() => void decide(item.id, "approve")}>Đồng ý video</button> : null}
+                    {item.videoReviewStatus === "PENDING" ? <button className="dc-btn-secondary" onClick={() => void decide(item.id, "reject")}>Từ chối video</button> : null}
+                  </div>
+                </article>
+              ))
+            )}
+            <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white p-3">
+              <button className="dc-btn-secondary" disabled={pagination.page <= 1} onClick={() => setPage((x) => Math.max(1, x - 1))}>Trang trước</button>
+              <p className="text-sm text-zinc-500">Trang {pagination.page}/{pagination.totalPages}</p>
+              <button className="dc-btn-secondary" disabled={pagination.page >= pagination.totalPages} onClick={() => setPage((x) => Math.min(pagination.totalPages, x + 1))}>Trang sau</button>
+            </div>
           </div>
+
+          <aside className="dc-card p-4">
+            <h2 className="font-semibold">Chi tiết video review</h2>
+            {!selectedId ? <p className="mt-2 text-sm text-zinc-500">Chọn một item để xem chi tiết.</p> : null}
+            {detailLoading ? <div className="mt-3"><LoadingSkeleton rows={4} /></div> : null}
+            {detail && !detailLoading ? (
+              <div className="mt-3 grid gap-2 text-sm">
+                <p><strong>Creator:</strong> {detail.account.displayName}</p>
+                <p><strong>Email:</strong> {detail.account.email}</p>
+                <p><strong>Campaign:</strong> {detail.campaign.title}</p>
+                <p><strong>Nhiệm vụ:</strong> {detail.mission.title}</p>
+                <p><strong>Video URL:</strong> <UrlValue value={detail.submission?.videoUrl} /></p>
+                <p><strong>Ghi chú creator:</strong> {detail.submission?.note ?? "-"}</p>
+                <p><strong>Trạng thái:</strong> {detail.videoReviewStatus}</p>
+                <p><strong>Nộp lúc:</strong> {fmtDate(detail.videoSubmittedAt)}</p>
+                <p><strong>Lý do từ chối:</strong> {detail.submission?.rejectReason ?? "-"}</p>
+              </div>
+            ) : null}
+          </aside>
         </section>
       ) : null}
     </section>
@@ -715,6 +789,9 @@ function BrandMissionFinalReviewsTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [selectedId, setSelectedId] = useState<string>("");
+  const [detail, setDetail] = useState<FinalItem | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [query, setQuery] = useState("");
@@ -748,6 +825,27 @@ function BrandMissionFinalReviewsTab() {
     }
   }
 
+  async function loadDetail(id: string, options?: { force?: boolean }) {
+    if (!options?.force && selectedId === id) {
+      setSelectedId("");
+      setDetail(null);
+      setDetailLoading(false);
+      return;
+    }
+    setSelectedId(id);
+    setDetailLoading(true);
+    try {
+      const res = await fetch(`/api/brand/dashboard/mission-final-reviews/${id}`, { cache: "no-store" });
+      const body = (await res.json()) as ApiResult<FinalItem>;
+      if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? "Không thể tải chi tiết");
+      setDetail(body.data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không thể tải chi tiết");
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
   async function approve(item: FinalItem) {
     setNotice("");
     setError("");
@@ -772,6 +870,7 @@ function BrandMissionFinalReviewsTab() {
       if (!res.ok || !body.success) throw new Error(body.error ?? "Duyệt thất bại");
       setNotice("Đã duyệt hoàn thành nhiệm vụ và cộng điểm.");
       await load();
+      if (selectedId === item.id) await loadDetail(item.id, { force: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Duyệt thất bại");
     }
@@ -792,6 +891,7 @@ function BrandMissionFinalReviewsTab() {
       if (!res.ok || !body.success) throw new Error(body.error ?? "Từ chối thất bại");
       setNotice("Đã từ chối bước hoàn thành.");
       await load();
+      if (selectedId === id) await loadDetail(id, { force: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Từ chối thất bại");
     }
@@ -830,40 +930,64 @@ function BrandMissionFinalReviewsTab() {
       {loading ? <LoadingSkeleton rows={5} /> : null}
 
       {!loading && !error ? (
-        <section className="grid gap-3">
-          {items.length === 0 ? (
-            <EmptyState title="Không có item cần duyệt" description="Không có mission nào cho trạng thái lọc hiện tại." />
-          ) : (
-            items.map((item) => (
-              <article key={item.id} className="dc-card p-4">
-                <p className="font-semibold">{item.account.displayName}</p>
-                <p className="text-xs text-zinc-500">{item.account.email}</p>
-                <p className="mt-1 text-sm">Campaign: {item.campaign.title}</p>
-                <p className="text-sm">Mission: {item.mission.title}</p>
-                <p className="text-sm">Reward: {item.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
-                <p className="text-sm">Hình thức nhận sản phẩm: {item.productReceiveOption}</p>
-                <p className="text-sm">Link video review đã duyệt: {item.submission?.videoUrl ?? "-"}</p>
-                <p className="text-sm">Link video social public: {item.submission?.publicVideoUrl ?? item.submission?.socialPostUrl ?? "-"}</p>
-                <p className="text-sm">Mã quảng cáo: {item.submission?.adCode ?? "-"}</p>
-                <p className="text-sm">Screenshot bài đăng: {item.submission?.screenshotUrl ?? "-"}</p>
-                <p className="text-sm">Ảnh bill mua hàng: {item.submission?.purchaseBillImageUrl ?? "-"}</p>
-                <p className="text-sm">Ảnh đánh giá 5 sao: {item.submission?.productReviewScreenshotUrl ?? "-"}</p>
-                <p className="text-sm">Ghi chú creator: {item.submission?.finalProofNote ?? "-"}</p>
-                <p className="text-sm">Trạng thái hoàn tiền: {item.reimbursementStatus}</p>
-                <p className="text-xs text-zinc-500 mt-1">Nộp lúc: {fmtDate(item.publishSubmittedAt)} · Trạng thái publish: {item.publishStatus}</p>
-                {item.submission?.rejectReason ? <p className="mt-1 text-sm text-red-700">Lý do từ chối gần nhất: {item.submission.rejectReason}</p> : null}
-                <div className="mt-3 flex gap-2">
-                  {item.publishStatus === "PENDING" ? <button className="dc-btn-primary" onClick={() => void approve(item)}>Đồng ý hoàn thành</button> : null}
-                  {item.publishStatus === "PENDING" ? <button className="dc-btn-secondary" onClick={() => void reject(item.id)}>Từ chối bước cuối</button> : null}
-                </div>
-              </article>
-            ))
-          )}
-          <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white p-3">
-            <button className="dc-btn-secondary" disabled={pagination.page <= 1} onClick={() => setPage((x) => Math.max(1, x - 1))}>Trang trước</button>
-            <p className="text-sm text-zinc-500">Trang {pagination.page}/{pagination.totalPages}</p>
-            <button className="dc-btn-secondary" disabled={pagination.page >= pagination.totalPages} onClick={() => setPage((x) => Math.min(pagination.totalPages, x + 1))}>Trang sau</button>
+        <section className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+          <div className="grid gap-3">
+            {items.length === 0 ? (
+              <EmptyState title="Không có item cần duyệt" description="Không có mission nào cho trạng thái lọc hiện tại." />
+            ) : (
+              items.map((item) => (
+                <article key={item.id} className={`dc-card p-4 ${selectedId === item.id ? "border-zinc-900" : ""}`}>
+                  <p className="font-semibold">{item.account.displayName}</p>
+                  <p className="text-xs text-zinc-500">{item.account.email}</p>
+                  <p className="mt-1 text-sm">Campaign: {item.campaign.title}</p>
+                  <p className="text-sm">Nhiệm vụ: {item.mission.title}</p>
+                  <p className="text-sm">Reward: {item.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
+                  <p className="text-sm">Hình thức nhận sản phẩm: {item.productReceiveOption}</p>
+                  <p className="text-xs text-zinc-500 mt-1">Nộp lúc: {fmtDate(item.publishSubmittedAt)} · Trạng thái publish: {item.publishStatus}</p>
+                  {item.submission?.rejectReason ? <p className="mt-1 text-sm text-red-700 line-clamp-2">Lý do từ chối gần nhất: {item.submission.rejectReason}</p> : null}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
+                      {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
+                    </button>
+                    {item.publishStatus === "PENDING" ? <button className="dc-btn-primary" onClick={() => void approve(item)}>Đồng ý hoàn thành</button> : null}
+                    {item.publishStatus === "PENDING" ? <button className="dc-btn-secondary" onClick={() => void reject(item.id)}>Từ chối bước cuối</button> : null}
+                  </div>
+                </article>
+              ))
+            )}
+            <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white p-3">
+              <button className="dc-btn-secondary" disabled={pagination.page <= 1} onClick={() => setPage((x) => Math.max(1, x - 1))}>Trang trước</button>
+              <p className="text-sm text-zinc-500">Trang {pagination.page}/{pagination.totalPages}</p>
+              <button className="dc-btn-secondary" disabled={pagination.page >= pagination.totalPages} onClick={() => setPage((x) => Math.min(pagination.totalPages, x + 1))}>Trang sau</button>
+            </div>
           </div>
+
+          <aside className="dc-card p-4">
+            <h2 className="font-semibold">Chi tiết duyệt hoàn thành</h2>
+            {!selectedId ? <p className="mt-2 text-sm text-zinc-500">Chọn một item để xem chi tiết.</p> : null}
+            {detailLoading ? <div className="mt-3"><LoadingSkeleton rows={5} /></div> : null}
+            {detail && !detailLoading ? (
+              <div className="mt-3 grid gap-2 text-sm">
+                <p><strong>Creator:</strong> {detail.account.displayName}</p>
+                <p><strong>Email:</strong> {detail.account.email}</p>
+                <p><strong>Campaign:</strong> {detail.campaign.title}</p>
+                <p><strong>Nhiệm vụ:</strong> {detail.mission.title}</p>
+                <p><strong>Reward:</strong> {detail.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
+                <p><strong>Hình thức nhận sản phẩm:</strong> {detail.productReceiveOption}</p>
+                <p><strong>Trạng thái hoàn tiền:</strong> {detail.reimbursementStatus}</p>
+                <p><strong>Video review đã duyệt:</strong> <UrlValue value={detail.submission?.videoUrl} /></p>
+                <p><strong>Link video social public:</strong> <UrlValue value={detail.submission?.publicVideoUrl ?? detail.submission?.socialPostUrl} /></p>
+                <p><strong>Mã quảng cáo:</strong> {detail.submission?.adCode ?? "-"}</p>
+                <p><strong>Screenshot bài đăng:</strong> <UrlValue value={detail.submission?.screenshotUrl} /></p>
+                <p><strong>Ảnh bill mua hàng:</strong> <UrlValue value={detail.submission?.purchaseBillImageUrl} /></p>
+                <p><strong>Ảnh đánh giá 5 sao:</strong> <UrlValue value={detail.submission?.productReviewScreenshotUrl} /></p>
+                <p><strong>Ghi chú creator:</strong> {detail.submission?.finalProofNote ?? "-"}</p>
+                <p><strong>Trạng thái publish:</strong> {detail.publishStatus}</p>
+                <p><strong>Nộp lúc:</strong> {fmtDate(detail.publishSubmittedAt)}</p>
+                <p><strong>Lý do từ chối:</strong> {detail.submission?.rejectReason ?? "-"}</p>
+              </div>
+            ) : null}
+          </aside>
         </section>
       ) : null}
     </section>
