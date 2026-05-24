@@ -747,6 +747,24 @@ function toOrder(sort?: Sort) {
   return sort === "oldest" ? "asc" : "desc";
 }
 
+async function resolveBrandOwnerAccountId(accountId: string) {
+  const ownedBrand = await prisma.brand.findFirst({
+    where: { ownerAccountId: accountId },
+    select: { ownerAccountId: true },
+    orderBy: { createdAt: "desc" }
+  });
+  if (ownedBrand) return ownedBrand.ownerAccountId;
+
+  const membership = await prisma.brandMember.findFirst({
+    where: { accountId },
+    select: { brand: { select: { ownerAccountId: true } } },
+    orderBy: { createdAt: "desc" }
+  });
+  if (membership) return membership.brand.ownerAccountId;
+
+  throw new AppError("Brand access is not configured for this account", 403, "BRAND_ACCESS_NOT_CONFIGURED");
+}
+
 export async function listMissionApplicationsForAdmin(input: {
   query?: string;
   status?: ApplicationStatus;
@@ -941,4 +959,204 @@ export async function approveMissionFinalReviewByAdmin(actorId: string, id: stri
 
 export async function rejectMissionFinalReviewByAdmin(actorId: string, id: string, feedback: string) {
   return rejectPublishReportByAdmin(actorId, id, feedback);
+}
+
+export async function listMissionApplicationsForBrand(
+  accountId: string,
+  input: {
+    query?: string;
+    status?: ApplicationStatus;
+    campaignId?: string;
+    campaign?: string;
+    sort?: Sort;
+    page?: number;
+    limit?: number;
+  }
+) {
+  const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
+  const where: Prisma.MissionApplicationWhereInput = {
+    campaign: { brandId: brandOwnerAccountId }
+  };
+  if (input.status) where.status = input.status;
+  if (input.campaignId) where.campaignId = input.campaignId;
+  if (input.campaign?.trim()) {
+    where.campaign = {
+      brandId: brandOwnerAccountId,
+      title: { contains: input.campaign.trim(), mode: "insensitive" }
+    };
+  }
+  if (input.query?.trim()) {
+    const q = input.query.trim();
+    where.OR = [
+      { account: { displayName: { contains: q, mode: "insensitive" } } },
+      { account: { email: { contains: q, mode: "insensitive" } } },
+      { mission: { title: { contains: q, mode: "insensitive" } } },
+      { campaign: { title: { contains: q, mode: "insensitive" } } }
+    ];
+  }
+
+  const paging = toPagination(input.page, input.limit);
+  const [total, items] = await prisma.$transaction([
+    prisma.missionApplication.count({ where }),
+    prisma.missionApplication.findMany({
+      where,
+      include: {
+        account: { select: { id: true, displayName: true, email: true, creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true } } } },
+        campaign: { select: { id: true, title: true, slug: true } },
+        mission: { select: { id: true, title: true, rewardPoints: true, productReceiveOption: true, productLink: true } },
+        reviewedBy: { select: { id: true, displayName: true, email: true } }
+      },
+      orderBy: { createdAt: toOrder(input.sort) },
+      skip: paging.skip,
+      take: paging.limit
+    })
+  ]);
+  return { items, pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
+}
+
+export async function getMissionApplicationDetailForBrand(accountId: string, id: string) {
+  const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
+  const item = await getMissionApplicationDetailForAdmin(id);
+  if (item.campaign.brandId !== brandOwnerAccountId) throw new AppError("Forbidden", 403, "BRAND_FORBIDDEN");
+  return item;
+}
+
+export async function approveMissionApplicationByBrand(accountId: string, id: string) {
+  await getMissionApplicationDetailForBrand(accountId, id);
+  return approveMissionApplicationByAdmin(accountId, id);
+}
+
+export async function rejectMissionApplicationByBrand(accountId: string, id: string, rejectReason: string) {
+  await getMissionApplicationDetailForBrand(accountId, id);
+  return rejectMissionApplicationByAdmin(accountId, id, rejectReason);
+}
+
+export async function listMissionVideoReviewsForBrand(
+  accountId: string,
+  input: {
+    query?: string;
+    campaignId?: string;
+    campaign?: string;
+    videoReviewStatus?: CreatorMissionVideoReviewStatus;
+    sort?: Sort;
+    page?: number;
+    limit?: number;
+  }
+) {
+  const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
+  const where: Prisma.CreatorMissionWhereInput = {
+    campaign: { brandId: brandOwnerAccountId },
+    videoReviewStatus: input.videoReviewStatus ?? "PENDING"
+  };
+  if (input.campaignId) where.campaignId = input.campaignId;
+  if (input.campaign?.trim()) {
+    where.campaign = {
+      brandId: brandOwnerAccountId,
+      title: { contains: input.campaign.trim(), mode: "insensitive" }
+    };
+  }
+  if (input.query?.trim()) {
+    const q = input.query.trim();
+    where.OR = [
+      { account: { displayName: { contains: q, mode: "insensitive" } } },
+      { account: { email: { contains: q, mode: "insensitive" } } },
+      { mission: { title: { contains: q, mode: "insensitive" } } },
+      { campaign: { title: { contains: q, mode: "insensitive" } } }
+    ];
+  }
+  const paging = toPagination(input.page, input.limit);
+  const [total, items] = await prisma.$transaction([
+    prisma.creatorMission.count({ where }),
+    prisma.creatorMission.findMany({
+      where,
+      include: creatorMissionInclude,
+      orderBy: { videoSubmittedAt: toOrder(input.sort) },
+      skip: paging.skip,
+      take: paging.limit
+    })
+  ]);
+  return { items: items.map(mapMission), pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
+}
+
+export async function getMissionVideoReviewDetailForBrand(accountId: string, id: string) {
+  const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
+  const item = await getMissionVideoReviewDetailForAdmin(id);
+  if (item.campaign.brandId !== brandOwnerAccountId) throw new AppError("Forbidden", 403, "BRAND_FORBIDDEN");
+  return item;
+}
+
+export async function approveMissionVideoReviewByBrand(accountId: string, id: string) {
+  await getMissionVideoReviewDetailForBrand(accountId, id);
+  return approveMissionVideoReviewByAdmin(accountId, id);
+}
+
+export async function rejectMissionVideoReviewByBrand(accountId: string, id: string, feedback: string) {
+  await getMissionVideoReviewDetailForBrand(accountId, id);
+  return rejectMissionVideoReviewByAdmin(accountId, id, feedback);
+}
+
+export async function listMissionFinalReviewsForBrand(
+  accountId: string,
+  input: {
+    query?: string;
+    campaignId?: string;
+    campaign?: string;
+    productReceiveOption?: ProductReceiveOption;
+    publishStatus?: CreatorMissionPublishStatus;
+    sort?: Sort;
+    page?: number;
+    limit?: number;
+  }
+) {
+  const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
+  const where: Prisma.CreatorMissionWhereInput = {
+    campaign: { brandId: brandOwnerAccountId },
+    publishStatus: input.publishStatus ?? "PENDING"
+  };
+  if (input.campaignId) where.campaignId = input.campaignId;
+  if (input.campaign?.trim()) {
+    where.campaign = {
+      brandId: brandOwnerAccountId,
+      title: { contains: input.campaign.trim(), mode: "insensitive" }
+    };
+  }
+  if (input.productReceiveOption) where.productReceiveOption = input.productReceiveOption;
+  if (input.query?.trim()) {
+    const q = input.query.trim();
+    where.OR = [
+      { account: { displayName: { contains: q, mode: "insensitive" } } },
+      { account: { email: { contains: q, mode: "insensitive" } } },
+      { mission: { title: { contains: q, mode: "insensitive" } } },
+      { campaign: { title: { contains: q, mode: "insensitive" } } }
+    ];
+  }
+  const paging = toPagination(input.page, input.limit);
+  const [total, items] = await prisma.$transaction([
+    prisma.creatorMission.count({ where }),
+    prisma.creatorMission.findMany({
+      where,
+      include: creatorMissionInclude,
+      orderBy: { publishSubmittedAt: toOrder(input.sort) },
+      skip: paging.skip,
+      take: paging.limit
+    })
+  ]);
+  return { items: items.map(mapMission), pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
+}
+
+export async function getMissionFinalReviewDetailForBrand(accountId: string, id: string) {
+  const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
+  const item = await getMissionFinalReviewDetailForAdmin(id);
+  if (item.campaign.brandId !== brandOwnerAccountId) throw new AppError("Forbidden", 403, "BRAND_FORBIDDEN");
+  return item;
+}
+
+export async function approveMissionFinalReviewByBrand(accountId: string, id: string, input?: { reimbursementAmountVnd?: number }) {
+  await getMissionFinalReviewDetailForBrand(accountId, id);
+  return approveMissionFinalReviewByAdmin(accountId, id, input);
+}
+
+export async function rejectMissionFinalReviewByBrand(accountId: string, id: string, feedback: string) {
+  await getMissionFinalReviewDetailForBrand(accountId, id);
+  return rejectMissionFinalReviewByAdmin(accountId, id, feedback);
 }

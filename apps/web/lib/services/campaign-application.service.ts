@@ -54,7 +54,7 @@ function toSnapshot(
       lifecycleStatus: null
     },
     PROFILE_REQUIRED: {
-      label: "Hoàn thiện hồ sơ Creator",
+      label: "Hoàn thiện thông tin mạng xã hội",
       disabled: true,
       message: "Bạn cần hoàn thiện hồ sơ Creator và chọn nền tảng chính trước khi xin làm nhiệm vụ.",
       rejectReason: null,
