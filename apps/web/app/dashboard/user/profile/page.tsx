@@ -65,6 +65,10 @@ function resolveAvatarSrc(input?: string | null) {
   }
 }
 
+function onlyDigits(raw: string) {
+  return raw.replace(/\D/g, "");
+}
+
 export default function UserProfilePage() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -309,7 +313,8 @@ export default function UserProfilePage() {
                   <option value="OTHER">OTHER</option>
                 </select>
                 <input className="dc-input" placeholder="Liên kết mạng xã hội" type="url" value={creatorForm.socialUrl} onChange={(e) => setCreatorForm((x) => ({ ...x, socialUrl: e.target.value }))} required />
-                <input className="dc-input" placeholder="Số lượng người theo dõi" type="number" min={0} value={creatorForm.followerCount} onChange={(e) => setCreatorForm((x) => ({ ...x, followerCount: e.target.value }))} />
+                <input className="dc-input" placeholder="Số lượng người theo dõi" type="text" inputMode="numeric" value={creatorForm.followerCount} onChange={(e) => setCreatorForm((x) => ({ ...x, followerCount: onlyDigits(e.target.value) }))} />
+                <p className="text-xs font-medium text-zinc-500">Đơn vị: follower, chỉ nhập số.</p>
                 <textarea className="dc-input min-h-24" placeholder="Giới thiệu bản thân" value={creatorForm.bio} onChange={(e) => setCreatorForm((x) => ({ ...x, bio: e.target.value }))} />
                 <button className="dc-btn-primary" disabled={submittingCreator} type="submit">{submittingCreator ? "Đang gửi..." : creatorStatus ? "Gửi lại hồ sơ Creator" : "Đăng ký Creator"}</button>
               </form>

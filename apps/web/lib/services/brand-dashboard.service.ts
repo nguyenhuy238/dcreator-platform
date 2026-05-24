@@ -85,6 +85,11 @@ type BrandMeta = {
 
 type VerificationStatus = BrandMeta["brandProfile"]["verificationStatus"];
 
+type CreatorMeta = {
+  categories: string[];
+  socialLinks: Array<{ label: string; url: string }>;
+};
+
 function parseBrandMeta(value: unknown): BrandMeta {
   const fallback: BrandMeta = {
     brandProfile: {
@@ -856,6 +861,22 @@ export async function listBrandCampaigns(accountId: string) {
   }));
 }
 
+function parseCreatorMeta(value: unknown): CreatorMeta {
+  const fallback: CreatorMeta = { categories: [], socialLinks: [] };
+  if (!value || typeof value !== "object") return fallback;
+  const raw = value as Record<string, unknown>;
+  const categories = Array.isArray(raw.categories)
+    ? raw.categories.filter((item): item is string => typeof item === "string")
+    : [];
+  const socialLinks = Array.isArray(raw.socialLinks)
+    ? raw.socialLinks.filter(
+        (item): item is { label: string; url: string } =>
+          Boolean(item && typeof item === "object" && typeof (item as { label?: unknown }).label === "string" && typeof (item as { url?: unknown }).url === "string")
+      )
+    : [];
+  return { categories, socialLinks };
+}
+
 export async function listBrandCampaignRequests(accountId: string) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true });
   const brand = ctx.brand;
@@ -929,7 +950,7 @@ export async function addRewardTier(accountId: string, input: RewardInput) {
 
 export async function listCreatorApplications(accountId: string) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true });
-  return prisma.missionSubmission.findMany({
+  const submissions = await prisma.missionSubmission.findMany({
     where: {
       mission: {
         campaign: { brandId: ctx.brandOwnerAccountId },
@@ -943,11 +964,49 @@ export async function listCreatorApplications(accountId: string) {
           id: true,
           displayName: true,
           email: true,
+          profile: {
+            select: {
+              bio: true,
+              socialLinks: true
+            }
+          },
           creatorProfile: {
             select: {
               mainPlatform: true,
               socialUrl: true,
-              followerCount: true
+              followerCount: true,
+              bio: true,
+              contentCategory: true,
+              portfolioUrl: true,
+              location: true,
+              expectedRate: true,
+              maxJobsPerMonth: true
+            }
+          },
+          submissions: {
+            where: {
+              lifecycleStatus: { in: ["APPROVED", "DONE"] }
+            },
+            orderBy: { updatedAt: "desc" },
+            take: 6,
+            select: {
+              id: true,
+              lifecycleStatus: true,
+              updatedAt: true,
+              mission: {
+                select: {
+                  id: true,
+                  title: true,
+                  campaign: {
+                    select: {
+                      id: true,
+                      title: true,
+                      slug: true,
+                      status: true
+                    }
+                  }
+                }
+              }
             }
           }
         }
@@ -955,6 +1014,36 @@ export async function listCreatorApplications(accountId: string) {
       mission: { select: { id: true, title: true, audience: true, campaign: { select: { id: true, title: true } } } }
     },
     orderBy: { createdAt: "desc" }
+  });
+
+  return submissions.map((item) => {
+    const meta = parseCreatorMeta(item.account.profile?.socialLinks);
+    const socialMap = new Map(meta.socialLinks.map((x) => [x.label.trim().toLowerCase(), x.url]));
+    const inferredCategory = meta.categories.length > 0 ? meta.categories.join(", ") : null;
+
+    return {
+      ...item,
+      account: {
+        ...item.account,
+        creatorProfile: {
+          mainPlatform: item.account.creatorProfile?.mainPlatform ?? "OTHER",
+          socialUrl:
+            item.account.creatorProfile?.socialUrl ??
+            socialMap.get("tiktok") ??
+            socialMap.get("facebook") ??
+            socialMap.get("instagram") ??
+            socialMap.get("youtube") ??
+            "",
+          followerCount: item.account.creatorProfile?.followerCount ?? null,
+          bio: item.account.profile?.bio ?? item.account.creatorProfile?.bio ?? null,
+          contentCategory: item.account.creatorProfile?.contentCategory ?? inferredCategory,
+          portfolioUrl: item.account.creatorProfile?.portfolioUrl ?? socialMap.get("portfolio") ?? null,
+          location: item.account.creatorProfile?.location ?? null,
+          expectedRate: item.account.creatorProfile?.expectedRate ?? null,
+          maxJobsPerMonth: item.account.creatorProfile?.maxJobsPerMonth ?? null
+        }
+      }
+    };
   });
 }
 

@@ -39,6 +39,21 @@ function statusTone(text: string) {
   return "text-amber-700";
 }
 
+function onlyDigits(raw: string) {
+  return raw.replace(/\D/g, "");
+}
+
+function parseNonNegativeInt(raw: string) {
+  const digits = onlyDigits(raw);
+  if (!digits) return 0;
+  return Number.parseInt(digits, 10);
+}
+
+function formatIntForInput(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "";
+  return value.toLocaleString("vi-VN");
+}
+
 export function WalletPageClient() {
   const [data, setData] = useState<WalletResponse["data"] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -135,12 +150,13 @@ export function WalletPageClient() {
                     <span>Số tiền nạp (VND)</span>
                     <input
                       className="dc-input"
-                      type="number"
-                      min={1000}
-                      step={1000}
-                      value={amountVnd}
-                      onChange={(event) => setAmountVnd(Number(event.target.value))}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="1.000"
+                      value={formatIntForInput(amountVnd)}
+                      onChange={(event) => setAmountVnd(parseNonNegativeInt(event.target.value))}
                     />
+                    <span className="text-xs text-zinc-500">Đơn vị: VND, tối thiểu 1.000 VND.</span>
                   </label>
                   <label className="grid gap-1 text-sm font-medium text-zinc-700">
                     <span>Idempotency key</span>

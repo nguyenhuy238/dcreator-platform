@@ -12,6 +12,25 @@ type Settings = {
   maintenanceMessage: string;
 };
 
+function onlyDigits(raw: string) {
+  return raw.replace(/\D/g, "");
+}
+
+function parseNonNegativeInt(raw: string) {
+  const digits = onlyDigits(raw);
+  if (!digits) return 0;
+  return Number.parseInt(digits, 10);
+}
+
+function parsePercent(raw: string) {
+  return Math.min(100, parseNonNegativeInt(raw));
+}
+
+function formatIntForInput(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "";
+  return value.toLocaleString("vi-VN");
+}
+
 export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -75,15 +94,18 @@ export default function AdminSettingsPage() {
       <form className="dc-card grid gap-4 p-5 md:grid-cols-2" onSubmit={onSubmit}>
         <label className="grid gap-1 text-sm font-medium text-zinc-700">
           SLA duyệt (giờ)
-          <input className="dc-input" type="number" min={1} max={168} value={form.reviewSlaHours} onChange={(e) => setForm((prev) => ({ ...prev, reviewSlaHours: Number(e.target.value) }))} />
+          <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={formatIntForInput(form.reviewSlaHours)} onChange={(e) => setForm((prev) => ({ ...prev, reviewSlaHours: Math.min(168, Math.max(1, parseNonNegativeInt(e.target.value))) }))} />
+          <span className="text-xs text-zinc-500">Đơn vị: giờ, phạm vi cho phép 1-168.</span>
         </label>
         <label className="grid gap-1 text-sm font-medium text-zinc-700">
           Ngưỡng payout tự động (VND)
-          <input className="dc-input" type="number" min={0} value={form.payoutAutoThresholdVnd} onChange={(e) => setForm((prev) => ({ ...prev, payoutAutoThresholdVnd: Number(e.target.value) }))} />
+          <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={formatIntForInput(form.payoutAutoThresholdVnd)} onChange={(e) => setForm((prev) => ({ ...prev, payoutAutoThresholdVnd: parseNonNegativeInt(e.target.value) }))} />
+          <span className="text-xs text-zinc-500">Đơn vị: VND, dùng để kích hoạt auto payout.</span>
         </label>
         <label className="grid gap-1 text-sm font-medium text-zinc-700">
           Ngưỡng cảnh báo fraud (%)
-          <input className="dc-input" type="number" min={0} max={100} value={form.fraudScoreThreshold} onChange={(e) => setForm((prev) => ({ ...prev, fraudScoreThreshold: Number(e.target.value) }))} />
+          <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={form.fraudScoreThreshold === 0 ? "" : String(form.fraudScoreThreshold)} onChange={(e) => setForm((prev) => ({ ...prev, fraudScoreThreshold: parsePercent(e.target.value) }))} />
+          <span className="text-xs text-zinc-500">Đơn vị: %, phạm vi 0-100.</span>
         </label>
         <label className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm font-medium text-zinc-700">
           <input type="checkbox" checked={form.requireRejectReason} onChange={(e) => setForm((prev) => ({ ...prev, requireRejectReason: e.target.checked }))} />

@@ -66,6 +66,21 @@ function formatCurrency(value: number) {
   return `${value.toLocaleString("vi-VN")}đ`;
 }
 
+function onlyDigits(raw: string) {
+  return raw.replace(/\D/g, "");
+}
+
+function parseNonNegativeInt(raw: string) {
+  const digits = onlyDigits(raw);
+  if (!digits) return 0;
+  return Number.parseInt(digits, 10);
+}
+
+function formatIntForInput(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "";
+  return value.toLocaleString("vi-VN");
+}
+
 function fulfillmentLabel(value: FulfillmentType) {
   return value === "NONE_WAREHOUSE" ? "Gửi kho NONE" : "Brand tự fulfillment";
 }
@@ -82,6 +97,7 @@ export default function BrandProductsPage() {
   const [form, setForm] = useState<Product>(defaultProduct);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -150,6 +166,25 @@ export default function BrandProductsPage() {
     }
   }
 
+  async function uploadProductImage(file: File) {
+    setUploadingImage(true);
+    setError("");
+    try {
+      const formData = new FormData();
+      formData.append("logo", file);
+      const response = await fetch("/api/uploads/brand-logo", { method: "POST", body: formData });
+      const payload = (await response.json()) as ApiResponse<{ logoUrl: string }>;
+      if (!response.ok || !payload.success || !payload.data?.logoUrl) {
+        throw new Error(payload.success ? "Không thể tải ảnh sản phẩm" : payload.error);
+      }
+      setField("imageUrl", payload.data.logoUrl);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Không thể tải ảnh sản phẩm");
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
   return (
     <>
       
@@ -170,7 +205,8 @@ export default function BrandProductsPage() {
             </label>
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">
               SKU
-              <input className="dc-input" value={form.sku} onChange={(event) => setField("sku", event.target.value)} required />
+              <input className="dc-input" value={form.sku} onChange={(event) => setField("sku", event.target.value.toUpperCase().trimStart())} required />
+              <span className="text-xs font-medium text-zinc-500">Mã nội bộ sản phẩm, tự động viết hoa.</span>
             </label>
             <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
               Mô tả sản phẩm
@@ -178,19 +214,56 @@ export default function BrandProductsPage() {
             </label>
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">
               Hình ảnh sản phẩm URL
-              <input className="dc-input" type="url" value={form.imageUrl} onChange={(event) => setField("imageUrl", event.target.value)} placeholder="https://..." />
+              <div className="grid gap-2">
+                <input className="dc-input bg-white" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(event) => {
+                  const file = event.target.files?.[0] ?? null;
+                  if (file) void uploadProductImage(file);
+                  event.currentTarget.value = "";
+                }} disabled={uploadingImage} />
+                <input className="dc-input" type="url" value={form.imageUrl} onChange={(event) => setField("imageUrl", event.target.value.trim())} placeholder="https://..." />
+              </div>
+              <span className="text-xs font-medium text-zinc-500">Nhập URL ảnh đầy đủ, ví dụ `https://...`.</span>
+              {uploadingImage ? <span className="text-xs font-medium text-zinc-500">Đang tải ảnh...</span> : null}
+              {form.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={form.imageUrl} alt="Product preview" className="h-28 w-full rounded-xl border border-zinc-200 object-cover" />
+              ) : null}
             </label>
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">
               Voucher có thể phát hành
-              <input className="dc-input" type="number" min={0} value={form.voucherStock} onChange={(event) => setField("voucherStock", Number(event.target.value))} />
+              <input
+                className="dc-input"
+                type="text"
+                inputMode="numeric"
+                placeholder="0"
+                value={formatIntForInput(form.voucherStock)}
+                onChange={(event) => setField("voucherStock", parseNonNegativeInt(event.target.value))}
+              />
+              <span className="text-xs font-medium text-zinc-500">Đơn vị: số lượng voucher (cái).</span>
             </label>
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">
               Giá bán đề xuất
-              <input className="dc-input" type="number" min={0} value={form.suggestedPriceVnd} onChange={(event) => setField("suggestedPriceVnd", Number(event.target.value))} />
+              <input
+                className="dc-input"
+                type="text"
+                inputMode="numeric"
+                placeholder="0"
+                value={formatIntForInput(form.suggestedPriceVnd)}
+                onChange={(event) => setField("suggestedPriceVnd", parseNonNegativeInt(event.target.value))}
+              />
+              <span className="text-xs font-medium text-zinc-500">Đơn vị: VND, chỉ nhập số.</span>
             </label>
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">
               Giá vốn
-              <input className="dc-input" type="number" min={0} value={form.costPriceVnd} onChange={(event) => setField("costPriceVnd", Number(event.target.value))} />
+              <input
+                className="dc-input"
+                type="text"
+                inputMode="numeric"
+                placeholder="0"
+                value={formatIntForInput(form.costPriceVnd)}
+                onChange={(event) => setField("costPriceVnd", parseNonNegativeInt(event.target.value))}
+              />
+              <span className="text-xs font-medium text-zinc-500">Đơn vị: VND, giá nhập/giá vốn thực tế.</span>
             </label>
             <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
               Chính sách đổi trả
@@ -202,11 +275,20 @@ export default function BrandProductsPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">
               Số lượng lô hàng
-              <input className="dc-input" type="number" min={0} value={form.batches[0]?.quantity ?? 0} onChange={(event) => setBatchField("quantity", Number(event.target.value))} />
+              <input
+                className="dc-input"
+                type="text"
+                inputMode="numeric"
+                placeholder="0"
+                value={formatIntForInput(form.batches[0]?.quantity ?? 0)}
+                onChange={(event) => setBatchField("quantity", parseNonNegativeInt(event.target.value))}
+              />
+              <span className="text-xs font-medium text-zinc-500">Đơn vị: sản phẩm (cái) trong lô.</span>
             </label>
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">
               Hạn sử dụng
               <input className="dc-input" type="date" value={form.batches[0]?.expiryDate ?? ""} onChange={(event) => setBatchField("expiryDate", event.target.value)} />
+              <span className="text-xs font-medium text-zinc-500">Trình duyệt có thể hiển thị khác nhau theo locale, dữ liệu lưu chuẩn ISO date.</span>
             </label>
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">
               Hình thức nhập kho
