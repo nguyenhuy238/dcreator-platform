@@ -1,5 +1,16 @@
 import type { Metadata } from "next";
+import { Manrope, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin", "vietnamese"],
+  variable: "--font-display"
+});
+
+const manrope = Manrope({
+  subsets: ["latin", "vietnamese"],
+  variable: "--font-sans"
+});
 
 export const metadata: Metadata = {
   title: "dCreator - Creator Commerce Platform",
@@ -9,7 +20,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="vi" suppressHydrationWarning>
-      <body>{children}</body>
+      <body className={`${spaceGrotesk.variable} ${manrope.variable}`}>{children}</body>
     </html>
   );
 }

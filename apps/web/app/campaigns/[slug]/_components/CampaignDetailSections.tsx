@@ -14,18 +14,11 @@ export function HeroSection({ hero }: { hero: CampaignDetailDTO["hero"] }) {
       )}
       <h1 className="mt-3 text-3xl font-black tracking-tight text-zinc-900">{hero.title}</h1>
       <p className="mt-2 text-slate-600">{hero.description}</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700">Brand: {hero.brand}</span>
-        <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700">Creator: {hero.creator ?? "Chưa có"}</span>
-        <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700">Loại: {hero.campaignType}</span>
-        <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700">Trạng thái: {hero.status}</span>
-        <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700">Hạn chót: {formatDateTime(hero.deadline)}</span>
-      </div>
     </section>
   );
 }
 
-export function FundingSection({ funding }: { funding: CampaignDetailDTO["funding"] }) {
+export function FundingSection({ funding, hero }: { funding: CampaignDetailDTO["funding"]; hero: CampaignDetailDTO["hero"] }) {
   return (
     <section className="dc-card p-4 md:p-5">
       <h2 className="text-2xl font-black text-zinc-900">Tiến độ ủng hộ</h2>
@@ -46,6 +39,13 @@ export function FundingSection({ funding }: { funding: CampaignDetailDTO["fundin
       <div className="flex flex-wrap gap-4 text-sm text-slate-600">
         <p>{funding.backerCount} backers</p>
         <p>Còn lại: {funding.remainingTimeLabel}</p>
+      </div>
+      <div className="mt-4 grid gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
+        <p>Brand: {hero.brand}</p>
+        <p>Creator: {hero.creator ?? "Chưa có"}</p>
+        <p>Loại: {hero.campaignType}</p>
+        <p>Trạng thái: {hero.status}</p>
+        <p>Hạn chót: {formatDateTime(hero.deadline)}</p>
       </div>
     </section>
   );

@@ -69,7 +69,7 @@ export async function listCampaigns(input: ListCampaignsInput) {
         backerCount: true,
         endsAt: true,
         createdAt: true,
-        brand: { select: { displayName: true } },
+        brand: { select: { displayName: true, avatarUrl: true } },
         creator: { select: { displayName: true } }
       }
     })
@@ -92,10 +92,34 @@ export async function listCampaigns(input: ListCampaignsInput) {
   const rewardByCampaignId = new Map<string, number>(
     rewardSums.map((row) => [row.campaignId, row._sum.stockRemaining ?? 0])
   );
+  const missionSubmissionByMission =
+    campaignIds.length === 0
+      ? []
+      : await prisma.missionSubmission.groupBy({
+          by: ["missionId"],
+          where: { mission: { campaignId: { in: campaignIds } } },
+          _count: { _all: true }
+        });
+  const missionIds = missionSubmissionByMission.map((item) => item.missionId);
+  const missions =
+    missionIds.length === 0
+      ? []
+      : await prisma.mission.findMany({
+          where: { id: { in: missionIds } },
+          select: { id: true, campaignId: true }
+        });
+  const missionIdToCampaignId = new Map<string, string>(missions.map((mission) => [mission.id, mission.campaignId]));
+  const creatorApplicantsByCampaignId = new Map<string, number>();
+  for (const row of missionSubmissionByMission) {
+    const campaignId = missionIdToCampaignId.get(row.missionId);
+    if (!campaignId) continue;
+    creatorApplicantsByCampaignId.set(campaignId, (creatorApplicantsByCampaignId.get(campaignId) ?? 0) + row._count._all);
+  }
 
   return {
     items: campaigns.map((campaign) => {
       const rewardsLeft = rewardByCampaignId.get(campaign.id) ?? 0;
+      const creatorApplicants = creatorApplicantsByCampaignId.get(campaign.id) ?? 0;
 
       return {
         id: campaign.id,
@@ -103,6 +127,7 @@ export async function listCampaigns(input: ListCampaignsInput) {
         title: campaign.title,
         coverImageUrl: campaign.coverImageUrl,
         brand: campaign.brand.displayName,
+        brandLogoUrl: campaign.brand.avatarUrl,
         creator: campaign.creator?.displayName ?? null,
         campaignType: campaign.campaignType,
         category: campaign.category,
@@ -113,6 +138,7 @@ export async function listCampaigns(input: ListCampaignsInput) {
             ? Math.min(100, Math.round((campaign.fundedAmountVnd / campaign.targetAmountVnd) * 100))
             : 0,
         backers: campaign.backerCount,
+        creatorApplicants,
         rewardsLeft,
         deadline: campaign.endsAt
       };

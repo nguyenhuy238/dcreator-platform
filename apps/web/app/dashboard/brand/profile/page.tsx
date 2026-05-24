@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
 
 type BrandProfile = {
@@ -35,7 +35,21 @@ export default function BrandProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [form, setForm] = useState<BrandProfile>(defaultForm);
+
+  function normalizeLogoUrl(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (trimmed.startsWith("/")) {
+      if (typeof window !== "undefined") {
+        return `${window.location.origin}${trimmed}`;
+      }
+      return trimmed;
+    }
+    return `https://${trimmed}`;
+  }
 
   async function loadProfile() {
     setLoading(true);
@@ -64,10 +78,14 @@ export default function BrandProfilePage() {
     setError("");
     setSuccess("");
     try {
+      const payloadBody: BrandProfile = {
+        ...form,
+        logoUrl: normalizeLogoUrl(form.logoUrl)
+      };
       const response = await fetch("/api/brand/dashboard/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form)
+        body: JSON.stringify(payloadBody)
       });
       const payload = (await response.json()) as ApiResponse<BrandProfile>;
       if (!response.ok || !payload.success) {
@@ -79,6 +97,33 @@ export default function BrandProfilePage() {
       setError(requestError instanceof Error ? requestError.message : "Cập nhật hồ sơ Brand thất bại");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleLogoUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+    setUploadingLogo(true);
+    setError("");
+    setSuccess("");
+    try {
+      const formData = new FormData();
+      formData.append("logo", file);
+      const response = await fetch("/api/uploads/brand-logo", {
+        method: "POST",
+        body: formData
+      });
+      const payload = (await response.json()) as ApiResponse<{ logoUrl: string }>;
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.success ? "Không thể tải logo lên" : payload.error);
+      }
+      setForm((current) => ({ ...current, logoUrl: payload.data.logoUrl }));
+      setSuccess("Đã tải logo lên. Nhấn 'Lưu hồ sơ Brand' để cập nhật chính thức.");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Tải logo thất bại");
+    } finally {
+      setUploadingLogo(false);
+      event.target.value = "";
     }
   }
 
@@ -129,16 +174,18 @@ export default function BrandProfilePage() {
                   required
                 />
               </label>
-              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-                URL logo
+              <div className="grid gap-2">
+                <label className="text-sm font-semibold text-zinc-700">Logo Brand</label>
+                <input className="dc-input bg-white" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={handleLogoUpload} disabled={uploadingLogo} />
+                {uploadingLogo ? <p className="text-sm text-zinc-500">Đang tải logo lên...</p> : null}
                 <input
                   className="dc-input"
-                  type="url"
+                  type="text"
                   value={form.logoUrl}
                   onChange={(event) => setForm((current) => ({ ...current, logoUrl: event.target.value }))}
-                  placeholder="https://..."
+                  placeholder="https://... hoặc URL sau khi upload"
                 />
-              </label>
+              </div>
               <label className="grid gap-2 text-sm font-semibold text-zinc-700">
                 Thông tin kinh doanh
                 <textarea
