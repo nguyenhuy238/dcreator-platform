@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data?: T; error?: string };
@@ -38,6 +38,69 @@ type MissionItem = {
 type FormMap = Record<string, string>;
 type PreVideoChoice = "VIDEO" | "TRANSCRIPT";
 type PreVideoChoiceMap = Record<string, PreVideoChoice>;
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function toTranscriptEditorHtml(value: string | null | undefined) {
+  if (!value) return "";
+  if (/<[a-z][\s\S]*>/i.test(value)) return value;
+  return escapeHtml(value).replace(/\n/g, "<br>");
+}
+
+type TranscriptEditorProps = {
+  editorId: string;
+  initialHtml: string;
+  disabled?: boolean;
+  onChange: (html: string) => void;
+};
+
+function TranscriptEditor({ editorId, initialHtml, disabled, onChange }: TranscriptEditorProps) {
+  const editorRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!editorRef.current) return;
+    if (editorRef.current.innerHTML !== initialHtml) {
+      editorRef.current.innerHTML = initialHtml;
+    }
+  }, [initialHtml]);
+
+  function applyCommand(command: string) {
+    if (disabled || !editorRef.current) return;
+    editorRef.current.focus();
+    document.execCommand(command, false);
+    onChange(editorRef.current.innerHTML);
+  }
+
+  function handleToolbarMouseDown(event: React.MouseEvent<HTMLButtonElement>) {
+    // Keep current text selection inside contentEditable when clicking toolbar buttons.
+    event.preventDefault();
+  }
+
+  return (
+    <div className="grid gap-2">
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="dc-btn-secondary" disabled={disabled} onMouseDown={handleToolbarMouseDown} onClick={() => applyCommand("bold")}><strong>B</strong></button>
+        <button type="button" className="dc-btn-secondary" disabled={disabled} onMouseDown={handleToolbarMouseDown} onClick={() => applyCommand("italic")}><em>I</em></button>
+        <button type="button" className="dc-btn-secondary" disabled={disabled} onMouseDown={handleToolbarMouseDown} onClick={() => applyCommand("underline")}><u>U</u></button>
+      </div>
+      <div
+        id={editorId}
+        ref={editorRef}
+        className="dc-input min-h-32 bg-white"
+        contentEditable={!disabled}
+        suppressContentEditableWarning
+        onInput={(event) => onChange((event.currentTarget as HTMLDivElement).innerHTML)}
+      />
+    </div>
+  );
+}
 
 function fmtDate(value: string | null) {
   if (!value) return "Không giới hạn";
@@ -319,7 +382,6 @@ export default function CreatorMissionsPage() {
                       {item.status === "DRAFT_PENDING" && item.videoReviewFeedback ? <p className="mt-2 text-sm text-red-700">Feedback kịch bản: {item.videoReviewFeedback}</p> : null}
                       {item.videoReviewStatus !== "NOT_SUBMITTED" && item.videoReviewFeedback ? <p className="mt-2 text-sm text-red-700">Feedback video: {item.videoReviewFeedback}</p> : null}
                       {item.publishFeedback ? <p className="mt-1 text-sm text-red-700">Feedback bước cuối: {item.publishFeedback}</p> : null}
-                      {item.submission?.rejectReason ? <p className="mt-1 text-sm text-red-700">Lý do từ chối gần nhất: {item.submission.rejectReason}</p> : null}
 
                       {canSubmitPurchase ? (
                         <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
@@ -359,12 +421,11 @@ export default function CreatorMissionsPage() {
                             </a>
                           ) : null}
                           <div className="mt-2 grid gap-2">
-                            <textarea
-                              className="dc-input min-h-28"
-                              placeholder="Nhập nội dung kịch bản..."
-                              value={transcriptMap[item.id] ?? item.submission?.proofTextNote ?? ""}
-                              onChange={(e) => setTranscriptMap((s) => ({ ...s, [item.id]: e.target.value }))}
+                            <TranscriptEditor
+                              editorId={`transcript-editor-${item.id}`}
+                              initialHtml={toTranscriptEditorHtml(transcriptMap[item.id] ?? item.submission?.proofTextNote ?? "")}
                               disabled={isTranscriptFlow && item.submission?.status === "SUBMITTED"}
+                              onChange={(html) => setTranscriptMap((s) => ({ ...s, [item.id]: html }))}
                             />
                             {!(isTranscriptFlow && item.submission?.status === "SUBMITTED") ? (
                               <button className="dc-btn-primary" disabled={busyId === item.id} onClick={() => void submitTranscript(item)}>

@@ -19,6 +19,23 @@ function fmtDate(value: string | null) {
   return new Date(value).toLocaleString("vi-VN");
 }
 
+function transcriptPlainText(value: string | null | undefined) {
+  if (!value) return "";
+  return value
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|li|h3|h4|blockquote)>/gi, "\n")
+    .replace(/<li>/gi, "- ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#39;/gi, "'")
+    .replace(/&quot;/gi, "\"")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export default function BrandMissionReviewsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("applications");
 
@@ -220,7 +237,7 @@ function BrandMissionTranscriptReviewsTab() {
             ) : (
               items.map((item) => {
                 const statusLabel = transcriptStatusLabel(item);
-                const transcript = item.submission?.proofTextNote ?? "";
+                const transcript = transcriptPlainText(item.submission?.proofTextNote ?? "");
                 return (
                   <article key={item.id} className={`dc-card p-4 ${selectedId === item.id ? "border-zinc-900" : ""}`}>
                     <p className="font-semibold">{item.account.displayName}</p>
@@ -271,7 +288,10 @@ function BrandMissionTranscriptReviewsTab() {
                 <p><strong>Link sản phẩm:</strong> {detail.mission.productLink ?? "-"}</p>
                 <p><strong>Deadline:</strong> {fmtDate(detail.mission.deadlineAt)}</p>
                 <p><strong>Kịch bản:</strong></p>
-                <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 whitespace-pre-wrap">{detail.submission?.proofTextNote ?? "-"}</div>
+                <div
+                  className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 prose prose-zinc max-w-none"
+                  dangerouslySetInnerHTML={{ __html: detail.submission?.proofTextNote ?? "-" }}
+                />
                 {detail.submission?.fileUploadUrl ? (
                   <a
                     href={`/api/uploads/transcript-download?url=${encodeURIComponent(detail.submission.fileUploadUrl)}`}

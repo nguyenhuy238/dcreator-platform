@@ -81,6 +81,53 @@ function now() {
   return new Date();
 }
 
+function normalizeTranscriptHtml(raw: string) {
+  const withoutScripts = raw
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, "");
+
+  const normalizedBlocks = withoutScripts
+    .replace(/<(\/?)div\b/gi, "<$1p")
+    .replace(/<(\/?)h1\b/gi, "<$1h3")
+    .replace(/<(\/?)h2\b/gi, "<$1h3");
+
+  const withoutEvents = normalizedBlocks
+    .replace(/\son\w+\s*=\s*"[^"]*"/gi, "")
+    .replace(/\son\w+\s*=\s*'[^']*'/gi, "")
+    .replace(/\son\w+\s*=\s*[^\s>]+/gi, "");
+
+  const withoutJsHref = withoutEvents.replace(
+    /\s(href|src)\s*=\s*(['"])\s*javascript:[\s\S]*?\2/gi,
+    ""
+  );
+
+  return withoutJsHref.replace(
+    /<\/?([a-z0-9-]+)(\s[^>]*?)?>/gi,
+    (match, tagName: string) => {
+      const tag = tagName.toLowerCase();
+      const allowed = new Set(["p", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li", "h3", "h4", "blockquote"]);
+      return allowed.has(tag) ? match : "";
+    }
+  );
+}
+
+function transcriptHtmlToPlainText(html: string) {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|li|h3|h4|blockquote)>/gi, "\n")
+    .replace(/<li>/gi, "- ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#39;/gi, "'")
+    .replace(/&quot;/gi, "\"")
+    .replace(/\r/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function toPagination(page?: number, limit?: number) {
   const safePage = Number.isFinite(page) && (page ?? 0) > 0 ? Number(page) : 1;
   const safeLimit = Number.isFinite(limit) && (limit ?? 0) > 0 ? Math.min(Number(limit), 100) : 20;
@@ -708,10 +755,11 @@ export async function submitCreatorMissionTranscript(accountId: string, creatorM
     throw new AppError("Purchase proof is required before transcript submission", 409, "PURCHASE_PROOF_REQUIRED");
   }
 
-  const text = transcript.trim();
-  if (!text) throw new AppError("Transcript is required", 422, "TRANSCRIPT_REQUIRED");
+  const sanitizedHtml = normalizeTranscriptHtml(transcript.trim());
+  const plainText = transcriptHtmlToPlainText(sanitizedHtml);
+  if (!plainText) throw new AppError("Transcript is required", 422, "TRANSCRIPT_REQUIRED");
   const transcriptFileUrl = await saveTextUpload({
-    content: text,
+    content: plainText,
     folder: "creator-transcript",
     suffix: `mission-transcript-${creatorMissionId}`,
     ext: "txt"
@@ -721,7 +769,7 @@ export async function submitCreatorMissionTranscript(accountId: string, creatorM
     await tx.missionSubmission.update({
       where: { id: current.submissionId! },
       data: {
-        proofTextNote: text,
+        proofTextNote: sanitizedHtml,
         fileUploadUrl: transcriptFileUrl,
         status: "SUBMITTED",
         lifecycleStatus: "SUBMITTED",
