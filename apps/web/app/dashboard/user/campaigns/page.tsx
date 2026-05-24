@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { AppShell, PublicHeader } from "@/app/components/dcreator/layout/shell";
+import { AppShell } from "@/app/components/dcreator/layout/shell";
 import { EmptyState, ErrorState, PageHeader, SectionHeader, StatsCard } from "@/app/components/dcreator/ui/base";
 
 type MyContribution = {
@@ -42,7 +42,6 @@ export default function UserCampaignsPage() {
 
   return (
     <>
-      <PublicHeader />
       <AppShell>
         <PageHeader title="Campaign đã tham gia" subtitle="Lịch sử ủng hộ và trạng thái phần thưởng của bạn." action={<Link href="/campaigns" className="dc-btn-primary">Khám phá campaign</Link>} />
         {error ? <ErrorState title="Không thể tải dữ liệu" description={error} /> : null}

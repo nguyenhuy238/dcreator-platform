@@ -1,6 +1,22 @@
 /* global process */
 
-import { PrismaClient, CampaignCategory, CampaignStatus, CampaignType, MissionStatus, RewardType, Role, RoleRequestStatus, RoleRequestType } from "@prisma/client";
+import {
+  PrismaClient,
+  CampaignCategory,
+  CampaignStatus,
+  CampaignType,
+  ContributionPaymentMethod,
+  ContributionStatus,
+  MissionLifecycleStatus,
+  MissionStatus,
+  RewardType,
+  Role,
+  RoleRequestStatus,
+  RoleRequestType,
+  VoucherStatus,
+  VoucherUsageType,
+  WalletTransactionType
+} from "@prisma/client";
 import { randomBytes, scryptSync } from "node:crypto";
 
 const prisma = new PrismaClient();
@@ -67,7 +83,7 @@ async function main() {
   const qaUser = await upsertAccount(QA_USER_EMAIL, "QA User", Role.USER, QA_DEFAULT_PASSWORD);
   await ensureAccountRole(qaUser.id, Role.USER);
 
-  await ensureWallet(qaUser.id, 500_000, 0);
+  await ensureWallet(qaUser.id, 499_000, 0);
   await ensureWallet(creatorUser.id, 100_000, 0);
   await ensureWallet(brandUser.id, 200_000, 0);
 
@@ -193,6 +209,126 @@ async function main() {
     }
   });
 
+  const contribution = await prisma.contribution.upsert({
+    where: { supporterId_idempotencyKey: { supporterId: qaUser.id, idempotencyKey: "qa-seed-success-contribution" } },
+    update: {
+      campaignId: campaign.id,
+      rewardId: reward.id,
+      paymentMethod: ContributionPaymentMethod.N_POINTS,
+      status: ContributionStatus.SUCCESS,
+      amountVnd: 100000
+    },
+    create: {
+      campaignId: campaign.id,
+      supporterId: qaUser.id,
+      rewardId: reward.id,
+      paymentMethod: ContributionPaymentMethod.N_POINTS,
+      status: ContributionStatus.SUCCESS,
+      idempotencyKey: "qa-seed-success-contribution",
+      amountVnd: 100000
+    }
+  });
+
+  await prisma.rewardClaim.upsert({
+    where: { contributionId: contribution.id },
+    update: {
+      rewardId: reward.id,
+      accountId: qaUser.id,
+      voucherCode: "QA-VOUCHER-001",
+      status: VoucherStatus.ACTIVE,
+      usageType: VoucherUsageType.ONE_TIME,
+      expiryAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+    },
+    create: {
+      rewardId: reward.id,
+      contributionId: contribution.id,
+      accountId: qaUser.id,
+      voucherCode: "QA-VOUCHER-001",
+      status: VoucherStatus.ACTIVE,
+      usageType: VoucherUsageType.ONE_TIME,
+      expiryAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+    }
+  });
+
+  const existingSubmission = await prisma.missionSubmission.findUnique({
+    where: { missionId_accountId: { missionId, accountId: qaUser.id } },
+    select: { id: true }
+  });
+  if (existingSubmission) {
+    await prisma.missionSubmission.update({
+      where: { id: existingSubmission.id },
+      data: {
+        lifecycleStatus: MissionLifecycleStatus.REJECTED,
+        status: MissionStatus.REJECTED,
+        rejectReason: "QA seed: cần bổ sung proof rõ hơn.",
+        note: "QA sample submission"
+      }
+    });
+  } else {
+    await prisma.missionSubmission.create({
+      data: {
+        missionId,
+        accountId: qaUser.id,
+        lifecycleStatus: MissionLifecycleStatus.REJECTED,
+        status: MissionStatus.REJECTED,
+        rejectReason: "QA seed: cần bổ sung proof rõ hơn.",
+        note: "QA sample submission"
+      }
+    });
+  }
+
+  const wallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: qaUser.id } });
+  await prisma.walletTransaction.upsert({
+    where: { walletId_idempotencyKey: { walletId: wallet.id, idempotencyKey: "qa-seed-topup-01" } },
+    update: {
+      accountId: qaUser.id,
+      type: WalletTransactionType.TOPUP,
+      pointsDelta: 500000,
+      cashDeltaVnd: 0,
+      balanceAfterPoints: 500000,
+      balanceAfterCashVnd: 0,
+      referenceType: "PAYMENT_TRANSACTION",
+      referenceId: "qa-seed-topup-01"
+    },
+    create: {
+      walletId: wallet.id,
+      accountId: qaUser.id,
+      type: WalletTransactionType.TOPUP,
+      pointsDelta: 500000,
+      cashDeltaVnd: 0,
+      balanceAfterPoints: 500000,
+      balanceAfterCashVnd: 0,
+      referenceType: "PAYMENT_TRANSACTION",
+      referenceId: "qa-seed-topup-01",
+      idempotencyKey: "qa-seed-topup-01"
+    }
+  });
+  await prisma.walletTransaction.upsert({
+    where: { walletId_idempotencyKey: { walletId: wallet.id, idempotencyKey: "qa-seed-support-01" } },
+    update: {
+      accountId: qaUser.id,
+      type: WalletTransactionType.SUPPORT,
+      pointsDelta: -1000,
+      cashDeltaVnd: 0,
+      balanceAfterPoints: 499000,
+      balanceAfterCashVnd: 0,
+      referenceType: "CONTRIBUTION",
+      referenceId: contribution.id
+    },
+    create: {
+      walletId: wallet.id,
+      accountId: qaUser.id,
+      type: WalletTransactionType.SUPPORT,
+      pointsDelta: -1000,
+      cashDeltaVnd: 0,
+      balanceAfterPoints: 499000,
+      balanceAfterCashVnd: 0,
+      referenceType: "CONTRIBUTION",
+      referenceId: contribution.id,
+      idempotencyKey: "qa-seed-support-01"
+    }
+  });
+
   console.log("QA scenario ready:");
   console.log(`- admin: ${QA_ADMIN_EMAIL}`);
   console.log(`- creator pending: ${QA_CREATOR_EMAIL}`);
@@ -201,6 +337,8 @@ async function main() {
   console.log(`- campaign: ${campaign.slug}`);
   console.log(`- rewardId: ${reward.id}`);
   console.log(`- missionId: ${missionId}`);
+  console.log(`- seeded contribution: ${contribution.id}`);
+  console.log(`- seeded voucherCode: QA-VOUCHER-001`);
 }
 
 main()

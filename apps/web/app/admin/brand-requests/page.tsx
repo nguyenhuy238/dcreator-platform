@@ -20,6 +20,14 @@ type BrandRow = {
   fanpage: string | null;
   reviewNote: string | null;
   rejectReason: string | null;
+  revenueSharePercent: number | null;
+  commissionRatePercent: number | null;
+  bccAgreementAccepted: boolean;
+  bccAgreementVersion: string | null;
+  bccAgreementTerms: string | null;
+  legalResponsibilityAccepted: boolean;
+  contractFileUrl: string | null;
+  contractSignedAt: string | null;
   createdAt: string;
   reviewedAt: string | null;
   account: { id: string; email: string; displayName: string; profile: { phone: string | null } | null };
@@ -50,7 +58,8 @@ type StatusFilter = "" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_REV
 export default function AdminBrandRequestsPage() {
   const [items, setItems] = useState<BrandRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [listError, setListError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [toast, setToast] = useState("");
   const [status, setStatus] = useState<StatusFilter>("PENDING_REVIEW");
   const [industry, setIndustry] = useState("");
@@ -65,7 +74,7 @@ export default function AdminBrandRequestsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError("");
+    setListError("");
     try {
       const params = new URLSearchParams();
       if (status) params.set("status", status);
@@ -77,7 +86,7 @@ export default function AdminBrandRequestsPage() {
       if (!res.ok || !body.success) throw new Error(body.error ?? "Tải danh sách thất bại");
       setItems(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Tải danh sách thất bại");
+      setListError(e instanceof Error ? e.message : "Tải danh sách thất bại");
     } finally {
       setLoading(false);
     }
@@ -85,14 +94,14 @@ export default function AdminBrandRequestsPage() {
 
   const loadDetail = useCallback(async (id: string) => {
     setDetailLoading(true);
-    setError("");
+    setListError("");
     try {
       const res = await fetch(`/api/admin/brand-requests/${id}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<BrandDetail>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Tải chi tiết thất bại");
       setDetail(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Tải chi tiết thất bại");
+      setListError(e instanceof Error ? e.message : "Tải chi tiết thất bại");
     } finally {
       setDetailLoading(false);
     }
@@ -120,12 +129,12 @@ export default function AdminBrandRequestsPage() {
     const action = dialogAction;
     if (!action) return;
     if (action !== "approve" && reason.trim().length < 5) {
-      setError("Lý do tối thiểu 5 ký tự.");
+      setActionError("Lý do tối thiểu 5 ký tự.");
       return;
     }
 
     setActing(true);
-    setError("");
+    setActionError("");
     try {
       const endpoint = action === "approve" ? "approve" : action === "reject" ? "reject" : "request-changes";
       const payload = action === "approve" ? undefined : { reason: reason.trim() };
@@ -138,11 +147,12 @@ export default function AdminBrandRequestsPage() {
       if (!res.ok || !body.success) throw new Error(body.error ?? "Cập nhật thất bại");
       setDialogAction(null);
       setReason("");
+      setActionError("");
       setToast("Cập nhật trạng thái thành công");
       setTimeout(() => setToast(""), 1800);
       await Promise.all([load(), loadDetail(detail.id)]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Cập nhật thất bại");
+      setActionError(e instanceof Error ? e.message : "Cập nhật thất bại");
     } finally {
       setActing(false);
     }
@@ -178,10 +188,10 @@ export default function AdminBrandRequestsPage() {
       </section>
 
       {loading ? <div className="mt-4"><LoadingSkeleton rows={5} /></div> : null}
-      {error ? <div className="mt-4"><ErrorState title="Không tải được Brand requests" description={error} onRetry={() => void load()} /></div> : null}
-      {!loading && !error && items.length === 0 ? <div className="mt-4"><EmptyState title="Không có hồ sơ" description="Không có Brand phù hợp bộ lọc." /></div> : null}
+      {listError ? <div className="mt-4"><ErrorState title="Không tải được Brand requests" description={listError} onRetry={() => void load()} /></div> : null}
+      {!loading && !listError && items.length === 0 ? <div className="mt-4"><EmptyState title="Không có hồ sơ" description="Không có Brand phù hợp bộ lọc." /></div> : null}
 
-      {!loading && !error && items.length > 0 ? (
+      {!loading && !listError && items.length > 0 ? (
         <>
           <div className="mt-4 hidden overflow-x-auto rounded-2xl border border-zinc-200 bg-white lg:block">
             <table className="min-w-full text-sm">
@@ -235,6 +245,12 @@ export default function AdminBrandRequestsPage() {
                   <p>Inventory description: {detail.inventoryDescription ?? "-"}</p>
                   <p>Description: {detail.description ?? "-"}</p>
                   <p>Business goal: {detail.businessGoal ?? "-"}</p>
+                  <p>Revenue share: {detail.revenueSharePercent ?? "-"}%</p>
+                  <p>Platform commission: {detail.commissionRatePercent ?? "-"}%</p>
+                  <p>BCC version: {detail.bccAgreementVersion ?? "-"}</p>
+                  <p>BCC accepted: {detail.bccAgreementAccepted ? "Yes" : "No"}</p>
+                  <p>Legal responsibility accepted: {detail.legalResponsibilityAccepted ? "Yes" : "No"}</p>
+                  <p>Contract signed at: {detail.contractSignedAt ? new Date(detail.contractSignedAt).toLocaleString("vi-VN") : "-"}</p>
                   <p>Admin note: {detail.reviewNote ?? "-"}</p>
                   <p>Reject reason: {detail.rejectReason ?? "-"}</p>
                   <p>Reviewer: {detail.reviewedBy?.displayName ?? "-"}</p>
@@ -242,6 +258,22 @@ export default function AdminBrandRequestsPage() {
                   {detail.website ? <a href={detail.website} target="_blank" rel="noreferrer" className="mt-1 block break-all text-blue-700 underline">{detail.website}</a> : null}
                   {detail.fanpage ? <a href={detail.fanpage} target="_blank" rel="noreferrer" className="mt-1 block break-all text-blue-700 underline">{detail.fanpage}</a> : null}
                   {detail.businessLicenseUrl ? <a href={detail.businessLicenseUrl} target="_blank" rel="noreferrer" className="mt-1 block break-all text-blue-700 underline">Business license</a> : null}
+                  <div className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                    <p className="font-semibold text-zinc-900">Tải lên hợp đồng / tài liệu bổ sung</p>
+                    {detail.contractFileUrl ? (
+                      <a href={detail.contractFileUrl} target="_blank" rel="noreferrer" className="mt-1 block break-all text-blue-700 underline">
+                        {detail.contractFileUrl}
+                      </a>
+                    ) : (
+                      <p className="mt-1 text-zinc-600">Chưa có tệp được tải lên.</p>
+                    )}
+                  </div>
+                  {detail.bccAgreementTerms ? (
+                    <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                      <p className="font-semibold text-zinc-900">BCC terms submitted</p>
+                      <p className="mt-2 whitespace-pre-wrap text-zinc-700">{detail.bccAgreementTerms}</p>
+                    </div>
+                  ) : null}
                 </section>
 
                 <section className="dc-card p-4 text-sm">
@@ -261,11 +293,20 @@ export default function AdminBrandRequestsPage() {
                 <section className="dc-card p-4">
                   <p className="font-semibold">Thao tác duyệt</p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button className="dc-btn-primary" disabled={acting || detail.status !== "PENDING_REVIEW"} onClick={() => { setReason(""); setDialogAction("approve"); }}>Approve</button>
-                    <button className="dc-btn-secondary" disabled={acting || detail.status !== "PENDING_REVIEW"} onClick={() => { setReason(""); setDialogAction("reject"); }}>Reject</button>
-                    <button className="dc-btn-secondary" disabled={acting || detail.status !== "PENDING_REVIEW"} onClick={() => { setReason(""); setDialogAction("request-changes"); }}>Request changes</button>
+                    <button className="dc-btn-primary" disabled={acting || detail.status !== "PENDING_REVIEW"} onClick={() => { setReason(""); setActionError(""); setDialogAction("approve"); }}>Approve</button>
+                    <button className="dc-btn-secondary" disabled={acting || detail.status !== "PENDING_REVIEW"} onClick={() => { setReason(""); setActionError(""); setDialogAction("reject"); }}>Reject</button>
+                    <button className="dc-btn-secondary" disabled={acting || detail.status !== "PENDING_REVIEW"} onClick={() => { setReason(""); setActionError(""); setDialogAction("request-changes"); }}>Request changes</button>
                   </div>
-                  {dialogAction && dialogAction !== "approve" ? <textarea className="dc-input mt-3 min-h-24" placeholder="Nhập lý do bắt buộc..." value={reason} onChange={(e) => setReason(e.target.value)} /> : null}
+                  {dialogAction && dialogAction !== "approve" ? (
+                    <div className="mt-3 grid gap-2">
+                      <textarea className="dc-input min-h-24" placeholder="Nhập lý do bắt buộc..." value={reason} onChange={(e) => { setReason(e.target.value); if (actionError) setActionError(""); }} />
+                      {actionError ? <p className="text-sm text-red-600">{actionError}</p> : null}
+                      <div className="flex gap-2">
+                        <button className="dc-btn-secondary" disabled={acting} onClick={() => { setDialogAction(null); setReason(""); setActionError(""); }}>Hủy</button>
+                        <button className="dc-btn-primary" disabled={acting} onClick={() => void submitDecision()}>{acting ? "Đang xử lý..." : "Xác nhận"}</button>
+                      </div>
+                    </div>
+                  ) : null}
                 </section>
               </div>
             )}
@@ -274,9 +315,9 @@ export default function AdminBrandRequestsPage() {
       ) : null}
 
       <ConfirmDialog
-        open={Boolean(dialogAction)}
-        title={dialogAction === "approve" ? "Xác nhận duyệt Brand" : dialogAction === "reject" ? "Xác nhận từ chối" : "Xác nhận yêu cầu bổ sung"}
-        message={dialogAction === "approve" ? "Hồ sơ sẽ được duyệt, cập nhật Brand và cấp role BRAND_OWNER." : "Hành động này sẽ cập nhật trạng thái hồ sơ."}
+        open={dialogAction === "approve"}
+        title="Xác nhận duyệt Brand"
+        message="Hồ sơ sẽ được duyệt, cập nhật Brand và cấp role BRAND_OWNER."
         confirmLabel={acting ? "Đang xử lý..." : "Xác nhận"}
         onCancel={() => !acting && setDialogAction(null)}
         onConfirm={() => void submitDecision()}

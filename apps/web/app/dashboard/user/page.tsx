@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { Role } from "@prisma/client";
-import { AppShell, PublicHeader } from "@/app/components/dcreator/layout/shell";
+import { AppShell } from "@/app/components/dcreator/layout/shell";
 import {
   EmptyState,
   ErrorState,
@@ -15,15 +15,9 @@ import {
 } from "@/app/components/dcreator/ui/base";
 import { MissionCard, VoucherCard } from "@/app/components/dcreator/cards/campaign";
 import { getDefaultDashboardPath } from "@/lib/auth/dashboard-access";
+import { getNavItemsForWorkspace } from "@/lib/navigation";
 
-const nav = [
-  { href: "/dashboard/user", label: "Tổng quan" },
-  { href: "/dashboard/user/profile", label: "Hồ sơ người dùng" },
-  { href: "/campaigns", label: "Chiến dịch" },
-  { href: "/wallet", label: "Ví" },
-  { href: "/vouchers", label: "Voucher" },
-  { href: "/me/missions", label: "Nhiệm vụ" }
-];
+const nav = getNavItemsForWorkspace("user", ["USER", "CREATOR", "BRAND_OWNER", "BRAND_STAFF", "ADMIN", "OPS"]);
 
 type ApiSuccess<T> = { success: true; data: T };
 type ApiFailure = { success: false; error: string };
@@ -164,7 +158,6 @@ export default function UserDashboardPage() {
 
   return (
     <>
-      <PublicHeader />
       <AppShell sidebarItems={nav}>
         <PageHeader
           title="Dashboard Người dùng"
@@ -245,7 +238,7 @@ export default function UserDashboardPage() {
           <SectionHeader
             title="Voucher đã nhận"
             action={
-              <Link href="/vouchers" className="dc-btn-secondary">
+              <Link href="/dashboard/user/vouchers" className="dc-btn-secondary">
                 Nhận voucher
               </Link>
             }
@@ -280,7 +273,7 @@ export default function UserDashboardPage() {
           <SectionHeader
             title="Mission đã tham gia"
             action={
-              <Link href="/me/missions" className="dc-btn-secondary">
+              <Link href="/dashboard/user/missions" className="dc-btn-secondary">
                 Xem tất cả
               </Link>
             }
@@ -292,7 +285,7 @@ export default function UserDashboardPage() {
               title="Chưa có mission"
               description="Bạn chưa tham gia mission nào."
               action={
-                <Link href="/missions" className="dc-btn-primary">
+                <Link href="/dashboard/user/missions" className="dc-btn-primary">
                   Tham gia mission
                 </Link>
               }

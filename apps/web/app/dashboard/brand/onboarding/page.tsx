@@ -106,6 +106,7 @@ export default function BrandOnboardingPage() {
   const [contractFile, setContractFile] = useState<File | null>(null);
   const [uploadingContractFile, setUploadingContractFile] = useState(false);
   const [contractUploadError, setContractUploadError] = useState("");
+  const [activeAction, setActiveAction] = useState<"sign" | "request-review" | null>(null);
   const isWaitingReview = form.reviewStatus === "PENDING_REVIEW";
   const isSupplementaryBccApproved = form.supplementaryBccReviewApproved;
   const isSigned = form.completed && Boolean(form.contractSignedAt);
@@ -198,42 +199,52 @@ export default function BrandOnboardingPage() {
   }, []);
 
   async function submitForm(requestAdminReview: boolean) {
+    const actionLabel = requestAdminReview ? "gửi nội dung bổ sung" : "ký hợp đồng BCC";
+    setActiveAction(requestAdminReview ? "request-review" : "sign");
+
     // Client-side validation to give immediate feedback
     const errors: Record<string, string> = {};
-    if (!requestAdminReview) {
-      if (!form.legalName || !form.legalName.trim()) {
-        errors.legalName = "Vui lòng nhập Pháp nhân / tên công ty.";
-      } else if (form.legalName.trim().length < 2) {
-        errors.legalName = "Pháp nhân / tên công ty phải ít nhất 2 ký tự.";
-      }
-      if (!form.industry || !form.industry.trim()) {
-        errors.industry = "Vui lòng nhập Ngành hàng.";
-      } else if (form.industry.trim().length < 2) {
-        errors.industry = "Ngành hàng phải ít nhất 2 ký tự.";
-      }
-      if (!form.taxCode || !form.taxCode.trim()) {
-        errors.taxCode = "Vui lòng nhập Mã số thuế.";
-      } else if (form.taxCode.trim().length < 3) {
-        errors.taxCode = "Mã số thuế phải ít nhất 3 ký tự.";
-      }
-      if (!form.productCategories || !form.productCategories.trim()) {
-        errors.productCategories = "Vui lòng nhập Danh mục sản phẩm.";
-      } else if (form.productCategories.trim().length < 2) {
-        errors.productCategories = "Danh mục sản phẩm phải ít nhất 2 ký tự.";
-      }
-      if (!form.inventoryDescription || form.inventoryDescription.trim().length < 10)
-        errors.inventoryDescription = "Mô tả tồn kho phải ít nhất 10 ký tự.";
+    if (!form.legalName || !form.legalName.trim()) {
+      errors.legalName = "Vui lòng nhập Pháp nhân / tên công ty.";
+    } else if (form.legalName.trim().length < 2) {
+      errors.legalName = "Pháp nhân / tên công ty phải ít nhất 2 ký tự.";
     }
+    if (!form.industry || !form.industry.trim()) {
+      errors.industry = "Vui lòng nhập Ngành hàng.";
+    } else if (form.industry.trim().length < 2) {
+      errors.industry = "Ngành hàng phải ít nhất 2 ký tự.";
+    }
+    if (!form.taxCode || !form.taxCode.trim()) {
+      errors.taxCode = "Vui lòng nhập Mã số thuế.";
+    } else if (form.taxCode.trim().length < 3) {
+      errors.taxCode = "Mã số thuế phải ít nhất 3 ký tự.";
+    }
+    if (!form.productCategories || !form.productCategories.trim()) {
+      errors.productCategories = "Vui lòng nhập Danh mục sản phẩm.";
+    } else if (form.productCategories.trim().length < 2) {
+      errors.productCategories = "Danh mục sản phẩm phải ít nhất 2 ký tự.";
+    }
+    if (!form.inventoryDescription || form.inventoryDescription.trim().length < 10) {
+      errors.inventoryDescription = "Mô tả tồn kho phải ít nhất 10 ký tự.";
+    }
+    const normalizedBusinessLicenseUrl = normalizeOptionalUrl(form.businessLicenseUrl);
+    if (form.businessLicenseUrl.trim() && !isValidHttpUrl(normalizedBusinessLicenseUrl)) {
+      errors.businessLicenseUrl = "URL giấy phép kinh doanh không hợp lệ. Ví dụ: https://example.com";
+    }
+
     if (contractUploadError) {
       errors.contractFileUrl = contractUploadError;
     }
+    if (requestAdminReview && !form.contractFileUrl) {
+      errors.contractFileUrl = "Vui lòng tải lên hợp đồng/tài liệu bổ sung trước khi gửi admin duyệt.";
+    }
     if (!form.bccAgreementAccepted) errors.bccAgreementAccepted = "Bạn phải đồng ý với nội dung hợp đồng BCC.";
-    if (!form.legalResponsibilityAccepted)
-      errors.legalResponsibilityAccepted = "Bạn phải xác nhận chịu trách nhiệm pháp lý.";
+    if (!form.legalResponsibilityAccepted) errors.legalResponsibilityAccepted = "Bạn phải xác nhận chịu trách nhiệm pháp lý.";
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      setError("");
+      setError(`Không thể ${actionLabel}. Vui lòng kiểm tra các trường được tô đỏ.`);
+      setActiveAction(null);
       focusFirstInvalidField(errors);
       return;
     }
@@ -247,11 +258,13 @@ export default function BrandOnboardingPage() {
         await uploadContractDocument(contractFile);
       } catch {
         setSaving(false);
+        setActiveAction(null);
         return;
       }
     }
     const body = {
       ...form,
+      businessLicenseUrl: normalizedBusinessLicenseUrl,
       bccAgreementAccepted: form.bccAgreementAccepted,
       bccAgreementTerms: form.bccAgreementTerms,
       legalResponsibilityAccepted: form.legalResponsibilityAccepted,
@@ -268,6 +281,7 @@ export default function BrandOnboardingPage() {
       payload = (await response.json()) as ApiResponse<Onboarding>;
     } catch {
       setSaving(false);
+      setActiveAction(null);
       setError("Lỗi phản hồi từ server.");
       return;
     }
@@ -285,7 +299,8 @@ export default function BrandOnboardingPage() {
         }
         if (Object.keys(serverErrors).length > 0) {
           setFieldErrors(serverErrors);
-          setError("");
+          setError(`Không thể ${actionLabel}. Vui lòng kiểm tra dữ liệu nhập.`);
+          setActiveAction(null);
           focusFirstInvalidField(serverErrors);
           return;
         }
@@ -293,9 +308,11 @@ export default function BrandOnboardingPage() {
       const firstFormError = body?.details?.formErrors?.[0];
       if (firstFormError) {
         setError(firstFormError);
+        setActiveAction(null);
         return;
       }
       setError(payload && !payload.success ? payload.error : "Không thể lưu onboarding");
+      setActiveAction(null);
       return;
     }
     setForm({
@@ -305,7 +322,27 @@ export default function BrandOnboardingPage() {
       legalResponsibilityAccepted: requestAdminReview ? false : payload.data.legalResponsibilityAccepted
     });
     if (requestAdminReview) {
-      setSuccess("Đã gửi yêu cầu thay đổi/bổ sung. Vui lòng chờ admin duyệt.");
+      setSuccess("Đã gửi nội dung bổ sung thành công. Hồ sơ đã chuyển trạng thái Chờ admin duyệt. Bạn sẽ nhận thông báo khi có kết quả.");
+    } else {
+      setSuccess("Ký hợp đồng BCC thành công. Hồ sơ onboarding đã được cập nhật và sẵn sàng cho các bước vận hành tiếp theo.");
+    }
+    setActiveAction(null);
+  }
+
+  function normalizeOptionalUrl(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return `https://${trimmed}`;
+  }
+
+  function isValidHttpUrl(value: string) {
+    if (!value) return true;
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === "http:" || parsed.protocol === "https:";
+    } catch {
+      return false;
     }
   }
 
@@ -328,6 +365,16 @@ export default function BrandOnboardingPage() {
         {!isSigned && isWaitingReview ? (
           <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700">
             Đang chờ admin duyệt yêu cầu sửa/bổ sung BCC.
+          </p>
+        ) : null}
+        {!isSigned && form.reviewStatus === "NEEDS_REVISION" ? (
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700">
+            Admin yêu cầu chỉnh sửa hồ sơ BCC. Vui lòng cập nhật thông tin/tài liệu rồi gửi lại.
+          </p>
+        ) : null}
+        {!isSigned && form.reviewStatus === "REJECTED" ? (
+          <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
+            Hồ sơ BCC đã bị từ chối. Vui lòng rà soát nội dung và gửi lại hồ sơ bổ sung.
           </p>
         ) : null}
         {!isSigned && isSupplementaryBccApproved ? (
@@ -353,7 +400,16 @@ export default function BrandOnboardingPage() {
                 <input id="taxCode" className={`dc-input ${fieldErrors.taxCode ? "border-red-500 ring-1 ring-red-300" : ""}`} placeholder="Mã số thuế" value={form.taxCode} onChange={(e) => setField("taxCode", e.target.value)} />
                 {fieldErrors.taxCode ? <p className="text-sm text-red-600">{fieldErrors.taxCode}</p> : null}
               </div>
-              <input className="dc-input" type="url" placeholder="Giấy phép kinh doanh URL" value={form.businessLicenseUrl} onChange={(e) => setField("businessLicenseUrl", e.target.value)} />
+              <div className="grid gap-1">
+                <input
+                  id="businessLicenseUrl"
+                  className={`dc-input ${fieldErrors.businessLicenseUrl ? "border-red-500 ring-1 ring-red-300" : ""}`}
+                  placeholder="Giấy phép kinh doanh URL (vd: https://facebook.com/brand)"
+                  value={form.businessLicenseUrl}
+                  onChange={(e) => setField("businessLicenseUrl", e.target.value)}
+                />
+                {fieldErrors.businessLicenseUrl ? <p className="text-sm text-red-600">{fieldErrors.businessLicenseUrl}</p> : null}
+              </div>
             </section>
 
             <section className="dc-card grid gap-4 p-5">
@@ -443,7 +499,7 @@ export default function BrandOnboardingPage() {
                     disabled={saving}
                     onClick={() => void submitForm(false)}
                   >
-                    {saving ? "Đang xử lý..." : "Ký ngay (không có ý kiến)"}
+                    {saving && activeAction === "sign" ? "Đang ký BCC..." : "Ký ngay (không có ý kiến)"}
                   </button>
                   <button
                     type="button"
@@ -451,7 +507,7 @@ export default function BrandOnboardingPage() {
                     disabled={saving}
                     onClick={() => void submitForm(true)}
                   >
-                    {saving ? "Đang gửi..." : "Gửi nội dung bổ sung & chờ admin duyệt"}
+                    {saving && activeAction === "request-review" ? "Đang gửi admin duyệt..." : "Gửi nội dung bổ sung & chờ admin duyệt"}
                   </button>
                 </div>
               ) : null}

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AppShell, PublicHeader } from "@/app/components/dcreator/layout/shell";
+import { AppShell } from "@/app/components/dcreator/layout/shell";
 import { EmptyState, ErrorState, PageHeader, SectionHeader, StatsCard, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type Voucher = {
@@ -46,7 +46,6 @@ export default function UserVouchersPage() {
 
   return (
     <>
-      <PublicHeader />
       <AppShell>
         <PageHeader title="Voucher của tôi" subtitle="Theo dõi trạng thái voucher đã nhận." />
         {error ? <ErrorState title="Không thể tải voucher" description={error} /> : null}
