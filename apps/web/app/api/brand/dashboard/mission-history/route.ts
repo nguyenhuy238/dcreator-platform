@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
   try {
     const account = await requireBrandActor(request);
     const query = missionHistoryQuerySchema.parse({
+      accountId: qp(request, "accountId"),
       query: qp(request, "query"),
       campaign: qp(request, "campaign"),
       status: qp(request, "status"),

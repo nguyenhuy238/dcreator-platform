@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
   try {
     await requireAdminOps(request);
     const query = missionHistoryQuerySchema.parse({
+      accountId: qp(request, "accountId"),
       query: qp(request, "query"),
       campaign: qp(request, "campaign"),
       status: qp(request, "status"),

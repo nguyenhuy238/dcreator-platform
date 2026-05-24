@@ -386,6 +386,7 @@ export async function listCreatorMissionsForAdmin() {
 }
 
 type MissionHistoryFilterInput = {
+  accountId?: string;
   query?: string;
   campaign?: string;
   status?: "PRODUCT_PENDING" | "DRAFT_PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
@@ -403,6 +404,10 @@ function applyMissionHistoryFilters(
   input: MissionHistoryFilterInput,
   campaignScope?: Prisma.CampaignWhereInput
 ) {
+  if (input.accountId?.trim()) {
+    where.accountId = input.accountId.trim();
+  }
+
   if (campaignScope || input.campaign?.trim()) {
     where.campaign = {
       ...(campaignScope ?? {}),

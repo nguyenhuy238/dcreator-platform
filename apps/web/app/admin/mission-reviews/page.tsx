@@ -360,12 +360,39 @@ type ApplicationListResponse = {
   pagination: { page: number; limit: number; total: number; totalPages: number };
 };
 
+type CompletedMissionHistoryItem = {
+  id: string;
+  status: string;
+  videoReviewStatus: string;
+  publishStatus: string;
+  completedAt: string | null;
+  updatedAt: string;
+  campaign: { title: string };
+  mission: { title: string; rewardPoints: number };
+};
+
+type CompletedMissionHistoryResponse = {
+  items: CompletedMissionHistoryItem[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+};
+
 const applicationStatusOptions = [
   { value: "", label: "Tất cả trạng thái" },
   { value: "PENDING_REVIEW", label: "Chờ duyệt" },
   { value: "APPROVED", label: "Đã duyệt" },
   { value: "REJECTED", label: "Đã từ chối" }
 ];
+
+function missionStatusLabel(status: string) {
+  const map: Record<string, string> = {
+    COMPLETED: "Hoàn thành",
+    APPROVED: "Đã duyệt",
+    REJECTED: "Đã từ chối",
+    PENDING: "Chờ duyệt",
+    IN_PROGRESS: "Đang thực hiện"
+  };
+  return map[status] ?? status;
+}
 
 function AdminMissionApplicationsTab() {
   const [items, setItems] = useState<ApplicationListItem[]>([]);
@@ -376,6 +403,10 @@ function AdminMissionApplicationsTab() {
   const [selectedId, setSelectedId] = useState<string>("");
   const [detail, setDetail] = useState<ApplicationDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [historyCreator, setHistoryCreator] = useState<{ id: string; displayName: string } | null>(null);
+  const [historyItems, setHistoryItems] = useState<CompletedMissionHistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState("");
 
   const [query, setQuery] = useState("");
   const [campaign, setCampaign] = useState("");
@@ -467,6 +498,28 @@ function AdminMissionApplicationsTab() {
     void load();
   }, [page]);
 
+  async function loadCompletedHistory(accountId: string, displayName: string) {
+    setHistoryCreator({ id: accountId, displayName });
+    setHistoryLoading(true);
+    setHistoryError("");
+    setHistoryItems([]);
+    try {
+      const params = new URLSearchParams();
+      params.set("accountId", accountId);
+      params.set("status", "COMPLETED");
+      params.set("limit", "10");
+      params.set("page", "1");
+      const res = await fetch(`/api/admin/mission-history?${params.toString()}`, { cache: "no-store" });
+      const body = (await res.json()) as ApiResult<CompletedMissionHistoryResponse>;
+      if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? "Không thể tải lịch sử hoàn thành");
+      setHistoryItems(body.data.items);
+    } catch (e) {
+      setHistoryError(e instanceof Error ? e.message : "Không thể tải lịch sử hoàn thành");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
   const title = useMemo(() => `Tổng ${pagination.total} đơn`, [pagination.total]);
 
   return (
@@ -482,6 +535,44 @@ function AdminMissionApplicationsTab() {
           <p className="text-sm text-zinc-500">{title}</p>
         </div>
       </section>
+
+      {historyCreator ? (
+        <div className="fixed inset-0 z-50 bg-zinc-900/50 p-3 md:p-6" onClick={() => { setHistoryCreator(null); setHistoryItems([]); setHistoryError(""); }}>
+          <div className="mx-auto max-h-[95vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 md:p-6" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-xl font-semibold text-zinc-900">Lịch sử nhiệm vụ đã hoàn thành - {historyCreator.displayName}</h3>
+              <button type="button" className="dc-btn-secondary" onClick={() => { setHistoryCreator(null); setHistoryItems([]); setHistoryError(""); }}>Đóng</button>
+            </div>
+            {historyLoading ? <div className="mt-4"><LoadingSkeleton rows={4} /></div> : null}
+            {!historyLoading && historyError ? (
+              <div className="mt-4">
+                <ErrorState
+                  title="Không tải được lịch sử"
+                  description={historyError}
+                  onRetry={() => void loadCompletedHistory(historyCreator.id, historyCreator.displayName)}
+                />
+              </div>
+            ) : null}
+            {!historyLoading && !historyError ? (
+              <div className="mt-4 grid gap-3">
+                {historyItems.length === 0 ? (
+                  <EmptyState title="Chưa có nhiệm vụ hoàn thành" description="Creator này chưa có lịch sử hoàn thành mission." />
+                ) : (
+                  historyItems.map((history) => (
+                    <article key={history.id} className="rounded-xl border border-zinc-200 bg-white p-3 text-sm">
+                      <p><strong>Campaign:</strong> {history.campaign.title}</p>
+                      <p><strong>Mission:</strong> {history.mission.title}</p>
+                      <p><strong>Reward:</strong> {history.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
+                      <p><strong>Trạng thái:</strong> {missionStatusLabel(history.status)} · Video: {missionStatusLabel(history.videoReviewStatus)} · Bước cuối: {missionStatusLabel(history.publishStatus)}</p>
+                      <p><strong>Hoàn thành lúc:</strong> {fmtDate(history.completedAt)} · <strong>Cập nhật:</strong> {fmtDate(history.updatedAt)}</p>
+                    </article>
+                  ))
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       {notice ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</p> : null}
       {error ? <ErrorState title="Có lỗi" description={error} onRetry={() => void load()} /> : null}
@@ -505,6 +596,9 @@ function AdminMissionApplicationsTab() {
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
                       {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
+                    </button>
+                    <button className="dc-btn-secondary" onClick={() => void loadCompletedHistory(item.account.id, item.account.displayName)}>
+                      Lịch sử Creator
                     </button>
                     {item.status === "PENDING_REVIEW" ? <button className="dc-btn-primary" onClick={() => void approve(item.id)}>Đồng ý</button> : null}
                     {item.status === "PENDING_REVIEW" ? <button className="dc-btn-secondary" onClick={() => void reject(item.id)}>Từ chối</button> : null}
