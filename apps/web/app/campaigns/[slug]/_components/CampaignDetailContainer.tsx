@@ -146,7 +146,7 @@ export function CampaignDetailContainer({ slug }: Props) {
         </div>
       </div>
       <div className="grid gap-4">
-        <FundingSection funding={data.funding} />
+        <FundingSection funding={data.funding} hero={data.hero} />
         <section className="dc-card p-4 md:p-5">
           <h2 className="text-2xl font-black text-zinc-900">Đăng ký chiến dịch Creator</h2>
           <p className="mt-1 text-sm text-slate-600">Nộp đơn để Brand/Admin duyệt trước khi nhận nhiệm vụ.</p>

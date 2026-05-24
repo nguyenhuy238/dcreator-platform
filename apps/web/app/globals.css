@@ -20,12 +20,20 @@ body {
   min-height: 100%;
   background: radial-gradient(circle at 10% -10%, #ffe7d6 0%, transparent 32%), var(--dc-bg);
   color: var(--dc-text);
-  font-family: "Inter", "Segoe UI", sans-serif;
+  font-family: var(--font-sans), "Segoe UI", sans-serif;
 }
 
 a {
   color: inherit;
   text-decoration: none;
+}
+
+.font-display {
+  font-family: var(--font-display), var(--font-sans), "Segoe UI", sans-serif;
+}
+
+.font-body {
+  font-family: var(--font-sans), "Segoe UI", sans-serif;
 }
 
 .dc-focus {
@@ -92,5 +100,57 @@ a {
 @keyframes dc-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes flywheel-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes flywheel-pulse-ring {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.03);
+    opacity: 0.85;
+  }
+}
+
+@keyframes flywheel-rotate-ring {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.flywheel-fade {
+  animation: flywheel-fade-up 650ms ease-out both;
+}
+
+.flywheel-pulse {
+  animation: flywheel-pulse-ring 3.2s ease-in-out infinite;
+}
+
+.flywheel-rotate {
+  animation: flywheel-rotate-ring 20s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flywheel-fade,
+  .flywheel-pulse,
+  .flywheel-rotate {
+    animation: none !important;
   }
 }

@@ -537,6 +537,7 @@ export async function getBrandProfile(accountId: string) {
     brandName: meta.brandProfile.brandName || brand?.name || latestApplication?.brandName || account.displayName || "",
     contactName: meta.brandProfile.contactName || brand?.contactName || latestApplication?.contactName || account.displayName || "",
     contactEmail: meta.brandProfile.contactEmail || brand?.contactEmail || latestApplication?.contactEmail || account.email || "",
+    logoUrl: meta.brandProfile.logoUrl || brand?.logoUrl || latestApplication?.logoUrl || "",
     bccAgreement: bccSource
       ? {
           revenueSharePercent: bccSource.revenueSharePercent,
