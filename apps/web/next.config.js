@@ -1,4 +1,14 @@
 /** @type {import('next').NextConfig} */
+const supabaseHostname = (() => {
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!url) return null;
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+})();
+
 const nextConfig = {
   typescript: {
     ignoreBuildErrors: true
@@ -17,8 +27,17 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: "images.unsplash.com"
+      },
+      {
+        protocol: "https",
+        hostname: "lmmekgicykqgfildpnwi.supabase.co"
       }
-    ]
+    ].concat(
+      supabaseHostname &&
+        supabaseHostname !== "lmmekgicykqgfildpnwi.supabase.co"
+        ? [{ protocol: "https", hostname: supabaseHostname }]
+        : []
+    )
   }
 };
 

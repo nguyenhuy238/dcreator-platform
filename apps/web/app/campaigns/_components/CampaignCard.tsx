@@ -2,6 +2,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { CreatorCampaignApplyButton } from "./CreatorCampaignApplyButton";
 
+const FALLBACK_COVER_IMAGE = "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200";
+
 export type CampaignCardData = {
   slug: string;
   title: string;
@@ -17,12 +19,25 @@ export type CampaignCardData = {
   deadline: string | Date | null;
 };
 
+function resolveCoverImageSrc(url: string | null) {
+  if (!url) return FALLBACK_COVER_IMAGE;
+
+  try {
+    const parsed = new URL(url);
+    if (!parsed.hostname) return FALLBACK_COVER_IMAGE;
+    if (parsed.pathname === "/" && !parsed.search) return FALLBACK_COVER_IMAGE;
+    return parsed.toString();
+  } catch {
+    return FALLBACK_COVER_IMAGE;
+  }
+}
+
 export function CampaignCard({ campaign }: { campaign: CampaignCardData }) {
   return (
     <article className="dc-card overflow-hidden">
       <Image
         className="aspect-video w-full object-cover bg-zinc-200"
-        src={campaign.coverImageUrl ?? "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200"}
+        src={resolveCoverImageSrc(campaign.coverImageUrl)}
         alt={campaign.title}
         width={1200}
         height={675}
