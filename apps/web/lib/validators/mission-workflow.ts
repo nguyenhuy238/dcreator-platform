@@ -38,6 +38,7 @@ export const missionApplicationAdminQuerySchema = z.object({
   query: z.string().trim().min(1).max(120).optional(),
   status: z.enum(["DRAFT", "PENDING_REVIEW", "APPROVED", "REJECTED", "NEEDS_REVISION"]).optional(),
   campaignId: z.string().trim().min(3).optional(),
+  campaign: z.string().trim().min(1).max(120).optional(),
   sort: z.enum(["newest", "oldest"]).optional(),
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional()
@@ -50,6 +51,7 @@ export const missionApplicationRejectSchema = z.object({
 export const missionVideoReviewAdminQuerySchema = z.object({
   query: z.string().trim().min(1).max(120).optional(),
   campaignId: z.string().trim().min(3).optional(),
+  campaign: z.string().trim().min(1).max(120).optional(),
   videoReviewStatus: z.enum(["NOT_SUBMITTED", "PENDING", "APPROVED", "REJECTED"]).optional(),
   sort: z.enum(["newest", "oldest"]).optional(),
   page: z.coerce.number().int().min(1).optional(),
@@ -63,6 +65,7 @@ export const missionVideoReviewRejectSchema = z.object({
 export const missionFinalReviewAdminQuerySchema = z.object({
   query: z.string().trim().min(1).max(120).optional(),
   campaignId: z.string().trim().min(3).optional(),
+  campaign: z.string().trim().min(1).max(120).optional(),
   productReceiveOption: z.enum(["DEPOSIT_PRODUCT", "CREATOR_BUY_FIRST", "NO_PRODUCT_REQUIRED"]).optional(),
   publishStatus: z.enum(["NOT_SUBMITTED", "PENDING", "APPROVED", "REJECTED"]).optional(),
   sort: z.enum(["newest", "oldest"]).optional(),

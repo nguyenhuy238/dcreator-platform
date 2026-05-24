@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
     const query = missionFinalReviewAdminQuerySchema.parse({
       query: qp(request, "query"),
       campaignId: qp(request, "campaignId"),
+      campaign: qp(request, "campaign"),
       productReceiveOption: qp(request, "productReceiveOption"),
       publishStatus: qp(request, "publishStatus"),
       sort: qp(request, "sort"),

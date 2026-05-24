@@ -751,6 +751,7 @@ export async function listMissionApplicationsForAdmin(input: {
   query?: string;
   status?: ApplicationStatus;
   campaignId?: string;
+  campaign?: string;
   sort?: Sort;
   page?: number;
   limit?: number;
@@ -758,6 +759,9 @@ export async function listMissionApplicationsForAdmin(input: {
   const where: Prisma.MissionApplicationWhereInput = {};
   if (input.status) where.status = input.status;
   if (input.campaignId) where.campaignId = input.campaignId;
+  if (input.campaign?.trim()) {
+    where.campaign = { title: { contains: input.campaign.trim(), mode: "insensitive" } };
+  }
   if (input.query?.trim()) {
     const q = input.query.trim();
     where.OR = [
@@ -838,6 +842,7 @@ export async function rejectMissionApplicationByAdmin(actorId: string, id: strin
 export async function listMissionVideoReviewsForAdmin(input: {
   query?: string;
   campaignId?: string;
+  campaign?: string;
   videoReviewStatus?: CreatorMissionVideoReviewStatus;
   sort?: Sort;
   page?: number;
@@ -845,6 +850,9 @@ export async function listMissionVideoReviewsForAdmin(input: {
 }) {
   const where: Prisma.CreatorMissionWhereInput = { videoReviewStatus: input.videoReviewStatus ?? "PENDING" };
   if (input.campaignId) where.campaignId = input.campaignId;
+  if (input.campaign?.trim()) {
+    where.campaign = { title: { contains: input.campaign.trim(), mode: "insensitive" } };
+  }
   if (input.query?.trim()) {
     const q = input.query.trim();
     where.OR = [
@@ -885,6 +893,7 @@ export async function rejectMissionVideoReviewByAdmin(actorId: string, id: strin
 export async function listMissionFinalReviewsForAdmin(input: {
   query?: string;
   campaignId?: string;
+  campaign?: string;
   productReceiveOption?: ProductReceiveOption;
   publishStatus?: CreatorMissionPublishStatus;
   sort?: Sort;
@@ -893,6 +902,9 @@ export async function listMissionFinalReviewsForAdmin(input: {
 }) {
   const where: Prisma.CreatorMissionWhereInput = { publishStatus: input.publishStatus ?? "PENDING" };
   if (input.campaignId) where.campaignId = input.campaignId;
+  if (input.campaign?.trim()) {
+    where.campaign = { title: { contains: input.campaign.trim(), mode: "insensitive" } };
+  }
   if (input.productReceiveOption) where.productReceiveOption = input.productReceiveOption;
   if (input.query?.trim()) {
     const q = input.query.trim();

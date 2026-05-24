@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
     const query = missionVideoReviewAdminQuerySchema.parse({
       query: qp(request, "query"),
       campaignId: qp(request, "campaignId"),
+      campaign: qp(request, "campaign"),
       videoReviewStatus: qp(request, "videoReviewStatus"),
       sort: qp(request, "sort"),
       page: request.nextUrl.searchParams.get("page") ?? undefined,
