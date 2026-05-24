@@ -1,6 +1,5 @@
 export type CampaignFilterState = {
   search: string;
-  type: string;
   category: string;
   status: string;
   rewardAvailable: boolean;
@@ -24,14 +23,7 @@ export function CampaignFilters({
           value={value.search}
           onChange={(e) => onChange({ ...value, search: e.target.value })}
         />
-        <div className="grid gap-2 md:grid-cols-3">
-          <select className="dc-input" value={value.type} onChange={(e) => onChange({ ...value, type: e.target.value })}>
-            <option value="">Tất cả loại</option>
-            <option value="DONATION">Ủng hộ cộng đồng</option>
-            <option value="PREORDER">Preorder</option>
-            <option value="SPONSORSHIP">Sponsorship</option>
-            <option value="COMMUNITY">Community</option>
-          </select>
+        <div className="grid gap-2 md:grid-cols-2">
           <select className="dc-input" value={value.category} onChange={(e) => onChange({ ...value, category: e.target.value })}>
             <option value="">Tất cả ngành hàng</option>
             <option value="TECH">Công nghệ</option>
