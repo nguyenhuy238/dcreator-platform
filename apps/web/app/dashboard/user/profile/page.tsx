@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { AppShell, PublicHeader } from "@/app/components/dcreator/layout/shell";
+import { AppShell } from "@/app/components/dcreator/layout/shell";
 import type { Role } from "@prisma/client";
 import { getNavItemsForWorkspace } from "@/lib/navigation";
 
@@ -166,11 +166,11 @@ export default function UserProfilePage() {
   }
 
   if (loading) {
-    return <><PublicHeader /><AppShell sidebarItems={sidebarItems}><div className="dc-card p-6">Đang tải hồ sơ...</div></AppShell></>;
+    return <><AppShell sidebarItems={sidebarItems}><div className="dc-card p-6">Đang tải hồ sơ...</div></AppShell></>;
   }
 
   if (!data) {
-    return <><PublicHeader /><AppShell sidebarItems={sidebarItems}><div className="dc-card p-6 text-red-700">{error || "Không tìm thấy hồ sơ"}</div></AppShell></>;
+    return <><AppShell sidebarItems={sidebarItems}><div className="dc-card p-6 text-red-700">{error || "Không tìm thấy hồ sơ"}</div></AppShell></>;
   }
 
   const creatorStatus = data.creatorApplication?.status as string | undefined;
@@ -178,14 +178,13 @@ export default function UserProfilePage() {
 
   return (
     <>
-      <PublicHeader />
       <AppShell sidebarItems={sidebarItems}>
         <h1 className="text-3xl font-black">Hồ sơ cá nhân</h1>
         <p className="mt-2 text-sm text-zinc-600">Đăng ký nâng cấp Creator/Brand tại đây và theo dõi trạng thái duyệt.</p>
         {error ? <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
         {success ? <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p> : null}
 
-        <section className="mt-6 grid gap-4 md:grid-cols-2">
+        <section id="role-requests" className="mt-6 grid gap-4 md:grid-cols-2">
           <div className="dc-card p-5">
             <h2 className="text-xl font-bold">Thông tin cá nhân</h2>
             <p className="mt-2 text-sm">Tên hiển thị: <span className="font-semibold">{data.account.displayName}</span></p>
