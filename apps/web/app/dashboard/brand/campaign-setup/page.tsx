@@ -31,6 +31,7 @@ type RequestForm = {
   requestedSlug: string;
   title: string;
   brief: string;
+  coverImageUrl: string;
   objective: string;
   priorityChannels: string;
   missionTypes: string;
@@ -51,6 +52,7 @@ const defaultForm: RequestForm = {
   requestedSlug: "",
   title: "",
   brief: "",
+  coverImageUrl: "",
   objective: "",
   priorityChannels: "",
   missionTypes: "",
@@ -69,6 +71,23 @@ function toDateTime(value: string) {
   return value ? new Date(value).toISOString() : undefined;
 }
 
+const COVER_MARKER = "[[COVER_IMAGE_URL]]:";
+
+function stripCoverImageMeta(brief: string) {
+  return brief
+    .split("\n")
+    .filter((line) => !line.trim().startsWith(COVER_MARKER))
+    .join("\n")
+    .trim();
+}
+
+function attachCoverImageMeta(brief: string, coverImageUrl: string) {
+  const cleanBrief = stripCoverImageMeta(brief);
+  const url = coverImageUrl.trim();
+  if (!url) return cleanBrief;
+  return `${cleanBrief}\n${COVER_MARKER}${url}`.trim();
+}
+
 function requestStatusLabel(status: CampaignRequest["status"]) {
   if (status === "APPROVED") return "Admin đã tạo & publish campaign";
   if (status === "REJECTED") return "Admin từ chối";
@@ -81,6 +100,25 @@ function formatDate(value: string) {
     dateStyle: "short",
     timeStyle: "short"
   });
+}
+
+function onlyDigits(raw: string) {
+  return raw.replace(/\D/g, "");
+}
+
+function parseNonNegativeInt(raw: string) {
+  const digits = onlyDigits(raw);
+  if (!digits) return 0;
+  return Number.parseInt(digits, 10);
+}
+
+function parsePercent(raw: string) {
+  return Math.min(100, parseNonNegativeInt(raw));
+}
+
+function formatIntForInput(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "";
+  return value.toLocaleString("vi-VN");
 }
 
 function SectionField({
@@ -107,6 +145,7 @@ export default function CampaignSetupPage() {
   const [feedback, setFeedback] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -144,6 +183,7 @@ export default function CampaignSetupPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          brief: attachCoverImageMeta(form.brief, form.coverImageUrl),
           setupSource: "BRAND_REQUESTED",
           startsAt: toDateTime(form.startsAt),
           endsAt: toDateTime(form.endsAt)
@@ -158,6 +198,25 @@ export default function CampaignSetupPage() {
       setError(requestError instanceof Error ? requestError.message : "Không thể gửi yêu cầu campaign");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function uploadCoverImage(file: File) {
+    setUploadingCover(true);
+    setError("");
+    try {
+      const formData = new FormData();
+      formData.append("logo", file);
+      const response = await fetch("/api/uploads/brand-logo", { method: "POST", body: formData });
+      const payload = (await response.json()) as ApiResponse<{ logoUrl: string }>;
+      if (!response.ok || !payload.success || !payload.data?.logoUrl) {
+        throw new Error(payload.success ? "Không thể tải ảnh campaign" : payload.error);
+      }
+      setField("coverImageUrl", payload.data.logoUrl);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Không thể tải ảnh campaign");
+    } finally {
+      setUploadingCover(false);
     }
   }
 
@@ -205,11 +264,26 @@ export default function CampaignSetupPage() {
                 <SectionField label="Slug campaign" hint="Dùng cho URL nội bộ, không có dấu cách.">
                   <input className="dc-input" value={form.requestedSlug} onChange={(event) => setField("requestedSlug", event.target.value)} placeholder="vd: tet-sale-2026" />
                 </SectionField>
-                <SectionField label="Tên campaign">
+                <SectionField label="Tên campaign" hint="Tên hiển thị công khai cho Creator/User.">
                   <input className="dc-input" value={form.title} onChange={(event) => setField("title", event.target.value)} placeholder="vd: Tết 2026 cùng Brand A" />
                 </SectionField>
+                <SectionField label="Ảnh cover campaign" hint="Tải ảnh lên để hiển thị ở danh sách campaign/public.">
+                  <div className="grid gap-2">
+                    <input className="dc-input bg-white" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      if (file) void uploadCoverImage(file);
+                      event.currentTarget.value = "";
+                    }} disabled={uploadingCover} />
+                    <input className="dc-input" type="url" value={form.coverImageUrl} onChange={(event) => setField("coverImageUrl", event.target.value.trim())} placeholder="https://... (URL ảnh sau khi upload)" />
+                    {uploadingCover ? <span className="text-xs font-medium text-zinc-500">Đang tải ảnh...</span> : null}
+                    {form.coverImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={form.coverImageUrl} alt="Campaign cover preview" className="h-28 w-full rounded-xl border border-zinc-200 object-cover" />
+                    ) : null}
+                  </div>
+                </SectionField>
                 <div className="md:col-span-2">
-                  <SectionField label="Mô tả ngắn">
+                  <SectionField label="Mô tả ngắn" hint="Tóm tắt ngắn: mục tiêu, lợi ích, sản phẩm/voucher chính.">
                     <textarea className="dc-input min-h-28" value={form.brief} onChange={(event) => setField("brief", event.target.value)} placeholder="Mô tả ngắn gọn về chiến dịch, quà tặng, voucher, hàng tồn kho, hoặc mục tiêu kích hoạt..." />
                   </SectionField>
                 </div>
@@ -220,14 +294,14 @@ export default function CampaignSetupPage() {
               <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-zinc-500">Chiến lược campaign</h3>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <div className="md:col-span-2">
-                  <SectionField label="Mục tiêu campaign">
+                  <SectionField label="Mục tiêu campaign" hint="Nêu KPI chính, ví dụ tăng nhận diện hoặc tăng chuyển đổi.">
                     <textarea className="dc-input min-h-24" value={form.objective} onChange={(event) => setField("objective", event.target.value)} placeholder="vd: Tăng nhận biết, đẩy voucher, kích hoạt creator, xả tồn kho..." />
                   </SectionField>
                 </div>
-                <SectionField label="Kênh ưu tiên">
+                <SectionField label="Kênh ưu tiên" hint="Nhập dạng danh sách, ngăn cách bằng dấu phẩy.">
                   <input className="dc-input" value={form.priorityChannels} onChange={(event) => setField("priorityChannels", event.target.value)} placeholder="vd: TikTok, Facebook, Livestream, Shop..." />
                 </SectionField>
-                <SectionField label="Loại nhiệm vụ">
+                <SectionField label="Loại nhiệm vụ" hint="Ví dụ: review, livestream, check-in, short video.">
                   <input className="dc-input" value={form.missionTypes} onChange={(event) => setField("missionTypes", event.target.value)} placeholder="vd: review, check-in, share, video..." />
                 </SectionField>
               </div>
@@ -236,14 +310,14 @@ export default function CampaignSetupPage() {
             <div className="rounded-2xl border border-zinc-100 bg-white p-4">
               <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-zinc-500">Ngân sách và lịch chạy</h3>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <SectionField label="Ngân sách dự kiến">
-                  <input className="dc-input" type="number" min={1} value={form.budgetVnd} onChange={(event) => setField("budgetVnd", Number(event.target.value))} />
+                <SectionField label="Ngân sách dự kiến" hint="Đơn vị: VND. Chỉ nhập số, không nhập ký tự tiền tệ.">
+                  <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={formatIntForInput(form.budgetVnd)} onChange={(event) => setField("budgetVnd", parseNonNegativeInt(event.target.value))} />
                 </SectionField>
-                <SectionField label="Ngân sách thưởng thêm">
-                  <input className="dc-input" type="number" min={0} value={form.bonusBudgetVnd} onChange={(event) => setField("bonusBudgetVnd", Number(event.target.value))} />
+                <SectionField label="Ngân sách thưởng thêm" hint="Đơn vị: VND. Dùng cho bonus ngoài ngân sách chính.">
+                  <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={formatIntForInput(form.bonusBudgetVnd)} onChange={(event) => setField("bonusBudgetVnd", parseNonNegativeInt(event.target.value))} />
                 </SectionField>
-                <SectionField label="Target amount">
-                  <input className="dc-input" type="number" min={1} value={form.targetAmountVnd} onChange={(event) => setField("targetAmountVnd", Number(event.target.value))} />
+                <SectionField label="Target amount" hint="Đơn vị: VND. Mục tiêu doanh thu/đóng góp kỳ vọng.">
+                  <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={formatIntForInput(form.targetAmountVnd)} onChange={(event) => setField("targetAmountVnd", parseNonNegativeInt(event.target.value))} />
                 </SectionField>
                 <SectionField label="Loại campaign">
                   <select className="dc-input" value={form.campaignType} onChange={(event) => setField("campaignType", event.target.value as RequestForm["campaignType"])}>
@@ -263,16 +337,16 @@ export default function CampaignSetupPage() {
                     <option value="EDUCATION">Education</option>
                   </select>
                 </SectionField>
-                <SectionField label="Hoa hồng Creator (%)">
-                  <input className="dc-input" type="number" min={0} max={100} value={form.creatorCommissionPercent} onChange={(event) => setField("creatorCommissionPercent", Number(event.target.value))} />
+                <SectionField label="Hoa hồng Creator (%)" hint="Đơn vị: phần trăm (%), từ 0 đến 100.">
+                  <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={form.creatorCommissionPercent === 0 ? "" : String(form.creatorCommissionPercent)} onChange={(event) => setField("creatorCommissionPercent", parsePercent(event.target.value))} />
                 </SectionField>
-                <SectionField label="Hoa hồng User (%)">
-                  <input className="dc-input" type="number" min={0} max={100} value={form.userCommissionPercent} onChange={(event) => setField("userCommissionPercent", Number(event.target.value))} />
+                <SectionField label="Hoa hồng User (%)" hint="Đơn vị: phần trăm (%), từ 0 đến 100.">
+                  <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={form.userCommissionPercent === 0 ? "" : String(form.userCommissionPercent)} onChange={(event) => setField("userCommissionPercent", parsePercent(event.target.value))} />
                 </SectionField>
-                <SectionField label="Ngày bắt đầu mong muốn">
+                <SectionField label="Ngày bắt đầu mong muốn" hint="Nhập theo lịch hệ thống, API lưu chuẩn ISO.">
                   <input className="dc-input" type="datetime-local" value={form.startsAt} onChange={(event) => setField("startsAt", event.target.value)} />
                 </SectionField>
-                <SectionField label="Ngày kết thúc mong muốn">
+                <SectionField label="Ngày kết thúc mong muốn" hint="Nhập theo lịch hệ thống, API lưu chuẩn ISO.">
                   <input className="dc-input" type="datetime-local" value={form.endsAt} onChange={(event) => setField("endsAt", event.target.value)} />
                 </SectionField>
               </div>
@@ -306,7 +380,7 @@ export default function CampaignSetupPage() {
                         </p>
                       </div>
                       <h2 className="mt-1 text-xl font-black text-zinc-900">{request.title}</h2>
-                      <p className="mt-1 text-sm text-zinc-600">{request.brief}</p>
+                      <p className="mt-1 text-sm text-zinc-600">{stripCoverImageMeta(request.brief)}</p>
                     </div>
                     <div className="flex flex-col items-end gap-2">
                       <p className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-sm font-semibold text-zinc-700">

@@ -187,6 +187,7 @@ export default function BrandRegisterPage() {
             </FormField>
             <FormField label={<span>Mã số thuế <span className="text-red-500">*</span></span>}>
               <input name="taxCode" className="dc-input" placeholder="0101234567" required />
+              <p className="text-xs font-medium text-zinc-500">Nhập mã số thuế doanh nghiệp, chỉ gồm ký tự số.</p>
             </FormField>
             <FormField label={<span>Ngành hàng <span className="text-red-500">*</span></span>}>
               <input name="industry" className="dc-input" placeholder="Beauty, Food, Fashion..." required />
@@ -195,7 +196,10 @@ export default function BrandRegisterPage() {
               <input name="productCategories" className="dc-input" placeholder="Skincare, voucher spa, combo quà..." required />
             </FormField>
             <FormField label={<span>Website <span className="text-red-500">*</span></span>}>
-              <input name="website" type="url" className="dc-input" placeholder="https://example.com" required />
+              <>
+                <input name="website" type="url" className="dc-input" placeholder="https://example.com" required />
+                <p className="text-xs font-medium text-zinc-500">Nhập URL đầy đủ, bao gồm `https://`.</p>
+              </>
             </FormField>
             <FormField label={<span>Fanpage</span>}>
               <input name="fanpage" type="url" className="dc-input" placeholder="https://facebook.com/..." />
@@ -248,10 +252,16 @@ export default function BrandRegisterPage() {
               <input name="campaignGoal" className="dc-input" placeholder="Tăng nhận diện, tăng đơn hàng, xử lý tồn kho..." />
             </FormField>
             <FormField label={<span>Ngân sách dự kiến (VND)</span>}>
-              <input name="estimatedBudget" type="number" min={0} className="dc-input" placeholder="50000000" />
+              <>
+                <input name="estimatedBudget" type="text" inputMode="numeric" pattern="[0-9]*" className="dc-input" placeholder="50000000" />
+                <p className="text-xs font-medium text-zinc-500">Đơn vị: VND, chỉ nhập số.</p>
+              </>
             </FormField>
             <FormField label={<span>Số creator dự kiến</span>}>
-              <input name="expectedCreatorCount" type="number" min={0} className="dc-input" placeholder="20" />
+              <>
+                <input name="expectedCreatorCount" type="text" inputMode="numeric" pattern="[0-9]*" className="dc-input" placeholder="20" />
+                <p className="text-xs font-medium text-zinc-500">Đơn vị: người (creator).</p>
+              </>
             </FormField>
             <div className="md:col-span-2">
               <FormField label={<span>Ghi chú</span>}>

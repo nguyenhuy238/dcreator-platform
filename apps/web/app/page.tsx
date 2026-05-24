@@ -1,72 +1,10 @@
 import Link from "next/link";
 import Image from "next/image";
-import { CampaignCard } from "@/app/campaigns/_components/CampaignCard";
-import { ProcessBanner } from "@/app/components/dcreator/home/ProcessBanner";
+import { FeaturedCampaignsSection } from "@/app/components/dcreator/home/FeaturedCampaignsSection";
+import { PartnerLogo } from "@/app/components/dcreator/home/PartnerLogo";
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
+import { getCurrentUserFromServer } from "@/lib/auth/current-user";
 import { listCampaigns } from "@/lib/services/campaign.service";
-
-const highlights = [
-  {
-    title: "Creator",
-    copy: "Dễ tìm job phù hợp, nhận hoa hồng theo hiệu quả nội dung."
-  },
-  {
-    title: "Brand/SME",
-    copy: "Tối ưu chi phí triển khai, đo rõ hiệu quả chuyển đổi."
-  },
-  {
-    title: "dCreator",
-    copy: "Kết nối Creator và Brand trong một quy trình minh bạch."
-  }
-];
-
-const processSteps = [
-  {
-    title: "1. Brand đưa sản phẩm",
-    copy: "Brand/SME đưa sản phẩm hoặc lô hàng lên nền tảng để tạo campaign phù hợp mục tiêu.",
-    image: "https://images.unsplash.com/photo-1556740749-887f6717d7e4?w=1200&q=80"
-  },
-  {
-    title: "2. Creator nhận job",
-    copy: "Creator chọn job đúng tệp, làm nội dung review hoặc livestream và phân phối trên kênh cá nhân.",
-    image: "https://images.unsplash.com/photo-1494173853739-c21f58b16055?w=1200&q=80"
-  },
-  {
-    title: "3. Tăng chuyển đổi",
-    copy: "Brand theo dõi doanh thu, hiệu quả nội dung và tối ưu campaign theo dữ liệu thực tế.",
-    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&q=80"
-  }
-];
-
-const roleCards = [
-  {
-    title: "Creator nhận được gì",
-    points: [
-      "Dễ tìm job đúng năng lực và tệp người xem",
-      "Có thêm thu nhập từ hoa hồng theo hiệu quả",
-      "Tăng uy tín cá nhân qua các chiến dịch thật"
-    ]
-  },
-  {
-    title: "Brand nhận được gì",
-    points: [
-      "Giảm chi phí triển khai social commerce",
-      "Theo dõi rõ creator nào tạo ra đơn hàng",
-      "Mở rộng đội ngũ bán hàng bằng nội dung"
-    ]
-  }
-];
-
-const testimonials = [
-  {
-    quote: "Mình nhận job nhanh hơn, brief rõ hơn và dễ theo dõi hiệu quả từng nội dung đã đăng.",
-    name: "Linh - Creator"
-  },
-  {
-    quote: "Brand có thể nhìn thấy doanh thu theo chiến dịch và tối ưu ngân sách dễ hơn rất nhiều.",
-    name: "SnackGo - Brand"
-  }
-];
 
 const faqs = [
   {
@@ -84,65 +22,187 @@ const faqs = [
 ];
 
 export default async function HomePage() {
-  const featuredCampaigns = await listCampaigns({
-    sort: "trending",
-    page: 1,
-    limit: 3,
-    status: "ACTIVE"
-  });
+  const [featuredCampaigns, campaignStatsSource, currentUser] = await Promise.all([
+    listCampaigns({
+      sort: "trending",
+      page: 1,
+      limit: 12,
+      status: "ACTIVE"
+    }),
+    listCampaigns({
+      sort: "trending",
+      page: 1,
+      limit: 24,
+      status: "ACTIVE"
+    }),
+    getCurrentUserFromServer()
+  ]);
+  const roles = currentUser?.roles ?? [];
+  const isLoggedIn = Boolean(currentUser);
+  const hasCreatorRole = roles.includes("CREATOR");
+  const hasBrandRole = roles.includes("BRAND_OWNER") || roles.includes("BRAND_STAFF");
+  const canUpgradeRole = isLoggedIn && (!hasCreatorRole || !hasBrandRole);
+
+  const activeCampaignCount = campaignStatsSource.pagination.total;
+  const participants = new Set<string>();
+  for (const item of campaignStatsSource.items) {
+    if (item.brand) participants.add(`brand:${item.brand}`);
+    if (item.creator) participants.add(`creator:${item.creator}`);
+  }
+  const totalParticipants = participants.size;
+  const fundedRatioSamples = campaignStatsSource.items
+    .filter((item) => item.targetAmount > 0)
+    .map((item) => item.fundedAmount / item.targetAmount);
+  const averageFundedRatio =
+    fundedRatioSamples.length > 0
+      ? fundedRatioSamples.reduce((sum, ratio) => sum + ratio, 0) / fundedRatioSamples.length
+      : 0;
+  const averageFundedRatioDisplay = `${averageFundedRatio.toFixed(2)}x`;
+  const brandMap = new Map<string, { name: string; logoUrl: string | null }>();
+  for (const item of campaignStatsSource.items) {
+    const brandName = item.brand?.trim();
+    if (!brandName) continue;
+    if (!brandMap.has(brandName)) {
+      brandMap.set(brandName, {
+        name: brandName,
+        logoUrl: item.brandLogoUrl ?? null
+      });
+      continue;
+    }
+    const current = brandMap.get(brandName);
+    if (current && !current.logoUrl && item.brandLogoUrl) {
+      brandMap.set(brandName, { ...current, logoUrl: item.brandLogoUrl });
+    }
+  }
+  const partneredBrands = Array.from(brandMap.values()).slice(0, 12);
   return (
     <>
       <PublicHeader />
-      <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-8 md:px-6">
-        <section className="dc-card overflow-hidden p-6 md:p-10">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">Creator Commerce Platform</p>
-          <h1 className="mt-3 max-w-3xl text-4xl font-black tracking-tight text-zinc-900 md:text-5xl">
-            Kết nối ảnh hưởng, mở rộng doanh thu.
-          </h1>
-          <p className="mt-3 max-w-2xl text-zinc-600">
-            dCreator giúp Creator và Brand hợp tác hiệu quả hơn, minh bạch hơn và tăng trưởng bền vững hơn.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/campaigns" className="dc-btn-primary">
-              Khám phá chiến dịch
-            </Link>
-            <Link href="/auth/register" className="dc-btn-secondary">
-              Tạo tài khoản
-            </Link>
-            <Link href="/dashboard/user/profile" className="dc-btn-secondary">
-              Nâng cấp role tại Profile
-            </Link>
+      <main className="mx-auto w-full max-w-7xl overflow-x-hidden px-4 pb-16 pt-8 md:px-6">
+        <section className="rounded-[2.2rem] bg-gradient-to-b from-zinc-100 via-zinc-50/50 to-white px-4 py-14 md:py-20">
+          <div className="mx-auto max-w-2xl text-center">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <span className="rounded-full bg-zinc-200/70 px-4 py-1 text-sm font-bold uppercase tracking-[0.1em] text-zinc-700">#Dividends</span>
+              <span className="rounded-full bg-zinc-200/70 px-4 py-1 text-sm font-bold uppercase tracking-[0.1em] text-zinc-700">#Domination</span>
+              <span className="rounded-full bg-zinc-200/70 px-4 py-1 text-sm font-bold uppercase tracking-[0.1em] text-zinc-700">#Dedicated</span>
+            </div>
+            <p className="font-display mt-6 bg-gradient-to-b from-zinc-950 to-zinc-700 bg-clip-text text-[58px] font-black leading-none tracking-[-0.05em] text-transparent md:text-[104px] lg:text-[120px]">dCREATOR</p>
+            <p className="mt-1 text-6xl font-medium italic leading-none text-zinc-400 [font-family:Georgia,'Times_New_Roman',serif] md:text-8xl">Platform</p>
+            <h1 className="mt-8 text-2xl font-semibold leading-tight text-zinc-500 md:text-4xl">
+              Giao điểm của <span className="font-black text-zinc-900">Sáng tạo</span> và <span className="font-black text-zinc-900">Vốn</span>.
+            </h1>
+            <p className="mx-auto mt-4 max-w-xl text-lg text-zinc-500 md:text-2xl">
+              Lan tỏa giá trị, giảm áp lực tài chính.
+            </p>
+            <div className="mt-10 flex flex-wrap items-center justify-center gap-3.5 md:mt-12">
+              <Link href="/campaigns" className="dc-btn-primary h-12 min-w-[220px] rounded-full px-7 text-xl font-bold tracking-[0.04em]">
+                Khám phá chiến dịch
+              </Link>
+              {!isLoggedIn ? (
+                <Link href="/auth/register" className="dc-btn-secondary h-12 min-w-[220px] rounded-full px-7 text-xl font-semibold">
+                  Tạo tài khoản
+                </Link>
+              ) : null}
+              {canUpgradeRole ? (
+                <Link href="/dashboard/user/profile" className="dc-btn-secondary h-12 min-w-[220px] rounded-full px-7 text-xl font-semibold">
+                  Nâng cấp vai trò tại hồ sơ
+                </Link>
+              ) : null}
+            </div>
+
+            <div className="mt-10 grid overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-50/70 md:mt-12 md:grid-cols-3">
+              <article className="px-4 py-6 text-center md:border-r md:border-zinc-200">
+                <p className="text-4xl font-black text-zinc-900 md:text-5xl">{activeCampaignCount}</p>
+                <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">Dự án đang chạy</p>
+              </article>
+              <article className="px-4 py-6 text-center md:border-r md:border-zinc-200">
+                <p className="text-4xl font-black text-zinc-900 md:text-5xl">{averageFundedRatioDisplay}</p>
+                <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">Tỷ lệ tài trợ trung bình</p>
+              </article>
+              <article className="px-4 py-6 text-center">
+                <p className="text-4xl font-black text-zinc-900 md:text-5xl">{totalParticipants}</p>
+                <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">Người tham gia</p>
+              </article>
+            </div>
           </div>
         </section>
 
-        <section className="mt-8 grid gap-4 md:grid-cols-3">
-          {highlights.map((item) => (
-            <article key={item.title} className="dc-card p-5">
-              <p className="text-xs uppercase tracking-wider text-zinc-500">{item.title}</p>
-              <p className="mt-2 text-sm text-zinc-600">{item.copy}</p>
+        <FeaturedCampaignsSection campaigns={featuredCampaigns.items} />
+
+        <section className="mt-10 rounded-[2rem] border border-zinc-200 bg-zinc-50 p-6 md:p-8">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">Sứ mệnh</p>
+          <h2 className="mt-2 text-3xl font-black text-zinc-900 md:text-4xl">Sứ mệnh của dCreator</h2>
+          <div className="mt-4 max-w-4xl space-y-3 text-base leading-8 text-zinc-700 md:text-lg">
+            <p>
+              dCreator mang sứ mệnh giúp thương hiệu tăng trưởng doanh thu thông qua sức mạnh của nội dung số và cộng đồng sáng tạo.
+            </p>
+            <p>
+              Chúng tôi xây dựng hệ sinh thái kết nối Brand - Creator - User, nơi mọi chiến dịch đều được vận hành minh bạch, tối ưu bằng dữ liệu thực tế và hướng đến hiệu quả kinh doanh thật.
+            </p>
+          </div>
+        </section>
+
+        <section className="mt-10 rounded-[2rem] border border-zinc-200 bg-white px-6 py-10 md:px-10 md:py-14">
+          <div className="mx-auto max-w-5xl text-center">
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-zinc-500">The Flywheel Engine</p>
+            <h2 className="mt-4 text-5xl font-black leading-[0.95] text-zinc-900 md:text-8xl">Win-Win-Win Flywheel</h2>
+            <p className="mx-auto mt-8 max-w-4xl text-2xl leading-tight text-zinc-600 md:text-4xl">
+              Dòng chảy giá trị khép kín giữa Thương hiệu, Creator và Người tiêu dùng.
+              <br />
+              Công bằng, minh bạch và cộng sinh.
+            </p>
+          </div>
+
+          <div className="mx-auto mt-20 max-w-5xl text-center">
+            <p className="text-2xl font-black uppercase tracking-[0.16em] text-zinc-900 md:text-3xl">BRAND</p>
+            <p className="mt-2 text-sm font-bold text-zinc-400 md:text-base">Inventory &amp; Margin</p>
+            <p className="mx-auto mt-3 max-w-xl text-lg leading-8 text-zinc-700 md:text-2xl">
+              Tăng doanh thu bằng UGC hiệu quả và tối ưu chi phí marketing.
+            </p>
+          </div>
+
+          <div className="relative mx-auto mt-10 h-[620px] w-full max-w-[860px] md:h-[760px]">
+            <div className="flywheel-pulse absolute left-1/2 top-1/2 h-[86%] w-[86%] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed border-zinc-300/70" />
+            <div className="absolute left-1/2 top-1/2 h-[62%] w-[62%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-zinc-300/65" />
+            <div className="absolute left-1/2 top-1/2 h-[46%] w-[46%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-zinc-300/55" />
+            <div className="absolute left-1/2 top-1/2 h-[30%] w-[30%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-zinc-300/45" />
+
+            <div className="absolute left-1/2 top-[18%] h-[56%] w-[56%] -translate-x-1/2">
+              <div className="absolute left-1/2 top-[16%] h-[62%] w-px -translate-x-1/2 bg-zinc-300/50" />
+              <div className="absolute bottom-[10%] left-[8%] h-px w-[45%] rotate-[58deg] bg-zinc-300/50 origin-left" />
+              <div className="absolute bottom-[10%] right-[8%] h-px w-[45%] -rotate-[58deg] bg-zinc-300/50 origin-right" />
+            </div>
+
+            <div className="flywheel-fade absolute left-1/2 top-[14%] flex h-24 w-24 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[2rem] border border-zinc-200 bg-white shadow-sm">
+              <span className="text-3xl">🏢</span>
+            </div>
+            <div className="flywheel-fade absolute left-[22%] top-[78%] flex h-24 w-24 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[2rem] border border-zinc-200 bg-white shadow-sm [animation-delay:160ms]">
+              <span className="text-3xl">👥</span>
+            </div>
+            <div className="flywheel-fade absolute right-[22%] top-[78%] flex h-24 w-24 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[2rem] border border-zinc-200 bg-white shadow-sm [animation-delay:320ms]">
+              <span className="text-3xl">📷</span>
+            </div>
+
+            <div className="flywheel-fade absolute left-1/2 top-1/2 flex h-36 w-36 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white [animation-delay:120ms]">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-zinc-900 text-5xl font-black text-white">d</div>
+            </div>
+          </div>
+
+          <div className="mx-auto mt-2 grid max-w-5xl gap-8 text-center md:grid-cols-2">
+            <article>
+              <p className="text-2xl font-black uppercase tracking-[0.16em] text-zinc-900 md:text-3xl">USER</p>
+              <p className="mt-2 text-sm font-bold text-zinc-400 md:text-base">Experience &amp; Value</p>
+              <p className="mt-3 text-lg leading-8 text-zinc-700 md:text-2xl">
+                Đồng sáng tạo nội dung và trở thành micro-creator.
+              </p>
             </article>
-          ))}
-        </section>
-
-        <section className="mt-10">
-          <div className="mb-4">
-            <h2 className="text-2xl font-black">Cách dCreator vận hành</h2>
-            <p className="mt-1 text-sm text-zinc-600">Mô hình ngắn gọn để Creator và Brand cùng tăng trưởng.</p>
-          </div>
-          <ProcessBanner steps={processSteps} />
-        </section>
-
-        <section className="mt-10">
-          <div className="mb-4 flex items-end justify-between">
-            <h2 className="text-2xl font-black">Chiến dịch nổi bật</h2>
-            <Link href="/campaigns" className="text-sm font-semibold text-zinc-600">
-              Xem tất cả
-            </Link>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {featuredCampaigns.items.map((campaign) => (
-              <CampaignCard key={campaign.slug} campaign={campaign} />
-            ))}
+            <article>
+              <p className="text-2xl font-black uppercase tracking-[0.16em] text-zinc-900 md:text-3xl">CREATOR</p>
+              <p className="mt-2 text-sm font-bold text-zinc-400 md:text-base">Content &amp; Influence</p>
+              <p className="mt-3 text-lg leading-8 text-zinc-700 md:text-2xl">
+                Nhận campaign, phát triển cá nhân và tạo thu nhập minh bạch.
+              </p>
+            </article>
           </div>
         </section>
 
@@ -173,31 +233,6 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <section className="mt-10 grid gap-4 md:grid-cols-2">
-          {roleCards.map((card) => (
-            <article
-              key={card.title}
-              className={`dc-card p-6 ${card.title.includes("Creator") ? "bg-sky-50/80" : "bg-amber-50/80"}`}
-            >
-              <h3 className="text-xl font-black text-zinc-900">{card.title}</h3>
-              <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-zinc-700">
-                {card.points.map((point) => (
-                  <li key={point}>{point}</li>
-                ))}
-              </ul>
-            </article>
-          ))}
-        </section>
-
-        <section className="mt-10 grid gap-4 md:grid-cols-2">
-          {testimonials.map((item) => (
-            <article key={item.name} className="dc-card bg-zinc-50 p-6">
-              <p className="text-sm text-zinc-700">&quot;{item.quote}&quot;</p>
-              <p className="mt-4 text-sm font-bold text-zinc-900">{item.name}</p>
-            </article>
-          ))}
-        </section>
-
         <section className="mt-10 rounded-[2rem] border border-zinc-200 bg-zinc-50 p-6 md:p-8">
           <h2 className="text-2xl font-black text-zinc-900">Câu hỏi thường gặp</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-3">
@@ -217,6 +252,32 @@ export default async function HomePage() {
               </article>
             ))}
           </div>
+        </section>
+
+        <section className="mt-10 rounded-[2rem] border border-zinc-200 bg-white p-6 md:p-8">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">Đối tác</p>
+              <h2 className="mt-2 text-2xl font-black text-zinc-900">Các Brand đã hợp tác với dCreator</h2>
+            </div>
+            <p className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-sm font-semibold text-zinc-700">
+              {partneredBrands.length} brands
+            </p>
+          </div>
+          {partneredBrands.length > 0 ? (
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+              {partneredBrands.map((brand) => (
+                <article key={brand.name} className="rounded-2xl border border-zinc-200 bg-gradient-to-b from-white to-zinc-50 px-4 py-5 text-center shadow-sm">
+                  <div className="mx-auto mb-3 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm">
+                    <PartnerLogo brandName={brand.name} logoUrl={brand.logoUrl} />
+                  </div>
+                  <p className="truncate text-base font-bold text-zinc-900">{brand.name}</p>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-zinc-500">Brand sẽ hiển thị khi có chiến dịch đang hoạt động.</p>
+          )}
         </section>
 
         <section className="mt-10 overflow-hidden rounded-[2rem] border border-zinc-900 bg-zinc-900 text-white shadow-2xl shadow-zinc-200/30">

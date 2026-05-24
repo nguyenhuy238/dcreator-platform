@@ -3,8 +3,8 @@ import { ok } from "@/lib/api-response";
 import { requireAdminOps } from "@/lib/auth/admin-guard";
 import { CAMPAIGN_STATUS_SET } from "@/lib/constants/enums";
 import { toErrorResponse } from "@/lib/errors";
-import { listCampaignsForAdmin } from "@/lib/services/admin-campaign-review.service";
-import { adminCampaignListQuerySchema } from "@/lib/validators/admin-campaign";
+import { createCampaignByAdmin, listCampaignsForAdmin } from "@/lib/services/admin-campaign-review.service";
+import { adminCampaignCreateSchema, adminCampaignListQuerySchema } from "@/lib/validators/admin-campaign";
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,6 +16,16 @@ export async function GET(request: NextRequest) {
       query
     });
     return ok(await listCampaignsForAdmin({ status: parsed.status, query: parsed.query }));
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const actor = await requireAdminOps(request);
+    const payload = adminCampaignCreateSchema.parse(await request.json());
+    return ok(await createCampaignByAdmin(actor.id, payload), 201);
   } catch (error) {
     return toErrorResponse(error);
   }

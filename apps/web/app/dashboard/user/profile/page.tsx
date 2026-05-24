@@ -49,6 +49,26 @@ function statusText(value?: unknown) {
   return "Chưa gửi";
 }
 
+function resolveAvatarSrc(input?: string | null) {
+  const raw = (input ?? "").trim();
+  if (!raw) return "";
+
+  try {
+    const parsed = new URL(raw);
+    if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+      return `${parsed.pathname}${parsed.search}`;
+    }
+    return raw;
+  } catch {
+    if (raw.startsWith("/")) return raw;
+    return "";
+  }
+}
+
+function onlyDigits(raw: string) {
+  return raw.replace(/\D/g, "");
+}
+
 export default function UserProfilePage() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -59,6 +79,8 @@ export default function UserProfilePage() {
   const [brandForm, setBrandForm] = useState(defaultBrand);
   const [submittingCreator, setSubmittingCreator] = useState(false);
   const [submittingBrand, setSubmittingBrand] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarLoadError, setAvatarLoadError] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -99,6 +121,11 @@ export default function UserProfilePage() {
   const sidebarItems = useMemo(() => {
     return nav;
   }, []);
+  const avatarSrc = useMemo(() => resolveAvatarSrc(data?.account.avatarUrl), [data?.account.avatarUrl]);
+
+  useEffect(() => {
+    setAvatarLoadError(false);
+  }, [avatarSrc]);
 
   async function submitCreator(event: FormEvent) {
     event.preventDefault();
@@ -169,6 +196,48 @@ export default function UserProfilePage() {
     return <><AppShell sidebarItems={sidebarItems}><div className="dc-card p-6">Đang tải hồ sơ...</div></AppShell></>;
   }
 
+  async function uploadAvatar(file: File) {
+    setUploadingAvatar(true);
+    setError("");
+    setSuccess("");
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+      const uploadRes = await fetch("/api/uploads/avatar", { method: "POST", body: formData });
+      const uploadPayload = await uploadRes.json();
+      if (!uploadRes.ok || !uploadPayload.success || !uploadPayload.data?.avatarUrl) {
+        throw new Error(uploadPayload.error ?? "Không thể tải ảnh đại diện");
+      }
+
+      const patchRes = await fetch("/api/profile/account", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avatarUrl: uploadPayload.data.avatarUrl })
+      });
+      const patchPayload = await patchRes.json();
+      if (!patchRes.ok || !patchPayload.success) {
+        throw new Error(patchPayload.error ?? "Không thể cập nhật ảnh đại diện");
+      }
+
+      setData((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          account: {
+            ...current.account,
+            avatarUrl: patchPayload.data.avatarUrl
+          }
+        };
+      });
+      setAvatarLoadError(false);
+      setSuccess("Đã cập nhật ảnh đại diện.");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Không thể tải ảnh đại diện");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
   if (!data) {
     return <><AppShell sidebarItems={sidebarItems}><div className="dc-card p-6 text-red-700">{error || "Không tìm thấy hồ sơ"}</div></AppShell></>;
   }
@@ -187,6 +256,35 @@ export default function UserProfilePage() {
         <section id="role-requests" className="mt-6 grid gap-4 md:grid-cols-2">
           <div className="dc-card p-5">
             <h2 className="text-xl font-bold">Thông tin cá nhân</h2>
+            <div className="mt-3 flex items-center gap-3">
+              {avatarSrc && !avatarLoadError ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={avatarSrc}
+                  alt={data.account.displayName || "User avatar"}
+                  className="h-12 w-12 rounded-xl border border-zinc-200 object-cover"
+                  onError={() => setAvatarLoadError(true)}
+                />
+              ) : (
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-900 text-sm font-bold text-white">
+                  {data.account.displayName.slice(0, 1).toUpperCase() || "U"}
+                </div>
+              )}
+              <label className="dc-btn-secondary cursor-pointer">
+                {uploadingAvatar ? "Đang tải..." : "Tải ảnh đại diện"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  disabled={uploadingAvatar}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    if (file) void uploadAvatar(file);
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
             <p className="mt-2 text-sm">Tên hiển thị: <span className="font-semibold">{data.account.displayName}</span></p>
             <p className="text-sm">Email: <span className="font-semibold">{data.account.email}</span></p>
             <p className="text-sm">Số điện thoại: <span className="font-semibold">{data.account.profile?.phone ?? "Chưa có"}</span></p>
@@ -215,7 +313,8 @@ export default function UserProfilePage() {
                   <option value="OTHER">OTHER</option>
                 </select>
                 <input className="dc-input" placeholder="Liên kết mạng xã hội" type="url" value={creatorForm.socialUrl} onChange={(e) => setCreatorForm((x) => ({ ...x, socialUrl: e.target.value }))} required />
-                <input className="dc-input" placeholder="Số lượng người theo dõi" type="number" min={0} value={creatorForm.followerCount} onChange={(e) => setCreatorForm((x) => ({ ...x, followerCount: e.target.value }))} />
+                <input className="dc-input" placeholder="Số lượng người theo dõi" type="text" inputMode="numeric" value={creatorForm.followerCount} onChange={(e) => setCreatorForm((x) => ({ ...x, followerCount: onlyDigits(e.target.value) }))} />
+                <p className="text-xs font-medium text-zinc-500">Đơn vị: follower, chỉ nhập số.</p>
                 <textarea className="dc-input min-h-24" placeholder="Giới thiệu bản thân" value={creatorForm.bio} onChange={(e) => setCreatorForm((x) => ({ ...x, bio: e.target.value }))} />
                 <button className="dc-btn-primary" disabled={submittingCreator} type="submit">{submittingCreator ? "Đang gửi..." : creatorStatus ? "Gửi lại hồ sơ Creator" : "Đăng ký Creator"}</button>
               </form>

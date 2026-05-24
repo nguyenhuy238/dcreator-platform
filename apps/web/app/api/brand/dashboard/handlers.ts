@@ -4,6 +4,7 @@ import { requireBrandActor } from "@/lib/auth/brand-guard";
 import { toErrorResponse } from "@/lib/errors";
 import {
   addRewardTier,
+  addCampaignMissionForBrand,
   approveCampaignForPublish,
   createBrandCampaign,
   createBrandCampaignRequest,
@@ -16,6 +17,7 @@ import {
   getBrandOverview,
   getBrandProfile,
   listBrandCampaigns,
+  listCampaignMissionsForBrand,
   listBrandCampaignRequests,
   listBrandMembers,
   listBrandProofs,
@@ -45,6 +47,7 @@ import {
   budgetTopupSchema,
   campaignBrandFeedbackSchema,
   campaignCreateSchema,
+  campaignMissionCreateSchema,
   campaignRequestSchema,
   creatorApplicationDecisionSchema,
   productSchema,
@@ -200,6 +203,17 @@ export async function POST_budget_lock(request: NextRequest) {
 export async function GET_analytics(request: NextRequest) {
   const account = await requireBrandActor(request);
   return ok(await getBrandAnalytics(account.id));
+}
+
+export async function POST_campaign_mission(request: NextRequest, campaignId: string) {
+  const account = await requireBrandActor(request);
+  const payload = campaignMissionCreateSchema.parse(await request.json());
+  return ok(await addCampaignMissionForBrand(account.id, campaignId, payload), 201);
+}
+
+export async function GET_campaign_missions(request: NextRequest, campaignId: string) {
+  const account = await requireBrandActor(request);
+  return ok(await listCampaignMissionsForBrand(account.id, campaignId));
 }
 
 export async function GET_members(request: NextRequest) {

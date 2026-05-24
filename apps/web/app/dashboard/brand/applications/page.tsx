@@ -17,7 +17,28 @@ type ApplicationItem = {
       mainPlatform: string;
       socialUrl: string;
       followerCount: number | null;
+      bio: string | null;
+      contentCategory: string | null;
+      portfolioUrl: string | null;
+      location: string | null;
+      expectedRate: number | null;
+      maxJobsPerMonth: number | null;
     } | null;
+    submissions: Array<{
+      id: string;
+      lifecycleStatus: string;
+      updatedAt: string;
+      mission: {
+        id: string;
+        title: string;
+        campaign: {
+          id: string;
+          title: string;
+          slug: string;
+          status: string;
+        };
+      };
+    }>;
   };
   mission: {
     id: string;
@@ -39,6 +60,7 @@ export default function BrandApplicationsPage() {
   const [campaignFilter, setCampaignFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [platformFilter, setPlatformFilter] = useState("");
+  const [expandedCreator, setExpandedCreator] = useState<Record<string, boolean>>({});
 
   async function load() {
     setLoading(true);
@@ -150,10 +172,44 @@ export default function BrandApplicationsPage() {
                   </div>
                   {item.note ? <p className="mt-2 text-sm text-zinc-700">Ghi chú: {item.note}</p> : null}
                   <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      className="dc-btn-secondary"
+                      onClick={() => setExpandedCreator((current) => ({ ...current, [item.id]: !current[item.id] }))}
+                    >
+                      {expandedCreator[item.id] ? "Ẩn hồ sơ" : "Xem hồ sơ & dự án cũ"}
+                    </button>
                     <button className="dc-btn-primary" onClick={() => void decide(item.id, "APPROVED")}>Duyệt creator</button>
                     <button className="dc-btn-secondary" onClick={() => void decide(item.id, "REJECTED")}>Từ chối creator</button>
                     <button className="dc-btn-secondary" onClick={() => window.alert("Tính năng gửi brief/mission sẽ dùng khi mission setup hoàn tất.")}>Gửi brief</button>
                   </div>
+                  {expandedCreator[item.id] ? (
+                    <div className="mt-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+                      <p className="text-sm font-semibold text-zinc-900">Hồ sơ Creator</p>
+                      <div className="mt-2 grid gap-1 text-sm text-zinc-600 md:grid-cols-2">
+                        <p>Ngành nội dung: {item.account.creatorProfile?.contentCategory || "Chưa cập nhật"}</p>
+                        <p>Khu vực: {item.account.creatorProfile?.location || "Chưa cập nhật"}</p>
+                        <p>Rate kỳ vọng: {item.account.creatorProfile?.expectedRate != null ? `${item.account.creatorProfile.expectedRate.toLocaleString("vi-VN")} VND` : "Chưa cập nhật"}</p>
+                        <p>Công suất: {item.account.creatorProfile?.maxJobsPerMonth != null ? `${item.account.creatorProfile.maxJobsPerMonth} job/tháng` : "Chưa cập nhật"}</p>
+                        <p className="md:col-span-2">Portfolio: {item.account.creatorProfile?.portfolioUrl || "Chưa cập nhật"}</p>
+                        <p className="md:col-span-2">Bio: {item.account.creatorProfile?.bio || "Chưa cập nhật"}</p>
+                      </div>
+                      <p className="mt-3 text-sm font-semibold text-zinc-900">Dự án cũ đã tham gia</p>
+                      {item.account.submissions.length === 0 ? (
+                        <p className="mt-1 text-sm text-zinc-600">Chưa có lịch sử dự án đã duyệt.</p>
+                      ) : (
+                        <div className="mt-2 grid gap-2">
+                          {item.account.submissions.map((submission) => (
+                            <div key={submission.id} className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700">
+                              <p className="font-semibold text-zinc-900">{submission.mission.campaign.title}</p>
+                              <p>Mission: {submission.mission.title}</p>
+                              <p>Trạng thái: {submission.lifecycleStatus}</p>
+                              <p>Cập nhật: {new Date(submission.updatedAt).toLocaleString("vi-VN")}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
                 </article>
               ))}
             </div>

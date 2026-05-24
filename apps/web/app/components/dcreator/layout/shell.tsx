@@ -81,9 +81,9 @@ export function PublicHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/70 bg-white/90 backdrop-blur">
       <div className="mx-auto grid w-full max-w-7xl grid-cols-[auto_1fr_auto] items-center px-4 py-3 md:px-6">
-        <Link href="/" className="dc-focus inline-flex items-center gap-2 text-2xl font-black tracking-tight">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 text-white shadow-sm">
-            <span className="text-[15px] font-black leading-none tracking-[-0.08em]">d</span>
+        <Link href="/" className="dc-focus font-display inline-flex items-center gap-2 text-[1.7rem] font-black tracking-tight">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-900 text-white shadow-sm">
+            <span className="text-[16px] font-black leading-none tracking-[-0.08em]">d</span>
           </span>
           <span>dCreator</span>
         </Link>

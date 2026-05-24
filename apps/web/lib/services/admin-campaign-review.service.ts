@@ -4,13 +4,18 @@ import { AppError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
 import { createNotification } from "@/lib/services/notification.service";
 import { assertStateTransition } from "@/lib/services/admin-transition.service";
+import type { z } from "zod";
+import type { adminCampaignCreateSchema } from "@/lib/validators/admin-campaign";
+import type { campaignMissionCreateSchema } from "@/lib/validators/brand-dashboard";
 
 type AdminDecision = "APPROVE" | "REJECT" | "REQUEST_CHANGES" | "PAUSE";
+type AdminCampaignCreateInput = z.infer<typeof adminCampaignCreateSchema>;
+type CampaignMissionInput = z.infer<typeof campaignMissionCreateSchema>;
 
 const campaignTransitionMap: Record<AdminDecision, readonly CampaignStatus[]> = {
   APPROVE: ["DRAFT", "PAUSED"],
   REJECT: ["DRAFT", "PAUSED"],
-  REQUEST_CHANGES: ["DRAFT", "PAUSED"],
+  REQUEST_CHANGES: ["DRAFT", "PAUSED", "ACTIVE"],
   PAUSE: ["ACTIVE"]
 };
 
@@ -268,4 +273,106 @@ export async function decideCampaignByAdmin(input: {
   }
 
   return updated;
+}
+
+export async function createCampaignByAdmin(actorId: string, input: AdminCampaignCreateInput) {
+  const brandAccount = await prisma.account.findUnique({
+    where: { id: input.brandAccountId },
+    select: { id: true, displayName: true, email: true, isActive: true }
+  });
+  if (!brandAccount) throw new AppError("Brand account not found", 404, "BRAND_ACCOUNT_NOT_FOUND");
+  if (!brandAccount.isActive) throw new AppError("Brand account is inactive", 409, "BRAND_ACCOUNT_INACTIVE");
+
+  const campaign = await prisma.campaign.create({
+    data: {
+      brandId: brandAccount.id,
+      slug: input.slug,
+      title: input.title,
+      brief: input.brief,
+      budgetVnd: input.budgetVnd,
+      targetAmountVnd: input.targetAmountVnd ?? input.budgetVnd,
+      category: input.category,
+      campaignType: input.campaignType,
+      setupSource: input.setupSource,
+      objective: input.objective || null,
+      priorityChannels: input.priorityChannels || null,
+      missionTypes: input.missionTypes || null,
+      creatorCommissionPercent: input.creatorCommissionPercent,
+      userCommissionPercent: input.userCommissionPercent,
+      bonusBudgetVnd: input.bonusBudgetVnd,
+      startsAt: input.startsAt ? new Date(input.startsAt) : null,
+      endsAt: input.endsAt ? new Date(input.endsAt) : null,
+      feasibilityStatus: input.publishNow ? "APPROVED" : "DRAFT",
+      brandApprovalStatus: input.publishNow ? "APPROVED" : "DRAFT",
+      status: input.publishNow ? "ACTIVE" : "DRAFT"
+    }
+  });
+
+  await writeAuditLog({
+    actorId,
+    action: "ADMIN_CAMPAIGN_CREATED",
+    targetType: "Campaign",
+    targetId: campaign.id,
+    newStatus: campaign.status,
+    metadata: { publishNow: Boolean(input.publishNow), brandAccountId: brandAccount.id }
+  });
+
+  await createNotification({
+    accountId: brandAccount.id,
+    event: NotificationEvent.CAMPAIGN_APPROVED,
+    title: input.publishNow ? "Admin đã tạo và publish campaign" : "Admin đã tạo campaign draft",
+    content: input.publishNow
+      ? `Campaign "${campaign.title}" đã được tạo và active.`
+      : `Campaign "${campaign.title}" đã được tạo ở trạng thái draft.`,
+    metadata: { campaignId: campaign.id }
+  });
+
+  return campaign;
+}
+
+export async function addCampaignMissionByAdmin(actorId: string, campaignId: string, input: CampaignMissionInput) {
+  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
+  if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
+
+  const deadlineAt = input.deadlineAt ? new Date(input.deadlineAt) : null;
+  if (deadlineAt && campaign.startsAt && deadlineAt < campaign.startsAt) {
+    throw new AppError("Mission deadline cannot be earlier than campaign start", 422, "MISSION_DEADLINE_INVALID");
+  }
+  if (deadlineAt && campaign.endsAt && deadlineAt > campaign.endsAt) {
+    throw new AppError("Mission deadline cannot be later than campaign end", 422, "MISSION_DEADLINE_INVALID");
+  }
+
+  const mission = await prisma.mission.create({
+    data: {
+      campaignId: campaign.id,
+      title: input.title,
+      description: input.description,
+      productLink: input.productLink || null,
+      rewardPoints: input.rewardPoints,
+      rewardCommissionVnd: input.rewardCommissionVnd,
+      audience: input.audience,
+      productReceiveOption: input.productReceiveOption,
+      allowRepeat: input.allowRepeat,
+      deadlineAt
+    }
+  });
+
+  await writeAuditLog({
+    actorId,
+    action: "ADMIN_CAMPAIGN_MISSION_CREATED",
+    targetType: "Mission",
+    targetId: mission.id,
+    metadata: { campaignId: campaign.id, audience: mission.audience }
+  });
+
+  return mission;
+}
+
+export async function listCampaignMissionsByAdmin(campaignId: string) {
+  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { id: true } });
+  if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
+  return prisma.mission.findMany({
+    where: { campaignId: campaign.id },
+    orderBy: { createdAt: "desc" }
+  });
 }
