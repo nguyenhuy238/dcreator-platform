@@ -1,8 +1,7 @@
-import { CampaignStatus, MissionAudience, MissionLifecycleStatus, Role } from "@prisma/client";
+import { ApplicationStatus, CampaignStatus, MissionAudience, MissionLifecycleStatus, Role } from "@prisma/client";
 import { appendCreatorCampaignApplicationTag } from "@/lib/constants/campaign-application";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
-import { acceptMission } from "@/lib/services/mission.service";
 
 export type CreatorCampaignApplicationState =
   | "LOGIN_REQUIRED"
@@ -57,7 +56,7 @@ function toSnapshot(
     PROFILE_REQUIRED: {
       label: "Hoàn thiện hồ sơ Creator",
       disabled: true,
-      message: "Vui lòng hoàn thiện hồ sơ Creator trước khi nộp đơn.",
+      message: "Bạn cần hoàn thiện hồ sơ Creator và chọn nền tảng chính trước khi xin làm nhiệm vụ.",
       rejectReason: null,
       submissionId: null,
       missionId: null,
@@ -122,11 +121,11 @@ function toSnapshot(
   return { state, ...defaults[state], ...partial };
 }
 
-function toStateFromLifecycle(status: MissionLifecycleStatus): CreatorCampaignApplicationState {
-  if (status === "ACCEPTED") return "PENDING_REVIEW";
-  if (status === "DOING") return "ASSIGNED";
+function toStateFromApplicationStatus(status: ApplicationStatus): CreatorCampaignApplicationState {
+  if (status === "PENDING_REVIEW") return "PENDING_REVIEW";
+  if (status === "APPROVED") return "ASSIGNED";
   if (status === "REJECTED") return "REJECTED";
-  return "ASSIGNED";
+  return "CAN_APPLY";
 }
 
 async function getCampaignAndCreatorMission(slug: string) {
@@ -158,42 +157,32 @@ export async function getCreatorCampaignApplicationStatus(
   viewer: Viewer
 ): Promise<CreatorCampaignApplicationSnapshot> {
   const campaignData = await getCampaignAndCreatorMission(slug);
-  if (!campaignData) {
-    return toSnapshot("CAMPAIGN_UNAVAILABLE");
-  }
+  if (!campaignData) return toSnapshot("CAMPAIGN_UNAVAILABLE");
 
   const { campaign, firstMission } = campaignData;
-  if (!campaign.isPublic || campaign.status !== CampaignStatus.ACTIVE) {
-    return toSnapshot("CAMPAIGN_UNAVAILABLE");
-  }
+  if (!campaign.isPublic || campaign.status !== CampaignStatus.ACTIVE) return toSnapshot("CAMPAIGN_UNAVAILABLE");
 
   if (!viewer) return toSnapshot("LOGIN_REQUIRED");
   if (!viewer.roles.includes(Role.CREATOR)) return toSnapshot("NOT_CREATOR");
 
   const creatorProfile = await prisma.creatorProfile.findUnique({
     where: { accountId: viewer.id },
-    select: { id: true }
+    select: { id: true, mainPlatform: true }
   });
-  if (!creatorProfile) return toSnapshot("PROFILE_REQUIRED");
+  if (!creatorProfile || !creatorProfile.mainPlatform) return toSnapshot("PROFILE_REQUIRED");
 
-  const existing = await prisma.missionSubmission.findFirst({
-    where: {
-      accountId: viewer.id,
-      mission: {
-        campaignId: campaign.id,
-        audience: { in: [MissionAudience.CREATOR, MissionAudience.USER] }
-      }
-    },
+  const existing = await prisma.missionApplication.findFirst({
+    where: { accountId: viewer.id, campaignId: campaign.id },
     orderBy: { createdAt: "desc" },
-    select: { id: true, missionId: true, lifecycleStatus: true, rejectReason: true }
+    select: { id: true, missionId: true, status: true, rejectReason: true }
   });
 
   if (existing) {
-    const state = toStateFromLifecycle(existing.lifecycleStatus);
+    const state = toStateFromApplicationStatus(existing.status);
     return toSnapshot(state, {
       submissionId: existing.id,
       missionId: existing.missionId,
-      lifecycleStatus: existing.lifecycleStatus,
+      lifecycleStatus: state === "ASSIGNED" ? "DOING" : state === "REJECTED" ? "REJECTED" : "ACCEPTED",
       rejectReason: existing.rejectReason
     });
   }
@@ -213,46 +202,51 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
     throw new AppError("Campaign is not open for creator application", 409, "CAMPAIGN_NOT_OPEN");
   }
 
+  if (!firstMission) {
+    throw new AppError("Campaign has no creator mission", 409, "CREATOR_MISSION_NOT_AVAILABLE");
+  }
+
   const creatorProfile = await prisma.creatorProfile.findUnique({
     where: { accountId },
     select: { id: true, mainPlatform: true, socialUrl: true, followerCount: true }
   });
-  if (!creatorProfile) {
-    throw new AppError("Creator profile is required", 422, "CREATOR_PROFILE_REQUIRED");
+  if (!creatorProfile || !creatorProfile.mainPlatform) {
+    throw new AppError(
+      "Bạn cần hoàn thiện hồ sơ Creator và chọn nền tảng chính trước khi xin làm nhiệm vụ.",
+      422,
+      "CREATOR_PROFILE_MAIN_PLATFORM_REQUIRED"
+    );
   }
 
-  const existing = await prisma.missionSubmission.findFirst({
+  const existing = await prisma.missionApplication.findUnique({
     where: {
-      accountId,
-      mission: {
-        campaignId: campaign.id,
-        audience: { in: [MissionAudience.CREATOR, MissionAudience.USER] }
+      missionId_accountId: {
+        missionId: firstMission.id,
+        accountId
       }
     },
-    select: { id: true, lifecycleStatus: true }
+    select: { id: true }
   });
   if (existing) {
     throw new AppError("Creator has already applied to this campaign", 409, "CREATOR_CAMPAIGN_ALREADY_APPLIED");
   }
 
-  if (!firstMission) {
-    throw new AppError("Campaign has no creator mission", 409, "CREATOR_MISSION_NOT_AVAILABLE");
-  }
-
-  const missionRole = firstMission.audience === MissionAudience.USER ? Role.USER : Role.CREATOR;
-  const submission = await acceptMission(firstMission.id, accountId, missionRole);
-
-  await prisma.missionSubmission.update({
-    where: { id: submission.id },
-    data: { note: appendCreatorCampaignApplicationTag(submission.note, slug) }
+  const application = await prisma.missionApplication.create({
+    data: {
+      missionId: firstMission.id,
+      campaignId: campaign.id,
+      accountId,
+      status: "PENDING_REVIEW",
+      note: appendCreatorCampaignApplicationTag(null, slug)
+    }
   });
 
   await prisma.auditLog.create({
     data: {
       actorId: accountId,
       action: "CREATOR_CAMPAIGN_APPLICATION_SUBMITTED",
-      targetType: "MissionSubmission",
-      targetId: submission.id,
+      targetType: "MissionApplication",
+      targetId: application.id,
       metadata: {
         campaignId: campaign.id,
         missionId: firstMission.id,
@@ -266,13 +260,13 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
   });
 
   return {
-    submissionId: submission.id,
-    missionId: submission.missionId,
-    lifecycleStatus: submission.lifecycleStatus,
+    submissionId: application.id,
+    missionId: application.missionId,
+    lifecycleStatus: "ACCEPTED" as const,
     status: toSnapshot("PENDING_REVIEW", {
-      submissionId: submission.id,
-      missionId: submission.missionId,
-      lifecycleStatus: submission.lifecycleStatus
+      submissionId: application.id,
+      missionId: application.missionId,
+      lifecycleStatus: "ACCEPTED"
     })
   };
 }

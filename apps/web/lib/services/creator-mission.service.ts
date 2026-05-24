@@ -1,554 +1,44 @@
-import { Prisma } from "@prisma/client";
-import { CREATOR_CAMPAIGN_APPLICATION_TAG } from "@/lib/constants/campaign-application";
+import {
+  ApplicationStatus,
+  CreatorMissionPublishStatus,
+  CreatorMissionVideoReviewStatus,
+  DepositStatus,
+  NotificationEvent,
+  Prisma,
+  ProductReceiveOption,
+  ProductStatus,
+  ReimbursementStatus
+} from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
+import { createNotification } from "@/lib/services/notification.service";
 
-export type ProductReceiveOption = "DEPOSIT_PRODUCT" | "CREATOR_BUY_FIRST" | "NO_PRODUCT_REQUIRED";
-export type CreatorMissionStatus = "PRODUCT_PENDING" | "DRAFT_PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
-export type ProductStatus = "NOT_REQUIRED" | "WAITING_DEPOSIT" | "WAITING_PURCHASE" | "RECEIVED";
-export type DepositStatus = "NOT_REQUIRED" | "PENDING" | "PAID" | "REFUND_PENDING" | "REFUNDED";
-export type ReimbursementStatus =
-  | "NOT_REQUIRED"
-  | "PENDING"
-  | "PURCHASE_SUBMITTED"
-  | "APPROVED"
-  | "PAYOUT_PENDING"
-  | "PAID"
-  | "REJECTED";
+type DbClient = Prisma.TransactionClient | typeof prisma;
+type Sort = "newest" | "oldest";
 
-type CreatorMissionDbExecutor = Pick<typeof prisma, "$queryRaw" | "$executeRaw">;
-
-type CreatorMissionRow = {
-  id: string;
-  missionId: string;
-  campaignId: string;
-  accountId: string;
-  applicationId: string | null;
-  status: CreatorMissionStatus;
-  productReceiveOption: ProductReceiveOption;
-  productStatus: ProductStatus;
-  depositStatus: DepositStatus;
-  reimbursementStatus: ReimbursementStatus;
-  purchaseProofTextNote: string | null;
-  purchaseProofScreenshotUrl: string | null;
-  purchaseProofNote: string | null;
-  purchaseProofSubmittedAt: Date | null;
-  purchaseProofReviewedAt: Date | null;
-  purchaseProofRejectReason: string | null;
-  assignedAt: Date;
-  startedAt: Date | null;
-  completedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  missionTitle: string;
-  missionDescription: string;
-  missionDeadlineAt: Date | null;
-  missionRewardPoints: number;
-  campaignTitle: string;
-  campaignSlug: string;
-  accountDisplayName: string;
-  accountEmail: string;
-};
-
-function isMissingPurchaseProofColumnError(error: unknown) {
-  if (!error || typeof error !== "object") return false;
-
-  const maybe = error as {
-    code?: string;
-    message?: string;
-    meta?: { code?: string; message?: string };
-  };
-
-  const pgCode = maybe.meta?.code ?? maybe.code;
-  const message = `${maybe.message ?? ""} ${maybe.meta?.message ?? ""}`.toLowerCase();
-  return pgCode === "42703" && message.includes("purchaseproof");
-}
-
-async function withPurchaseProofColumnFallback<T>(primary: () => Promise<T>, fallback: () => Promise<T>) {
-  try {
-    return await primary();
-  } catch (error) {
-    if (isMissingPurchaseProofColumnError(error)) {
-      return fallback();
-    }
-    throw error;
-  }
-}
-
-function isPast(date?: Date | null) {
-  return Boolean(date && date.getTime() <= Date.now());
-}
-
-function mapInitialStateByReceiveOption(productReceiveOption: ProductReceiveOption) {
-  if (productReceiveOption === "DEPOSIT_PRODUCT") {
-    return {
-      status: "PRODUCT_PENDING" as CreatorMissionStatus,
-      productStatus: "WAITING_DEPOSIT" as ProductStatus,
-      depositStatus: "PENDING" as DepositStatus,
-      reimbursementStatus: "NOT_REQUIRED" as ReimbursementStatus
-    };
-  }
-
-  if (productReceiveOption === "CREATOR_BUY_FIRST") {
-    return {
-      status: "PRODUCT_PENDING" as CreatorMissionStatus,
-      productStatus: "WAITING_PURCHASE" as ProductStatus,
-      depositStatus: "NOT_REQUIRED" as DepositStatus,
-      reimbursementStatus: "PENDING" as ReimbursementStatus
-    };
-  }
-
-  return {
-    status: "DRAFT_PENDING" as CreatorMissionStatus,
-    productStatus: "NOT_REQUIRED" as ProductStatus,
-    depositStatus: "NOT_REQUIRED" as DepositStatus,
-    reimbursementStatus: "NOT_REQUIRED" as ReimbursementStatus
-  };
-}
-
-export function getCreatorMissionGuidanceByOption(option: ProductReceiveOption) {
-  if (option === "DEPOSIT_PRODUCT") {
-    return "Bạn cần cọc tiền sản phẩm. Sau khi xác nhận cọc, sản phẩm sẽ được gửi cho bạn. Sau khi nhiệm vụ được nghiệm thu, tiền cọc sẽ được hoàn lại.";
-  }
-  if (option === "CREATOR_BUY_FIRST") {
-    return "Bạn tự mua sản phẩm theo link brand cung cấp. Xác nhận đã mua để bắt đầu quay video review, sau đó gửi báo cáo đăng bài để admin xác nhận hoàn tiền.";
-  }
-  return "Nhiệm vụ này không yêu cầu nhận sản phẩm. Bạn có thể bắt đầu thực hiện nội dung theo brief và gửi bản nháp đúng deadline.";
-}
-
-function mapCreatorMissionRow(item: CreatorMissionRow) {
-  return {
-    id: item.id,
-    status: item.status,
-    productReceiveOption: item.productReceiveOption,
-    productStatus: item.productStatus,
-    depositStatus: item.depositStatus,
-    reimbursementStatus: item.reimbursementStatus,
-    purchaseProof: {
-      proofTextNote: item.purchaseProofTextNote,
-      screenshotUrl: item.purchaseProofScreenshotUrl,
-      note: item.purchaseProofNote,
-      submittedAt: item.purchaseProofSubmittedAt?.toISOString() ?? null,
-      reviewedAt: item.purchaseProofReviewedAt?.toISOString() ?? null,
-      rejectReason: item.purchaseProofRejectReason
-    },
-    assignedAt: item.assignedAt.toISOString(),
-    startedAt: item.startedAt?.toISOString() ?? null,
-    completedAt: item.completedAt?.toISOString() ?? null,
-    mission: {
-      id: item.missionId,
-      title: item.missionTitle,
-      description: item.missionDescription,
-      deadlineAt: item.missionDeadlineAt?.toISOString() ?? null,
-      rewardPoints: item.missionRewardPoints
-    },
-    campaign: {
-      id: item.campaignId,
-      title: item.campaignTitle,
-      slug: item.campaignSlug
-    },
-    account: {
-      id: item.accountId,
-      displayName: item.accountDisplayName,
-      email: item.accountEmail
-    },
-    guidance: getCreatorMissionGuidanceByOption(item.productReceiveOption)
-  };
-}
-
-async function getCreatorMissionRowById(db: CreatorMissionDbExecutor, creatorMissionId: string) {
-  const rows = await withPurchaseProofColumnFallback(
-    () =>
-      db.$queryRaw<CreatorMissionRow[]>`
-        SELECT
-          cm."id",
-          cm."missionId",
-          cm."campaignId",
-          cm."accountId",
-          cm."applicationId",
-          cm."status",
-          cm."productReceiveOption",
-          cm."productStatus",
-          cm."depositStatus",
-          cm."reimbursementStatus",
-          cm."purchaseProofTextNote",
-          cm."purchaseProofScreenshotUrl",
-          cm."purchaseProofNote",
-          cm."purchaseProofSubmittedAt",
-          cm."purchaseProofReviewedAt",
-          cm."purchaseProofRejectReason",
-          cm."assignedAt",
-          cm."startedAt",
-          cm."completedAt",
-          cm."createdAt",
-          cm."updatedAt",
-          m."title" AS "missionTitle",
-          m."description" AS "missionDescription",
-          m."deadlineAt" AS "missionDeadlineAt",
-          m."rewardPoints" AS "missionRewardPoints",
-          c."title" AS "campaignTitle",
-          c."slug" AS "campaignSlug",
-          a."displayName" AS "accountDisplayName",
-          a."email" AS "accountEmail"
-        FROM "CreatorMission" cm
-        INNER JOIN "Mission" m ON m."id" = cm."missionId"
-        INNER JOIN "Campaign" c ON c."id" = cm."campaignId"
-        INNER JOIN "Account" a ON a."id" = cm."accountId"
-        WHERE cm."id" = ${creatorMissionId}
-        LIMIT 1
-      `,
-    () =>
-      db.$queryRaw<CreatorMissionRow[]>`
-        SELECT
-          cm."id",
-          cm."missionId",
-          cm."campaignId",
-          cm."accountId",
-          cm."applicationId",
-          cm."status",
-          cm."productReceiveOption",
-          cm."productStatus",
-          cm."depositStatus",
-          cm."reimbursementStatus",
-          NULL::TEXT AS "purchaseProofTextNote",
-          NULL::TEXT AS "purchaseProofScreenshotUrl",
-          NULL::TEXT AS "purchaseProofNote",
-          NULL::TIMESTAMP(3) AS "purchaseProofSubmittedAt",
-          NULL::TIMESTAMP(3) AS "purchaseProofReviewedAt",
-          NULL::TEXT AS "purchaseProofRejectReason",
-          cm."assignedAt",
-          cm."startedAt",
-          cm."completedAt",
-          cm."createdAt",
-          cm."updatedAt",
-          m."title" AS "missionTitle",
-          m."description" AS "missionDescription",
-          m."deadlineAt" AS "missionDeadlineAt",
-          m."rewardPoints" AS "missionRewardPoints",
-          c."title" AS "campaignTitle",
-          c."slug" AS "campaignSlug",
-          a."displayName" AS "accountDisplayName",
-          a."email" AS "accountEmail"
-        FROM "CreatorMission" cm
-        INNER JOIN "Mission" m ON m."id" = cm."missionId"
-        INNER JOIN "Campaign" c ON c."id" = cm."campaignId"
-        INNER JOIN "Account" a ON a."id" = cm."accountId"
-        WHERE cm."id" = ${creatorMissionId}
-        LIMIT 1
-      `
-  );
-
-  return rows[0] ?? null;
-}
-
-async function findCreatorMissionByApplication(db: CreatorMissionDbExecutor, applicationId: string) {
-  const rows = await withPurchaseProofColumnFallback(
-    () =>
-      db.$queryRaw<CreatorMissionRow[]>`
-        SELECT
-          cm."id",
-          cm."missionId",
-          cm."campaignId",
-          cm."accountId",
-          cm."applicationId",
-          cm."status",
-          cm."productReceiveOption",
-          cm."productStatus",
-          cm."depositStatus",
-          cm."reimbursementStatus",
-          cm."purchaseProofTextNote",
-          cm."purchaseProofScreenshotUrl",
-          cm."purchaseProofNote",
-          cm."purchaseProofSubmittedAt",
-          cm."purchaseProofReviewedAt",
-          cm."purchaseProofRejectReason",
-          cm."assignedAt",
-          cm."startedAt",
-          cm."completedAt",
-          cm."createdAt",
-          cm."updatedAt",
-          m."title" AS "missionTitle",
-          m."description" AS "missionDescription",
-          m."deadlineAt" AS "missionDeadlineAt",
-          m."rewardPoints" AS "missionRewardPoints",
-          c."title" AS "campaignTitle",
-          c."slug" AS "campaignSlug",
-          a."displayName" AS "accountDisplayName",
-          a."email" AS "accountEmail"
-        FROM "CreatorMission" cm
-        INNER JOIN "Mission" m ON m."id" = cm."missionId"
-        INNER JOIN "Campaign" c ON c."id" = cm."campaignId"
-        INNER JOIN "Account" a ON a."id" = cm."accountId"
-        WHERE cm."applicationId" = ${applicationId}
-        LIMIT 1
-      `,
-    () =>
-      db.$queryRaw<CreatorMissionRow[]>`
-        SELECT
-          cm."id",
-          cm."missionId",
-          cm."campaignId",
-          cm."accountId",
-          cm."applicationId",
-          cm."status",
-          cm."productReceiveOption",
-          cm."productStatus",
-          cm."depositStatus",
-          cm."reimbursementStatus",
-          NULL::TEXT AS "purchaseProofTextNote",
-          NULL::TEXT AS "purchaseProofScreenshotUrl",
-          NULL::TEXT AS "purchaseProofNote",
-          NULL::TIMESTAMP(3) AS "purchaseProofSubmittedAt",
-          NULL::TIMESTAMP(3) AS "purchaseProofReviewedAt",
-          NULL::TEXT AS "purchaseProofRejectReason",
-          cm."assignedAt",
-          cm."startedAt",
-          cm."completedAt",
-          cm."createdAt",
-          cm."updatedAt",
-          m."title" AS "missionTitle",
-          m."description" AS "missionDescription",
-          m."deadlineAt" AS "missionDeadlineAt",
-          m."rewardPoints" AS "missionRewardPoints",
-          c."title" AS "campaignTitle",
-          c."slug" AS "campaignSlug",
-          a."displayName" AS "accountDisplayName",
-          a."email" AS "accountEmail"
-        FROM "CreatorMission" cm
-        INNER JOIN "Mission" m ON m."id" = cm."missionId"
-        INNER JOIN "Campaign" c ON c."id" = cm."campaignId"
-        INNER JOIN "Account" a ON a."id" = cm."accountId"
-        WHERE cm."applicationId" = ${applicationId}
-        LIMIT 1
-      `
-  );
-  return rows[0] ?? null;
-}
-
-async function findCreatorMissionByMissionAndAccount(db: CreatorMissionDbExecutor, missionId: string, accountId: string) {
-  const rows = await withPurchaseProofColumnFallback(
-    () =>
-      db.$queryRaw<CreatorMissionRow[]>`
-        SELECT
-          cm."id",
-          cm."missionId",
-          cm."campaignId",
-          cm."accountId",
-          cm."applicationId",
-          cm."status",
-          cm."productReceiveOption",
-          cm."productStatus",
-          cm."depositStatus",
-          cm."reimbursementStatus",
-          cm."purchaseProofTextNote",
-          cm."purchaseProofScreenshotUrl",
-          cm."purchaseProofNote",
-          cm."purchaseProofSubmittedAt",
-          cm."purchaseProofReviewedAt",
-          cm."purchaseProofRejectReason",
-          cm."assignedAt",
-          cm."startedAt",
-          cm."completedAt",
-          cm."createdAt",
-          cm."updatedAt",
-          m."title" AS "missionTitle",
-          m."description" AS "missionDescription",
-          m."deadlineAt" AS "missionDeadlineAt",
-          m."rewardPoints" AS "missionRewardPoints",
-          c."title" AS "campaignTitle",
-          c."slug" AS "campaignSlug",
-          a."displayName" AS "accountDisplayName",
-          a."email" AS "accountEmail"
-        FROM "CreatorMission" cm
-        INNER JOIN "Mission" m ON m."id" = cm."missionId"
-        INNER JOIN "Campaign" c ON c."id" = cm."campaignId"
-        INNER JOIN "Account" a ON a."id" = cm."accountId"
-        WHERE cm."missionId" = ${missionId}
-          AND cm."accountId" = ${accountId}
-        LIMIT 1
-      `,
-    () =>
-      db.$queryRaw<CreatorMissionRow[]>`
-        SELECT
-          cm."id",
-          cm."missionId",
-          cm."campaignId",
-          cm."accountId",
-          cm."applicationId",
-          cm."status",
-          cm."productReceiveOption",
-          cm."productStatus",
-          cm."depositStatus",
-          cm."reimbursementStatus",
-          NULL::TEXT AS "purchaseProofTextNote",
-          NULL::TEXT AS "purchaseProofScreenshotUrl",
-          NULL::TEXT AS "purchaseProofNote",
-          NULL::TIMESTAMP(3) AS "purchaseProofSubmittedAt",
-          NULL::TIMESTAMP(3) AS "purchaseProofReviewedAt",
-          NULL::TEXT AS "purchaseProofRejectReason",
-          cm."assignedAt",
-          cm."startedAt",
-          cm."completedAt",
-          cm."createdAt",
-          cm."updatedAt",
-          m."title" AS "missionTitle",
-          m."description" AS "missionDescription",
-          m."deadlineAt" AS "missionDeadlineAt",
-          m."rewardPoints" AS "missionRewardPoints",
-          c."title" AS "campaignTitle",
-          c."slug" AS "campaignSlug",
-          a."displayName" AS "accountDisplayName",
-          a."email" AS "accountEmail"
-        FROM "CreatorMission" cm
-        INNER JOIN "Mission" m ON m."id" = cm."missionId"
-        INNER JOIN "Campaign" c ON c."id" = cm."campaignId"
-        INNER JOIN "Account" a ON a."id" = cm."accountId"
-        WHERE cm."missionId" = ${missionId}
-          AND cm."accountId" = ${accountId}
-        LIMIT 1
-      `
-  );
-  return rows[0] ?? null;
-}
-
-export async function ensureCreatorMissionFromApprovedApplication(
-  db: CreatorMissionDbExecutor,
-  input: {
-    missionId: string;
-    campaignId: string;
-    accountId: string;
-    applicationId: string;
-  }
-) {
-  const existingByApplication = await findCreatorMissionByApplication(db, input.applicationId);
-  if (existingByApplication) return existingByApplication;
-
-  const existingByMissionAndAccount = await findCreatorMissionByMissionAndAccount(db, input.missionId, input.accountId);
-  if (existingByMissionAndAccount) return existingByMissionAndAccount;
-
-  const missionRows = await db.$queryRaw<Array<{ id: string; productReceiveOption: ProductReceiveOption }>>`
-    SELECT "id", "productReceiveOption"
-    FROM "Mission"
-    WHERE "id" = ${input.missionId}
-    LIMIT 1
-  `;
-
-  const mission = missionRows[0];
-  if (!mission) throw new AppError("Mission not found", 404, "MISSION_NOT_FOUND");
-
-  const state = mapInitialStateByReceiveOption(mission.productReceiveOption);
-  const now = new Date();
-
-  await db.$executeRaw(
-    Prisma.sql`
-      INSERT INTO "CreatorMission" (
-        "id",
-        "missionId",
-        "campaignId",
-        "accountId",
-        "applicationId",
-        "status",
-        "productReceiveOption",
-        "productStatus",
-        "depositStatus",
-        "reimbursementStatus",
-        "createdAt",
-        "updatedAt"
-      )
-      VALUES (
-        ${crypto.randomUUID()},
-        ${input.missionId},
-        ${input.campaignId},
-        ${input.accountId},
-        ${input.applicationId},
-        ${state.status}::"CreatorMissionStatus",
-        ${mission.productReceiveOption}::"ProductReceiveOption",
-        ${state.productStatus}::"ProductStatus",
-        ${state.depositStatus}::"DepositStatus",
-        ${state.reimbursementStatus}::"ReimbursementStatus",
-        ${now},
-        ${now}
-      )
-      ON CONFLICT ("missionId", "accountId") DO NOTHING
-    `
-  );
-
-  const created = await findCreatorMissionByApplication(db, input.applicationId);
-  if (created) return created;
-
-  const fallback = await findCreatorMissionByMissionAndAccount(db, input.missionId, input.accountId);
-  if (!fallback) {
-    throw new AppError("Creator mission creation failed", 500, "CREATOR_MISSION_CREATE_FAILED");
-  }
-  return fallback;
-}
-
-const creatorMissionWorkflowSelect = {
-  id: true,
-  missionId: true,
-  campaignId: true,
-  accountId: true,
-  applicationId: true,
-  status: true,
-  productReceiveOption: true,
-  productStatus: true,
-  depositStatus: true,
-  reimbursementStatus: true,
-  purchaseProofTextNote: true,
-  purchaseProofScreenshotUrl: true,
-  purchaseProofNote: true,
-  purchaseProofSubmittedAt: true,
-  purchaseProofReviewedAt: true,
-  purchaseProofRejectReason: true,
-  productPurchasedConfirmedAt: true,
-  videoReviewStatus: true,
-  videoReviewFeedback: true,
-  videoSubmittedAt: true,
-  videoReviewedAt: true,
-  publishStatus: true,
-  publishFeedback: true,
-  publishSubmittedAt: true,
-  publishReviewedAt: true,
-  publishPurchaseAmountVnd: true,
-  rewardCreditedAt: true,
-  assignedAt: true,
-  startedAt: true,
-  completedAt: true,
-  createdAt: true,
-  updatedAt: true,
+const creatorMissionInclude = {
   mission: {
     select: {
       id: true,
       title: true,
       description: true,
-      deadlineAt: true,
+      productLink: true,
       rewardPoints: true,
-      productLink: true
+      rewardCommissionVnd: true,
+      productReceiveOption: true,
+      deadlineAt: true
     }
   },
-  campaign: {
-    select: {
-      id: true,
-      brandId: true,
-      title: true,
-      slug: true
-    }
-  },
+  campaign: { select: { id: true, title: true, slug: true, brandId: true } },
   account: {
     select: {
       id: true,
       displayName: true,
       email: true,
-      creatorProfile: {
-        select: {
-          mainPlatform: true,
-          socialUrl: true,
-          followerCount: true
-        }
-      }
+      creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true } }
     }
   },
-  application: {
+  submission: {
     select: {
       id: true,
       lifecycleStatus: true,
@@ -556,520 +46,450 @@ const creatorMissionWorkflowSelect = {
       videoUrl: true,
       socialPostUrl: true,
       screenshotUrl: true,
-      fileUploadUrl: true,
       proofTextNote: true,
       note: true,
       rejectReason: true,
+      purchaseBillImageUrl: true,
+      productReviewScreenshotUrl: true,
+      purchaseProofNote: true,
+      purchaseConfirmedAt: true,
+      publicVideoUrl: true,
+      adCode: true,
+      finalProofNote: true,
+      finalSubmittedAt: true,
       reviewedAt: true,
       approvedAt: true,
       rewardGrantedAt: true
     }
+  },
+  missionApplication: {
+    select: { id: true, status: true, note: true, rejectReason: true, reviewedAt: true, createdAt: true }
   }
-} satisfies Prisma.CreatorMissionSelect;
+} satisfies Prisma.CreatorMissionInclude;
 
-type CreatorMissionWorkflowEntity = Prisma.CreatorMissionGetPayload<{ select: typeof creatorMissionWorkflowSelect }>;
+type CreatorMissionEntity = Prisma.CreatorMissionGetPayload<{ include: typeof creatorMissionInclude }>;
 
-function mapCreatorMissionWorkflow(entity: CreatorMissionWorkflowEntity) {
+function dt(value: Date | null | undefined) {
+  return value ? value.toISOString() : null;
+}
+
+function now() {
+  return new Date();
+}
+
+function toPagination(page?: number, limit?: number) {
+  const safePage = Number.isFinite(page) && (page ?? 0) > 0 ? Number(page) : 1;
+  const safeLimit = Number.isFinite(limit) && (limit ?? 0) > 0 ? Math.min(Number(limit), 100) : 20;
+  return { page: safePage, limit: safeLimit, skip: (safePage - 1) * safeLimit };
+}
+
+function toCreatorMissionState(option: ProductReceiveOption) {
+  if (option === "NO_PRODUCT_REQUIRED") {
+    return {
+      status: "IN_PROGRESS" as const,
+      productStatus: "NOT_REQUIRED" as ProductStatus,
+      depositStatus: "NOT_REQUIRED" as DepositStatus,
+      reimbursementStatus: "NOT_REQUIRED" as ReimbursementStatus,
+      startedAt: now()
+    };
+  }
+
+  if (option === "CREATOR_BUY_FIRST") {
+    return {
+      status: "PRODUCT_PENDING" as const,
+      productStatus: "WAITING_PURCHASE" as ProductStatus,
+      depositStatus: "NOT_REQUIRED" as DepositStatus,
+      reimbursementStatus: "PENDING" as ReimbursementStatus,
+      startedAt: null
+    };
+  }
+
   return {
-    id: entity.id,
-    status: entity.status,
-    productReceiveOption: entity.productReceiveOption,
-    productStatus: entity.productStatus,
-    depositStatus: entity.depositStatus,
-    reimbursementStatus: entity.reimbursementStatus,
-    productPurchasedConfirmedAt: entity.productPurchasedConfirmedAt?.toISOString() ?? null,
-    videoReviewStatus: entity.videoReviewStatus,
-    videoReviewFeedback: entity.videoReviewFeedback,
-    videoSubmittedAt: entity.videoSubmittedAt?.toISOString() ?? null,
-    videoReviewedAt: entity.videoReviewedAt?.toISOString() ?? null,
-    publishStatus: entity.publishStatus,
-    publishFeedback: entity.publishFeedback,
-    publishSubmittedAt: entity.publishSubmittedAt?.toISOString() ?? null,
-    publishReviewedAt: entity.publishReviewedAt?.toISOString() ?? null,
-    publishPurchaseAmountVnd: entity.publishPurchaseAmountVnd,
-    rewardCreditedAt: entity.rewardCreditedAt?.toISOString() ?? null,
-    purchaseProof: {
-      proofTextNote: entity.purchaseProofTextNote,
-      screenshotUrl: entity.purchaseProofScreenshotUrl,
-      note: entity.purchaseProofNote,
-      submittedAt: entity.purchaseProofSubmittedAt?.toISOString() ?? null,
-      reviewedAt: entity.purchaseProofReviewedAt?.toISOString() ?? null,
-      rejectReason: entity.purchaseProofRejectReason
-    },
-    submission: entity.application
+    status: "PRODUCT_PENDING" as const,
+    productStatus: "WAITING_DEPOSIT" as ProductStatus,
+    depositStatus: "PENDING" as DepositStatus,
+    reimbursementStatus: "NOT_REQUIRED" as ReimbursementStatus,
+    startedAt: null
+  };
+}
+
+function mapMission(item: CreatorMissionEntity) {
+  return {
+    id: item.id,
+    missionId: item.missionId,
+    campaignId: item.campaignId,
+    accountId: item.accountId,
+    submissionId: item.submissionId,
+    missionApplicationId: item.missionApplicationId,
+    status: item.status,
+    productReceiveOption: item.productReceiveOption,
+    productStatus: item.productStatus,
+    depositStatus: item.depositStatus,
+    reimbursementStatus: item.reimbursementStatus,
+    reimbursementAmountVnd: item.reimbursementAmountVnd,
+    purchaseProofTextNote: item.purchaseProofTextNote,
+    purchaseProofScreenshotUrl: item.purchaseProofScreenshotUrl,
+    purchaseProofNote: item.purchaseProofNote,
+    purchaseProofSubmittedAt: dt(item.purchaseProofSubmittedAt),
+    purchaseProofReviewedAt: dt(item.purchaseProofReviewedAt),
+    purchaseProofRejectReason: item.purchaseProofRejectReason,
+    productPurchasedConfirmedAt: dt(item.productPurchasedConfirmedAt),
+    videoReviewStatus: item.videoReviewStatus,
+    videoReviewFeedback: item.videoReviewFeedback,
+    videoSubmittedAt: dt(item.videoSubmittedAt),
+    videoReviewedAt: dt(item.videoReviewedAt),
+    publishStatus: item.publishStatus,
+    publishFeedback: item.publishFeedback,
+    publishSubmittedAt: dt(item.publishSubmittedAt),
+    publishReviewedAt: dt(item.publishReviewedAt),
+    publishPurchaseAmountVnd: item.publishPurchaseAmountVnd,
+    rewardCreditedAt: dt(item.rewardCreditedAt),
+    assignedAt: item.assignedAt.toISOString(),
+    startedAt: dt(item.startedAt),
+    completedAt: dt(item.completedAt),
+    createdAt: item.createdAt.toISOString(),
+    updatedAt: item.updatedAt.toISOString(),
+    mission: { ...item.mission, deadlineAt: dt(item.mission.deadlineAt) },
+    campaign: item.campaign,
+    account: item.account,
+    submission: item.submission
       ? {
-          id: entity.application.id,
-          lifecycleStatus: entity.application.lifecycleStatus,
-          status: entity.application.status,
-          videoUrl: entity.application.videoUrl,
-          socialPostUrl: entity.application.socialPostUrl,
-          screenshotUrl: entity.application.screenshotUrl,
-          fileUploadUrl: entity.application.fileUploadUrl,
-          proofTextNote: entity.application.proofTextNote,
-          note: entity.application.note,
-          rejectReason: entity.application.rejectReason,
-          reviewedAt: entity.application.reviewedAt?.toISOString() ?? null,
-          approvedAt: entity.application.approvedAt?.toISOString() ?? null,
-          rewardGrantedAt: entity.application.rewardGrantedAt?.toISOString() ?? null
+          ...item.submission,
+          purchaseConfirmedAt: dt(item.submission.purchaseConfirmedAt),
+          finalSubmittedAt: dt(item.submission.finalSubmittedAt),
+          reviewedAt: dt(item.submission.reviewedAt),
+          approvedAt: dt(item.submission.approvedAt),
+          rewardGrantedAt: dt(item.submission.rewardGrantedAt)
         }
       : null,
-    assignedAt: entity.assignedAt.toISOString(),
-    startedAt: entity.startedAt?.toISOString() ?? null,
-    completedAt: entity.completedAt?.toISOString() ?? null,
-    mission: {
-      id: entity.mission.id,
-      title: entity.mission.title,
-      description: entity.mission.description,
-      deadlineAt: entity.mission.deadlineAt?.toISOString() ?? null,
-      rewardPoints: entity.mission.rewardPoints,
-      productLink: entity.mission.productLink
-    },
-    campaign: {
-      id: entity.campaign.id,
-      brandId: entity.campaign.brandId,
-      title: entity.campaign.title,
-      slug: entity.campaign.slug
-    },
-    account: {
-      id: entity.account.id,
-      displayName: entity.account.displayName,
-      email: entity.account.email,
-      creatorProfile: entity.account.creatorProfile
-        ? {
-            mainPlatform: entity.account.creatorProfile.mainPlatform,
-            socialUrl: entity.account.creatorProfile.socialUrl,
-            followerCount: entity.account.creatorProfile.followerCount
-          }
-        : null
-    },
-    guidance: getCreatorMissionGuidanceByOption(entity.productReceiveOption)
+    missionApplication: item.missionApplication
+      ? { ...item.missionApplication, reviewedAt: dt(item.missionApplication.reviewedAt), createdAt: item.missionApplication.createdAt.toISOString() }
+      : null
   };
+}
+
+async function getMissionById(id: string) {
+  return prisma.creatorMission.findUnique({ where: { id }, include: creatorMissionInclude });
+}
+
+async function getMissionByIdForAccount(id: string, accountId: string) {
+  const mission = await getMissionById(id);
+  if (!mission) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
+  if (mission.accountId !== accountId) throw new AppError("Forbidden", 403, "CREATOR_MISSION_FORBIDDEN");
+  return mission;
+}
+
+async function ensureSubmission(tx: Prisma.TransactionClient, missionId: string, accountId: string, note?: string | null) {
+  const existing = await tx.missionSubmission.findUnique({
+    where: { missionId_accountId: { missionId, accountId } }
+  });
+  if (existing) return existing;
+  return tx.missionSubmission.create({
+    data: {
+      missionId,
+      accountId,
+      lifecycleStatus: "ACCEPTED",
+      status: "OPEN",
+      note: note ?? null
+    }
+  });
+}
+
+async function notifyCreator(accountId: string, event: NotificationEvent, title: string, content: string, metadata: Record<string, unknown>) {
+  await createNotification({ accountId, event, title, content, metadata });
+}
+
+async function creditPointsOnce(
+  tx: Prisma.TransactionClient,
+  accountId: string,
+  pointsDelta: number,
+  referenceType: string,
+  referenceId: string,
+  idempotencyKey: string
+) {
+  if (pointsDelta <= 0) return;
+  const wallet = await tx.wallet.upsert({
+    where: { userId: accountId },
+    create: { userId: accountId },
+    update: {}
+  });
+  const existing = await tx.walletTransaction.findUnique({
+    where: { walletId_idempotencyKey: { walletId: wallet.id, idempotencyKey } }
+  });
+  if (existing) return;
+  const current = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+  const updated = await tx.wallet.update({
+    where: { id: wallet.id },
+    data: { pointsBalance: current.pointsBalance + pointsDelta }
+  });
+  await tx.walletTransaction.create({
+    data: {
+      walletId: wallet.id,
+      accountId,
+      type: "ADJUSTMENT",
+      pointsDelta,
+      cashDeltaVnd: 0,
+      balanceAfterPoints: updated.pointsBalance,
+      balanceAfterCashVnd: updated.cashBalanceVnd,
+      referenceType,
+      referenceId,
+      idempotencyKey
+    }
+  });
+}
+
+async function syncCreatorMissions(accountId: string) {
+  const approvedApps = await prisma.missionApplication.findMany({
+    where: { accountId, status: "APPROVED" },
+    select: { id: true, missionId: true, campaignId: true, note: true }
+  });
+
+  for (const app of approvedApps) {
+    await prisma.$transaction(async (tx) => {
+      const submission = await ensureSubmission(tx, app.missionId, accountId, app.note);
+      await ensureCreatorMissionFromApprovedApplication(tx, {
+        missionId: app.missionId,
+        campaignId: app.campaignId,
+        accountId,
+        missionApplicationId: app.id,
+        submissionId: submission.id
+      });
+    });
+  }
+}
+
+export function getCreatorMissionGuidanceByOption(option: ProductReceiveOption) {
+  if (option === "DEPOSIT_PRODUCT") return "Ban can dat coc va nhan san pham truoc khi quay video.";
+  if (option === "CREATOR_BUY_FIRST") return "Ban tu mua san pham, gui bill + anh danh gia, sau do nop video va link public.";
+  return "Nhiem vu khong yeu cau san pham, co the nop video ngay.";
+}
+
+export async function ensureCreatorMissionFromApprovedApplication(
+  db: DbClient,
+  input: {
+    missionId: string;
+    campaignId: string;
+    accountId: string;
+    applicationId?: string;
+    missionApplicationId?: string;
+    submissionId?: string;
+  }
+) {
+  const mission = await db.mission.findUnique({
+    where: { id: input.missionId },
+    select: { id: true, productReceiveOption: true }
+  });
+  if (!mission) throw new AppError("Mission not found", 404, "MISSION_NOT_FOUND");
+
+  const existing = await db.creatorMission.findUnique({
+    where: { missionId_accountId: { missionId: input.missionId, accountId: input.accountId } }
+  });
+
+  if (existing) {
+    return db.creatorMission.update({
+      where: { id: existing.id },
+      data: {
+        submissionId: existing.submissionId ?? input.submissionId ?? input.applicationId ?? null,
+        missionApplicationId: existing.missionApplicationId ?? input.missionApplicationId ?? null
+      }
+    });
+  }
+
+  const initial = toCreatorMissionState(mission.productReceiveOption);
+  return db.creatorMission.create({
+    data: {
+      missionId: input.missionId,
+      campaignId: input.campaignId,
+      accountId: input.accountId,
+      submissionId: input.submissionId ?? input.applicationId ?? null,
+      missionApplicationId: input.missionApplicationId ?? null,
+      status: initial.status,
+      productReceiveOption: mission.productReceiveOption,
+      productStatus: initial.productStatus,
+      depositStatus: initial.depositStatus,
+      reimbursementStatus: initial.reimbursementStatus,
+      assignedAt: now(),
+      startedAt: initial.startedAt,
+      videoReviewStatus: "NOT_SUBMITTED",
+      publishStatus: "NOT_SUBMITTED"
+    }
+  });
 }
 
 export async function getMyCreatorMissions(accountId: string) {
-  const legacyNotes = ["[ADMIN_APPROVED]", "[ADMIN_ASSIGNED_TASK]", "[SENT_TO_BRAND_REVIEW]"];
-  const pendingBackfill = await prisma.missionSubmission.findMany({
-    where: {
-      accountId,
-      OR: [
-        { mission: { audience: "CREATOR" } },
-        { note: { contains: CREATOR_CAMPAIGN_APPLICATION_TAG } },
-        ...legacyNotes.map((tag) => ({ note: { contains: tag } }))
-      ]
-    },
-    select: {
-      id: true,
-      missionId: true,
-      accountId: true,
-      mission: { select: { campaignId: true } }
-    },
-    orderBy: { createdAt: "desc" },
-    take: 50
-  });
-
-  for (const row of pendingBackfill) {
-    await ensureCreatorMissionFromApprovedApplication(prisma, {
-      missionId: row.missionId,
-      campaignId: row.mission.campaignId,
-      accountId: row.accountId,
-      applicationId: row.id
-    });
-  }
-
-  const items = await prisma.creatorMission.findMany({
+  await syncCreatorMissions(accountId);
+  const rows = await prisma.creatorMission.findMany({
     where: { accountId },
-    orderBy: { createdAt: "desc" },
-    select: creatorMissionWorkflowSelect
+    include: creatorMissionInclude,
+    orderBy: { updatedAt: "desc" }
   });
-  return items.map(mapCreatorMissionWorkflow);
+  return rows.map(mapMission);
 }
 
 export async function listCreatorMissionsForAdmin() {
-  const items = await prisma.creatorMission.findMany({
-    orderBy: { createdAt: "desc" },
-    select: creatorMissionWorkflowSelect
+  const rows = await prisma.creatorMission.findMany({
+    include: creatorMissionInclude,
+    orderBy: { updatedAt: "desc" }
   });
-  return items.map(mapCreatorMissionWorkflow);
+  return rows.map(mapMission);
 }
 
 export async function confirmDepositPaid(creatorMissionId: string, accountId: string) {
-  const current = await getCreatorMissionRowById(prisma, creatorMissionId);
-  if (!current) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  if (current.accountId !== accountId) throw new AppError("Forbidden", 403, "CREATOR_MISSION_FORBIDDEN");
-  if (current.productReceiveOption !== "DEPOSIT_PRODUCT") {
-    throw new AppError("Creator mission does not use deposit flow", 409, "CREATOR_MISSION_INVALID_FLOW");
-  }
-  if (current.productStatus !== "WAITING_DEPOSIT" || current.depositStatus !== "PENDING") {
-    throw new AppError("Creator mission is not waiting for deposit", 409, "CREATOR_MISSION_INVALID_STATUS");
-  }
-
-  await prisma.$executeRaw(
-    Prisma.sql`
-      UPDATE "CreatorMission"
-      SET
-        "depositStatus" = 'PAID'::"DepositStatus",
-        "productStatus" = 'RECEIVED'::"ProductStatus",
-        "status" = 'DRAFT_PENDING'::"CreatorMissionStatus",
-        "updatedAt" = ${new Date()}
-      WHERE "id" = ${creatorMissionId}
-    `
-  );
-
-  await prisma.auditLog.create({
-    data: {
-      actorId: accountId,
-      action: "CREATOR_MISSION_DEPOSIT_CONFIRMED_BY_CREATOR",
-      targetType: "CreatorMission",
-      targetId: creatorMissionId
-    }
+  const current = await getMissionByIdForAccount(creatorMissionId, accountId);
+  if (current.productReceiveOption !== "DEPOSIT_PRODUCT") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
+  const updated = await prisma.creatorMission.update({
+    where: { id: creatorMissionId },
+    data: { status: "IN_PROGRESS", productStatus: "RECEIVED", depositStatus: "PAID", startedAt: current.startedAt ?? now() },
+    include: creatorMissionInclude
   });
-
-  const updated = await getCreatorMissionRowById(prisma, creatorMissionId);
-  if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  return mapCreatorMissionRow(updated);
+  return mapMission(updated);
 }
 
-export async function submitPurchaseProof(
-  creatorMissionId: string,
-  accountId: string,
-  payload: { proofTextNote: string; screenshotUrl?: string; note?: string }
-) {
-  const current = await getCreatorMissionRowById(prisma, creatorMissionId);
-  if (!current) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  if (current.accountId !== accountId) throw new AppError("Forbidden", 403, "CREATOR_MISSION_FORBIDDEN");
-  if (current.productReceiveOption !== "CREATOR_BUY_FIRST") {
-    throw new AppError("Creator mission does not use buy-first flow", 409, "CREATOR_MISSION_INVALID_FLOW");
-  }
-
-  const validReimbursement = current.reimbursementStatus === "PENDING" || current.reimbursementStatus === "REJECTED";
-  if (current.productStatus !== "WAITING_PURCHASE" || !validReimbursement) {
-    throw new AppError("Creator mission is not waiting purchase proof", 409, "CREATOR_MISSION_INVALID_STATUS");
-  }
-
-  await withPurchaseProofColumnFallback(
-    () =>
-      prisma.$executeRaw(
-        Prisma.sql`
-          UPDATE "CreatorMission"
-          SET
-            "reimbursementStatus" = 'PURCHASE_SUBMITTED'::"ReimbursementStatus",
-            "purchaseProofTextNote" = ${payload.proofTextNote},
-            "purchaseProofScreenshotUrl" = ${payload.screenshotUrl ?? null},
-            "purchaseProofNote" = ${payload.note ?? null},
-            "purchaseProofSubmittedAt" = ${new Date()},
-            "purchaseProofReviewedAt" = null,
-            "purchaseProofRejectReason" = null,
-            "updatedAt" = ${new Date()}
-          WHERE "id" = ${creatorMissionId}
-        `
-      ),
-    () =>
-      prisma.$executeRaw(
-        Prisma.sql`
-          UPDATE "CreatorMission"
-          SET
-            "reimbursementStatus" = 'PURCHASE_SUBMITTED'::"ReimbursementStatus",
-            "updatedAt" = ${new Date()}
-          WHERE "id" = ${creatorMissionId}
-        `
-      )
-  );
-
-  await prisma.auditLog.create({
-    data: {
-      actorId: accountId,
-      action: "CREATOR_MISSION_PURCHASE_PROOF_SUBMITTED",
-      targetType: "CreatorMission",
-      targetId: creatorMissionId,
-      metadata: {
-        proofTextNote: payload.proofTextNote,
-        screenshotUrl: payload.screenshotUrl ?? null,
-        note: payload.note ?? null
+export async function submitPurchaseProof(creatorMissionId: string, accountId: string, payload: { proofTextNote: string; screenshotUrl?: string; note?: string }) {
+  const current = await getMissionByIdForAccount(creatorMissionId, accountId);
+  if (current.productReceiveOption !== "CREATOR_BUY_FIRST") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
+  if (!current.submissionId) throw new AppError("Mission submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
+  await prisma.$transaction(async (tx) => {
+    await tx.missionSubmission.update({
+      where: { id: current.submissionId! },
+      data: {
+        purchaseBillImageUrl: payload.screenshotUrl ?? null,
+        purchaseProofNote: payload.proofTextNote,
+        note: payload.note ?? null,
+        purchaseConfirmedAt: now()
       }
-    }
+    });
+    await tx.creatorMission.update({
+      where: { id: creatorMissionId },
+      data: {
+        purchaseProofTextNote: payload.proofTextNote,
+        purchaseProofScreenshotUrl: payload.screenshotUrl ?? null,
+        purchaseProofNote: payload.note ?? null,
+        purchaseProofSubmittedAt: now(),
+        productStatus: "RECEIVED",
+        reimbursementStatus: "PENDING",
+        status: "IN_PROGRESS",
+        startedAt: current.startedAt ?? now()
+      }
+    });
   });
-
-  const updated = await getCreatorMissionRowById(prisma, creatorMissionId);
+  const updated = await getMissionById(creatorMissionId);
   if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  return mapCreatorMissionRow(updated);
+  return mapMission(updated);
 }
 
 export async function submitDraft(creatorMissionId: string, accountId: string, payload: { videoUrl: string; note?: string }) {
-  const current = await getCreatorMissionRowById(prisma, creatorMissionId);
-  if (!current) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  if (current.accountId !== accountId) throw new AppError("Forbidden", 403, "CREATOR_MISSION_FORBIDDEN");
-  if (current.status !== "DRAFT_PENDING") {
-    throw new AppError("Creator mission is not ready for draft", 409, "CREATOR_MISSION_NOT_READY_FOR_DRAFT");
+  const current = await getMissionByIdForAccount(creatorMissionId, accountId);
+  if (!current.submissionId) throw new AppError("Mission submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
+  if (current.productReceiveOption === "CREATOR_BUY_FIRST" && current.productStatus !== "RECEIVED") {
+    throw new AppError("Purchase proof is required before video submission", 409, "PURCHASE_PROOF_REQUIRED");
   }
-  if (isPast(current.missionDeadlineAt)) {
-    throw new AppError("Mission deadline has passed", 409, "MISSION_DEADLINE_PASSED");
-  }
-
-  const result = await prisma.$transaction(async (tx) => {
-    const existing = await tx.missionSubmission.findUnique({
-      where: { missionId_accountId: { missionId: current.missionId, accountId } }
-    });
-
-    const submission = existing
-      ? await tx.missionSubmission.update({
-          where: { id: existing.id },
-          data: {
-            videoUrl: payload.videoUrl,
-            note: payload.note ?? existing.note,
-            socialPostUrl: null,
-            screenshotUrl: null,
-            fileUploadUrl: null,
-            proofTextNote: null,
-            lifecycleStatus: "PENDING_REVIEW",
-            status: "SUBMITTED",
-            reviewedById: null,
-            reviewedAt: null,
-            approvedAt: null,
-            rejectReason: null
-          }
-        })
-      : await tx.missionSubmission.create({
-          data: {
-            missionId: current.missionId,
-            accountId,
-            videoUrl: payload.videoUrl,
-            note: payload.note,
-            lifecycleStatus: "PENDING_REVIEW",
-            status: "SUBMITTED"
-          }
-        });
-
-    await tx.$executeRaw(
-      Prisma.sql`
-        UPDATE "CreatorMission"
-        SET
-          "status" = 'IN_PROGRESS'::"CreatorMissionStatus",
-          "startedAt" = COALESCE("startedAt", ${new Date()}),
-          "videoReviewStatus" = 'PENDING'::"CreatorMissionVideoReviewStatus",
-          "videoReviewFeedback" = null,
-          "videoSubmittedAt" = ${new Date()},
-          "videoReviewedAt" = null,
-          "publishStatus" = 'NOT_SUBMITTED'::"CreatorMissionPublishStatus",
-          "publishFeedback" = null,
-          "publishSubmittedAt" = null,
-          "publishReviewedAt" = null,
-          "publishPurchaseAmountVnd" = null,
-          "rewardCreditedAt" = null,
-          "applicationId" = COALESCE("applicationId", ${submission.id}),
-          "updatedAt" = ${new Date()}
-        WHERE "id" = ${creatorMissionId}
-      `
-    );
-
-    await tx.auditLog.create({
+  await prisma.$transaction(async (tx) => {
+    await tx.missionSubmission.update({
+      where: { id: current.submissionId! },
       data: {
-        actorId: accountId,
-        action: "CREATOR_MISSION_DRAFT_SUBMITTED",
-        targetType: "CreatorMission",
-        targetId: creatorMissionId,
-        metadata: {
-          missionSubmissionId: submission.id
-        }
+        videoUrl: payload.videoUrl,
+        note: payload.note ?? null,
+        status: "SUBMITTED",
+        lifecycleStatus: "SUBMITTED",
+        rejectReason: null,
+        reviewedById: null,
+        reviewedAt: null,
+        approvedAt: null
       }
     });
-
-    return submission;
+    await tx.creatorMission.update({
+      where: { id: creatorMissionId },
+      data: {
+        status: "IN_PROGRESS",
+        videoReviewStatus: "PENDING",
+        videoReviewFeedback: null,
+        videoSubmittedAt: now(),
+        publishStatus: "NOT_SUBMITTED",
+        publishFeedback: null
+      }
+    });
   });
-
-  const updated = await getCreatorMissionRowById(prisma, creatorMissionId);
+  const updated = await getMissionById(creatorMissionId);
   if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-
-  return {
-    creatorMission: mapCreatorMissionRow(updated),
-    submissionId: result.id,
-    submissionLifecycleStatus: result.lifecycleStatus
-  };
+  return { creatorMission: mapMission(updated), submissionId: updated.submissionId, submissionLifecycleStatus: updated.submission?.lifecycleStatus ?? null };
 }
 
 export async function confirmDepositAndProductReceivedByAdmin(actorId: string, creatorMissionId: string) {
-  const current = await getCreatorMissionRowById(prisma, creatorMissionId);
+  const current = await getMissionById(creatorMissionId);
   if (!current) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  if (current.productReceiveOption !== "DEPOSIT_PRODUCT") {
-    throw new AppError("Creator mission does not use deposit flow", 409, "CREATOR_MISSION_INVALID_FLOW");
-  }
-
-  await prisma.$executeRaw(
-    Prisma.sql`
-      UPDATE "CreatorMission"
-      SET
-        "depositStatus" = 'PAID'::"DepositStatus",
-        "productStatus" = 'RECEIVED'::"ProductStatus",
-        "status" = 'DRAFT_PENDING'::"CreatorMissionStatus",
-        "updatedAt" = ${new Date()}
-      WHERE "id" = ${creatorMissionId}
-    `
-  );
-
-  await prisma.auditLog.create({
+  if (current.productReceiveOption !== "DEPOSIT_PRODUCT") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
+  const updated = await prisma.creatorMission.update({
+    where: { id: creatorMissionId },
     data: {
-      actorId,
-      action: "CREATOR_MISSION_DEPOSIT_CONFIRMED_BY_ADMIN",
-      targetType: "CreatorMission",
-      targetId: creatorMissionId
-    }
+      status: "IN_PROGRESS",
+      productStatus: "RECEIVED",
+      depositStatus: "PAID",
+      purchaseProofReviewedAt: now(),
+      purchaseProofRejectReason: null,
+      startedAt: current.startedAt ?? now()
+    },
+    include: creatorMissionInclude
   });
-
-  const updated = await getCreatorMissionRowById(prisma, creatorMissionId);
-  if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  return mapCreatorMissionRow(updated);
+  await notifyCreator(updated.accountId, "MISSION_APPLICATION_APPROVED", "Da xac nhan nhan san pham", "Admin da xac nhan buoc san pham.", { creatorMissionId, actorId });
+  return mapMission(updated);
 }
 
 export async function approvePurchaseProofByAdmin(actorId: string, creatorMissionId: string) {
-  const current = await getCreatorMissionRowById(prisma, creatorMissionId);
+  const current = await getMissionById(creatorMissionId);
   if (!current) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  if (current.productReceiveOption !== "CREATOR_BUY_FIRST") {
-    throw new AppError("Creator mission does not use buy-first flow", 409, "CREATOR_MISSION_INVALID_FLOW");
-  }
-  if (current.reimbursementStatus !== "PURCHASE_SUBMITTED") {
-    throw new AppError("Creator mission does not have submitted purchase proof", 409, "CREATOR_MISSION_INVALID_STATUS");
-  }
-
-  await withPurchaseProofColumnFallback(
-    () =>
-      prisma.$executeRaw(
-        Prisma.sql`
-          UPDATE "CreatorMission"
-          SET
-            "reimbursementStatus" = 'APPROVED'::"ReimbursementStatus",
-            "productStatus" = 'RECEIVED'::"ProductStatus",
-            "status" = 'DRAFT_PENDING'::"CreatorMissionStatus",
-            "purchaseProofReviewedAt" = ${new Date()},
-            "purchaseProofRejectReason" = null,
-            "updatedAt" = ${new Date()}
-          WHERE "id" = ${creatorMissionId}
-        `
-      ),
-    () =>
-      prisma.$executeRaw(
-        Prisma.sql`
-          UPDATE "CreatorMission"
-          SET
-            "reimbursementStatus" = 'APPROVED'::"ReimbursementStatus",
-            "productStatus" = 'RECEIVED'::"ProductStatus",
-            "status" = 'DRAFT_PENDING'::"CreatorMissionStatus",
-            "updatedAt" = ${new Date()}
-          WHERE "id" = ${creatorMissionId}
-        `
-      )
-  );
-
-  await prisma.auditLog.create({
+  if (current.productReceiveOption !== "CREATOR_BUY_FIRST") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
+  const updated = await prisma.creatorMission.update({
+    where: { id: creatorMissionId },
     data: {
-      actorId,
-      action: "CREATOR_MISSION_PURCHASE_PROOF_APPROVED",
-      targetType: "CreatorMission",
-      targetId: creatorMissionId
-    }
+      status: "IN_PROGRESS",
+      productStatus: "RECEIVED",
+      reimbursementStatus: "APPROVED",
+      purchaseProofReviewedAt: now(),
+      purchaseProofRejectReason: null,
+      startedAt: current.startedAt ?? now()
+    },
+    include: creatorMissionInclude
   });
-
-  const updated = await getCreatorMissionRowById(prisma, creatorMissionId);
-  if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  return mapCreatorMissionRow(updated);
+  await notifyCreator(updated.accountId, "MISSION_APPLICATION_APPROVED", "Da duyet bang chung mua hang", "Ban co the nop video review.", { creatorMissionId, actorId });
+  return mapMission(updated);
 }
 
 export async function rejectPurchaseProofByAdmin(actorId: string, creatorMissionId: string, reason?: string) {
-  const current = await getCreatorMissionRowById(prisma, creatorMissionId);
+  const current = await getMissionById(creatorMissionId);
   if (!current) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  if (current.productReceiveOption !== "CREATOR_BUY_FIRST") {
-    throw new AppError("Creator mission does not use buy-first flow", 409, "CREATOR_MISSION_INVALID_FLOW");
-  }
-  if (current.reimbursementStatus !== "PURCHASE_SUBMITTED") {
-    throw new AppError("Creator mission does not have submitted purchase proof", 409, "CREATOR_MISSION_INVALID_STATUS");
-  }
-
-  await withPurchaseProofColumnFallback(
-    () =>
-      prisma.$executeRaw(
-        Prisma.sql`
-          UPDATE "CreatorMission"
-          SET
-            "reimbursementStatus" = 'REJECTED'::"ReimbursementStatus",
-            "productStatus" = 'WAITING_PURCHASE'::"ProductStatus",
-            "status" = 'PRODUCT_PENDING'::"CreatorMissionStatus",
-            "purchaseProofReviewedAt" = ${new Date()},
-            "purchaseProofRejectReason" = ${reason ?? "Purchase proof rejected"},
-            "updatedAt" = ${new Date()}
-          WHERE "id" = ${creatorMissionId}
-        `
-      ),
-    () =>
-      prisma.$executeRaw(
-        Prisma.sql`
-          UPDATE "CreatorMission"
-          SET
-            "reimbursementStatus" = 'REJECTED'::"ReimbursementStatus",
-            "productStatus" = 'WAITING_PURCHASE'::"ProductStatus",
-            "status" = 'PRODUCT_PENDING'::"CreatorMissionStatus",
-            "updatedAt" = ${new Date()}
-          WHERE "id" = ${creatorMissionId}
-        `
-      )
-  );
-
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "CREATOR_MISSION_PURCHASE_PROOF_REJECTED",
-      targetType: "CreatorMission",
-      targetId: creatorMissionId,
-      metadata: { reason: reason ?? null }
-    }
-  });
-
-  const updated = await getCreatorMissionRowById(prisma, creatorMissionId);
-  if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  return mapCreatorMissionRow(updated);
-}
-
-async function getCreatorMissionWorkflowById(creatorMissionId: string) {
-  return prisma.creatorMission.findUnique({
+  if (current.productReceiveOption !== "CREATOR_BUY_FIRST") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
+  const feedback = reason?.trim() || "Purchase proof rejected";
+  const updated = await prisma.creatorMission.update({
     where: { id: creatorMissionId },
-    select: creatorMissionWorkflowSelect
+    data: {
+      status: "PRODUCT_PENDING",
+      productStatus: "WAITING_PURCHASE",
+      reimbursementStatus: "REJECTED",
+      purchaseProofReviewedAt: now(),
+      purchaseProofRejectReason: feedback
+    },
+    include: creatorMissionInclude
   });
+  await notifyCreator(updated.accountId, "MISSION_APPLICATION_REJECTED", "Bang chung mua hang bi tu choi", feedback, { creatorMissionId, actorId });
+  return mapMission(updated);
 }
 
 export async function confirmProductPurchased(creatorMissionId: string, accountId: string) {
-  const current = await getCreatorMissionWorkflowById(creatorMissionId);
-  if (!current) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  if (current.accountId !== accountId) throw new AppError("Forbidden", 403, "CREATOR_MISSION_FORBIDDEN");
-  if (current.productReceiveOption !== "CREATOR_BUY_FIRST") {
-    throw new AppError("Creator mission does not use buy-first flow", 409, "CREATOR_MISSION_INVALID_FLOW");
-  }
-  if (!current.mission.productLink) {
-    throw new AppError("Mission product link is missing", 409, "MISSION_PRODUCT_LINK_MISSING");
-  }
-  if (current.status !== "PRODUCT_PENDING" || current.productStatus !== "WAITING_PURCHASE") {
-    throw new AppError("Creator mission is not waiting product purchase confirmation", 409, "CREATOR_MISSION_INVALID_STATUS");
-  }
-
-  await prisma.creatorMission.update({
+  const current = await getMissionByIdForAccount(creatorMissionId, accountId);
+  if (current.productReceiveOption !== "CREATOR_BUY_FIRST") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
+  const updated = await prisma.creatorMission.update({
     where: { id: creatorMissionId },
     data: {
-      status: "DRAFT_PENDING",
+      status: "IN_PROGRESS",
       productStatus: "RECEIVED",
       reimbursementStatus: "PENDING",
-      productPurchasedConfirmedAt: new Date(),
-      updatedAt: new Date()
-    }
+      productPurchasedConfirmedAt: now(),
+      startedAt: current.startedAt ?? now()
+    },
+    include: creatorMissionInclude
   });
-
-  await prisma.auditLog.create({
-    data: {
-      actorId: accountId,
-      action: "CREATOR_MISSION_PRODUCT_PURCHASE_CONFIRMED",
-      targetType: "CreatorMission",
-      targetId: creatorMissionId
-    }
-  });
-
-  const updated = await getCreatorMissionWorkflowById(creatorMissionId);
-  if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  return mapCreatorMissionWorkflow(updated);
+  return mapMission(updated);
 }
 
 export async function submitPublishReport(
@@ -1077,330 +497,436 @@ export async function submitPublishReport(
   accountId: string,
   payload: { socialPostUrl: string; adCode?: string; purchaseInvoiceUrl?: string; ratingImageUrl?: string; note?: string }
 ) {
-  const current = await getCreatorMissionWorkflowById(creatorMissionId);
-  if (!current) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  if (current.accountId !== accountId) throw new AppError("Forbidden", 403, "CREATOR_MISSION_FORBIDDEN");
-  if (current.videoReviewStatus !== "APPROVED") {
-    throw new AppError("Video draft must be approved before publish report", 409, "CREATOR_MISSION_VIDEO_NOT_APPROVED");
-  }
-  if (!current.application) {
-    throw new AppError("Mission submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
-  }
-  if (current.productReceiveOption === "CREATOR_BUY_FIRST") {
-    if (!payload.purchaseInvoiceUrl?.trim()) {
-      throw new AppError("Purchase invoice url is required for CREATOR_BUY_FIRST", 422, "PURCHASE_INVOICE_REQUIRED");
-    }
-    if (!payload.ratingImageUrl?.trim()) {
-      throw new AppError("Rating image url is required for CREATOR_BUY_FIRST", 422, "RATING_IMAGE_REQUIRED");
-    }
-  }
-
+  const current = await getMissionByIdForAccount(creatorMissionId, accountId);
+  if (current.videoReviewStatus !== "APPROVED") throw new AppError("Video must be approved first", 409, "CREATOR_MISSION_VIDEO_NOT_APPROVED");
+  if (!current.submissionId) throw new AppError("Mission submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
   await prisma.$transaction(async (tx) => {
     await tx.missionSubmission.update({
-      where: { id: current.application!.id },
+      where: { id: current.submissionId! },
       data: {
         socialPostUrl: payload.socialPostUrl,
+        publicVideoUrl: payload.socialPostUrl,
+        adCode: payload.adCode ?? null,
         proofTextNote: payload.adCode ?? null,
         screenshotUrl: payload.purchaseInvoiceUrl ?? null,
-        fileUploadUrl: payload.ratingImageUrl ?? null,
-        note: payload.note ?? null,
-        lifecycleStatus: "SUBMITTED",
+        productReviewScreenshotUrl: payload.ratingImageUrl ?? null,
+        finalProofNote: payload.note ?? null,
+        finalSubmittedAt: now(),
         status: "SUBMITTED",
+        lifecycleStatus: "SUBMITTED",
+        rejectReason: null,
         reviewedById: null,
-        reviewedAt: null,
-        approvedAt: null,
-        rejectReason: null
+        reviewedAt: null
       }
     });
-
     await tx.creatorMission.update({
       where: { id: creatorMissionId },
-      data: {
-        publishStatus: "PENDING",
-        publishFeedback: null,
-        publishSubmittedAt: new Date(),
-        publishReviewedAt: null,
-        updatedAt: new Date()
-      }
-    });
-
-    await tx.auditLog.create({
-      data: {
-        actorId: accountId,
-        action: "CREATOR_MISSION_PUBLISH_REPORT_SUBMITTED",
-        targetType: "CreatorMission",
-        targetId: creatorMissionId,
-        metadata: {
-          socialPostUrl: payload.socialPostUrl,
-          purchaseInvoiceUrl: payload.purchaseInvoiceUrl ?? null,
-          ratingImageUrl: payload.ratingImageUrl ?? null
-        }
-      }
+      data: { publishStatus: "PENDING", publishFeedback: null, publishSubmittedAt: now(), publishReviewedAt: null }
     });
   });
-
-  const updated = await getCreatorMissionWorkflowById(creatorMissionId);
+  const updated = await getMissionById(creatorMissionId);
   if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  return mapCreatorMissionWorkflow(updated);
+  return mapMission(updated);
 }
 
 export async function approveVideoReviewByAdmin(actorId: string, creatorMissionId: string) {
-  const current = await getCreatorMissionWorkflowById(creatorMissionId);
-  if (!current) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  if (!current.application) throw new AppError("Mission submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
-  if (current.videoReviewStatus !== "PENDING") {
-    throw new AppError("Creator mission is not waiting for video review", 409, "CREATOR_MISSION_INVALID_STATUS");
-  }
-
-  await prisma.$transaction(async (tx) => {
+  const current = await getMissionById(creatorMissionId);
+  if (!current || !current.submissionId) throw new AppError("Creator mission/submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
+  if (current.videoReviewStatus !== "PENDING") throw new AppError("Invalid status", 409, "CREATOR_MISSION_INVALID_STATUS");
+  const updated = await prisma.$transaction(async (tx) => {
     await tx.missionSubmission.update({
-      where: { id: current.application!.id },
-      data: {
-        lifecycleStatus: "APPROVED",
-        status: "APPROVED",
-        reviewedById: actorId,
-        reviewedAt: new Date(),
-        approvedAt: new Date(),
-        rejectReason: null
-      }
+      where: { id: current.submissionId! },
+      data: { status: "APPROVED", lifecycleStatus: "APPROVED", rejectReason: null, reviewedById: actorId, reviewedAt: now(), approvedAt: now() }
     });
-
-    await tx.creatorMission.update({
+    return tx.creatorMission.update({
       where: { id: creatorMissionId },
-      data: {
-        status: "IN_PROGRESS",
-        videoReviewStatus: "APPROVED",
-        videoReviewFeedback: null,
-        videoReviewedAt: new Date(),
-        publishStatus: "NOT_SUBMITTED",
-        publishFeedback: null,
-        updatedAt: new Date()
-      }
-    });
-
-    await tx.auditLog.create({
-      data: {
-        actorId,
-        action: "CREATOR_MISSION_VIDEO_REVIEW_APPROVED",
-        targetType: "CreatorMission",
-        targetId: creatorMissionId
-      }
+      data: { status: "IN_PROGRESS", videoReviewStatus: "APPROVED", videoReviewFeedback: null, videoReviewedAt: now(), publishStatus: "NOT_SUBMITTED", publishFeedback: null },
+      include: creatorMissionInclude
     });
   });
-
-  const updated = await getCreatorMissionWorkflowById(creatorMissionId);
-  if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  return mapCreatorMissionWorkflow(updated);
+  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_APPROVED", "Video duoc duyet", "Ban co the nop link social public.", { creatorMissionId, actorId });
+  return mapMission(updated);
 }
 
 export async function rejectVideoReviewByAdmin(actorId: string, creatorMissionId: string, reason: string) {
-  const current = await getCreatorMissionWorkflowById(creatorMissionId);
-  if (!current) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  if (!current.application) throw new AppError("Mission submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
-  if (current.videoReviewStatus !== "PENDING") {
-    throw new AppError("Creator mission is not waiting for video review", 409, "CREATOR_MISSION_INVALID_STATUS");
-  }
-
-  await prisma.$transaction(async (tx) => {
+  const current = await getMissionById(creatorMissionId);
+  if (!current || !current.submissionId) throw new AppError("Creator mission/submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
+  if (current.videoReviewStatus !== "PENDING") throw new AppError("Invalid status", 409, "CREATOR_MISSION_INVALID_STATUS");
+  const feedback = reason.trim();
+  if (!feedback) throw new AppError("reason is required", 422, "REJECT_REASON_REQUIRED");
+  const updated = await prisma.$transaction(async (tx) => {
     await tx.missionSubmission.update({
-      where: { id: current.application!.id },
-      data: {
-        lifecycleStatus: "REJECTED",
-        status: "REJECTED",
-        rejectReason: reason,
-        reviewedById: actorId,
-        reviewedAt: new Date(),
-        approvedAt: null
-      }
+      where: { id: current.submissionId! },
+      data: { status: "REJECTED", lifecycleStatus: "REJECTED", rejectReason: feedback, reviewedById: actorId, reviewedAt: now(), approvedAt: null }
     });
-
-    await tx.creatorMission.update({
-      where: { id: creatorMissionId },
-      data: {
-        status: "DRAFT_PENDING",
-        videoReviewStatus: "REJECTED",
-        videoReviewFeedback: reason,
-        videoReviewedAt: new Date(),
-        publishStatus: "NOT_SUBMITTED",
-        publishFeedback: null,
-        publishSubmittedAt: null,
-        publishReviewedAt: null,
-        updatedAt: new Date()
-      }
-    });
-
-    await tx.auditLog.create({
-      data: {
-        actorId,
-        action: "CREATOR_MISSION_VIDEO_REVIEW_REJECTED",
-        targetType: "CreatorMission",
-        targetId: creatorMissionId,
-        metadata: { reason }
-      }
-    });
-  });
-
-  const updated = await getCreatorMissionWorkflowById(creatorMissionId);
-  if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  return mapCreatorMissionWorkflow(updated);
-}
-
-export async function approvePublishReportByAdmin(
-  actorId: string,
-  creatorMissionId: string,
-  purchaseAmountVnd: number
-) {
-  const current = await getCreatorMissionWorkflowById(creatorMissionId);
-  if (!current) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  if (!current.application) throw new AppError("Mission submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
-  if (current.publishStatus !== "PENDING") {
-    throw new AppError("Creator mission publish report is not pending", 409, "CREATOR_MISSION_INVALID_STATUS");
-  }
-  if (current.videoReviewStatus !== "APPROVED") {
-    throw new AppError("Video draft must be approved first", 409, "CREATOR_MISSION_VIDEO_NOT_APPROVED");
-  }
-  if (!current.application.socialPostUrl) {
-    throw new AppError("Publish report missing social post url", 422, "PUBLISH_REPORT_MISSING_SOCIAL_URL");
-  }
-
-  const purchasePoints = Math.floor(purchaseAmountVnd / 100);
-  const missionRewardPoints = current.mission.rewardPoints;
-  const pointsDelta = missionRewardPoints + purchasePoints;
-  const idempotencyKey = `creator_mission_reward_${creatorMissionId}`;
-
-  await prisma.$transaction(async (tx) => {
-    await tx.missionSubmission.update({
-      where: { id: current.application!.id },
-      data: {
-        lifecycleStatus: "DONE",
-        status: "APPROVED",
-        reviewedById: actorId,
-        reviewedAt: new Date(),
-        approvedAt: new Date(),
-        rejectReason: null,
-        rewardGrantedAt: new Date()
-      }
-    });
-
-    const wallet = await tx.wallet.upsert({
-      where: { userId: current.accountId },
-      create: { userId: current.accountId },
-      update: {}
-    });
-
-    const existingRewardTx = await tx.walletTransaction.findUnique({
-      where: {
-        walletId_idempotencyKey: {
-          walletId: wallet.id,
-          idempotencyKey
-        }
-      }
-    });
-
-    if (!existingRewardTx) {
-      const currentWallet = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
-      const updatedWallet = await tx.wallet.update({
-        where: { id: wallet.id },
-        data: {
-          pointsBalance: currentWallet.pointsBalance + pointsDelta
-        }
-      });
-
-      await tx.walletTransaction.create({
-        data: {
-          walletId: wallet.id,
-          accountId: current.accountId,
-          type: "ADJUSTMENT",
-          pointsDelta,
-          cashDeltaVnd: 0,
-          balanceAfterPoints: updatedWallet.pointsBalance,
-          balanceAfterCashVnd: updatedWallet.cashBalanceVnd,
-          referenceType: "CREATOR_MISSION",
-          referenceId: creatorMissionId,
-          idempotencyKey
-        }
-      });
-    }
-
-    await tx.creatorMission.update({
-      where: { id: creatorMissionId },
-      data: {
-        status: "COMPLETED",
-        completedAt: new Date(),
-        publishStatus: "APPROVED",
-        publishFeedback: null,
-        publishReviewedAt: new Date(),
-        publishPurchaseAmountVnd: purchaseAmountVnd,
-        rewardCreditedAt: new Date(),
-        reimbursementStatus: current.productReceiveOption === "CREATOR_BUY_FIRST" ? "PAID" : current.reimbursementStatus,
-        updatedAt: new Date()
-      }
-    });
-
-    await tx.auditLog.create({
-      data: {
-        actorId,
-        action: "CREATOR_MISSION_PUBLISH_REPORT_APPROVED",
-        targetType: "CreatorMission",
-        targetId: creatorMissionId,
-        metadata: {
-          purchaseAmountVnd,
-          purchasePoints,
-          missionRewardPoints,
-          totalPointsGranted: pointsDelta
-        }
-      }
-    });
-  });
-
-  const updated = await getCreatorMissionWorkflowById(creatorMissionId);
-  if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  return mapCreatorMissionWorkflow(updated);
-}
-
-export async function rejectPublishReportByAdmin(actorId: string, creatorMissionId: string, reason: string) {
-  const current = await getCreatorMissionWorkflowById(creatorMissionId);
-  if (!current) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  if (!current.application) throw new AppError("Mission submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
-  if (current.publishStatus !== "PENDING") {
-    throw new AppError("Creator mission publish report is not pending", 409, "CREATOR_MISSION_INVALID_STATUS");
-  }
-
-  await prisma.$transaction(async (tx) => {
-    await tx.missionSubmission.update({
-      where: { id: current.application!.id },
-      data: {
-        lifecycleStatus: "APPROVED",
-        status: "APPROVED",
-        reviewedById: actorId,
-        reviewedAt: new Date(),
-        rejectReason: null
-      }
-    });
-
-    await tx.creatorMission.update({
+    return tx.creatorMission.update({
       where: { id: creatorMissionId },
       data: {
         status: "IN_PROGRESS",
-        publishStatus: "REJECTED",
-        publishFeedback: reason,
-        publishReviewedAt: new Date(),
-        updatedAt: new Date()
-      }
-    });
-
-    await tx.auditLog.create({
-      data: {
-        actorId,
-        action: "CREATOR_MISSION_PUBLISH_REPORT_REJECTED",
-        targetType: "CreatorMission",
-        targetId: creatorMissionId,
-        metadata: { reason }
-      }
+        videoReviewStatus: "REJECTED",
+        videoReviewFeedback: feedback,
+        videoReviewedAt: now(),
+        publishStatus: "NOT_SUBMITTED",
+        publishFeedback: null,
+        publishSubmittedAt: null,
+        publishReviewedAt: null
+      },
+      include: creatorMissionInclude
     });
   });
+  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_REJECTED", "Video bi tu choi", feedback, { creatorMissionId, actorId });
+  return mapMission(updated);
+}
 
-  const updated = await getCreatorMissionWorkflowById(creatorMissionId);
-  if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  return mapCreatorMissionWorkflow(updated);
+export async function approvePublishReportByAdmin(actorId: string, creatorMissionId: string, purchaseAmountVnd: number) {
+  const current = await getMissionById(creatorMissionId);
+  if (!current || !current.submissionId) throw new AppError("Creator mission/submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
+  if (current.publishStatus === "APPROVED" && current.status === "COMPLETED") return mapMission(current);
+  if (current.publishStatus !== "PENDING") throw new AppError("Invalid status", 409, "CREATOR_MISSION_INVALID_STATUS");
+  if (current.videoReviewStatus !== "APPROVED") throw new AppError("Video must be approved first", 409, "CREATOR_MISSION_VIDEO_NOT_APPROVED");
+  if (current.productReceiveOption === "CREATOR_BUY_FIRST" && purchaseAmountVnd <= 0) {
+    throw new AppError("Reimbursement amount is required", 422, "REIMBURSEMENT_AMOUNT_REQUIRED");
+  }
+  const reimbursementVnd = current.productReceiveOption === "CREATOR_BUY_FIRST" ? Math.floor(purchaseAmountVnd) : 0;
+  const reimbursementPoints = reimbursementVnd > 0 ? Math.floor(reimbursementVnd / 100) : 0;
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.missionSubmission.update({
+      where: { id: current.submissionId! },
+      data: { status: "APPROVED", lifecycleStatus: "DONE", rejectReason: null, reviewedById: actorId, reviewedAt: now(), approvedAt: now(), rewardGrantedAt: now() }
+    });
+
+    await creditPointsOnce(tx, current.accountId, current.mission.rewardPoints, "CREATOR_MISSION_REWARD", creatorMissionId, `creator_mission_reward_${creatorMissionId}`);
+    if (reimbursementPoints > 0) {
+      await creditPointsOnce(tx, current.accountId, reimbursementPoints, "PRODUCT_REIMBURSEMENT", creatorMissionId, `creator_mission_reimbursement_${creatorMissionId}`);
+    }
+
+    return tx.creatorMission.update({
+      where: { id: creatorMissionId },
+      data: {
+        status: "COMPLETED",
+        publishStatus: "APPROVED",
+        publishFeedback: null,
+        publishReviewedAt: now(),
+        completedAt: current.completedAt ?? now(),
+        rewardCreditedAt: current.rewardCreditedAt ?? now(),
+        publishPurchaseAmountVnd: reimbursementVnd > 0 ? reimbursementVnd : current.publishPurchaseAmountVnd,
+        reimbursementAmountVnd: reimbursementVnd > 0 ? reimbursementVnd : current.reimbursementAmountVnd,
+        reimbursementStatus: current.productReceiveOption === "CREATOR_BUY_FIRST" ? "PAID" : current.reimbursementStatus
+      },
+      include: creatorMissionInclude
+    });
+  });
+  await notifyCreator(updated.accountId, "CREATOR_MISSION_FINAL_APPROVED", "Nhiem vu da hoan thanh", "Nhiem vu da duoc duyet va cong diem.", { creatorMissionId, actorId });
+  return mapMission(updated);
+}
+
+export async function rejectPublishReportByAdmin(actorId: string, creatorMissionId: string, reason: string) {
+  const current = await getMissionById(creatorMissionId);
+  if (!current || !current.submissionId) throw new AppError("Creator mission/submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
+  if (current.publishStatus !== "PENDING") throw new AppError("Invalid status", 409, "CREATOR_MISSION_INVALID_STATUS");
+  const feedback = reason.trim();
+  if (!feedback) throw new AppError("reason is required", 422, "REJECT_REASON_REQUIRED");
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.missionSubmission.update({ where: { id: current.submissionId! }, data: { rejectReason: feedback, reviewedById: actorId, reviewedAt: now() } });
+    return tx.creatorMission.update({
+      where: { id: creatorMissionId },
+      data: { status: "IN_PROGRESS", publishStatus: "REJECTED", publishFeedback: feedback, publishReviewedAt: now() },
+      include: creatorMissionInclude
+    });
+  });
+  await notifyCreator(updated.accountId, "CREATOR_MISSION_FINAL_REJECTED", "Buoc hoan thanh bi tu choi", feedback, { creatorMissionId, actorId });
+  return mapMission(updated);
+}
+
+export async function listCreatorMissionApplicationsByAccount(accountId: string) {
+  return prisma.missionApplication.findMany({
+    where: { accountId },
+    include: {
+      mission: { select: { id: true, title: true, rewardPoints: true, productReceiveOption: true, productLink: true } },
+      campaign: { select: { id: true, title: true, slug: true } }
+    },
+    orderBy: { createdAt: "desc" }
+  });
+}
+
+export async function getCreatorMissionDetail(accountId: string, creatorMissionId: string) {
+  return mapMission(await getMissionByIdForAccount(creatorMissionId, accountId));
+}
+
+export async function submitCreatorMissionPurchaseProof(
+  accountId: string,
+  creatorMissionId: string,
+  payload: { purchaseBillImageUrl: string; productReviewScreenshotUrl: string; purchaseProofNote?: string }
+) {
+  const current = await getMissionByIdForAccount(creatorMissionId, accountId);
+  if (!current.submissionId) throw new AppError("Mission submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
+  if (current.productReceiveOption !== "CREATOR_BUY_FIRST") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.missionSubmission.update({
+      where: { id: current.submissionId! },
+      data: {
+        purchaseBillImageUrl: payload.purchaseBillImageUrl,
+        productReviewScreenshotUrl: payload.productReviewScreenshotUrl,
+        purchaseProofNote: payload.purchaseProofNote ?? null,
+        purchaseConfirmedAt: now()
+      }
+    });
+    return tx.creatorMission.update({
+      where: { id: creatorMissionId },
+      data: {
+        purchaseProofSubmittedAt: now(),
+        productStatus: "RECEIVED",
+        status: "IN_PROGRESS",
+        reimbursementStatus: "PENDING",
+        startedAt: current.startedAt ?? now()
+      },
+      include: creatorMissionInclude
+    });
+  });
+  return mapMission(updated);
+}
+
+export async function submitCreatorMissionVideo(accountId: string, creatorMissionId: string, payload: { videoUrl: string; note?: string }) {
+  return submitDraft(creatorMissionId, accountId, payload);
+}
+
+export async function submitCreatorMissionPublish(
+  accountId: string,
+  creatorMissionId: string,
+  payload: { publicVideoUrl?: string; socialPostUrl?: string; adCode?: string; screenshotUrl?: string; finalProofNote?: string }
+) {
+  const url = payload.publicVideoUrl ?? payload.socialPostUrl;
+  if (!url?.trim()) throw new AppError("publicVideoUrl or socialPostUrl is required", 422, "SOCIAL_POST_URL_REQUIRED");
+  return submitPublishReport(creatorMissionId, accountId, {
+    socialPostUrl: url.trim(),
+    adCode: payload.adCode,
+    purchaseInvoiceUrl: payload.screenshotUrl,
+    note: payload.finalProofNote
+  });
+}
+
+export async function createMissionApplicationForCreator(accountId: string, payload: { missionId: string; note?: string }) {
+  const profile = await prisma.creatorProfile.findUnique({ where: { accountId }, select: { id: true, mainPlatform: true } });
+  if (!profile || !profile.mainPlatform) {
+    throw new AppError("Ban can hoan thien ho so Creator va chon nen tang chinh truoc khi xin lam nhiem vu.", 422, "CREATOR_PROFILE_MAIN_PLATFORM_REQUIRED");
+  }
+  const mission = await prisma.mission.findUnique({
+    where: { id: payload.missionId },
+    select: {
+      id: true,
+      campaignId: true,
+      status: true,
+      campaign: { select: { isPublic: true, status: true } }
+    }
+  });
+  if (!mission) throw new AppError("Mission not found", 404, "MISSION_NOT_FOUND");
+  if (mission.status !== "OPEN") throw new AppError("Mission is not open", 409, "MISSION_NOT_OPEN");
+  if (!mission.campaign.isPublic || mission.campaign.status !== "ACTIVE") throw new AppError("Campaign is not open", 409, "CAMPAIGN_NOT_OPEN");
+
+  const existing = await prisma.missionApplication.findUnique({
+    where: { missionId_accountId: { missionId: mission.id, accountId } }
+  });
+  if (existing) throw new AppError("Ban da xin lam nhiem vu nay", 409, "MISSION_APPLICATION_ALREADY_EXISTS");
+
+  return prisma.missionApplication.create({
+    data: {
+      missionId: mission.id,
+      campaignId: mission.campaignId,
+      accountId,
+      status: "PENDING_REVIEW",
+      note: payload.note?.trim() || null
+    },
+    include: {
+      mission: { select: { id: true, title: true, rewardPoints: true, productReceiveOption: true } },
+      campaign: { select: { id: true, title: true, slug: true } }
+    }
+  });
+}
+
+function toOrder(sort?: Sort) {
+  return sort === "oldest" ? "asc" : "desc";
+}
+
+export async function listMissionApplicationsForAdmin(input: {
+  query?: string;
+  status?: ApplicationStatus;
+  campaignId?: string;
+  sort?: Sort;
+  page?: number;
+  limit?: number;
+}) {
+  const where: Prisma.MissionApplicationWhereInput = {};
+  if (input.status) where.status = input.status;
+  if (input.campaignId) where.campaignId = input.campaignId;
+  if (input.query?.trim()) {
+    const q = input.query.trim();
+    where.OR = [
+      { account: { displayName: { contains: q, mode: "insensitive" } } },
+      { account: { email: { contains: q, mode: "insensitive" } } },
+      { mission: { title: { contains: q, mode: "insensitive" } } },
+      { campaign: { title: { contains: q, mode: "insensitive" } } }
+    ];
+  }
+  const paging = toPagination(input.page, input.limit);
+  const [total, items] = await prisma.$transaction([
+    prisma.missionApplication.count({ where }),
+    prisma.missionApplication.findMany({
+      where,
+      include: {
+        account: { select: { id: true, displayName: true, email: true, creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true } } } },
+        campaign: { select: { id: true, title: true, slug: true } },
+        mission: { select: { id: true, title: true, rewardPoints: true, productReceiveOption: true, productLink: true } },
+        reviewedBy: { select: { id: true, displayName: true, email: true } }
+      },
+      orderBy: { createdAt: toOrder(input.sort) },
+      skip: paging.skip,
+      take: paging.limit
+    })
+  ]);
+  return { items, pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
+}
+
+export async function getMissionApplicationDetailForAdmin(id: string) {
+  const item = await prisma.missionApplication.findUnique({
+    where: { id },
+    include: {
+      account: { select: { id: true, displayName: true, email: true, creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true, bio: true } } } },
+      campaign: { select: { id: true, title: true, slug: true, brandId: true } },
+      mission: { select: { id: true, title: true, description: true, rewardPoints: true, productReceiveOption: true, productLink: true, deadlineAt: true } },
+      reviewedBy: { select: { id: true, displayName: true, email: true } }
+    }
+  });
+  if (!item) throw new AppError("Mission application not found", 404, "MISSION_APPLICATION_NOT_FOUND");
+  return item;
+}
+
+export async function approveMissionApplicationByAdmin(actorId: string, id: string) {
+  const current = await getMissionApplicationDetailForAdmin(id);
+  if (current.status !== "PENDING_REVIEW") throw new AppError("Mission application is not pending review", 409, "MISSION_APPLICATION_INVALID_STATUS");
+  const updated = await prisma.$transaction(async (tx) => {
+    const next = await tx.missionApplication.update({
+      where: { id },
+      data: { status: "APPROVED", reviewedById: actorId, reviewedAt: now(), rejectReason: null }
+    });
+    const submission = await ensureSubmission(tx, current.missionId, current.accountId, current.note);
+    await ensureCreatorMissionFromApprovedApplication(tx, {
+      missionId: current.missionId,
+      campaignId: current.campaignId,
+      accountId: current.accountId,
+      missionApplicationId: current.id,
+      submissionId: submission.id
+    });
+    return next;
+  });
+  await notifyCreator(current.accountId, "MISSION_APPLICATION_APPROVED", "Don xin nhiem vu duoc duyet", `Ban da duoc duyet nhiem vu \"${current.mission.title}\".`, { missionApplicationId: id });
+  return updated;
+}
+
+export async function rejectMissionApplicationByAdmin(actorId: string, id: string, rejectReason: string) {
+  const current = await getMissionApplicationDetailForAdmin(id);
+  if (current.status !== "PENDING_REVIEW") throw new AppError("Mission application is not pending review", 409, "MISSION_APPLICATION_INVALID_STATUS");
+  const reason = rejectReason.trim();
+  if (!reason) throw new AppError("rejectReason is required", 422, "REJECT_REASON_REQUIRED");
+  const updated = await prisma.missionApplication.update({
+    where: { id },
+    data: { status: "REJECTED", rejectReason: reason, reviewedById: actorId, reviewedAt: now() }
+  });
+  await notifyCreator(current.accountId, "MISSION_APPLICATION_REJECTED", "Don xin nhiem vu bi tu choi", reason, { missionApplicationId: id });
+  return updated;
+}
+
+export async function listMissionVideoReviewsForAdmin(input: {
+  query?: string;
+  campaignId?: string;
+  videoReviewStatus?: CreatorMissionVideoReviewStatus;
+  sort?: Sort;
+  page?: number;
+  limit?: number;
+}) {
+  const where: Prisma.CreatorMissionWhereInput = { videoReviewStatus: input.videoReviewStatus ?? "PENDING" };
+  if (input.campaignId) where.campaignId = input.campaignId;
+  if (input.query?.trim()) {
+    const q = input.query.trim();
+    where.OR = [
+      { account: { displayName: { contains: q, mode: "insensitive" } } },
+      { account: { email: { contains: q, mode: "insensitive" } } },
+      { mission: { title: { contains: q, mode: "insensitive" } } },
+      { campaign: { title: { contains: q, mode: "insensitive" } } }
+    ];
+  }
+  const paging = toPagination(input.page, input.limit);
+  const [total, items] = await prisma.$transaction([
+    prisma.creatorMission.count({ where }),
+    prisma.creatorMission.findMany({
+      where,
+      include: creatorMissionInclude,
+      orderBy: { videoSubmittedAt: toOrder(input.sort) },
+      skip: paging.skip,
+      take: paging.limit
+    })
+  ]);
+  return { items: items.map(mapMission), pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
+}
+
+export async function getMissionVideoReviewDetailForAdmin(id: string) {
+  const item = await getMissionById(id);
+  if (!item) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
+  return mapMission(item);
+}
+
+export async function approveMissionVideoReviewByAdmin(actorId: string, id: string) {
+  return approveVideoReviewByAdmin(actorId, id);
+}
+
+export async function rejectMissionVideoReviewByAdmin(actorId: string, id: string, feedback: string) {
+  return rejectVideoReviewByAdmin(actorId, id, feedback);
+}
+
+export async function listMissionFinalReviewsForAdmin(input: {
+  query?: string;
+  campaignId?: string;
+  productReceiveOption?: ProductReceiveOption;
+  publishStatus?: CreatorMissionPublishStatus;
+  sort?: Sort;
+  page?: number;
+  limit?: number;
+}) {
+  const where: Prisma.CreatorMissionWhereInput = { publishStatus: input.publishStatus ?? "PENDING" };
+  if (input.campaignId) where.campaignId = input.campaignId;
+  if (input.productReceiveOption) where.productReceiveOption = input.productReceiveOption;
+  if (input.query?.trim()) {
+    const q = input.query.trim();
+    where.OR = [
+      { account: { displayName: { contains: q, mode: "insensitive" } } },
+      { account: { email: { contains: q, mode: "insensitive" } } },
+      { mission: { title: { contains: q, mode: "insensitive" } } },
+      { campaign: { title: { contains: q, mode: "insensitive" } } }
+    ];
+  }
+  const paging = toPagination(input.page, input.limit);
+  const [total, items] = await prisma.$transaction([
+    prisma.creatorMission.count({ where }),
+    prisma.creatorMission.findMany({
+      where,
+      include: creatorMissionInclude,
+      orderBy: { publishSubmittedAt: toOrder(input.sort) },
+      skip: paging.skip,
+      take: paging.limit
+    })
+  ]);
+  return { items: items.map(mapMission), pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
+}
+
+export async function getMissionFinalReviewDetailForAdmin(id: string) {
+  const item = await getMissionById(id);
+  if (!item) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
+  return mapMission(item);
+}
+
+export async function approveMissionFinalReviewByAdmin(actorId: string, id: string, input?: { reimbursementAmountVnd?: number }) {
+  return approvePublishReportByAdmin(actorId, id, input?.reimbursementAmountVnd ?? 0);
+}
+
+export async function rejectMissionFinalReviewByAdmin(actorId: string, id: string, feedback: string) {
+  return rejectPublishReportByAdmin(actorId, id, feedback);
 }

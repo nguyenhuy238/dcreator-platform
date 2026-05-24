@@ -103,7 +103,10 @@ export function CreatorCampaignApplyButton({ slug, compact = false }: Props) {
     }
 
     if (status.state === "PROFILE_REQUIRED") {
-      setNotice({ type: "error", text: "Vui lòng hoàn thiện hồ sơ Creator trước khi nộp đơn." });
+      setNotice({
+        type: "error",
+        text: "Bạn cần hoàn thiện hồ sơ Creator và chọn nền tảng chính trước khi xin làm nhiệm vụ."
+      });
       return;
     }
 
@@ -156,7 +159,7 @@ export function CreatorCampaignApplyButton({ slug, compact = false }: Props) {
           {notice.text}
         </p>
       ) : null}
-      {!compact && !notice && status?.message ? (
+      {!notice && status?.message ? (
         <p className="text-xs text-zinc-500">
           {status.message}
           {status.state === "REJECTED" && status.rejectReason ? ` Lý do: ${status.rejectReason}` : ""}
