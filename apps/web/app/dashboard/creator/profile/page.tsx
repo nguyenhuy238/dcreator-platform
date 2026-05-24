@@ -50,12 +50,29 @@ function normalizeAvatarUrl(value: string) {
   return `https://${trimmed}`;
 }
 
+function resolveAvatarSrc(input: string) {
+  const raw = input.trim();
+  if (!raw) return "";
+
+  try {
+    const parsed = new URL(raw);
+    if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+      return `${parsed.pathname}${parsed.search}`;
+    }
+    return raw;
+  } catch {
+    if (raw.startsWith("/")) return raw;
+    return "";
+  }
+}
+
 export default function CreatorProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarLoadError, setAvatarLoadError] = useState(false);
 
   const [displayName, setDisplayName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -64,6 +81,7 @@ export default function CreatorProfilePage() {
   const [socialMap, setSocialMap] = useState<Record<SocialKey, string>>({ TikTok: "", Facebook: "", Instagram: "", YouTube: "", Portfolio: "" });
 
   const bioCount = useMemo(() => bio.trim().length, [bio]);
+  const previewAvatarSrc = useMemo(() => resolveAvatarSrc(avatarUrl), [avatarUrl]);
 
   async function load() {
     setLoading(true);
@@ -89,6 +107,10 @@ export default function CreatorProfilePage() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    setAvatarLoadError(false);
+  }, [avatarUrl]);
 
   function toggleCategory(category: string) {
     setCategories((current) => {
@@ -145,6 +167,7 @@ export default function CreatorProfilePage() {
         throw new Error(payload.error ?? "Không thể tải ảnh đại diện");
       }
       setAvatarUrl(payload.data.avatarUrl);
+      setAvatarLoadError(false);
       setToast("Đã tải ảnh đại diện. Nhấn lưu để cập nhật hồ sơ.");
       setTimeout(() => setToast(""), 2200);
     } catch (requestError) {
@@ -223,8 +246,14 @@ export default function CreatorProfilePage() {
             ) : (
               <div className="grid gap-3">
                 <div className="flex items-center gap-3">
-                  {avatarUrl ? (
-                    <div className="h-14 w-14 rounded-2xl border border-zinc-200 bg-cover bg-center" style={{ backgroundImage: `url(${avatarUrl})` }} />
+                  {previewAvatarSrc && !avatarLoadError ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={previewAvatarSrc}
+                      alt={displayName || "Creator avatar"}
+                      className="h-14 w-14 rounded-2xl border border-zinc-200 object-cover"
+                      onError={() => setAvatarLoadError(true)}
+                    />
                   ) : (
                     <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-900 text-lg font-black text-white">{displayName.slice(0, 1).toUpperCase() || "C"}</div>
                   )}
