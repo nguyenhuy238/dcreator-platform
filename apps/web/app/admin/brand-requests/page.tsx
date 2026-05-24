@@ -20,6 +20,14 @@ type BrandRow = {
   fanpage: string | null;
   reviewNote: string | null;
   rejectReason: string | null;
+  revenueSharePercent: number | null;
+  commissionRatePercent: number | null;
+  bccAgreementAccepted: boolean;
+  bccAgreementVersion: string | null;
+  bccAgreementTerms: string | null;
+  legalResponsibilityAccepted: boolean;
+  contractFileUrl: string | null;
+  contractSignedAt: string | null;
   createdAt: string;
   reviewedAt: string | null;
   account: { id: string; email: string; displayName: string; profile: { phone: string | null } | null };
@@ -237,6 +245,12 @@ export default function AdminBrandRequestsPage() {
                   <p>Inventory description: {detail.inventoryDescription ?? "-"}</p>
                   <p>Description: {detail.description ?? "-"}</p>
                   <p>Business goal: {detail.businessGoal ?? "-"}</p>
+                  <p>Revenue share: {detail.revenueSharePercent ?? "-"}%</p>
+                  <p>Platform commission: {detail.commissionRatePercent ?? "-"}%</p>
+                  <p>BCC version: {detail.bccAgreementVersion ?? "-"}</p>
+                  <p>BCC accepted: {detail.bccAgreementAccepted ? "Yes" : "No"}</p>
+                  <p>Legal responsibility accepted: {detail.legalResponsibilityAccepted ? "Yes" : "No"}</p>
+                  <p>Contract signed at: {detail.contractSignedAt ? new Date(detail.contractSignedAt).toLocaleString("vi-VN") : "-"}</p>
                   <p>Admin note: {detail.reviewNote ?? "-"}</p>
                   <p>Reject reason: {detail.rejectReason ?? "-"}</p>
                   <p>Reviewer: {detail.reviewedBy?.displayName ?? "-"}</p>
@@ -244,6 +258,22 @@ export default function AdminBrandRequestsPage() {
                   {detail.website ? <a href={detail.website} target="_blank" rel="noreferrer" className="mt-1 block break-all text-blue-700 underline">{detail.website}</a> : null}
                   {detail.fanpage ? <a href={detail.fanpage} target="_blank" rel="noreferrer" className="mt-1 block break-all text-blue-700 underline">{detail.fanpage}</a> : null}
                   {detail.businessLicenseUrl ? <a href={detail.businessLicenseUrl} target="_blank" rel="noreferrer" className="mt-1 block break-all text-blue-700 underline">Business license</a> : null}
+                  <div className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                    <p className="font-semibold text-zinc-900">Tải lên hợp đồng / tài liệu bổ sung</p>
+                    {detail.contractFileUrl ? (
+                      <a href={detail.contractFileUrl} target="_blank" rel="noreferrer" className="mt-1 block break-all text-blue-700 underline">
+                        {detail.contractFileUrl}
+                      </a>
+                    ) : (
+                      <p className="mt-1 text-zinc-600">Chưa có tệp được tải lên.</p>
+                    )}
+                  </div>
+                  {detail.bccAgreementTerms ? (
+                    <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                      <p className="font-semibold text-zinc-900">BCC terms submitted</p>
+                      <p className="mt-2 whitespace-pre-wrap text-zinc-700">{detail.bccAgreementTerms}</p>
+                    </div>
+                  ) : null}
                 </section>
 
                 <section className="dc-card p-4 text-sm">
