@@ -1,10 +1,12 @@
-import { ApplicationStatus, SocialPlatform } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { ok } from "@/lib/api-response";
 import { requireAdminOps } from "@/lib/auth/admin-guard";
 import { toErrorResponse } from "@/lib/errors";
 import { listCreatorApplications } from "@/lib/services/role-upgrade.service";
 import { adminCreatorListQuerySchema } from "@/lib/validators/admin-creator";
+
+const APPLICATION_STATUSES = ["DRAFT", "PENDING_REVIEW", "APPROVED", "REJECTED", "NEEDS_REVISION"] as const;
+const SOCIAL_PLATFORMS = ["TIKTOK", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "OTHER"] as const;
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,9 +18,9 @@ export async function GET(request: NextRequest) {
     const sort = request.nextUrl.searchParams.get("sort") ?? undefined;
 
     const parsed = adminCreatorListQuerySchema.parse({
-      status: statusRaw && Object.values(ApplicationStatus).includes(statusRaw as ApplicationStatus) ? (statusRaw as ApplicationStatus) : undefined,
+      status: statusRaw && APPLICATION_STATUSES.includes(statusRaw as (typeof APPLICATION_STATUSES)[number]) ? statusRaw : undefined,
       query,
-      platform: platformRaw && Object.values(SocialPlatform).includes(platformRaw as SocialPlatform) ? (platformRaw as SocialPlatform) : undefined,
+      platform: platformRaw && SOCIAL_PLATFORMS.includes(platformRaw as (typeof SOCIAL_PLATFORMS)[number]) ? platformRaw : undefined,
       contentCategory,
       sort
     });

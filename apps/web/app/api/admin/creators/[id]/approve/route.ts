@@ -1,4 +1,3 @@
-import { ApplicationStatus } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { ok } from "@/lib/api-response";
 import { requireAdminOps } from "@/lib/auth/admin-guard";
@@ -13,7 +12,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
     assertSameOrigin(request);
     const actor = await requireAdminOps(request);
     const { id } = await params;
-    return ok(await reviewCreatorApplication(actor.id, id, ApplicationStatus.APPROVED));
+    return ok(await reviewCreatorApplication(actor.id, id, "APPROVED"));
   } catch (error) {
     return toErrorResponse(error);
   }

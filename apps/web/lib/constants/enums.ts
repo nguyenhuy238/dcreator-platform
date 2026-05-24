@@ -1,0 +1,35 @@
+export const APPLICATION_STATUS = [
+  "DRAFT",
+  "PENDING_REVIEW",
+  "APPROVED",
+  "REJECTED",
+  "NEEDS_REVISION"
+] as const;
+
+export const SOCIAL_PLATFORM = ["TIKTOK", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "OTHER"] as const;
+
+export const CAMPAIGN_STATUS = ["DRAFT", "ACTIVE", "PAUSED", "COMPLETED", "ARCHIVED"] as const;
+
+export const MISSION_LIFECYCLE_STATUS = [
+  "OPEN",
+  "ACCEPTED",
+  "DOING",
+  "SUBMITTED",
+  "PENDING_REVIEW",
+  "APPROVED",
+  "DONE",
+  "REJECTED",
+  "EXPIRED",
+  "CANCELLED"
+] as const;
+
+export const PRODUCT_REVIEW_STATUS = ["DRAFT", "PENDING_REVIEW", "APPROVED", "REJECTED", "CHANGES_REQUESTED"] as const;
+
+export const NOTIFICATION_CHANNEL = ["IN_APP", "EMAIL", "PUSH"] as const;
+
+export const APPLICATION_STATUS_SET = new Set<string>(APPLICATION_STATUS);
+export const SOCIAL_PLATFORM_SET = new Set<string>(SOCIAL_PLATFORM);
+export const CAMPAIGN_STATUS_SET = new Set<string>(CAMPAIGN_STATUS);
+export const MISSION_LIFECYCLE_STATUS_SET = new Set<string>(MISSION_LIFECYCLE_STATUS);
+export const PRODUCT_REVIEW_STATUS_SET = new Set<string>(PRODUCT_REVIEW_STATUS);
+export const NOTIFICATION_CHANNEL_SET = new Set<string>(NOTIFICATION_CHANNEL);

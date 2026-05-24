@@ -1,4 +1,3 @@
-import { ApplicationStatus } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { ok } from "@/lib/api-response";
 import { assertSameOrigin } from "@/lib/auth/csrf";
@@ -15,7 +14,7 @@ export async function POST(request: NextRequest, { params }: Props) {
     const actor = await requireAdminOps(request);
     const { id } = await params;
     const payload = reviewApplicationSchema.parse(await request.json());
-    return ok(await reviewBrandApplication(actor.id, id, payload.status as ApplicationStatus, payload.rejectReason, payload.reviewNote));
+    return ok(await reviewBrandApplication(actor.id, id, payload.status, payload.rejectReason, payload.reviewNote));
   } catch (error) {
     return toErrorResponse(error);
   }

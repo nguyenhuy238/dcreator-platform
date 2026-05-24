@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { ApplicationStatus, Brand, BrandInventoryBatch, BrandMemberRole, BrandProduct, CampaignStatus, MissionAudience, Role } from "@prisma/client";
+import { Brand, BrandInventoryBatch, BrandMemberRole, BrandProduct, CampaignStatus, MissionAudience, Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { APPLICATION_STATUS } from "@/lib/constants/enums";
 import { AppError } from "@/lib/errors";
 import { approveProof, rejectProof } from "@/lib/services/mission.service";
 import { getBrandKpis } from "@/lib/services/analytics.service";
@@ -38,6 +39,7 @@ type CreatorApplicationDecisionInput = z.infer<typeof creatorApplicationDecision
 type ProofReviewDecisionInput = z.infer<typeof proofReviewDecisionSchema>;
 type BudgetLockInput = z.infer<typeof budgetLockSchema>;
 type BudgetTopupInput = z.infer<typeof budgetTopupSchema>;
+type ApplicationStatusValue = (typeof APPLICATION_STATUS)[number];
 type ProductSubmissionInput = z.infer<typeof productSubmissionSchema>;
 type BrandMemberInviteInput = z.infer<typeof brandMemberInviteSchema>;
 type BrandMemberRoleUpdateInput = z.infer<typeof brandMemberRoleUpdateSchema>;
@@ -281,10 +283,10 @@ export async function getBrandOverview(accountId: string) {
 
 function toOnboardingStatus(
   brand: Brand | null,
-  latestApplication?: { bccAgreementAccepted: boolean; status: ApplicationStatus; reviewNote?: string | null } | null
+  latestApplication?: { bccAgreementAccepted: boolean; status: ApplicationStatusValue; reviewNote?: string | null } | null
 ) {
   const supplementaryBccReviewApproved =
-    latestApplication?.status === ApplicationStatus.APPROVED &&
+    latestApplication?.status === "APPROVED" &&
     latestApplication?.reviewNote === "Brand requested onboarding/BCC update and admin review.";
   const bccAgreementAccepted = Boolean(
     latestApplication?.bccAgreementAccepted || (brand?.bccAgreementTerms && brand.contractSignedAt && brand.legalResponsibilityAccepted)
@@ -468,19 +470,19 @@ export async function updateBrandOnboarding(accountId: string, input: BrandOnboa
       reviewedAt: null
     };
 
-    if (latestApplication && latestApplication.status === ApplicationStatus.PENDING_REVIEW) {
+    if (latestApplication && latestApplication.status === "PENDING_REVIEW") {
       await prisma.brandApplication.update({
         where: { id: latestApplication.id },
         data: {
           ...applicationData,
-          status: ApplicationStatus.PENDING_REVIEW
+          status: "PENDING_REVIEW"
         }
       });
     } else {
       await prisma.brandApplication.create({
         data: {
           accountId,
-          status: ApplicationStatus.PENDING_REVIEW,
+          status: "PENDING_REVIEW",
           ...applicationData
         }
       });
@@ -513,7 +515,7 @@ export async function updateBrandOnboarding(accountId: string, input: BrandOnboa
 
   return toOnboardingStatus(updated, {
     bccAgreementAccepted: input.bccAgreementAccepted,
-    status: isRequestReview ? ApplicationStatus.PENDING_REVIEW : ApplicationStatus.APPROVED
+    status: isRequestReview ? "PENDING_REVIEW" : "APPROVED"
   });
 }
 

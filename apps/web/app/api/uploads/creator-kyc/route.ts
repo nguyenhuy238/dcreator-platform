@@ -1,11 +1,9 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
 import { ok } from "@/lib/api-response";
 import { assertSameOrigin } from "@/lib/auth/csrf";
 import { requireAuth } from "@/lib/auth/guard";
 import { AppError, toErrorResponse } from "@/lib/errors";
+import { saveUpload } from "@/lib/storage/upload";
 
 export const runtime = "nodejs";
 
@@ -22,14 +20,12 @@ function ensureImage(file: File | null, label: string): asserts file is File {
 }
 
 async function saveImage(file: File, suffix: string) {
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const ext = file.type.split("/")[1] || "jpg";
-  const fileName = `${Date.now()}-${randomUUID()}-${suffix}.${ext}`;
-  const relativeDir = path.join("uploads", "creator-kyc");
-  const absoluteDir = path.join(process.cwd(), "public", relativeDir);
-  await mkdir(absoluteDir, { recursive: true });
-  await writeFile(path.join(absoluteDir, fileName), buffer);
-  return `/${relativeDir.replace(/\\/g, "/")}/${fileName}`;
+  return saveUpload({
+    file,
+    folder: "creator-kyc",
+    suffix,
+    ext: file.type.split("/")[1] || "jpg"
+  });
 }
 
 export async function POST(request: NextRequest) {

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 export function StatusBadge({ status }: { status: string }) {
   const labels: Record<string, string> = {
@@ -62,7 +62,26 @@ export function ErrorState({ title, description, onRetry }: { title: string; des
 }
 
 export function LoadingSkeleton({ rows = 3 }: { rows?: number }) {
-  return <div className="grid gap-3">{Array.from({ length: rows }).map((_, i) => <div key={i} className="h-20 animate-pulse rounded-3xl bg-zinc-100" />)}</div>;
+  return (
+    <div className="grid gap-3">
+      {Array.from({ length: rows }).map((_, i) => (
+        <LoadingBlock key={i} className="h-20 rounded-3xl" style={{ animationDelay: `${i * 80}ms` }} />
+      ))}
+    </div>
+  );
+}
+
+export function LoadingBlock({ className, style }: { className?: string; style?: CSSProperties }) {
+  return <div className={`dc-loading-shimmer bg-zinc-100 ${className ?? ""}`} style={style} />;
+}
+
+export function LoadingSpinner({ label = "Đang tải..." }: { label?: string }) {
+  return (
+    <div className="inline-flex items-center gap-2 text-sm font-medium text-zinc-600" role="status" aria-live="polite">
+      <span className="dc-loading-spinner" aria-hidden="true" />
+      <span>{label}</span>
+    </div>
+  );
 }
 
 export function ActionToast({ message }: { message: string }) {

@@ -1,5 +1,11 @@
-import { ApplicationStatus, SocialPlatform } from "@prisma/client";
 import { z } from "zod";
+
+const applicationStatus = {
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+  NEEDS_REVISION: "NEEDS_REVISION"
+} as const;
+const socialPlatforms = ["TIKTOK", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "OTHER"] as const;
 
 const optionalUrl = z.url().trim().max(400).optional().or(z.literal(""));
 
@@ -7,7 +13,7 @@ export const creatorApplicationSchema = z.object({
   displayName: z.string().trim().min(2).max(120),
   avatarUrl: optionalUrl,
   bio: z.string().trim().max(2000).optional(),
-  mainPlatform: z.nativeEnum(SocialPlatform),
+  mainPlatform: z.enum(socialPlatforms),
   socialUrl: z.url().trim().max(400),
   handle: z.string().trim().max(120).optional(),
   followerCount: z.number().int().min(0).optional(),
@@ -68,11 +74,11 @@ export const rejectApplicationSchema = z.object({
 });
 
 export const reviewApplicationSchema = z.object({
-  status: z.enum([ApplicationStatus.APPROVED, ApplicationStatus.REJECTED, ApplicationStatus.NEEDS_REVISION]),
+  status: z.enum([applicationStatus.APPROVED, applicationStatus.REJECTED, applicationStatus.NEEDS_REVISION]),
   rejectReason: z.string().trim().max(1000).optional(),
   reviewNote: z.string().trim().max(1000).optional()
 }).superRefine((value, ctx) => {
-  if ((value.status === ApplicationStatus.REJECTED || value.status === ApplicationStatus.NEEDS_REVISION) && !value.rejectReason) {
+  if ((value.status === applicationStatus.REJECTED || value.status === applicationStatus.NEEDS_REVISION) && !value.rejectReason) {
     ctx.addIssue({ code: "custom", path: ["rejectReason"], message: "rejectReason is required" });
   }
 });

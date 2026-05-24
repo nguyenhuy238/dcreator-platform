@@ -1,8 +1,8 @@
-import { ProductReviewStatus } from "@prisma/client";
 import { z } from "zod";
+import { PRODUCT_REVIEW_STATUS } from "@/lib/constants/enums";
 
 export const adminProductListQuerySchema = z.object({
-  status: z.nativeEnum(ProductReviewStatus).optional(),
+  status: z.enum(PRODUCT_REVIEW_STATUS).optional(),
   query: z.string().trim().max(200).optional()
 });
 

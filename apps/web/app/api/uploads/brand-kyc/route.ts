@@ -1,11 +1,9 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
 import { ok } from "@/lib/api-response";
 import { assertSameOrigin } from "@/lib/auth/csrf";
 import { requireAuth } from "@/lib/auth/guard";
 import { AppError, toErrorResponse } from "@/lib/errors";
+import { saveUpload } from "@/lib/storage/upload";
 
 export const runtime = "nodejs";
 
@@ -22,14 +20,12 @@ function ensureImage(file: File | null, label: string): asserts file is File {
 }
 
 async function saveImage(file: File, suffix: string) {
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const ext = file.type.split("/")[1] || "jpg";
-  const fileName = `${Date.now()}-${randomUUID()}-${suffix}.${ext}`;
-  const relativeDir = path.join("uploads", "brand-kyc");
-  const absoluteDir = path.join(process.cwd(), "public", relativeDir);
-  await mkdir(absoluteDir, { recursive: true });
-  await writeFile(path.join(absoluteDir, fileName), buffer);
-  return `/${relativeDir.replace(/\\/g, "/")}/${fileName}`;
+  return saveUpload({
+    file,
+    folder: "brand-kyc",
+    suffix,
+    ext: file.type.split("/")[1] || "jpg"
+  });
 }
 
 const ALLOWED_DOC_TYPES = [
@@ -48,14 +44,18 @@ async function saveDocument(file: File, suffix: string) {
   if (file.size > 10 * 1024 * 1024) {
     throw new AppError(`File vượt quá 10MB`, 422, "FILE_TOO_LARGE");
   }
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const ext = file.type.split("/")[1]?.replace("vnd.openxmlformats-officedocument.wordprocessingml.document", "docx").replace("msword", "doc") || "bin";
-  const fileName = `${Date.now()}-${randomUUID()}-${suffix}.${ext}`;
-  const relativeDir = path.join("uploads", "brand-kyc");
-  const absoluteDir = path.join(process.cwd(), "public", relativeDir);
-  await mkdir(absoluteDir, { recursive: true });
-  await writeFile(path.join(absoluteDir, fileName), buffer);
-  return `/${relativeDir.replace(/\\/g, "/")}/${fileName}`;
+  const ext =
+    file.type
+      .split("/")[1]
+      ?.replace("vnd.openxmlformats-officedocument.wordprocessingml.document", "docx")
+      .replace("msword", "doc") || "bin";
+
+  return saveUpload({
+    file,
+    folder: "brand-kyc",
+    suffix,
+    ext
+  });
 }
 
 export async function POST(request: NextRequest) {

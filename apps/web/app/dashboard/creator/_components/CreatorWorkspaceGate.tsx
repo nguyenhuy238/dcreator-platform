@@ -25,14 +25,14 @@ export function CreatorWorkspaceGate({
   children: React.ReactNode;
   fallback?: React.ReactNode;
 }) {
-  const [ready, setReady] = useState(false);
   const [user, setUser] = useState<WorkspaceUser | null>(null);
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     async function loadMe() {
       try {
-        const response = await fetch("/api/auth/me", { cache: "no-store" });
+        const response = await fetch("/api/auth/me", { cache: "default", signal: controller.signal });
         const payload = (await response.json()) as AuthMePayload;
         if (!active) return;
         if (response.ok && payload.success && payload.data?.user) {
@@ -42,21 +42,16 @@ export function CreatorWorkspaceGate({
         }
       } catch {
         if (active) setUser(null);
-      } finally {
-        if (active) setReady(true);
       }
     }
     void loadMe();
     return () => {
       active = false;
+      controller.abort();
     };
   }, []);
 
-  if (!ready) {
-    return <div className="h-28 animate-pulse rounded-2xl bg-zinc-100" />;
-  }
-
-  if (!user?.roles.includes("CREATOR")) {
+  if (!user || !user.roles.includes("CREATOR")) {
     return <>{fallback ?? children}</>;
   }
 

@@ -4,6 +4,9 @@ import { toErrorResponse } from "@/lib/errors";
 import { campaignQuerySchema } from "@/lib/validators";
 import { listCampaigns } from "@/lib/services/campaign.service";
 
+export const runtime = "nodejs";
+export const revalidate = 60;
+
 export async function GET(request: NextRequest) {
   try {
     const parsed = campaignQuerySchema.parse({
@@ -18,7 +21,9 @@ export async function GET(request: NextRequest) {
     });
 
     const data = await listCampaigns(parsed);
-    return ok(data);
+    const response = ok(data);
+    response.headers.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
+    return response;
   } catch (error) {
     return toErrorResponse(error);
   }

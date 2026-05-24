@@ -1,8 +1,8 @@
-import { CampaignStatus } from "@prisma/client";
 import { z } from "zod";
+import { CAMPAIGN_STATUS } from "@/lib/constants/enums";
 
 export const adminCampaignListQuerySchema = z.object({
-  status: z.nativeEnum(CampaignStatus).optional(),
+  status: z.enum(CAMPAIGN_STATUS).optional(),
   query: z.string().trim().max(200).optional()
 });
 

@@ -6,6 +6,7 @@ import { AppError } from "@/lib/errors";
 import { getCurrentSessionFromRequest } from "@/lib/auth/session";
 import { decodeSession, SESSION_COOKIE } from "@/lib/auth/session-token";
 import { resolvePrimaryRole } from "@/lib/auth/role-constants";
+import { RuntimeTtlCache } from "@/lib/perf/runtime-cache";
 
 export type CurrentUser = {
   id: string;
@@ -24,9 +25,50 @@ export type CurrentUser = {
   brandRequestStatus: string | null;
 };
 
+const currentUserCache = new RuntimeTtlCache<CurrentUser>(15_000, 4000);
+
+function mapAccountToCurrentUser(
+  account: {
+    id: string;
+    email: string;
+    displayName: string;
+    avatarUrl: string | null;
+    isActive: boolean;
+    roleAssignments: Array<{ role: Role }>;
+    creatorProfile: { id: string } | null;
+    creatorApplications: Array<{ status: string }>;
+    brandApplications: Array<{ status: string }>;
+    ownedBrandMemberships: Array<{ role: "OWNER" | "STAFF"; brand: { id: string; name: string } }>;
+  },
+  fallbackRole: Role
+): CurrentUser {
+  const assignmentRoles = account.roleAssignments.map((item) => item.role);
+  const roles = Array.from(new Set<Role>(assignmentRoles.length > 0 ? assignmentRoles : [fallbackRole]));
+  const primaryRole = resolvePrimaryRole(roles);
+
+  return {
+    id: account.id,
+    email: account.email,
+    displayName: account.displayName,
+    avatarUrl: account.avatarUrl,
+    role: primaryRole,
+    primaryRole,
+    roles,
+    isActive: account.isActive,
+    creatorProfile: account.creatorProfile,
+    brandMemberships: account.ownedBrandMemberships.map((item) => ({ id: item.brand.id, name: item.brand.name, role: item.role })),
+    activeBrandId: account.ownedBrandMemberships[0]?.brand.id ?? null,
+    permissions: roles.map((role) => `role:${role.toLowerCase()}`),
+    creatorRequestStatus: account.creatorApplications[0]?.status ?? null,
+    brandRequestStatus: account.brandApplications[0]?.status ?? null
+  };
+}
+
 export async function getCurrentUser(request: NextRequest): Promise<CurrentUser | null> {
   const session = await getCurrentSessionFromRequest(request);
   if (!session) return null;
+  const cached = currentUserCache.get(session.sid);
+  if (cached) return cached;
 
   const account = await prisma.account.findUnique({
     where: { id: session.sub },
@@ -46,26 +88,9 @@ export async function getCurrentUser(request: NextRequest): Promise<CurrentUser 
     }
   });
   if (!account || !account.isActive) return null;
-
-  const assignmentRoles = account.roleAssignments.map((item) => item.role);
-  const roles = Array.from(new Set<Role>(assignmentRoles.length > 0 ? assignmentRoles : [session.role]));
-  const primaryRole = resolvePrimaryRole(roles);
-  return {
-    id: account.id,
-    email: account.email,
-    displayName: account.displayName,
-    avatarUrl: account.avatarUrl,
-    role: primaryRole,
-    primaryRole,
-    roles,
-    isActive: account.isActive,
-    creatorProfile: account.creatorProfile,
-    brandMemberships: account.ownedBrandMemberships.map((item) => ({ id: item.brand.id, name: item.brand.name, role: item.role })),
-    activeBrandId: account.ownedBrandMemberships[0]?.brand.id ?? null,
-    permissions: roles.map((role) => `role:${role.toLowerCase()}`),
-    creatorRequestStatus: account.creatorApplications[0]?.status ?? null,
-    brandRequestStatus: account.brandApplications[0]?.status ?? null
-  };
+  const mapped = mapAccountToCurrentUser(account, session.role);
+  currentUserCache.set(session.sid, mapped);
+  return mapped;
 }
 
 export async function getCurrentUserFromServer() {
@@ -74,6 +99,8 @@ export async function getCurrentUserFromServer() {
   if (!token) return null;
   try {
     const payload = decodeSession(token);
+    const cached = currentUserCache.get(payload.sid);
+    if (cached) return cached;
     const mockRequest = { cookies: { get: (name: string) => (name === SESSION_COOKIE ? { value: token } : undefined) } } as unknown as NextRequest;
     const session = await getCurrentSessionFromRequest(mockRequest);
     if (!session || session.sub !== payload.sub) return null;
@@ -93,25 +120,9 @@ export async function getCurrentUserFromServer() {
       }
     });
     if (!account || !account.isActive) return null;
-    const assignmentRoles = account.roleAssignments.map((item) => item.role);
-    const roles = Array.from(new Set<Role>(assignmentRoles.length > 0 ? assignmentRoles : [payload.role]));
-    const primaryRole = resolvePrimaryRole(roles);
-    return {
-      id: account.id,
-      email: account.email,
-      displayName: account.displayName,
-      avatarUrl: account.avatarUrl,
-      role: primaryRole,
-      primaryRole,
-      roles,
-      isActive: account.isActive,
-      creatorProfile: account.creatorProfile,
-      brandMemberships: account.ownedBrandMemberships.map((item) => ({ id: item.brand.id, name: item.brand.name, role: item.role })),
-      activeBrandId: account.ownedBrandMemberships[0]?.brand.id ?? null,
-      permissions: roles.map((role) => `role:${role.toLowerCase()}`),
-      creatorRequestStatus: account.creatorApplications[0]?.status ?? null,
-      brandRequestStatus: account.brandApplications[0]?.status ?? null
-    } satisfies CurrentUser;
+    const mapped = mapAccountToCurrentUser(account, payload.role);
+    currentUserCache.set(payload.sid, mapped);
+    return mapped satisfies CurrentUser;
   } catch {
     return null;
   }

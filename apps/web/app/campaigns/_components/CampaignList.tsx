@@ -29,10 +29,18 @@ export function CampaignList() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState(filters.search);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(filters.search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filters.search]);
 
   const queryString = useMemo(() => {
     const query = new URLSearchParams();
-    if (filters.search) query.set("search", filters.search);
+    if (debouncedSearch) query.set("search", debouncedSearch);
     if (filters.type) query.set("type", filters.type);
     if (filters.category) query.set("category", filters.category);
     if (filters.status) query.set("status", filters.status);
@@ -41,14 +49,15 @@ export function CampaignList() {
     query.set("page", String(page));
     query.set("limit", "12");
     return query.toString();
-  }, [filters, page]);
+  }, [filters.type, filters.category, filters.status, filters.rewardAvailable, filters.sort, debouncedSearch, page]);
 
   useEffect(() => {
+    const controller = new AbortController();
     let mounted = true;
     setLoading(true);
     setError("");
 
-    fetch(`/api/campaigns?${queryString}`)
+    fetch(`/api/campaigns?${queryString}`, { signal: controller.signal })
       .then(async (res) => {
         const payload = (await res.json()) as CampaignListResponse;
         if (!res.ok || !payload.success) {
@@ -59,6 +68,7 @@ export function CampaignList() {
         setTotalPages(payload.data.pagination.totalPages);
       })
       .catch((err: unknown) => {
+        if (err instanceof Error && err.name === "AbortError") return;
         if (!mounted) return;
         setError(err instanceof Error ? err.message : "Lỗi không xác định");
       })
@@ -69,6 +79,7 @@ export function CampaignList() {
 
     return () => {
       mounted = false;
+      controller.abort();
     };
   }, [queryString]);
 

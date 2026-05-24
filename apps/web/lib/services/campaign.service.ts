@@ -40,7 +40,7 @@ export async function listCampaigns(input: ListCampaignsInput) {
 
   const orderBy: Prisma.CampaignOrderByWithRelationInput[] = [];
   if (input.sort === "trending") {
-    orderBy.push({ contributions: { _count: "desc" } }, { updatedAt: "desc" });
+    orderBy.push({ backerCount: "desc" }, { updatedAt: "desc" });
   } else if (input.sort === "newest") {
     orderBy.push({ createdAt: "desc" });
   } else if (input.sort === "ending-soon") {
@@ -66,22 +66,36 @@ export async function listCampaigns(input: ListCampaignsInput) {
         category: true,
         fundedAmountVnd: true,
         targetAmountVnd: true,
+        backerCount: true,
         endsAt: true,
         createdAt: true,
         brand: { select: { displayName: true } },
-        creator: { select: { displayName: true } },
-        contributions: { select: { supporterId: true } },
-        rewards: { select: { stockRemaining: true, isActive: true } }
+        creator: { select: { displayName: true } }
       }
     })
   ]);
 
+  const campaignIds = campaigns.map((campaign) => campaign.id);
+  const rewardSums =
+    campaignIds.length === 0
+      ? []
+      : await prisma.reward.groupBy({
+          by: ["campaignId"],
+          where: {
+            campaignId: { in: campaignIds },
+            isActive: true
+          },
+          _sum: {
+            stockRemaining: true
+          }
+        });
+  const rewardByCampaignId = new Map<string, number>(
+    rewardSums.map((row) => [row.campaignId, row._sum.stockRemaining ?? 0])
+  );
+
   return {
     items: campaigns.map((campaign) => {
-      const distinctBackers = new Set(campaign.contributions.map((c) => c.supporterId)).size;
-      const rewardsLeft = campaign.rewards
-        .filter((reward) => reward.isActive)
-        .reduce((sum, reward) => sum + reward.stockRemaining, 0);
+      const rewardsLeft = rewardByCampaignId.get(campaign.id) ?? 0;
 
       return {
         id: campaign.id,
@@ -98,7 +112,7 @@ export async function listCampaigns(input: ListCampaignsInput) {
           campaign.targetAmountVnd > 0
             ? Math.min(100, Math.round((campaign.fundedAmountVnd / campaign.targetAmountVnd) * 100))
             : 0,
-        backers: distinctBackers,
+        backers: campaign.backerCount,
         rewardsLeft,
         deadline: campaign.endsAt
       };

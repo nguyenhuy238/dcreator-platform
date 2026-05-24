@@ -1,14 +1,14 @@
 "use client";
 
-import { ApplicationStatus } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActionToast, ConfirmDialog, EmptyState, ErrorState, LoadingSkeleton, PageHeader, StatsCard, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { APPLICATION_STATUS } from "@/lib/constants/enums";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
 
 type CreatorRow = {
   id: string;
-  status: ApplicationStatus;
+  status: (typeof APPLICATION_STATUS)[number];
   displayName: string;
   mainPlatform: string;
   socialUrl: string;

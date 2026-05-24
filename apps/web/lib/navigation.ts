@@ -1,6 +1,5 @@
-import type { Role } from "@prisma/client";
-
 export type Workspace = "user" | "creator" | "brand" | "admin";
+export type RoleCode = "USER" | "CREATOR" | "BRAND_OWNER" | "BRAND_STAFF" | "ADMIN" | "OPS";
 
 export type NavItem = {
   href: string;
@@ -16,7 +15,7 @@ type WorkspaceConfig = {
   description: string;
   defaultHref: string;
   routePrefixes: readonly string[];
-  allowedRoles: readonly Role[];
+  allowedRoles: readonly RoleCode[];
   navItems: readonly NavItem[];
 };
 
@@ -122,13 +121,13 @@ export function getWorkspaceForPath(pathname: string): Workspace {
   return "user";
 }
 
-export function canAccessWorkspace(workspace: Workspace, roles: Role[]): boolean {
+export function canAccessWorkspace(workspace: Workspace, roles: RoleCode[]): boolean {
   const config = WORKSPACES.find((item) => item.id === workspace);
   if (!config) return false;
   return roles.some((role) => config.allowedRoles.includes(role));
 }
 
-export function getAvailableWorkspaces(roles: Role[]) {
+export function getAvailableWorkspaces(roles: RoleCode[]) {
   return WORKSPACES.filter((workspace) => canAccessWorkspace(workspace.id, roles)).map((workspace) => ({
     id: workspace.id,
     label: workspace.label,
@@ -140,7 +139,7 @@ export function getWorkspaceConfig(workspace: Workspace): WorkspaceConfig {
   return WORKSPACES.find((item) => item.id === workspace) ?? WORKSPACES[0]!;
 }
 
-export function getNavItemsForWorkspace(workspace: Workspace, roles: Role[]) {
+export function getNavItemsForWorkspace(workspace: Workspace, roles: RoleCode[]) {
   if (!canAccessWorkspace(workspace, roles)) return [] as NavItem[];
   return [...getWorkspaceConfig(workspace).navItems];
 }
