@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { AdminAvatar } from "@/app/admin/_components/AdminAvatar";
 import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
@@ -114,6 +115,13 @@ export default function AdminCreatorDetailPage() {
         <div className="flex items-center justify-between">
           <p className="font-semibold">Current status</p>
           <StatusBadge status={item.status.toLowerCase()} />
+        </div>
+        <div className="mt-3 flex items-center gap-3">
+          <AdminAvatar name={item.displayName || "Creator"} imageUrl={item.avatarUrl} className="h-12 w-12" alt={item.displayName || "Creator avatar"} />
+          <div className="min-w-0">
+            <p className="font-semibold text-zinc-900">{item.displayName}</p>
+            <p className="truncate text-sm text-zinc-600">{item.account.email}</p>
+          </div>
         </div>
         <div className="mt-3 grid gap-2 text-sm text-zinc-700">
           <p>Category: {item.contentCategory ?? "Không có"}</p>

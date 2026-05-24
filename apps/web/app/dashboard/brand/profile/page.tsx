@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
 
 type BrandProfile = {
@@ -30,13 +30,31 @@ function statusLabel(status: BrandProfile["verificationStatus"]) {
   return "Chưa xác minh";
 }
 
+function resolveLogoSrc(input: string) {
+  const raw = input.trim();
+  if (!raw) return "";
+
+  try {
+    const parsed = new URL(raw);
+    if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+      return `${parsed.pathname}${parsed.search}`;
+    }
+    return raw;
+  } catch {
+    if (raw.startsWith("/")) return raw;
+    return "";
+  }
+}
+
 export default function BrandProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoLoadError, setLogoLoadError] = useState(false);
   const [form, setForm] = useState<BrandProfile>(defaultForm);
+  const previewLogoSrc = useMemo(() => resolveLogoSrc(form.logoUrl), [form.logoUrl]);
 
   function normalizeLogoUrl(value: string) {
     const trimmed = value.trim();
@@ -71,6 +89,10 @@ export default function BrandProfilePage() {
   useEffect(() => {
     void loadProfile();
   }, []);
+
+  useEffect(() => {
+    setLogoLoadError(false);
+  }, [form.logoUrl]);
 
   async function submitProfile(event: FormEvent) {
     event.preventDefault();
@@ -118,6 +140,7 @@ export default function BrandProfilePage() {
         throw new Error(payload.success ? "Không thể tải logo lên" : payload.error);
       }
       setForm((current) => ({ ...current, logoUrl: payload.data.logoUrl }));
+      setLogoLoadError(false);
       setSuccess("Đã tải logo lên. Nhấn 'Lưu hồ sơ Brand' để cập nhật chính thức.");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Tải logo thất bại");
@@ -203,12 +226,13 @@ export default function BrandProfilePage() {
             <aside className="dc-card h-fit p-5">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">Xem trước</p>
               <div className="mt-4 flex items-center gap-3">
-                {form.logoUrl ? (
-                  <div
-                    aria-label={form.brandName || "Logo Brand"}
-                    className="h-14 w-14 rounded-2xl border border-zinc-200 bg-zinc-100 bg-cover bg-center"
-                    role="img"
-                    style={{ backgroundImage: `url(${form.logoUrl})` }}
+                {previewLogoSrc && !logoLoadError ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={previewLogoSrc}
+                    alt={form.brandName || "Logo Brand"}
+                    className="h-14 w-14 rounded-2xl border border-zinc-200 bg-zinc-100 object-cover"
+                    onError={() => setLogoLoadError(true)}
                   />
                 ) : (
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-900 text-lg font-black text-white">
