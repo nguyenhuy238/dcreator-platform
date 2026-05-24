@@ -99,28 +99,44 @@ export default function CreatorRegisterPage() {
       setIdCardBackImageUrl(uploaded.idCardBackImageUrl);
       setPortraitImageUrl(uploaded.portraitImageUrl);
 
-      const note = [
-        `Tên hiển thị: ${displayName}`,
-        `Email: ${email}`,
-        `TikTok: ${tiktokUrl || "Chưa cung cấp"}`,
-        `Instagram: ${instagramUrl || "Chưa cung cấp"}`,
-        `Facebook: ${facebookUrl || "Chưa cung cấp"}`,
-        `Số follower: ${followerCount}`,
-        `Ngành hàng ưu tiên review: ${preferredCategory}`,
-        `KYC CCCD mặt trước: ${uploaded.idCardFrontImageUrl}`,
-        `KYC CCCD mặt sau: ${uploaded.idCardBackImageUrl}`,
-        `KYC chân dung: ${uploaded.portraitImageUrl}`,
-        `Ghi chú thêm: ${creatorNote || "Không có"}`
-      ].join("\n");
+      const creatorBio = [
+        `TikTok: ${tiktokUrl || "N/A"}`,
+        `Instagram: ${instagramUrl || "N/A"}`,
+        `Facebook: ${facebookUrl || "N/A"}`,
+        `Ghi chú: ${creatorNote || "Không có"}`
+      ].join(" | ");
 
-      const roleRequestResponse = await fetch("/api/role-requests/creator", {
+      const creatorApplicationResponse = await fetch("/api/profile/creator-application", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ note })
+        body: JSON.stringify({
+          displayName,
+          avatarUrl: "",
+          bio: creatorBio,
+          mainPlatform: "TIKTOK",
+          socialUrl: tiktokUrl,
+          handle: "",
+          followerCount: Number(followerCount),
+          contentCategory: preferredCategory,
+          portfolioUrl: instagramUrl,
+          location: "",
+          expectedRate: 0,
+          maxJobsPerMonth: 0,
+          realName: "",
+          phone: "",
+          identityNumber: "",
+          identityFrontUrl: uploaded.idCardFrontImageUrl,
+          identityBackUrl: uploaded.idCardBackImageUrl,
+          selfieUrl: uploaded.portraitImageUrl,
+          bankAccountName: "",
+          bankAccountNumber: "",
+          bankName: "",
+          taxCode: ""
+        })
       });
-      const roleRequestPayload = await roleRequestResponse.json();
-      if (!roleRequestResponse.ok || !roleRequestPayload.success) {
-        throw new Error(roleRequestPayload.error ?? "Không thể gửi yêu cầu Creator.");
+      const creatorApplicationPayload = await creatorApplicationResponse.json();
+      if (!creatorApplicationResponse.ok || !creatorApplicationPayload.success) {
+        throw new Error(creatorApplicationPayload.error ?? "Không thể gửi hồ sơ Creator.");
       }
 
       setSuccess("Đã tạo tài khoản Creator. Hồ sơ đang chờ duyệt.");

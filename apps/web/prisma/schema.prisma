@@ -25,6 +25,12 @@ enum ApplicationStatus {
   NEEDS_REVISION
 }
 
+enum CreatorSocialLinkStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum SocialPlatform {
   TIKTOK
   INSTAGRAM
@@ -402,6 +408,7 @@ model Account {
   brandApplications BrandApplication[]
   ownedBrandMemberships BrandMember[] @relation("BrandMemberAccount")
   reviewedCreatorApplications CreatorApplication[] @relation("CreatorApplicationReviewer")
+  reviewedCreatorSocialLinks CreatorSocialLink[] @relation("CreatorSocialLinkReviewer")
   reviewedBrandApplications BrandApplication[] @relation("BrandApplicationReviewer")
   reviewedBrands Brand[] @relation("BrandReviewer")
   reviewedBrandCampaignRequests BrandCampaignRequest[] @relation("BrandCampaignRequestReviewer")
@@ -472,8 +479,8 @@ model CreatorProfile {
   displayName       String
   avatarUrl         String?
   bio               String?
-  mainPlatform      SocialPlatform
-  socialUrl         String
+  mainPlatform      SocialPlatform?
+  socialUrl         String?
   handle            String?
   followerCount     Int?
   contentCategory   String?
@@ -495,6 +502,29 @@ model CreatorProfile {
   updatedAt         DateTime @updatedAt
 
   account           Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  socialLinks       CreatorSocialLink[]
+}
+
+model CreatorSocialLink {
+  id               String            @id @default(cuid())
+  creatorProfileId String
+  platform         SocialPlatform
+  socialUrl        String
+  followers        Int               @default(0)
+  status           CreatorSocialLinkStatus @default(PENDING)
+  rejectReason     String?
+  reviewNote       String?
+  reviewedById     String?
+  reviewedAt       DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  creatorProfile   CreatorProfile    @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  reviewedBy       Account?          @relation("CreatorSocialLinkReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([creatorProfileId, createdAt])
+  @@index([status, createdAt])
+  @@unique([creatorProfileId, platform, socialUrl])
 }
 
 model BrandApplication {
