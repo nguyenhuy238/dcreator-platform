@@ -50,7 +50,7 @@ const queueCards: Array<{ key: keyof AdminOverview["queues"]; title: string; hre
   { key: "creatorPendingReview", title: "Creator chờ duyệt", href: "/admin/creator-applications" },
   { key: "campaignPendingReview", title: "Campaign chờ duyệt", href: "/admin/campaigns" },
   { key: "creatorApplicationsPendingReview", title: "Creator applications", href: "/admin/creator-applications" },
-  { key: "contentSubmissionsPendingReview", title: "Content submissions", href: "/admin/content-review" },
+  { key: "contentSubmissionsPendingReview", title: "Video chờ duyệt", href: "/admin/mission-video-reviews" },
   { key: "productInventoryPendingReview", title: "Product/Inventory review", href: "/admin/product-inventory" },
   { key: "fulfillmentPendingIssues", title: "Fulfillment lỗi/chờ xử lý", href: "/admin/fulfillment" },
   { key: "payoutPendingReview", title: "Payout/commission chờ duyệt", href: "/admin/payouts" }
@@ -104,7 +104,7 @@ export function AdminDashboardClient() {
       />
 
       <section className="dc-grid-dashboard">
-        <StatsCard title="Tổng queue cần xử lý" value={`${totalQueue}`} hint="Brand/Creator/Campaign/Content/Payout" />
+        <StatsCard title="Tổng queue cần xử lý" value={`${totalQueue}`} hint="Brand/Creator/Campaign/Video/Payout" />
         <StatsCard title="Campaign active" value={`${overview.totals.activeCampaigns}`} />
         <StatsCard title="Brand active" value={`${overview.totals.activeBrands}`} />
         <StatsCard title="Creator active" value={`${overview.totals.activeCreators}`} />
