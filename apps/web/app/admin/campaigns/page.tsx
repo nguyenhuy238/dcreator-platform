@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 
@@ -84,7 +85,16 @@ export default function AdminCampaignsPage() {
 
   return (
     <>
-      <PageHeader title="Campaign CMS" subtitle="Nhận yêu cầu từ Brand; khi duyệt, Admin tạo campaign thật và publish lên hệ thống." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
+      <PageHeader
+        title="Campaign CMS"
+        subtitle="Nhận yêu cầu từ Brand; khi duyệt, Admin tạo campaign thật và publish lên hệ thống."
+        action={(
+          <div className="flex gap-2">
+            <Link className="dc-btn-primary" href="/admin/campaigns/create">Tạo campaign</Link>
+            <button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>
+          </div>
+        )}
+      />
       <section className="dc-card p-4">
         <div className="flex flex-wrap gap-2">
           <select className="dc-input max-w-72" value={status} onChange={(e) => setStatus(e.target.value)}>

@@ -104,7 +104,7 @@ export function AdminDashboardClient() {
       />
 
       <section className="dc-grid-dashboard">
-        <StatsCard title="Tổng queue cần xử lý" value={`${totalQueue}`} hint="Brand/Creator/Campaign/Video/Payout" />
+        <StatsCard title="Tổng queue cần xử lý" value={`${totalQueue}`} hint="Brand, Creator, Campaign, Video, Payout" />
         <StatsCard title="Campaign active" value={`${overview.totals.activeCampaigns}`} />
         <StatsCard title="Brand active" value={`${overview.totals.activeBrands}`} />
         <StatsCard title="Creator active" value={`${overview.totals.activeCreators}`} />

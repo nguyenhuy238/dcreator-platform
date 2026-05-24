@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { ActionToast, EmptyState, ErrorState, FormField, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
 
 type SocialLink = { label: string; url: string };
@@ -37,11 +37,25 @@ function fromSocialMap(map: Record<SocialKey, string>) {
   return (Object.entries(map) as Array<[SocialKey, string]>).filter(([, url]) => url.trim()).map(([label, url]) => ({ label, url: url.trim() }));
 }
 
+function normalizeAvatarUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("/")) {
+    if (typeof window !== "undefined") {
+      return `${window.location.origin}${trimmed}`;
+    }
+    return trimmed;
+  }
+  return `https://${trimmed}`;
+}
+
 export default function CreatorProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [displayName, setDisplayName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -94,7 +108,7 @@ export default function CreatorProfilePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           displayName: displayName.trim(),
-          avatarUrl: avatarUrl.trim(),
+          avatarUrl: normalizeAvatarUrl(avatarUrl),
           bio: bio.trim(),
           categories,
           socialLinks: fromSocialMap(socialMap)
@@ -114,6 +128,33 @@ export default function CreatorProfilePage() {
     }
   }
 
+  async function handleAvatarUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+    setUploadingAvatar(true);
+    setError("");
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+      const response = await fetch("/api/uploads/avatar", {
+        method: "POST",
+        body: formData
+      });
+      const payload = (await response.json()) as ApiResponse<{ avatarUrl: string }>;
+      if (!response.ok || !payload.success || !payload.data) {
+        throw new Error(payload.error ?? "Không thể tải ảnh đại diện");
+      }
+      setAvatarUrl(payload.data.avatarUrl);
+      setToast("Đã tải ảnh đại diện. Nhấn lưu để cập nhật hồ sơ.");
+      setTimeout(() => setToast(""), 2200);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Không thể tải ảnh đại diện");
+    } finally {
+      setUploadingAvatar(false);
+      event.target.value = "";
+    }
+  }
+
   return (
     <>
       <PageHeader title="Hồ sơ Creator" subtitle="Quản lý thông tin cá nhân, lĩnh vực nội dung và các kênh mạng xã hội." />
@@ -130,9 +171,13 @@ export default function CreatorProfilePage() {
               <input className="dc-input" value={displayName} onChange={(event) => setDisplayName(event.target.value)} required />
             </FormField>
 
-            <FormField label="Ảnh đại diện URL">
-              <input className="dc-input" type="url" placeholder="https://..." value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} />
-            </FormField>
+            <div className="grid gap-2">
+              <FormField label="Ảnh đại diện">
+                <input className="dc-input bg-white" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarUpload} disabled={uploadingAvatar} />
+              </FormField>
+              {uploadingAvatar ? <p className="text-sm text-zinc-500">Đang tải ảnh đại diện...</p> : null}
+              <input className="dc-input" type="text" placeholder="https://... (hoặc URL sau khi upload)" value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} />
+            </div>
 
             <FormField label={`Bio (${bioCount}/1000)`}>
               <textarea className="dc-input min-h-28" maxLength={1000} value={bio} onChange={(event) => setBio(event.target.value)} placeholder="Mô tả ngắn về phong cách nội dung, thế mạnh và tệp audience..." />
