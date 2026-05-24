@@ -42,6 +42,21 @@ function toPlatformBadge(platform: Channel["platform"]) {
   return "OTHER";
 }
 
+function onlyDigits(raw: string) {
+  return raw.replace(/\D/g, "");
+}
+
+function parseNonNegativeInt(raw: string) {
+  const digits = onlyDigits(raw);
+  if (!digits) return 0;
+  return Number.parseInt(digits, 10);
+}
+
+function formatIntForInput(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "";
+  return value.toLocaleString("vi-VN");
+}
+
 export default function CreatorChannelsPage() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [creatorProfile, setCreatorProfile] = useState<CreatorProfileSnapshot | null>(null);
@@ -208,10 +223,16 @@ export default function CreatorChannelsPage() {
                 </select>
               </FormField>
               <FormField label="URL kênh">
-                <input className="dc-input" type="url" placeholder="https://..." value={draft.url} onChange={(event) => setDraft((current) => ({ ...current, url: event.target.value }))} />
+                <>
+                  <input className="dc-input" type="url" placeholder="https://..." value={draft.url} onChange={(event) => setDraft((current) => ({ ...current, url: event.target.value }))} />
+                  <p className="text-xs font-medium text-zinc-500">Nhập link đầy đủ của kênh (bao gồm `https://`).</p>
+                </>
               </FormField>
               <FormField label="Số lượng follower">
-                <input className="dc-input" type="number" min={0} value={draft.followerCount} onChange={(event) => setDraft((current) => ({ ...current, followerCount: Number(event.target.value) }))} />
+                <>
+                  <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={formatIntForInput(draft.followerCount)} onChange={(event) => setDraft((current) => ({ ...current, followerCount: parseNonNegativeInt(event.target.value) }))} />
+                  <p className="text-xs font-medium text-zinc-500">Đơn vị: follower, chỉ nhập số.</p>
+                </>
               </FormField>
               <button className="dc-btn-primary" disabled={saving || !canSubmit} onClick={() => void addChannel()}>{saving ? "Đang lưu..." : "Thêm kênh"}</button>
             </div>

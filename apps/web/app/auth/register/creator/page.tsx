@@ -181,7 +181,10 @@ export default function CreatorRegisterPage() {
               <input name="displayName" className="dc-input" placeholder="Ví dụ: Linh Review" required minLength={2} />
             </FormField>
             <FormField label={<span>Số follower <span className="text-red-500">*</span></span>}>
-              <input name="followerCount" type="number" className="dc-input" placeholder="Ví dụ: 25000" required min={1} />
+              <>
+                <input name="followerCount" type="text" inputMode="numeric" pattern="[0-9]*" className="dc-input" placeholder="Ví dụ: 25000" required />
+                <p className="text-xs font-medium text-zinc-500">Đơn vị: follower, chỉ nhập số.</p>
+              </>
             </FormField>
             <FormField
               label={
@@ -246,7 +249,10 @@ export default function CreatorRegisterPage() {
 
             <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
               <FormField label={<span>TikTok <span className="text-red-500">*</span></span>}>
-                <input name="tiktokUrl" type="url" className="dc-input" placeholder="https://www.tiktok.com/@yourhandle" required />
+                <>
+                  <input name="tiktokUrl" type="url" className="dc-input" placeholder="https://www.tiktok.com/@yourhandle" required />
+                  <p className="text-xs font-medium text-zinc-500">Nhập URL đầy đủ, bao gồm `https://`.</p>
+                </>
               </FormField>
               <FormField label={<span>Instagram <span className="text-red-500">*</span></span>}>
                 <input name="instagramUrl" type="url" className="dc-input" placeholder="https://www.instagram.com/yourhandle" required />

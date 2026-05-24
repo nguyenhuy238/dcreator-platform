@@ -18,6 +18,20 @@ import { listAdminVouchers } from "@/lib/services/voucher.service";
 import { scanFraudRiskSignals } from "@/lib/services/fraud-flag.service";
 import { getAdminKpis } from "@/lib/services/analytics.service";
 
+const COVER_MARKER = "[[COVER_IMAGE_URL]]:";
+
+function extractCoverImageMeta(brief: string) {
+  const lines = brief.split("\n");
+  const markerLine = lines.find((line) => line.trim().startsWith(COVER_MARKER));
+  const coverImageUrl = markerLine ? markerLine.trim().slice(COVER_MARKER.length).trim() : null;
+  const cleanBrief = lines
+    .filter((line) => !line.trim().startsWith(COVER_MARKER))
+    .join("\n")
+    .trim();
+
+  return { coverImageUrl, cleanBrief };
+}
+
 export async function getAdminOverview() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const prismaAny = prisma as any;
@@ -412,12 +426,14 @@ export async function decideCampaignReview(actorId: string, campaignId: string, 
 
   const updated = await prisma.$transaction(async (tx) => {
     if (decision === "APPROVED") {
+      const { coverImageUrl, cleanBrief } = extractCoverImageMeta(request.brief);
       const campaign = await tx.campaign.create({
         data: {
           brandId: request.brand.ownerAccountId,
           slug: request.requestedSlug,
           title: request.title,
-          brief: request.brief,
+          brief: cleanBrief,
+          coverImageUrl: coverImageUrl || null,
           budgetVnd: request.budgetVnd,
           targetAmountVnd: request.targetAmountVnd,
           category: request.category,

@@ -54,6 +54,21 @@ function buildPayoutReason(available: number) {
   return "";
 }
 
+function onlyDigits(raw: string) {
+  return raw.replace(/\D/g, "");
+}
+
+function parseNonNegativeInt(raw: string) {
+  const digits = onlyDigits(raw);
+  if (!digits) return 0;
+  return Number.parseInt(digits, 10);
+}
+
+function formatIntForInput(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "";
+  return value.toLocaleString("vi-VN");
+}
+
 export default function CreatorWalletPage() {
   const [payout, setPayout] = useState<PayoutData | null>(null);
   const [commission, setCommission] = useState<CommissionData | null>(null);
@@ -188,7 +203,10 @@ export default function CreatorWalletPage() {
 
               <form className="grid gap-3" onSubmit={onRequestPayout}>
                 <FormField label="Số tiền muốn rút (VNĐ)">
-                  <input className="dc-input" type="number" min={100000} step={1000} value={amountVnd} onChange={(event) => setAmountVnd(Number(event.target.value))} />
+                  <>
+                    <input className="dc-input" type="text" inputMode="numeric" placeholder="100.000" value={formatIntForInput(amountVnd)} onChange={(event) => setAmountVnd(parseNonNegativeInt(event.target.value))} />
+                    <p className="text-xs font-medium text-zinc-500">Đơn vị: VND, tối thiểu 100.000 VND mỗi lần rút.</p>
+                  </>
                 </FormField>
                 <FormField label="Ghi chú (tuỳ chọn)">
                   <textarea className="dc-input min-h-24" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ví dụ: rút đợt 1 tháng này" />
