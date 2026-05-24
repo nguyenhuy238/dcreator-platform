@@ -1,4 +1,4 @@
-import { MissionLifecycleStatus } from "@prisma/client";
+import { CreatorSocialLinkStatus, MissionLifecycleStatus, SocialPlatform } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { acceptMission, submitMissionProof } from "@/lib/services/mission.service";
@@ -53,6 +53,47 @@ function parseProfileMeta(value: unknown): {
   const kycVerified = source.kycVerified === true;
 
   return { categories, socialLinks, channels, kycVerified };
+}
+
+function toSocialPlatform(platform: string): SocialPlatform {
+  const normalized = platform.trim().toLowerCase();
+  if (normalized === "tiktok") return "TIKTOK";
+  if (normalized === "instagram") return "INSTAGRAM";
+  if (normalized === "youtube") return "YOUTUBE";
+  if (normalized === "facebook") return "FACEBOOK";
+  return "OTHER";
+}
+
+function fromSocialPlatform(platform: SocialPlatform): "TikTok" | "Instagram" | "YouTube" | "Facebook" | "Other" {
+  if (platform === "TIKTOK") return "TikTok";
+  if (platform === "INSTAGRAM") return "Instagram";
+  if (platform === "YOUTUBE") return "YouTube";
+  if (platform === "FACEBOOK") return "Facebook";
+  return "Other";
+}
+
+async function ensureCreatorProfileForSocialLink(accountId: string) {
+  const existing = await prisma.creatorProfile.findUnique({ where: { accountId } });
+  if (existing) return existing;
+
+  const account = await prisma.account.findUniqueOrThrow({
+    where: { id: accountId },
+    select: {
+      displayName: true,
+      avatarUrl: true,
+      profile: { select: { bio: true, phone: true } }
+    }
+  });
+
+  return prisma.creatorProfile.create({
+    data: {
+      accountId,
+      displayName: account.displayName,
+      avatarUrl: account.avatarUrl,
+      bio: account.profile?.bio ?? null,
+      phone: account.profile?.phone ?? null
+    }
+  });
 }
 
 export async function getCreatorDashboardOverview(accountId: string) {
@@ -257,37 +298,100 @@ export async function updateCreatorProfile(accountId: string, input: CreatorProf
 }
 
 export async function getCreatorChannels(accountId: string) {
-  const profile = await prisma.profile.findUnique({ where: { accountId } });
-  const profileMeta = parseProfileMeta(profile?.socialLinks);
-  return { channels: profileMeta.channels };
-}
-
-export async function updateCreatorChannels(accountId: string, input: CreatorChannelsUpdateInput) {
-  const current = await prisma.profile.findUnique({ where: { accountId } });
-  const currentMeta = parseProfileMeta(current?.socialLinks);
-
-  await prisma.profile.upsert({
+  const creatorProfile = await prisma.creatorProfile.findUnique({
     where: { accountId },
-    create: {
-      accountId,
+    include: {
       socialLinks: {
-        categories: currentMeta.categories,
-        socialLinks: currentMeta.socialLinks,
-        channels: input.channels,
-        kycVerified: currentMeta.kycVerified
-      }
-    },
-    update: {
-      socialLinks: {
-        categories: currentMeta.categories,
-        socialLinks: currentMeta.socialLinks,
-        channels: input.channels,
-        kycVerified: currentMeta.kycVerified
+        orderBy: [{ createdAt: "desc" }]
       }
     }
   });
 
-  return { channels: input.channels };
+  return {
+    creatorProfile: creatorProfile
+      ? {
+          id: creatorProfile.id,
+          displayName: creatorProfile.displayName,
+          mainPlatform: creatorProfile.mainPlatform,
+          socialUrl: creatorProfile.socialUrl,
+          followerCount: creatorProfile.followerCount
+        }
+      : null,
+    channels: creatorProfile
+      ? creatorProfile.socialLinks.map((item) => ({
+          id: item.id,
+          platform: fromSocialPlatform(item.platform),
+          url: item.socialUrl,
+          followerCount: item.followers,
+          status: item.status,
+          rejectReason: item.rejectReason,
+          createdAt: item.createdAt
+        }))
+      : []
+  };
+}
+
+export async function updateCreatorChannels(accountId: string, input: CreatorChannelsUpdateInput) {
+  const creatorProfile = await ensureCreatorProfileForSocialLink(accountId);
+
+  try {
+    await prisma.creatorSocialLink.create({
+      data: {
+        creatorProfileId: creatorProfile.id,
+        platform: toSocialPlatform(input.platform),
+        socialUrl: input.url,
+        followers: input.followerCount,
+        status: "PENDING",
+        rejectReason: null,
+        reviewNote: null,
+        reviewedAt: null,
+        reviewedById: null
+      }
+    });
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "P2002") {
+      throw new AppError("Channel already exists", 409, "CHANNEL_EXISTS");
+    }
+    throw error;
+  }
+
+  return getCreatorChannels(accountId);
+}
+
+export async function removeCreatorChannel(accountId: string, linkId: string) {
+  const link = await prisma.creatorSocialLink.findUnique({
+    where: { id: linkId },
+    include: { creatorProfile: { select: { accountId: true } } }
+  });
+  if (!link || link.creatorProfile.accountId !== accountId) {
+    throw new AppError("Channel not found", 404, "CHANNEL_NOT_FOUND");
+  }
+  await prisma.creatorSocialLink.delete({ where: { id: linkId } });
+  return getCreatorChannels(accountId);
+}
+
+export async function setCreatorMainChannel(accountId: string, linkId: string) {
+  const link = await prisma.creatorSocialLink.findUnique({
+    where: { id: linkId },
+    include: { creatorProfile: true }
+  });
+  if (!link || link.creatorProfile.accountId !== accountId) {
+    throw new AppError("Channel not found", 404, "CHANNEL_NOT_FOUND");
+  }
+  if (link.status !== CreatorSocialLinkStatus.APPROVED) {
+    throw new AppError("Channel must be approved before selecting as main", 409, "CHANNEL_NOT_APPROVED");
+  }
+
+  await prisma.creatorProfile.update({
+    where: { id: link.creatorProfileId },
+    data: {
+      mainPlatform: link.platform,
+      socialUrl: link.socialUrl,
+      followerCount: link.followers
+    }
+  });
+
+  return getCreatorChannels(accountId);
 }
 
 export async function getCreatorPortfolio(accountId: string) {

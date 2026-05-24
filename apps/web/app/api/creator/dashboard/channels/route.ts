@@ -23,3 +23,13 @@ export async function PUT(request: NextRequest) {
     return toErrorResponse(error);
   }
 }
+
+export async function POST(request: NextRequest) {
+  try {
+    const account = await requireApprovedCreator(request);
+    const payload = creatorChannelsUpdateSchema.parse(await request.json());
+    return ok(await updateCreatorChannels(account.id, payload));
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}

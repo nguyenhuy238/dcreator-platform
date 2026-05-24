@@ -62,7 +62,10 @@ const adminNavItems: readonly NavItem[] = [
   { href: "/admin/brand-requests", label: "Duyệt Brand", description: "Duyệt hồ sơ Brand" },
   { href: "/admin/products", label: "Duyệt sản phẩm", description: "Kiểm duyệt sản phẩm/lô hàng" },
   { href: "/admin/campaigns", label: "Duyệt campaign", description: "Kiểm duyệt campaign/job" },
-  { href: "/admin/content-review", label: "Duyệt proof / content", description: "Kiểm duyệt proof/video" },
+  { href: "/admin/content-review", label: "Duyệt proof / content", description: "Duyệt proof/video" },
+  { href: "/admin/mission-applications", label: "Duyệt nhận nhiệm vụ", description: "Duyệt đơn xin làm nhiệm vụ" },
+  { href: "/admin/mission-video-reviews", label: "Duyệt video", description: "Duyệt video review của creator" },
+  { href: "/admin/mission-final-reviews", label: "Duyệt hoàn thành", description: "Duyệt bước hoàn thành nhiệm vụ" },
   { href: "/admin/finance", label: "Finance / payout", description: "Tài chính và chi trả" },
   { href: "/admin/audit", label: "Audit log", description: "Nhật ký vận hành hệ thống" },
   { href: "/admin/notifications", label: "Notification", description: "Thông báo hệ thống" },
@@ -180,6 +183,9 @@ const breadcrumbLabelMap: Record<string, string> = {
   "/admin/campaigns": "Duyệt campaign",
   "/admin/proofs": "Duyệt proof / content",
   "/admin/content-review": "Duyệt proof / content",
+  "/admin/mission-applications": "Duyệt nhận nhiệm vụ",
+  "/admin/mission-video-reviews": "Duyệt video",
+  "/admin/mission-final-reviews": "Duyệt hoàn thành",
   "/admin/finance": "Finance / payout",
   "/admin/audit": "Audit log",
   "/admin/notifications": "Notification",
@@ -202,3 +208,4 @@ export function getBreadcrumbsForPath(pathname: string, workspace: Workspace): B
   }
   return crumbs;
 }
+

@@ -25,6 +25,12 @@ enum ApplicationStatus {
   NEEDS_REVISION
 }
 
+enum CreatorSocialLinkStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum SocialPlatform {
   TIKTOK
   INSTAGRAM
@@ -312,6 +318,12 @@ enum NotificationEvent {
   PROOF_SUBMITTED
   PROOF_APPROVED
   PROOF_REJECTED
+  MISSION_APPLICATION_APPROVED
+  MISSION_APPLICATION_REJECTED
+  CREATOR_MISSION_VIDEO_APPROVED
+  CREATOR_MISSION_VIDEO_REJECTED
+  CREATOR_MISSION_FINAL_APPROVED
+  CREATOR_MISSION_FINAL_REJECTED
   CREATOR_APPLICATION_APPROVED
   BRAND_APPLICATION_APPROVED
   CAMPAIGN_APPROVED
@@ -368,42 +380,43 @@ enum AnalyticsEventName {
 }
 
 model Account {
-  id             String             @id @default(cuid())
-  email          String             @unique
-  passwordHash   String?
-  displayName    String
-  avatarUrl      String?
-  role           Role
-  isActive       Boolean            @default(true)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String?
+  displayName  String
+  avatarUrl    String?
+  role         Role
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  campaigns      Campaign[]         @relation("CampaignBrand")
-  campaignsAsCreator Campaign[]     @relation("CampaignCreator")
-  wallet         Wallet?
-  profile        Profile?
-  submissions    MissionSubmission[]
-  proofReviews   ProofReview[]
-  supports       Contribution[]
-  auditLogs      AuditLog[]
-  notifications  Notification[]
-  riskFlags      RiskFlag[]         @relation("RiskFlagAccount")
-  sessions       AuthSession[]
-  roleRequests   RoleRequest[]      @relation("RoleRequestApplicant")
-  reviewedRoleRequests RoleRequest[] @relation("RoleRequestReviewer")
-  walletTransactions WalletTransaction[]
-  paymentTransactions PaymentTransaction[]
-  payoutRequests   PayoutRequest[]
-  rewardClaims    RewardClaim[]
-  analyticsEvents AnalyticsEvent[]
-  roleAssignments AccountRole[]
-  creatorApplications CreatorApplication[]
-  creatorProfile CreatorProfile?
-  brandApplications BrandApplication[]
-  ownedBrandMemberships BrandMember[] @relation("BrandMemberAccount")
-  reviewedCreatorApplications CreatorApplication[] @relation("CreatorApplicationReviewer")
-  reviewedBrandApplications BrandApplication[] @relation("BrandApplicationReviewer")
-  reviewedBrands Brand[] @relation("BrandReviewer")
+  campaigns                     Campaign[]             @relation("CampaignBrand")
+  campaignsAsCreator            Campaign[]             @relation("CampaignCreator")
+  wallet                        Wallet?
+  profile                       Profile?
+  submissions                   MissionSubmission[]
+  proofReviews                  ProofReview[]
+  supports                      Contribution[]
+  auditLogs                     AuditLog[]
+  notifications                 Notification[]
+  riskFlags                     RiskFlag[]             @relation("RiskFlagAccount")
+  sessions                      AuthSession[]
+  roleRequests                  RoleRequest[]          @relation("RoleRequestApplicant")
+  reviewedRoleRequests          RoleRequest[]          @relation("RoleRequestReviewer")
+  walletTransactions            WalletTransaction[]
+  paymentTransactions           PaymentTransaction[]
+  payoutRequests                PayoutRequest[]
+  rewardClaims                  RewardClaim[]
+  analyticsEvents               AnalyticsEvent[]
+  roleAssignments               AccountRole[]
+  creatorApplications           CreatorApplication[]
+  creatorProfile                CreatorProfile?
+  brandApplications             BrandApplication[]
+  ownedBrandMemberships         BrandMember[]          @relation("BrandMemberAccount")
+  reviewedCreatorApplications   CreatorApplication[]   @relation("CreatorApplicationReviewer")
+  reviewedCreatorSocialLinks    CreatorSocialLink[]    @relation("CreatorSocialLinkReviewer")
+  reviewedBrandApplications     BrandApplication[]     @relation("BrandApplicationReviewer")
+  reviewedBrands                Brand[]                @relation("BrandReviewer")
   reviewedBrandCampaignRequests BrandCampaignRequest[] @relation("BrandCampaignRequestReviewer")
   ownedBrands Brand[] @relation("BrandOwner")
   reviewedProductSubmissions ProductSubmission[] @relation("ProductSubmissionReviewer")
@@ -413,63 +426,26 @@ model Account {
   supportTicketComments SupportTicketComment[] @relation("SupportTicketCommentAuthor")
   creatorMissions CreatorMission[]
   settings       AccountSettings?
+  appliedMissionApplications    MissionApplication[]   @relation("MissionApplicationAccount")
+  reviewedMissionApplications   MissionApplication[]   @relation("MissionApplicationReviewer")
 }
 
 model AccountRole {
-  id             String   @id @default(cuid())
-  accountId      String
-  role           Role
-  createdAt      DateTime @default(now())
+  id        String   @id @default(cuid())
+  accountId String
+  role      Role
+  createdAt DateTime @default(now())
 
-  account        Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@unique([accountId, role])
   @@index([role, createdAt])
 }
 
 model CreatorApplication {
-  id               String            @id @default(cuid())
-  accountId        String
-  status           ApplicationStatus @default(PENDING_REVIEW)
-  displayName      String
-  avatarUrl        String?
-  bio              String?
-  mainPlatform     SocialPlatform
-  socialUrl        String
-  handle           String?
-  followerCount    Int?
-  contentCategory  String?
-  portfolioUrl     String?
-  location         String?
-  expectedRate     Int?
-  maxJobsPerMonth  Int?
-  realName         String?
-  phone            String?
-  identityNumber   String?
-  identityFrontUrl String?
-  identityBackUrl  String?
-  selfieUrl        String?
-  bankAccountName  String?
-  bankAccountNumber String?
-  bankName         String?
-  taxCode          String?
-  rejectReason     String?
-  reviewNote       String?
-  reviewedById     String?
-  reviewedAt       DateTime?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-
-  account          Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  reviewedBy       Account?          @relation("CreatorApplicationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-
-  @@index([accountId, createdAt])
-  @@index([status, createdAt])
-}
-
-model CreatorProfile {
-  id                String   @id @default(cuid())
-  accountId         String   @unique
+  id                String            @id @default(cuid())
+  accountId         String
+  status            ApplicationStatus @default(PENDING_REVIEW)
   displayName       String
   avatarUrl         String?
   bio               String?
@@ -492,10 +468,72 @@ model CreatorProfile {
   bankAccountNumber String?
   bankName          String?
   taxCode           String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  rejectReason      String?
+  reviewNote        String?
+  reviewedById      String?
+  reviewedAt        DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
-  account           Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account    Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  reviewedBy Account? @relation("CreatorApplicationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([accountId, createdAt])
+  @@index([status, createdAt])
+}
+
+model CreatorProfile {
+  id                String          @id @default(cuid())
+  accountId         String          @unique
+  displayName       String
+  avatarUrl         String?
+  bio               String?
+  mainPlatform      SocialPlatform?
+  socialUrl         String?
+  handle            String?
+  followerCount     Int?
+  contentCategory   String?
+  portfolioUrl      String?
+  location          String?
+  expectedRate      Int?
+  maxJobsPerMonth   Int?
+  realName          String?
+  phone             String?
+  identityNumber    String?
+  identityFrontUrl  String?
+  identityBackUrl   String?
+  selfieUrl         String?
+  bankAccountName   String?
+  bankAccountNumber String?
+  bankName          String?
+  taxCode           String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  account     Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  socialLinks CreatorSocialLink[]
+}
+
+model CreatorSocialLink {
+  id               String                  @id @default(cuid())
+  creatorProfileId String
+  platform         SocialPlatform
+  socialUrl        String
+  followers        Int                     @default(0)
+  status           CreatorSocialLinkStatus @default(PENDING)
+  rejectReason     String?
+  reviewNote       String?
+  reviewedById     String?
+  reviewedAt       DateTime?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  creatorProfile CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  reviewedBy     Account?       @relation("CreatorSocialLinkReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@unique([creatorProfileId, platform, socialUrl])
+  @@index([creatorProfileId, createdAt])
+  @@index([status, createdAt])
 }
 
 model BrandApplication {
@@ -542,54 +580,54 @@ model BrandApplication {
   createdAt                    DateTime          @default(now())
   updatedAt                    DateTime          @updatedAt
 
-  account                      Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  reviewedBy                   Account?          @relation("BrandApplicationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  account    Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  reviewedBy Account? @relation("BrandApplicationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
 
   @@index([accountId, createdAt])
   @@index([status, createdAt])
 }
 
 model Brand {
-  id                  String      @id @default(cuid())
-  ownerAccountId      String
-  name                String
-  logoUrl             String?
-  legalName           String?
-  industry            String?
-  website             String?
-  fanpage             String?
-  address             String?
-  contactName         String
-  contactPhone        String
-  contactEmail        String
-  description         String?
-  businessGoal        String?
-  taxCode             String?
-  businessLicenseUrl  String?
-  representativeName  String?
-  representativePhone String?
-  representativeEmail String?
-  productCategories   String?
-  inventoryDescription String?
-  revenueSharePercent Int?
-  commissionRatePercent Int?
-  bccAgreementVersion String?
-  bccAgreementTerms   String?
-  legalResponsibilityAccepted Boolean @default(false)
-  contractFileUrl     String?
-  contractSignedAt    DateTime?
-  status              BrandStatus @default(PENDING_VERIFICATION)
-  reviewedById        String?
-  reviewedAt          DateTime?
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
+  id                          String      @id @default(cuid())
+  ownerAccountId              String
+  name                        String
+  logoUrl                     String?
+  legalName                   String?
+  industry                    String?
+  website                     String?
+  fanpage                     String?
+  address                     String?
+  contactName                 String
+  contactPhone                String
+  contactEmail                String
+  description                 String?
+  businessGoal                String?
+  taxCode                     String?
+  businessLicenseUrl          String?
+  representativeName          String?
+  representativePhone         String?
+  representativeEmail         String?
+  productCategories           String?
+  inventoryDescription        String?
+  revenueSharePercent         Int?
+  commissionRatePercent       Int?
+  bccAgreementVersion         String?
+  bccAgreementTerms           String?
+  legalResponsibilityAccepted Boolean     @default(false)
+  contractFileUrl             String?
+  contractSignedAt            DateTime?
+  status                      BrandStatus @default(PENDING_VERIFICATION)
+  reviewedById                String?
+  reviewedAt                  DateTime?
+  createdAt                   DateTime    @default(now())
+  updatedAt                   DateTime    @updatedAt
 
-  owner               Account     @relation("BrandOwner", fields: [ownerAccountId], references: [id], onDelete: Restrict)
-  reviewedBy          Account?    @relation("BrandReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-  members             BrandMember[]
-  products            BrandProduct[]
-  campaignRequests    BrandCampaignRequest[]
-  productSubmissions  ProductSubmission[]
+  owner              Account                @relation("BrandOwner", fields: [ownerAccountId], references: [id], onDelete: Restrict)
+  reviewedBy         Account?               @relation("BrandReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  members            BrandMember[]
+  products           BrandProduct[]
+  campaignRequests   BrandCampaignRequest[]
+  productSubmissions ProductSubmission[]
 }
 
 model BrandCampaignRequest {
@@ -620,9 +658,9 @@ model BrandCampaignRequest {
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime                   @updatedAt
 
-  brand                    Brand                      @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  createdCampaign          Campaign?                  @relation("CampaignFromBrandRequest", fields: [createdCampaignId], references: [id], onDelete: SetNull)
-  reviewedBy               Account?                   @relation("BrandCampaignRequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  brand           Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  createdCampaign Campaign? @relation("CampaignFromBrandRequest", fields: [createdCampaignId], references: [id], onDelete: SetNull)
+  reviewedBy      Account?  @relation("BrandCampaignRequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
 
   @@index([brandId, createdAt])
   @@index([status, createdAt])
@@ -630,25 +668,25 @@ model BrandCampaignRequest {
 }
 
 model BrandProduct {
-  id                  String                @id @default(cuid())
+  id                  String   @id @default(cuid())
   brandId             String
   sku                 String
   name                String
   description         String?
   imageUrl            String?
-  stockQty            Int                   @default(0)
-  voucherStock        Int                   @default(0)
-  campaignEligibility Boolean               @default(true)
-  suggestedPriceVnd   Int                   @default(0)
-  costPriceVnd        Int                   @default(0)
-  priceVnd            Int                   @default(0)
-  pricePoints         Int                   @default(0)
+  stockQty            Int      @default(0)
+  voucherStock        Int      @default(0)
+  campaignEligibility Boolean  @default(true)
+  suggestedPriceVnd   Int      @default(0)
+  costPriceVnd        Int      @default(0)
+  priceVnd            Int      @default(0)
+  pricePoints         Int      @default(0)
   returnPolicy        String?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  brand               Brand                 @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  batches             BrandInventoryBatch[]
+  brand   Brand                 @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  batches BrandInventoryBatch[]
 
   @@unique([brandId, sku])
   @@index([brandId, createdAt])
@@ -668,36 +706,36 @@ model BrandInventoryBatch {
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 
-  product             BrandProduct    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product BrandProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId, createdAt])
   @@index([opsStatus])
 }
 
 model BrandMember {
-  id         String          @id @default(cuid())
-  brandId    String
-  accountId  String
-  role       BrandMemberRole @default(STAFF)
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  id        String          @id @default(cuid())
+  brandId   String
+  accountId String
+  role      BrandMemberRole @default(STAFF)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
 
-  brand      Brand           @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  account    Account         @relation("BrandMemberAccount", fields: [accountId], references: [id], onDelete: Cascade)
+  brand   Brand   @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  account Account @relation("BrandMemberAccount", fields: [accountId], references: [id], onDelete: Cascade)
 
   @@unique([brandId, accountId])
   @@index([accountId, role])
 }
 
 model AuthSession {
-  id             String   @id @default(cuid())
-  accountId      String
-  expiresAt      DateTime
-  revokedAt      DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id        String    @id @default(cuid())
+  accountId String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  account        Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@index([accountId])
   @@index([expiresAt])
@@ -717,81 +755,82 @@ model AccountSettings {
 }
 
 model RoleRequest {
-  id             String            @id @default(cuid())
-  accountId      String
-  type           RoleRequestType
-  status         RoleRequestStatus @default(PENDING)
-  brandName      String?
-  brandWebsite   String?
-  note           String?
-  reviewedById   String?
-  reviewedAt     DateTime?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  id           String            @id @default(cuid())
+  accountId    String
+  type         RoleRequestType
+  status       RoleRequestStatus @default(PENDING)
+  brandName    String?
+  brandWebsite String?
+  note         String?
+  reviewedById String?
+  reviewedAt   DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 
-  account        Account           @relation("RoleRequestApplicant", fields: [accountId], references: [id], onDelete: Cascade)
-  reviewedBy     Account?          @relation("RoleRequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  account    Account  @relation("RoleRequestApplicant", fields: [accountId], references: [id], onDelete: Cascade)
+  reviewedBy Account? @relation("RoleRequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
 
   @@index([accountId, status])
   @@index([type, status])
 }
 
 model Profile {
-  id             String   @id @default(cuid())
-  accountId      String   @unique
-  bio            String?
-  phone          String?
-  socialLinks    Json?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id          String   @id @default(cuid())
+  accountId   String   @unique
+  bio         String?
+  phone       String?
+  socialLinks Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  account        Account  @relation(fields: [accountId], references: [id])
+  account Account @relation(fields: [accountId], references: [id])
 }
 
 model Campaign {
-  id             String           @id @default(cuid())
-  brandId        String
-  creatorId      String?
-  slug           String           @unique
-  title          String
-  brief          String
-  coverImageUrl  String?
-  campaignType   CampaignType      @default(COMMUNITY)
-  setupSource    CampaignSetupSource @default(BRAND_REQUESTED)
-  objective      String?
-  priorityChannels String?
-  missionTypes   String?
-  creatorCommissionPercent Int      @default(0)
-  userCommissionPercent Int         @default(0)
-  bonusBudgetVnd Int                @default(0)
-  feasibilityStatus CampaignFeasibilityStatus @default(DRAFT)
-  feasibilityNote String?
-  brandApprovalStatus BrandCampaignApprovalStatus @default(DRAFT)
-  brandFeedback   String?
-  category       CampaignCategory  @default(LIFESTYLE)
-  targetAmountVnd Int              @default(10000000)
-  fundedAmountVnd Int              @default(0)
-  backerCount     Int              @default(0)
-  isPublic       Boolean           @default(true)
-  budgetVnd      Int
-  status         CampaignStatus   @default(DRAFT)
-  startsAt       DateTime?
-  endsAt         DateTime?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  id                       String                      @id @default(cuid())
+  brandId                  String
+  creatorId                String?
+  slug                     String                      @unique
+  title                    String
+  brief                    String
+  coverImageUrl            String?
+  campaignType             CampaignType                @default(COMMUNITY)
+  setupSource              CampaignSetupSource         @default(BRAND_REQUESTED)
+  objective                String?
+  priorityChannels         String?
+  missionTypes             String?
+  creatorCommissionPercent Int                         @default(0)
+  userCommissionPercent    Int                         @default(0)
+  bonusBudgetVnd           Int                         @default(0)
+  feasibilityStatus        CampaignFeasibilityStatus   @default(DRAFT)
+  feasibilityNote          String?
+  brandApprovalStatus      BrandCampaignApprovalStatus @default(DRAFT)
+  brandFeedback            String?
+  category                 CampaignCategory            @default(LIFESTYLE)
+  targetAmountVnd          Int                         @default(10000000)
+  fundedAmountVnd          Int                         @default(0)
+  backerCount              Int                         @default(0)
+  isPublic                 Boolean                     @default(true)
+  budgetVnd                Int
+  status                   CampaignStatus              @default(DRAFT)
+  startsAt                 DateTime?
+  endsAt                   DateTime?
+  createdAt                DateTime                    @default(now())
+  updatedAt                DateTime                    @updatedAt
 
-  brand          Account          @relation("CampaignBrand", fields: [brandId], references: [id])
-  creator        Account?         @relation("CampaignCreator", fields: [creatorId], references: [id])
-  missions       Mission[]
-  rewards        Reward[]
-  contributions  Contribution[]
-  paymentOrders  PaymentOrder[]
-  analytics      AnalyticsDaily[]
-  analyticsEvents AnalyticsEvent[]
+  brand               Account                @relation("CampaignBrand", fields: [brandId], references: [id])
+  creator             Account?               @relation("CampaignCreator", fields: [creatorId], references: [id])
+  missions            Mission[]
+  rewards             Reward[]
+  contributions       Contribution[]
+  paymentOrders       PaymentOrder[]
+  analytics           AnalyticsDaily[]
+  analyticsEvents     AnalyticsEvent[]
   sourceBrandRequests BrandCampaignRequest[] @relation("CampaignFromBrandRequest")
-  fulfillmentOrders FulfillmentOrder[]
-  productSubmissions ProductSubmission[]
-  creatorMissions CreatorMission[]
+  fulfillmentOrders   FulfillmentOrder[]
+  productSubmissions  ProductSubmission[]
+  creatorMissions     CreatorMission[]
+  missionApplications MissionApplication[]
 
   @@index([isPublic, status, updatedAt])
   @@index([isPublic, status, createdAt])
@@ -801,23 +840,23 @@ model Campaign {
 }
 
 model ProductSubmission {
-  id              String              @id @default(cuid())
-  brandId         String
-  campaignId      String?
-  name            String
-  sku             String?
-  description     String?
-  unitPriceVnd    Int                 @default(0)
-  reviewStatus    ProductReviewStatus @default(DRAFT)
-  reviewNote      String?
-  reviewedById    String?
-  reviewedAt      DateTime?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  id           String              @id @default(cuid())
+  brandId      String
+  campaignId   String?
+  name         String
+  sku          String?
+  description  String?
+  unitPriceVnd Int                 @default(0)
+  reviewStatus ProductReviewStatus @default(DRAFT)
+  reviewNote   String?
+  reviewedById String?
+  reviewedAt   DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
 
-  brand           Brand               @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  campaign        Campaign?           @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  reviewedBy      Account?            @relation("ProductSubmissionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  brand            Brand            @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  campaign         Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  reviewedBy       Account?         @relation("ProductSubmissionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   inventoryBatches InventoryBatch[]
 
   @@index([brandId, reviewStatus, createdAt])
@@ -836,78 +875,112 @@ model InventoryBatch {
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 
-  productSubmission ProductSubmission @relation(fields: [productSubmissionId], references: [id], onDelete: Cascade)
+  productSubmission ProductSubmission  @relation(fields: [productSubmissionId], references: [id], onDelete: Cascade)
   fulfillmentOrders FulfillmentOrder[]
 
   @@index([productSubmissionId, stockStatus, createdAt])
 }
 
 model FulfillmentOrder {
-  id                String            @id @default(cuid())
-  campaignId        String?
-  inventoryBatchId  String?
-  creatorAccountId  String?
-  recipientName     String?
-  recipientPhone    String?
-  shippingAddress   String?
-  status            FulfillmentStatus @default(PENDING)
-  failureReason     String?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  id               String            @id @default(cuid())
+  campaignId       String?
+  inventoryBatchId String?
+  creatorAccountId String?
+  recipientName    String?
+  recipientPhone   String?
+  shippingAddress  String?
+  status           FulfillmentStatus @default(PENDING)
+  failureReason    String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
-  campaign        Campaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  inventoryBatch  InventoryBatch? @relation(fields: [inventoryBatchId], references: [id], onDelete: SetNull)
-  creatorAccount  Account?       @relation("FulfillmentCreator", fields: [creatorAccountId], references: [id], onDelete: SetNull)
+  campaign       Campaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  inventoryBatch InventoryBatch? @relation(fields: [inventoryBatchId], references: [id], onDelete: SetNull)
+  creatorAccount Account?        @relation("FulfillmentCreator", fields: [creatorAccountId], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt])
   @@index([campaignId, status, createdAt])
 }
 
 model Mission {
-  id             String              @id @default(cuid())
-  campaignId     String
-  title          String
-  description    String
-  productLink    String?
-  rewardPoints   Int
-  rewardCommissionVnd Int            @default(0)
-  audience       MissionAudience     @default(USER)
+  id                   String               @id @default(cuid())
+  campaignId           String
+  title                String
+  description          String
+  productLink          String?
+  rewardPoints         Int
+  rewardCommissionVnd  Int                  @default(0)
+  audience             MissionAudience      @default(USER)
   productReceiveOption ProductReceiveOption @default(NO_PRODUCT_REQUIRED)
-  allowRepeat    Boolean             @default(false)
-  deadlineAt     DateTime?
-  status         MissionStatus       @default(OPEN)
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  allowRepeat          Boolean              @default(false)
+  deadlineAt           DateTime?
+  status               MissionStatus        @default(OPEN)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
 
-  campaign       Campaign            @relation(fields: [campaignId], references: [id])
-  proofReviews   ProofReview[]
-  submissions    MissionSubmission[]
+  campaign        Campaign             @relation(fields: [campaignId], references: [id])
+  proofReviews    ProofReview[]
+  submissions     MissionSubmission[]
   creatorMissions CreatorMission[]
+  applications    MissionApplication[]
+}
+
+model MissionApplication {
+  id           String            @id @default(cuid())
+  missionId    String
+  campaignId   String
+  accountId    String
+  status       ApplicationStatus @default(PENDING_REVIEW)
+  note         String?
+  rejectReason String?
+  reviewedById String?
+  reviewedAt   DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  mission        Mission         @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  campaign       Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  account        Account         @relation("MissionApplicationAccount", fields: [accountId], references: [id], onDelete: Cascade)
+  reviewedBy     Account?        @relation("MissionApplicationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  creatorMission CreatorMission?
+
+  @@unique([missionId, accountId])
+  @@index([accountId, status, createdAt])
+  @@index([campaignId, status, createdAt])
+  @@index([status, createdAt])
 }
 
 model MissionSubmission {
-  id             String        @id @default(cuid())
-  missionId      String
-  accountId      String
-  lifecycleStatus MissionLifecycleStatus @default(ACCEPTED)
-  videoUrl       String?
-  imageUrl       String?
-  socialPostUrl  String?
-  screenshotUrl  String?
-  fileUploadUrl  String?
-  proofTextNote  String?
-  note           String?
-  rejectReason   String?
-  approvedAt     DateTime?
-  rewardGrantedAt DateTime?
-  status         MissionStatus @default(SUBMITTED)
-  reviewedById   String?
-  reviewedAt     DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                         String                 @id @default(cuid())
+  missionId                  String
+  accountId                  String
+  lifecycleStatus            MissionLifecycleStatus @default(ACCEPTED)
+  videoUrl                   String?
+  imageUrl                   String?
+  socialPostUrl              String?
+  screenshotUrl              String?
+  fileUploadUrl              String?
+  proofTextNote              String?
+  note                       String?
+  rejectReason               String?
+  purchaseBillImageUrl       String?
+  productReviewScreenshotUrl String?
+  purchaseProofNote          String?
+  purchaseConfirmedAt        DateTime?
+  publicVideoUrl             String?
+  adCode                     String?
+  finalProofNote             String?
+  finalSubmittedAt           DateTime?
+  approvedAt                 DateTime?
+  rewardGrantedAt            DateTime?
+  status                     MissionStatus          @default(SUBMITTED)
+  reviewedById               String?
+  reviewedAt                 DateTime?
+  createdAt                  DateTime               @default(now())
+  updatedAt                  DateTime               @updatedAt
 
-  mission        Mission       @relation(fields: [missionId], references: [id])
-  account        Account       @relation(fields: [accountId], references: [id])
+  mission        Mission         @relation(fields: [missionId], references: [id])
+  account        Account         @relation(fields: [accountId], references: [id])
   reviews        ProofReview[]
   creatorMission CreatorMission?
 
@@ -916,43 +989,46 @@ model MissionSubmission {
 }
 
 model CreatorMission {
-  id                   String                @id @default(cuid())
-  missionId            String
-  campaignId           String
-  accountId            String
-  applicationId        String?               @unique
-  status               CreatorMissionStatus
-  productReceiveOption ProductReceiveOption
-  productStatus        ProductStatus
-  depositStatus        DepositStatus
-  reimbursementStatus  ReimbursementStatus
-  purchaseProofTextNote String?
-  purchaseProofScreenshotUrl String?
-  purchaseProofNote    String?
-  purchaseProofSubmittedAt DateTime?
-  purchaseProofReviewedAt DateTime?
-  purchaseProofRejectReason String?
+  id                          String                          @id @default(cuid())
+  missionId                   String
+  campaignId                  String
+  accountId                   String
+  submissionId                String?                         @unique
+  missionApplicationId        String?                         @unique
+  status                      CreatorMissionStatus
+  productReceiveOption        ProductReceiveOption
+  productStatus               ProductStatus
+  depositStatus               DepositStatus
+  reimbursementStatus         ReimbursementStatus
+  purchaseProofTextNote       String?
+  purchaseProofScreenshotUrl  String?
+  purchaseProofNote           String?
+  purchaseProofSubmittedAt    DateTime?
+  purchaseProofReviewedAt     DateTime?
+  purchaseProofRejectReason   String?
   productPurchasedConfirmedAt DateTime?
-  videoReviewStatus    CreatorMissionVideoReviewStatus @default(NOT_SUBMITTED)
-  videoReviewFeedback  String?
-  videoSubmittedAt     DateTime?
-  videoReviewedAt      DateTime?
-  publishStatus        CreatorMissionPublishStatus @default(NOT_SUBMITTED)
-  publishFeedback      String?
-  publishSubmittedAt   DateTime?
-  publishReviewedAt    DateTime?
-  publishPurchaseAmountVnd Int?
-  rewardCreditedAt     DateTime?
-  assignedAt           DateTime              @default(now())
-  startedAt            DateTime?
-  completedAt          DateTime?
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
+  videoReviewStatus           CreatorMissionVideoReviewStatus @default(NOT_SUBMITTED)
+  videoReviewFeedback         String?
+  videoSubmittedAt            DateTime?
+  videoReviewedAt             DateTime?
+  publishStatus               CreatorMissionPublishStatus     @default(NOT_SUBMITTED)
+  publishFeedback             String?
+  publishSubmittedAt          DateTime?
+  publishReviewedAt           DateTime?
+  publishPurchaseAmountVnd    Int?
+  reimbursementAmountVnd      Int?
+  rewardCreditedAt            DateTime?
+  assignedAt                  DateTime                        @default(now())
+  startedAt                   DateTime?
+  completedAt                 DateTime?
+  createdAt                   DateTime                        @default(now())
+  updatedAt                   DateTime                        @updatedAt
 
-  mission              Mission               @relation(fields: [missionId], references: [id], onDelete: Restrict)
-  campaign             Campaign              @relation(fields: [campaignId], references: [id], onDelete: Restrict)
-  account              Account               @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  application          MissionSubmission?    @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  mission            Mission             @relation(fields: [missionId], references: [id], onDelete: Restrict)
+  campaign           Campaign            @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  account            Account             @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  submission         MissionSubmission?  @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  missionApplication MissionApplication? @relation(fields: [missionApplicationId], references: [id], onDelete: SetNull)
 
   @@unique([missionId, accountId])
   @@index([accountId, status, createdAt])
@@ -960,261 +1036,261 @@ model CreatorMission {
 }
 
 model ProofReview {
-  id               String         @id @default(cuid())
-  submissionId     String
-  missionId        String
-  reviewerId       String
-  reviewerRole     Role
-  decision         ReviewDecision
-  rejectReason     String?
-  note             String?
-  createdAt        DateTime       @default(now())
+  id           String         @id @default(cuid())
+  submissionId String
+  missionId    String
+  reviewerId   String
+  reviewerRole Role
+  decision     ReviewDecision
+  rejectReason String?
+  note         String?
+  createdAt    DateTime       @default(now())
 
-  submission       MissionSubmission @relation(fields: [submissionId], references: [id])
-  mission          Mission        @relation(fields: [missionId], references: [id])
-  reviewer         Account        @relation(fields: [reviewerId], references: [id])
+  submission MissionSubmission @relation(fields: [submissionId], references: [id])
+  mission    Mission           @relation(fields: [missionId], references: [id])
+  reviewer   Account           @relation(fields: [reviewerId], references: [id])
 
   @@index([submissionId, createdAt])
 }
 
 model Contribution {
-  id             String            @id @default(cuid())
-  campaignId     String
-  supporterId    String
-  rewardId       String?
-  paymentMethod  ContributionPaymentMethod @default(N_POINTS)
-  status         ContributionStatus @default(PENDING)
-  idempotencyKey String?
+  id                   String                    @id @default(cuid())
+  campaignId           String
+  supporterId          String
+  rewardId             String?
+  paymentMethod        ContributionPaymentMethod @default(N_POINTS)
+  status               ContributionStatus        @default(PENDING)
+  idempotencyKey       String?
   paymentTransactionId String?
-  amountVnd      Int
-  note           String?
-  createdAt      DateTime          @default(now())
+  amountVnd            Int
+  note                 String?
+  createdAt            DateTime                  @default(now())
 
-  campaign       Campaign          @relation(fields: [campaignId], references: [id])
-  supporter      Account           @relation(fields: [supporterId], references: [id])
-  reward         Reward?           @relation(fields: [rewardId], references: [id])
+  campaign           Campaign            @relation(fields: [campaignId], references: [id])
+  supporter          Account             @relation(fields: [supporterId], references: [id])
+  reward             Reward?             @relation(fields: [rewardId], references: [id])
   paymentTransaction PaymentTransaction? @relation(fields: [paymentTransactionId], references: [id])
-  rewardClaim    RewardClaim?
+  rewardClaim        RewardClaim?
 
   @@unique([supporterId, idempotencyKey])
 }
 
 model Reward {
-  id             String   @id @default(cuid())
-  campaignId     String
-  title          String
-  description    String?
-  rewardType     RewardType @default(DIGITAL_VOUCHER)
-  pointsCost     Int
-  stockTotal     Int
-  stockRemaining Int
-  isActive       Boolean  @default(true)
+  id                  String     @id @default(cuid())
+  campaignId          String
+  title               String
+  description         String?
+  rewardType          RewardType @default(DIGITAL_VOUCHER)
+  pointsCost          Int
+  stockTotal          Int
+  stockRemaining      Int
+  isActive            Boolean    @default(true)
   estimatedDeliveryAt DateTime?
-  createdAt      DateTime @default(now())
+  createdAt           DateTime   @default(now())
 
-  campaign       Campaign @relation(fields: [campaignId], references: [id])
-  contributions  Contribution[]
-  claims         RewardClaim[]
+  campaign      Campaign       @relation(fields: [campaignId], references: [id])
+  contributions Contribution[]
+  claims        RewardClaim[]
 }
 
 model RewardClaim {
-  id             String   @id @default(cuid())
-  rewardId       String
-  contributionId String   @unique
-  accountId      String
-  voucherCode    String   @unique
-  status         VoucherStatus @default(ISSUED)
-  usageType      VoucherUsageType @default(ONE_TIME)
-  expiryAt       DateTime?
-  activatedAt    DateTime?
-  usedAt         DateTime?
-  cancelledAt    DateTime?
+  id              String           @id @default(cuid())
+  rewardId        String
+  contributionId  String           @unique
+  accountId       String
+  voucherCode     String           @unique
+  status          VoucherStatus    @default(ISSUED)
+  usageType       VoucherUsageType @default(ONE_TIME)
+  expiryAt        DateTime?
+  activatedAt     DateTime?
+  usedAt          DateTime?
+  cancelledAt     DateTime?
   cancelledReason String?
-  createdAt      DateTime @default(now())
+  createdAt       DateTime         @default(now())
 
-  reward         Reward   @relation(fields: [rewardId], references: [id])
-  contribution   Contribution @relation(fields: [contributionId], references: [id])
-  account        Account  @relation(fields: [accountId], references: [id])
+  reward       Reward       @relation(fields: [rewardId], references: [id])
+  contribution Contribution @relation(fields: [contributionId], references: [id])
+  account      Account      @relation(fields: [accountId], references: [id])
 
   @@index([accountId, createdAt])
 }
 
 model Wallet {
-  id             String              @id @default(cuid())
-  userId         String              @unique
-  pointsBalance  Int                 @default(0)
-  cashBalanceVnd Int                 @default(0)
-  updatedAt      DateTime            @updatedAt
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  pointsBalance  Int      @default(0)
+  cashBalanceVnd Int      @default(0)
+  updatedAt      DateTime @updatedAt
 
-  user           Account             @relation(fields: [userId], references: [id])
-  ledgerEntries  WalletLedger[]
-  transactions   WalletTransaction[]
+  user                Account              @relation(fields: [userId], references: [id])
+  ledgerEntries       WalletLedger[]
+  transactions        WalletTransaction[]
   paymentTransactions PaymentTransaction[]
-  payoutRequests PayoutRequest[]
+  payoutRequests      PayoutRequest[]
 }
 
 model WalletTransaction {
-  id             String                @id @default(cuid())
-  walletId       String
-  accountId      String
-  type           WalletTransactionType
-  pointsDelta    Int                   @default(0)
-  cashDeltaVnd   Int                   @default(0)
-  balanceAfterPoints Int
+  id                  String                @id @default(cuid())
+  walletId            String
+  accountId           String
+  type                WalletTransactionType
+  pointsDelta         Int                   @default(0)
+  cashDeltaVnd        Int                   @default(0)
+  balanceAfterPoints  Int
   balanceAfterCashVnd Int
-  referenceType  String?
-  referenceId    String?
-  idempotencyKey String?
-  createdAt      DateTime              @default(now())
+  referenceType       String?
+  referenceId         String?
+  idempotencyKey      String?
+  createdAt           DateTime              @default(now())
 
-  wallet         Wallet                @relation(fields: [walletId], references: [id])
-  account        Account               @relation(fields: [accountId], references: [id])
+  wallet  Wallet  @relation(fields: [walletId], references: [id])
+  account Account @relation(fields: [accountId], references: [id])
 
+  @@unique([walletId, idempotencyKey])
   @@index([walletId, createdAt])
   @@index([accountId, createdAt])
-  @@unique([walletId, idempotencyKey])
 }
 
 model PaymentTransaction {
-  id                 String                    @id @default(cuid())
-  walletId           String
-  accountId          String
-  provider           String
-  idempotencyKey     String
-  orderCode          String                    @unique
-  requestedAmountVnd Int
-  creditedPoints     Int
+  id                   String                   @id @default(cuid())
+  walletId             String
+  accountId            String
+  provider             String
+  idempotencyKey       String
+  orderCode            String                   @unique
+  requestedAmountVnd   Int
+  creditedPoints       Int
   gatewayTransactionId String?
-  status             PaymentTransactionStatus  @default(PENDING)
-  rawPayload         Json?
-  createdAt          DateTime                  @default(now())
-  updatedAt          DateTime                  @updatedAt
+  status               PaymentTransactionStatus @default(PENDING)
+  rawPayload           Json?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
 
-  wallet             Wallet                    @relation(fields: [walletId], references: [id])
-  account            Account                   @relation(fields: [accountId], references: [id])
-  contributions      Contribution[]
+  wallet        Wallet         @relation(fields: [walletId], references: [id])
+  account       Account        @relation(fields: [accountId], references: [id])
+  contributions Contribution[]
 
   @@unique([accountId, idempotencyKey])
   @@index([walletId, status, createdAt])
 }
 
 model PayoutRequest {
-  id                 String               @id @default(cuid())
-  accountId          String
-  walletId           String
-  amountVnd          Int
-  status             PayoutRequestStatus  @default(PENDING)
-  note               String?
-  reviewedById       String?
-  reviewedAt         DateTime?
-  paidAt             DateTime?
-  idempotencyKey     String
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
+  id             String              @id @default(cuid())
+  accountId      String
+  walletId       String
+  amountVnd      Int
+  status         PayoutRequestStatus @default(PENDING)
+  note           String?
+  reviewedById   String?
+  reviewedAt     DateTime?
+  paidAt         DateTime?
+  idempotencyKey String
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 
-  account            Account              @relation(fields: [accountId], references: [id])
-  wallet             Wallet               @relation(fields: [walletId], references: [id])
+  account Account @relation(fields: [accountId], references: [id])
+  wallet  Wallet  @relation(fields: [walletId], references: [id])
 
   @@unique([accountId, idempotencyKey])
   @@index([accountId, status, createdAt])
 }
 
 model WalletLedger {
-  id             String            @id @default(cuid())
-  walletId       String
-  entryType      TransactionType
-  pointsDelta    Int
-  cashDeltaVnd   Int
-  description    String
-  createdAt      DateTime          @default(now())
+  id           String          @id @default(cuid())
+  walletId     String
+  entryType    TransactionType
+  pointsDelta  Int
+  cashDeltaVnd Int
+  description  String
+  createdAt    DateTime        @default(now())
 
-  wallet         Wallet            @relation(fields: [walletId], references: [id])
+  wallet Wallet @relation(fields: [walletId], references: [id])
 }
 
 model PaymentOrder {
-  id             String            @id @default(cuid())
-  campaignId     String
-  orderCode      String            @unique
-  amountVnd      Int
-  provider       String
-  status         TransactionStatus @default(PENDING)
-  createdAt      DateTime          @default(now())
+  id         String            @id @default(cuid())
+  campaignId String
+  orderCode  String            @unique
+  amountVnd  Int
+  provider   String
+  status     TransactionStatus @default(PENDING)
+  createdAt  DateTime          @default(now())
 
-  campaign       Campaign          @relation(fields: [campaignId], references: [id])
+  campaign Campaign @relation(fields: [campaignId], references: [id])
 }
 
 model Notification {
-  id             String                       @id @default(cuid())
+  id             String                     @id @default(cuid())
   accountId      String
   event          NotificationEvent
-  channel        NotificationChannel          @default(IN_APP)
+  channel        NotificationChannel        @default(IN_APP)
   title          String
   content        String
   metadata       Json?
-  isRead         Boolean                      @default(false)
+  isRead         Boolean                    @default(false)
   readAt         DateTime?
-  deliveryStatus NotificationDeliveryStatus   @default(QUEUED)
+  deliveryStatus NotificationDeliveryStatus @default(QUEUED)
   sentAt         DateTime?
-  createdAt      DateTime                     @default(now())
-  updatedAt      DateTime                     @updatedAt
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
 
-  account        Account                      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@index([accountId, createdAt])
   @@index([accountId, isRead, createdAt])
 }
 
 model AnalyticsDaily {
-  id             String   @id @default(cuid())
-  date           DateTime
-  campaignId     String
-  impressions    Int      @default(0)
-  clicks         Int      @default(0)
-  supports       Int      @default(0)
-  supportVnd     Int      @default(0)
-  createdAt      DateTime @default(now())
+  id          String   @id @default(cuid())
+  date        DateTime
+  campaignId  String
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  supports    Int      @default(0)
+  supportVnd  Int      @default(0)
+  createdAt   DateTime @default(now())
 
-  campaign       Campaign @relation(fields: [campaignId], references: [id])
+  campaign Campaign @relation(fields: [campaignId], references: [id])
 
   @@unique([date, campaignId])
 }
 
 model AuditLog {
-  id             String   @id @default(cuid())
-  actorId        String?
-  actorRole      Role?
-  action         String
-  targetType     String
-  targetId       String
-  oldStatus      String?
-  newStatus      String?
-  reason         String?
-  metadata       Json?
-  createdAt      DateTime @default(now())
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorRole  Role?
+  action     String
+  targetType String
+  targetId   String
+  oldStatus  String?
+  newStatus  String?
+  reason     String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
 
-  actor          Account? @relation(fields: [actorId], references: [id])
+  actor Account? @relation(fields: [actorId], references: [id])
 }
 
 model RiskFlag {
-  id             String   @id @default(cuid())
-  accountId      String?
-  targetType     String
-  targetId       String
-  reason         String
-  score          Int      @default(0)
-  metadata       Json?
-  createdAt      DateTime @default(now())
+  id         String   @id @default(cuid())
+  accountId  String?
+  targetType String
+  targetId   String
+  reason     String
+  score      Int      @default(0)
+  metadata   Json?
+  createdAt  DateTime @default(now())
 
-  account        Account? @relation("RiskFlagAccount", fields: [accountId], references: [id])
+  account Account? @relation("RiskFlagAccount", fields: [accountId], references: [id])
 }
 
 model SupportTicket {
-  id                  String               @id @default(cuid())
+  id                  String                @id @default(cuid())
   requesterAccountId  String
   assigneeAccountId   String?
   title               String
   description         String
-  status              SupportTicketStatus  @default(OPEN)
+  status              SupportTicketStatus   @default(OPEN)
   priority            SupportTicketPriority @default(MEDIUM)
   category            SupportTicketCategory @default(OTHER)
   responseSummary     String?
@@ -1225,12 +1301,12 @@ model SupportTicket {
   relatedOrderId      String?
   relatedPayoutId     String?
   relatedSubmissionId String?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
 
-  requester           Account              @relation("SupportTicketRequester", fields: [requesterAccountId], references: [id], onDelete: Cascade)
-  assignee            Account?             @relation("SupportTicketAssignee", fields: [assigneeAccountId], references: [id], onDelete: SetNull)
-  comments            SupportTicketComment[]
+  requester Account                @relation("SupportTicketRequester", fields: [requesterAccountId], references: [id], onDelete: Cascade)
+  assignee  Account?               @relation("SupportTicketAssignee", fields: [assigneeAccountId], references: [id], onDelete: SetNull)
+  comments  SupportTicketComment[]
 
   @@index([status, priority, createdAt])
   @@index([requesterAccountId, createdAt])
@@ -1238,32 +1314,32 @@ model SupportTicket {
 }
 
 model SupportTicketComment {
-  id              String        @id @default(cuid())
-  ticketId        String
-  authorId        String
-  message         String
-  isInternal      Boolean       @default(false)
-  createdAt       DateTime      @default(now())
+  id         String   @id @default(cuid())
+  ticketId   String
+  authorId   String
+  message    String
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now())
 
-  ticket          SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  author          Account       @relation("SupportTicketCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author Account       @relation("SupportTicketCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([ticketId, createdAt])
 }
 
 model AnalyticsEvent {
-  id             String             @id @default(cuid())
-  eventName      AnalyticsEventName
-  userId         String?
-  sessionId      String
-  campaignId     String?
-  brandId        String?
-  creatorId      String?
-  metadata       Json?
-  createdAt      DateTime           @default(now())
+  id         String             @id @default(cuid())
+  eventName  AnalyticsEventName
+  userId     String?
+  sessionId  String
+  campaignId String?
+  brandId    String?
+  creatorId  String?
+  metadata   Json?
+  createdAt  DateTime           @default(now())
 
-  user           Account?           @relation(fields: [userId], references: [id], onDelete: SetNull)
-  campaign       Campaign?          @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  user     Account?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
 
   @@index([eventName, createdAt])
   @@index([sessionId, createdAt])

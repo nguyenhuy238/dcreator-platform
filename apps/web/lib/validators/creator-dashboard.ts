@@ -38,12 +38,17 @@ export const creatorProfileUpdateSchema = z.object({
 export const creatorChannelSchema = z.object({
   platform: z.enum(supportedPlatforms),
   url: z.url().max(400),
-  followerCount: z.number().int().min(0),
-  isVerified: z.boolean().default(false)
+  followerCount: z.number().int().min(0)
 });
 
 export const creatorChannelsUpdateSchema = z.object({
-  channels: z.array(creatorChannelSchema).max(20)
+  platform: z.enum(supportedPlatforms),
+  url: z.url().max(400),
+  followerCount: z.number().int().min(0)
+});
+
+export const creatorChannelSetMainSchema = z.object({
+  linkId: z.string().trim().min(5).max(191)
 });
 
 export type CreatorJobStatus = z.infer<typeof creatorJobStatusSchema>;
