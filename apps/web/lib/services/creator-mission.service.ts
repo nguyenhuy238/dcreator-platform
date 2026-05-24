@@ -385,6 +385,72 @@ export async function listCreatorMissionsForAdmin() {
   return rows.map(mapMission);
 }
 
+type MissionHistoryFilterInput = {
+  query?: string;
+  campaign?: string;
+  status?: "PRODUCT_PENDING" | "DRAFT_PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+  videoReviewStatus?: CreatorMissionVideoReviewStatus;
+  publishStatus?: CreatorMissionPublishStatus;
+  productReceiveOption?: ProductReceiveOption;
+  productStatus?: ProductStatus;
+  reimbursementStatus?: ReimbursementStatus;
+  page?: number;
+  limit?: number;
+};
+
+function applyMissionHistoryFilters(
+  where: Prisma.CreatorMissionWhereInput,
+  input: MissionHistoryFilterInput,
+  campaignScope?: Prisma.CampaignWhereInput
+) {
+  if (campaignScope || input.campaign?.trim()) {
+    where.campaign = {
+      ...(campaignScope ?? {}),
+      ...(input.campaign?.trim() ? { title: { contains: input.campaign.trim(), mode: "insensitive" } } : {})
+    };
+  }
+
+  if (input.query?.trim()) {
+    const q = input.query.trim();
+    where.OR = [
+      { account: { displayName: { contains: q, mode: "insensitive" } } },
+      { account: { email: { contains: q, mode: "insensitive" } } },
+      { mission: { title: { contains: q, mode: "insensitive" } } },
+      { campaign: { title: { contains: q, mode: "insensitive" } } }
+    ];
+  }
+
+  if (input.status) where.status = input.status;
+  if (input.videoReviewStatus) where.videoReviewStatus = input.videoReviewStatus;
+  if (input.publishStatus) where.publishStatus = input.publishStatus;
+  if (input.productReceiveOption) where.productReceiveOption = input.productReceiveOption;
+  if (input.productStatus) where.productStatus = input.productStatus;
+  if (input.reimbursementStatus) where.reimbursementStatus = input.reimbursementStatus;
+}
+
+export async function listMissionHistoryForAdmin(input: MissionHistoryFilterInput) {
+  const where: Prisma.CreatorMissionWhereInput = {};
+  applyMissionHistoryFilters(where, input);
+  const paging = toPagination(input.page, input.limit);
+  const [total, items] = await prisma.$transaction([
+    prisma.creatorMission.count({ where }),
+    prisma.creatorMission.findMany({
+      where,
+      include: creatorMissionInclude,
+      orderBy: { updatedAt: "desc" },
+      skip: paging.skip,
+      take: paging.limit
+    })
+  ]);
+  return { items: items.map(mapMission), pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
+}
+
+export async function getMissionHistoryDetailForAdmin(id: string) {
+  const item = await getMissionById(id);
+  if (!item) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
+  return mapMission(item);
+}
+
 export async function confirmDepositPaid(creatorMissionId: string, accountId: string) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
   if (current.productReceiveOption !== "DEPOSIT_PRODUCT") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
@@ -1250,6 +1316,32 @@ export async function listMissionApplicationsForBrand(
     })
   ]);
   return { items, pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
+}
+
+export async function listMissionHistoryForBrand(accountId: string, input: MissionHistoryFilterInput) {
+  const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
+  const where: Prisma.CreatorMissionWhereInput = {};
+  applyMissionHistoryFilters(where, input, { brandId: brandOwnerAccountId });
+  const paging = toPagination(input.page, input.limit);
+  const [total, items] = await prisma.$transaction([
+    prisma.creatorMission.count({ where }),
+    prisma.creatorMission.findMany({
+      where,
+      include: creatorMissionInclude,
+      orderBy: { updatedAt: "desc" },
+      skip: paging.skip,
+      take: paging.limit
+    })
+  ]);
+  return { items: items.map(mapMission), pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
+}
+
+export async function getMissionHistoryDetailForBrand(accountId: string, id: string) {
+  const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
+  const item = await getMissionById(id);
+  if (!item) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
+  if (item.campaign.brandId !== brandOwnerAccountId) throw new AppError("Forbidden", 403, "BRAND_FORBIDDEN");
+  return mapMission(item);
 }
 
 export async function getMissionApplicationDetailForBrand(accountId: string, id: string) {

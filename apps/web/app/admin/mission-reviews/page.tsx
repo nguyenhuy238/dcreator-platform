@@ -143,9 +143,7 @@ function AdminMissionTranscriptReviewsTab() {
   const [detailLoading, setDetailLoading] = useState(false);
 
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("PENDING");
   const [campaign, setCampaign] = useState("");
-  const [sort, setSort] = useState("newest");
   const [page, setPage] = useState(1);
 
   async function load(pageOverride?: number) {
@@ -155,9 +153,7 @@ function AdminMissionTranscriptReviewsTab() {
     try {
       const params = new URLSearchParams();
       if (query.trim()) params.set("query", query.trim());
-      if (status) params.set("status", status);
       if (campaign.trim()) params.set("campaign", campaign.trim());
-      params.set("sort", sort);
       params.set("page", String(targetPage));
       params.set("limit", "20");
 
@@ -234,21 +230,14 @@ function AdminMissionTranscriptReviewsTab() {
 
   useEffect(() => {
     void load();
-  }, [page, sort]);
+  }, [page]);
 
   return (
     <section className="mt-4 grid gap-4">
       <section className="dc-card p-4">
-        <div className="grid gap-2 md:grid-cols-5">
-          <input className="dc-input md:col-span-2" placeholder="Tìm creator theo tên/email" value={query} onChange={(e) => setQuery(e.target.value)} />
-          <select className="dc-input" value={status} onChange={(e) => setStatus(e.target.value)}>
-            {transcriptStatusOptions.map((s) => <option key={s.value || "all"} value={s.value}>{s.label}</option>)}
-          </select>
+        <div className="grid gap-2 md:grid-cols-2">
+          <input className="dc-input" placeholder="Tìm creator theo tên/email" value={query} onChange={(e) => setQuery(e.target.value)} />
           <input className="dc-input" placeholder="Tên campaign" value={campaign} onChange={(e) => setCampaign(e.target.value)} />
-          <select className="dc-input" value={sort} onChange={(e) => setSort(e.target.value)}>
-            <option value="newest">Mới nhất</option>
-            <option value="oldest">Cũ nhất</option>
-          </select>
         </div>
         <div className="mt-3 flex gap-2">
           <button className="dc-btn-primary" onClick={() => { setPage(1); void load(1); }}>Lọc</button>
@@ -389,9 +378,7 @@ function AdminMissionApplicationsTab() {
   const [detailLoading, setDetailLoading] = useState(false);
 
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("PENDING_REVIEW");
   const [campaign, setCampaign] = useState("");
-  const [sort, setSort] = useState("newest");
   const [page, setPage] = useState(1);
 
   async function load(pageOverride?: number) {
@@ -401,9 +388,8 @@ function AdminMissionApplicationsTab() {
     try {
       const params = new URLSearchParams();
       if (query.trim()) params.set("query", query.trim());
-      if (status) params.set("status", status);
       if (campaign.trim()) params.set("campaign", campaign.trim());
-      params.set("sort", sort);
+      params.set("status", "PENDING_REVIEW");
       params.set("page", String(targetPage));
       params.set("limit", "20");
 
@@ -473,23 +459,16 @@ function AdminMissionApplicationsTab() {
 
   useEffect(() => {
     void load();
-  }, [page, sort]);
+  }, [page]);
 
   const title = useMemo(() => `Tổng ${pagination.total} đơn`, [pagination.total]);
 
   return (
     <section className="mt-4 grid gap-4">
       <section className="dc-card p-4">
-        <div className="grid gap-2 md:grid-cols-5">
-          <input className="dc-input md:col-span-2" placeholder="Tìm creator theo tên/email" value={query} onChange={(e) => setQuery(e.target.value)} />
-          <select className="dc-input" value={status} onChange={(e) => setStatus(e.target.value)}>
-            {applicationStatusOptions.map((s) => <option key={s.value || "all"} value={s.value}>{s.label}</option>)}
-          </select>
+        <div className="grid gap-2 md:grid-cols-2">
+          <input className="dc-input" placeholder="Tìm creator theo tên/email" value={query} onChange={(e) => setQuery(e.target.value)} />
           <input className="dc-input" placeholder="Tên campaign" value={campaign} onChange={(e) => setCampaign(e.target.value)} />
-          <select className="dc-input" value={sort} onChange={(e) => setSort(e.target.value)}>
-            <option value="newest">Mới nhất</option>
-            <option value="oldest">Cũ nhất</option>
-          </select>
         </div>
         <div className="mt-3 flex gap-2">
           <button className="dc-btn-primary" onClick={() => { setPage(1); void load(1); }}>Lọc</button>
@@ -592,8 +571,6 @@ function AdminMissionVideoReviewsTab() {
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [query, setQuery] = useState("");
   const [campaign, setCampaign] = useState("");
-  const [status, setStatus] = useState("PENDING");
-  const [sort, setSort] = useState("newest");
 
   async function load(pageOverride?: number) {
     const targetPage = pageOverride ?? page;
@@ -603,8 +580,6 @@ function AdminMissionVideoReviewsTab() {
       const params = new URLSearchParams();
       if (query.trim()) params.set("query", query.trim());
       if (campaign.trim()) params.set("campaign", campaign.trim());
-      if (status) params.set("videoReviewStatus", status);
-      params.set("sort", sort);
       params.set("page", String(targetPage));
       params.set("limit", "20");
 
@@ -670,21 +645,14 @@ function AdminMissionVideoReviewsTab() {
 
   useEffect(() => {
     void load();
-  }, [page, sort]);
+  }, [page]);
 
   return (
     <section className="mt-4 grid gap-4">
       <section className="dc-card p-4">
-        <div className="grid gap-2 md:grid-cols-5">
-          <input className="dc-input md:col-span-2" placeholder="Tìm creator theo tên/email" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <div className="grid gap-2 md:grid-cols-2">
+          <input className="dc-input" placeholder="Tìm creator theo tên/email" value={query} onChange={(e) => setQuery(e.target.value)} />
           <input className="dc-input" placeholder="Tên campaign" value={campaign} onChange={(e) => setCampaign(e.target.value)} />
-          <select className="dc-input" value={status} onChange={(e) => setStatus(e.target.value)}>
-            {videoStatusOptions.map((s) => <option key={s.value || "all"} value={s.value}>{s.label}</option>)}
-          </select>
-          <select className="dc-input" value={sort} onChange={(e) => setSort(e.target.value)}>
-            <option value="newest">Mới nhất</option>
-            <option value="oldest">Cũ nhất</option>
-          </select>
         </div>
         <div className="mt-3 flex gap-2">
           <button className="dc-btn-primary" onClick={() => { setPage(1); void load(1); }}>Lọc</button>
@@ -804,9 +772,6 @@ function AdminMissionFinalReviewsTab() {
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [query, setQuery] = useState("");
   const [campaign, setCampaign] = useState("");
-  const [publishStatus, setPublishStatus] = useState("PENDING");
-  const [productReceiveOption, setProductReceiveOption] = useState("");
-  const [sort, setSort] = useState("newest");
 
   async function load(pageOverride?: number) {
     const targetPage = pageOverride ?? page;
@@ -816,9 +781,6 @@ function AdminMissionFinalReviewsTab() {
       const params = new URLSearchParams();
       if (query.trim()) params.set("query", query.trim());
       if (campaign.trim()) params.set("campaign", campaign.trim());
-      if (publishStatus) params.set("publishStatus", publishStatus);
-      if (productReceiveOption) params.set("productReceiveOption", productReceiveOption);
-      params.set("sort", sort);
       params.set("page", String(targetPage));
       params.set("limit", "20");
       const res = await fetch(`/api/admin/mission-final-reviews?${params.toString()}`, { cache: "no-store" });
@@ -907,24 +869,14 @@ function AdminMissionFinalReviewsTab() {
 
   useEffect(() => {
     void load();
-  }, [page, sort]);
+  }, [page]);
 
   return (
     <section className="mt-4 grid gap-4">
       <section className="dc-card p-4">
-        <div className="grid gap-2 md:grid-cols-6">
-          <input className="dc-input md:col-span-2" placeholder="Tìm creator theo tên/email" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <div className="grid gap-2 md:grid-cols-2">
+          <input className="dc-input" placeholder="Tìm creator theo tên/email" value={query} onChange={(e) => setQuery(e.target.value)} />
           <input className="dc-input" placeholder="Tên campaign" value={campaign} onChange={(e) => setCampaign(e.target.value)} />
-          <select className="dc-input" value={publishStatus} onChange={(e) => setPublishStatus(e.target.value)}>
-            {finalPublishStatusOptions.map((s) => <option key={s.value || "all"} value={s.value}>{s.label}</option>)}
-          </select>
-          <select className="dc-input" value={productReceiveOption} onChange={(e) => setProductReceiveOption(e.target.value)}>
-            {finalProductOptions.map((s) => <option key={s.value || "all"} value={s.value}>{s.label}</option>)}
-          </select>
-          <select className="dc-input" value={sort} onChange={(e) => setSort(e.target.value)}>
-            <option value="newest">Mới nhất</option>
-            <option value="oldest">Cũ nhất</option>
-          </select>
         </div>
         <div className="mt-3 flex gap-2">
           <button className="dc-btn-primary" onClick={() => { setPage(1); void load(1); }}>Lọc</button>
