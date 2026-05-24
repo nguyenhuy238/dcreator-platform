@@ -16,6 +16,10 @@ export const creatorMissionVideoSubmitSchema = z.object({
   note: z.string().trim().max(500).optional()
 });
 
+export const creatorMissionTranscriptSubmitSchema = z.object({
+  transcript: z.string().trim().min(10).max(5000)
+});
+
 export const creatorMissionPublishSubmitSchema = z
   .object({
     publicVideoUrl: z.string().trim().url().max(2000).optional(),
@@ -62,6 +66,20 @@ export const missionVideoReviewRejectSchema = z.object({
   feedback: z.string().trim().min(3).max(500)
 });
 
+export const missionTranscriptReviewAdminQuerySchema = z.object({
+  query: z.string().trim().min(1).max(120).optional(),
+  campaignId: z.string().trim().min(3).optional(),
+  campaign: z.string().trim().min(1).max(120).optional(),
+  status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
+  sort: z.enum(["newest", "oldest"]).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional()
+});
+
+export const missionTranscriptReviewRejectSchema = z.object({
+  feedback: z.string().trim().min(3).max(500)
+});
+
 export const missionFinalReviewAdminQuerySchema = z.object({
   query: z.string().trim().min(1).max(120).optional(),
   campaignId: z.string().trim().min(3).optional(),
@@ -79,4 +97,18 @@ export const missionFinalReviewApproveSchema = z.object({
 
 export const missionFinalReviewRejectSchema = z.object({
   feedback: z.string().trim().min(3).max(500)
+});
+
+export const missionHistoryQuerySchema = z.object({
+  accountId: z.string().trim().min(3).optional(),
+  query: z.string().trim().min(1).max(120).optional(),
+  campaign: z.string().trim().min(1).max(120).optional(),
+  status: z.enum(["PRODUCT_PENDING", "DRAFT_PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
+  videoReviewStatus: z.enum(["NOT_SUBMITTED", "PENDING", "APPROVED", "REJECTED"]).optional(),
+  publishStatus: z.enum(["NOT_SUBMITTED", "PENDING", "APPROVED", "REJECTED"]).optional(),
+  productReceiveOption: z.enum(["DEPOSIT_PRODUCT", "CREATOR_BUY_FIRST", "NO_PRODUCT_REQUIRED"]).optional(),
+  productStatus: z.enum(["NOT_REQUIRED", "WAITING_DEPOSIT", "WAITING_PURCHASE", "RECEIVED"]).optional(),
+  reimbursementStatus: z.enum(["NOT_REQUIRED", "PENDING", "PURCHASE_SUBMITTED", "APPROVED", "PAYOUT_PENDING", "PAID", "REJECTED"]).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional()
 });

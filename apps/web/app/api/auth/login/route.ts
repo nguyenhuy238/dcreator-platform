@@ -22,11 +22,11 @@ export async function POST(request: NextRequest) {
     });
 
     if (!account || !account.passwordHash || !account.isActive) {
-      throw new AppError("Invalid credentials", 401, "AUTH_INVALID_CREDENTIALS");
+      throw new AppError("Sai thông tin đăng nhập!", 401, "AUTH_INVALID_CREDENTIALS");
     }
 
     if (!verifyPassword(input.password, account.passwordHash)) {
-      throw new AppError("Invalid credentials", 401, "AUTH_INVALID_CREDENTIALS");
+      throw new AppError("Sai thông tin đăng nhập!", 401, "AUTH_INVALID_CREDENTIALS");
     }
 
     const assignmentRoles = account.roleAssignments.map((item) => item.role);

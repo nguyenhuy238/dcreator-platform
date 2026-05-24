@@ -14,10 +14,10 @@ type Entry = {
 };
 
 const rules: Record<Bucket, Rule> = {
-  login: { windowMs: 10 * 60 * 1000, max: 5, message: "Too many login attempts. Please try again later." },
-  contribution: { windowMs: 10 * 60 * 1000, max: 20, message: "Too many contribution requests. Please try again later." },
-  proof_submit: { windowMs: 10 * 60 * 1000, max: 15, message: "Too many proof submissions. Please try again later." },
-  payment_create: { windowMs: 10 * 60 * 1000, max: 10, message: "Too many payment requests. Please try again later." }
+  login: { windowMs: 10 * 60 * 1000, max: 5, message: "Đăng nhập quá nhiều lần. Vui lòng thử lại sau." },
+  contribution: { windowMs: 10 * 60 * 1000, max: 20, message: "Quá nhiều yêu cầu đóng góp. Vui lòng thử lại sau." },
+  proof_submit: { windowMs: 10 * 60 * 1000, max: 15, message: "Quá nhiều lần gửi bằng chứng. Vui lòng thử lại sau." },
+  payment_create: { windowMs: 10 * 60 * 1000, max: 10, message: "Quá nhiều yêu cầu thanh toán. Vui lòng thử lại sau." }
 };
 
 const store = new Map<string, Entry>();

@@ -1,4 +1,4 @@
-"use client";
+﻿﻿"use client";
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { ActionToast, EmptyState, ErrorState, FormField, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
@@ -14,74 +14,24 @@ type CreatorProfile = {
 
 type ApiResponse<T> = { success: boolean; data?: T; error?: string };
 
-type SocialKey = "TikTok" | "Facebook" | "Instagram" | "YouTube" | "Portfolio";
+type AvatarUploadResponse = { avatarUrl: string };
 
 const categoryOptions = ["Lifestyle", "Food", "Beauty", "Tech", "Education", "Gaming", "Affiliate", "UGC"];
-
-function toSocialMap(items: SocialLink[]) {
-  const map: Record<SocialKey, string> = {
-    TikTok: "",
-    Facebook: "",
-    Instagram: "",
-    YouTube: "",
-    Portfolio: ""
-  };
-  for (const item of items) {
-    const key = item.label as SocialKey;
-    if (key in map) map[key] = item.url;
-  }
-  return map;
-}
-
-function fromSocialMap(map: Record<SocialKey, string>) {
-  return (Object.entries(map) as Array<[SocialKey, string]>).filter(([, url]) => url.trim()).map(([label, url]) => ({ label, url: url.trim() }));
-}
-
-function normalizeAvatarUrl(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (trimmed.startsWith("/")) {
-    if (typeof window !== "undefined") {
-      return `${window.location.origin}${trimmed}`;
-    }
-    return trimmed;
-  }
-  return `https://${trimmed}`;
-}
-
-function resolveAvatarSrc(input: string) {
-  const raw = input.trim();
-  if (!raw) return "";
-
-  try {
-    const parsed = new URL(raw);
-    if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
-      return `${parsed.pathname}${parsed.search}`;
-    }
-    return raw;
-  } catch {
-    if (raw.startsWith("/")) return raw;
-    return "";
-  }
-}
 
 export default function CreatorProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarFileName, setAvatarFileName] = useState("");
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [avatarLoadError, setAvatarLoadError] = useState(false);
 
   const [displayName, setDisplayName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [bio, setBio] = useState("");
   const [categories, setCategories] = useState<string[]>([]);
-  const [socialMap, setSocialMap] = useState<Record<SocialKey, string>>({ TikTok: "", Facebook: "", Instagram: "", YouTube: "", Portfolio: "" });
 
   const bioCount = useMemo(() => bio.trim().length, [bio]);
-  const previewAvatarSrc = useMemo(() => resolveAvatarSrc(avatarUrl), [avatarUrl]);
 
   async function load() {
     setLoading(true);
@@ -96,7 +46,6 @@ export default function CreatorProfilePage() {
       setAvatarUrl(payload.data.avatarUrl ?? "");
       setBio(payload.data.bio ?? "");
       setCategories(payload.data.categories ?? []);
-      setSocialMap(toSocialMap(payload.data.socialLinks ?? []));
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Không thể tải hồ sơ Creator");
     } finally {
@@ -108,16 +57,44 @@ export default function CreatorProfilePage() {
     void load();
   }, []);
 
-  useEffect(() => {
-    setAvatarLoadError(false);
-  }, [avatarUrl]);
-
   function toggleCategory(category: string) {
     setCategories((current) => {
       if (current.includes(category)) return current.filter((item) => item !== category);
       if (current.length >= 8) return current;
       return [...current, category];
     });
+  }
+
+  async function handleAvatarChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+
+    setAvatarFileName(file.name);
+    setUploadingAvatar(true);
+    setError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+
+      const response = await fetch("/api/uploads/creator-avatar", {
+        method: "POST",
+        body: formData
+      });
+      const payload = (await response.json()) as ApiResponse<AvatarUploadResponse>;
+      if (!response.ok || !payload.success || !payload.data) {
+        throw new Error(payload.error ?? "Không thể tải ảnh đại diện lên");
+      }
+
+      setAvatarUrl(payload.data.avatarUrl);
+      setToast("Đã tải ảnh đại diện thành công.");
+      setTimeout(() => setToast(""), 2200);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Không thể tải ảnh đại diện lên");
+    } finally {
+      setUploadingAvatar(false);
+      event.target.value = "";
+    }
   }
 
   async function submit(event: FormEvent) {
@@ -130,10 +107,9 @@ export default function CreatorProfilePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           displayName: displayName.trim(),
-          avatarUrl: normalizeAvatarUrl(avatarUrl),
+          avatarUrl: avatarUrl.trim(),
           bio: bio.trim(),
-          categories,
-          socialLinks: fromSocialMap(socialMap)
+          categories
         })
       });
       const payload = (await response.json()) as ApiResponse<CreatorProfile>;
@@ -150,37 +126,9 @@ export default function CreatorProfilePage() {
     }
   }
 
-  async function handleAvatarUpload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-    if (!file) return;
-    setUploadingAvatar(true);
-    setError("");
-    try {
-      const formData = new FormData();
-      formData.append("avatar", file);
-      const response = await fetch("/api/uploads/avatar", {
-        method: "POST",
-        body: formData
-      });
-      const payload = (await response.json()) as ApiResponse<{ avatarUrl: string }>;
-      if (!response.ok || !payload.success || !payload.data) {
-        throw new Error(payload.error ?? "Không thể tải ảnh đại diện");
-      }
-      setAvatarUrl(payload.data.avatarUrl);
-      setAvatarLoadError(false);
-      setToast("Đã tải ảnh đại diện. Nhấn lưu để cập nhật hồ sơ.");
-      setTimeout(() => setToast(""), 2200);
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Không thể tải ảnh đại diện");
-    } finally {
-      setUploadingAvatar(false);
-      event.target.value = "";
-    }
-  }
-
   return (
     <>
-      <PageHeader title="Hồ sơ Creator" subtitle="Quản lý thông tin cá nhân, lĩnh vực nội dung và các kênh mạng xã hội." />
+      <PageHeader title="Hồ sơ Creator" subtitle="Quản lý thông tin cá nhân và lĩnh vực nội dung." />
 
       {error ? <ErrorState title="Không thể xử lý hồ sơ" description={error} onRetry={() => void load()} /> : null}
       {loading ? <LoadingSkeleton rows={4} /> : null}
@@ -194,13 +142,14 @@ export default function CreatorProfilePage() {
               <input className="dc-input" value={displayName} onChange={(event) => setDisplayName(event.target.value)} required />
             </FormField>
 
-            <div className="grid gap-2">
-              <FormField label="Ảnh đại diện">
-                <input className="dc-input bg-white" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarUpload} disabled={uploadingAvatar} />
-              </FormField>
-              {uploadingAvatar ? <p className="text-sm text-zinc-500">Đang tải ảnh đại diện...</p> : null}
-              <input className="dc-input" type="text" placeholder="https://... (hoặc URL sau khi upload)" value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} />
-            </div>
+            <FormField label="Ảnh đại diện">
+              <div className="grid gap-2">
+                <input className="dc-input" type="file" accept="image/*" onChange={handleAvatarChange} disabled={uploadingAvatar} />
+                <p className="text-xs text-zinc-500">
+                  {uploadingAvatar ? "Đang tải ảnh đại diện..." : avatarFileName ? `Đã chọn: ${avatarFileName}` : "Chọn ảnh JPG/PNG/WebP, tối đa 5MB"}
+                </p>
+              </div>
+            </FormField>
 
             <FormField label={`Bio (${bioCount}/1000)`}>
               <textarea className="dc-input min-h-28" maxLength={1000} value={bio} onChange={(event) => setBio(event.target.value)} placeholder="Mô tả ngắn về phong cách nội dung, thế mạnh và tệp audience..." />
@@ -223,20 +172,9 @@ export default function CreatorProfilePage() {
               {categories.length === 0 ? <p className="mt-1 text-xs text-zinc-500">Chọn ít nhất 1 niche để nhận đề xuất campaign phù hợp.</p> : null}
             </div>
 
-            <SectionHeader title="Social links & Portfolio" />
-            {(Object.keys(socialMap) as SocialKey[]).map((key) => (
-              <FormField key={key} label={key}>
-                <input
-                  className="dc-input"
-                  type="url"
-                  placeholder={key === "Portfolio" ? "https://portfolio..." : `https://${key.toLowerCase()}.com/...`}
-                  value={socialMap[key]}
-                  onChange={(event) => setSocialMap((current) => ({ ...current, [key]: event.target.value }))}
-                />
-              </FormField>
-            ))}
-
-            <button type="submit" className="dc-btn-primary w-fit" disabled={saving}>{saving ? "Đang lưu..." : "Lưu hồ sơ Creator"}</button>
+            <button type="submit" className="dc-btn-primary w-fit" disabled={saving || uploadingAvatar}>
+              {saving ? "Đang lưu..." : "Lưu hồ sơ Creator"}
+            </button>
           </form>
 
           <aside className="dc-card h-fit p-5">
@@ -246,14 +184,8 @@ export default function CreatorProfilePage() {
             ) : (
               <div className="grid gap-3">
                 <div className="flex items-center gap-3">
-                  {previewAvatarSrc && !avatarLoadError ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={previewAvatarSrc}
-                      alt={displayName || "Creator avatar"}
-                      className="h-14 w-14 rounded-2xl border border-zinc-200 object-cover"
-                      onError={() => setAvatarLoadError(true)}
-                    />
+                  {avatarUrl ? (
+                    <div className="h-14 w-14 rounded-2xl border border-zinc-200 bg-cover bg-center" style={{ backgroundImage: `url(${avatarUrl})` }} />
                   ) : (
                     <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-900 text-lg font-black text-white">{displayName.slice(0, 1).toUpperCase() || "C"}</div>
                   )}
@@ -263,11 +195,6 @@ export default function CreatorProfilePage() {
                   </div>
                 </div>
                 <p className="text-sm text-zinc-600">{bio || "Chưa có bio"}</p>
-                <div className="grid gap-1 text-sm text-zinc-600">
-                  {(Object.entries(socialMap) as Array<[SocialKey, string]>).map(([label, url]) => (
-                    url.trim() ? <p key={label}><span className="font-semibold text-zinc-900">{label}:</span> {url}</p> : null
-                  ))}
-                </div>
               </div>
             )}
           </aside>
