@@ -12,6 +12,7 @@ import {
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { createNotification } from "@/lib/services/notification.service";
+import { saveTextUpload } from "@/lib/storage/upload";
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 type Sort = "newest" | "oldest";
@@ -41,11 +42,14 @@ const creatorMissionInclude = {
   submission: {
     select: {
       id: true,
+      createdAt: true,
+      updatedAt: true,
       lifecycleStatus: true,
       status: true,
       videoUrl: true,
       socialPostUrl: true,
       screenshotUrl: true,
+      fileUploadUrl: true,
       proofTextNote: true,
       note: true,
       rejectReason: true,
@@ -75,6 +79,53 @@ function dt(value: Date | null | undefined) {
 
 function now() {
   return new Date();
+}
+
+function normalizeTranscriptHtml(raw: string) {
+  const withoutScripts = raw
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, "");
+
+  const normalizedBlocks = withoutScripts
+    .replace(/<(\/?)div\b/gi, "<$1p")
+    .replace(/<(\/?)h1\b/gi, "<$1h3")
+    .replace(/<(\/?)h2\b/gi, "<$1h3");
+
+  const withoutEvents = normalizedBlocks
+    .replace(/\son\w+\s*=\s*"[^"]*"/gi, "")
+    .replace(/\son\w+\s*=\s*'[^']*'/gi, "")
+    .replace(/\son\w+\s*=\s*[^\s>]+/gi, "");
+
+  const withoutJsHref = withoutEvents.replace(
+    /\s(href|src)\s*=\s*(['"])\s*javascript:[\s\S]*?\2/gi,
+    ""
+  );
+
+  return withoutJsHref.replace(
+    /<\/?([a-z0-9-]+)(\s[^>]*?)?>/gi,
+    (match, tagName: string) => {
+      const tag = tagName.toLowerCase();
+      const allowed = new Set(["p", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li", "h3", "h4", "blockquote"]);
+      return allowed.has(tag) ? match : "";
+    }
+  );
+}
+
+function transcriptHtmlToPlainText(html: string) {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|li|h3|h4|blockquote)>/gi, "\n")
+    .replace(/<li>/gi, "- ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#39;/gi, "'")
+    .replace(/&quot;/gi, "\"")
+    .replace(/\r/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function toPagination(page?: number, limit?: number) {
@@ -334,6 +385,77 @@ export async function listCreatorMissionsForAdmin() {
   return rows.map(mapMission);
 }
 
+type MissionHistoryFilterInput = {
+  accountId?: string;
+  query?: string;
+  campaign?: string;
+  status?: "PRODUCT_PENDING" | "DRAFT_PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+  videoReviewStatus?: CreatorMissionVideoReviewStatus;
+  publishStatus?: CreatorMissionPublishStatus;
+  productReceiveOption?: ProductReceiveOption;
+  productStatus?: ProductStatus;
+  reimbursementStatus?: ReimbursementStatus;
+  page?: number;
+  limit?: number;
+};
+
+function applyMissionHistoryFilters(
+  where: Prisma.CreatorMissionWhereInput,
+  input: MissionHistoryFilterInput,
+  campaignScope?: Prisma.CampaignWhereInput
+) {
+  if (input.accountId?.trim()) {
+    where.accountId = input.accountId.trim();
+  }
+
+  if (campaignScope || input.campaign?.trim()) {
+    where.campaign = {
+      ...(campaignScope ?? {}),
+      ...(input.campaign?.trim() ? { title: { contains: input.campaign.trim(), mode: "insensitive" } } : {})
+    };
+  }
+
+  if (input.query?.trim()) {
+    const q = input.query.trim();
+    where.OR = [
+      { account: { displayName: { contains: q, mode: "insensitive" } } },
+      { account: { email: { contains: q, mode: "insensitive" } } },
+      { mission: { title: { contains: q, mode: "insensitive" } } },
+      { campaign: { title: { contains: q, mode: "insensitive" } } }
+    ];
+  }
+
+  if (input.status) where.status = input.status;
+  if (input.videoReviewStatus) where.videoReviewStatus = input.videoReviewStatus;
+  if (input.publishStatus) where.publishStatus = input.publishStatus;
+  if (input.productReceiveOption) where.productReceiveOption = input.productReceiveOption;
+  if (input.productStatus) where.productStatus = input.productStatus;
+  if (input.reimbursementStatus) where.reimbursementStatus = input.reimbursementStatus;
+}
+
+export async function listMissionHistoryForAdmin(input: MissionHistoryFilterInput) {
+  const where: Prisma.CreatorMissionWhereInput = {};
+  applyMissionHistoryFilters(where, input);
+  const paging = toPagination(input.page, input.limit);
+  const [total, items] = await prisma.$transaction([
+    prisma.creatorMission.count({ where }),
+    prisma.creatorMission.findMany({
+      where,
+      include: creatorMissionInclude,
+      orderBy: { updatedAt: "desc" },
+      skip: paging.skip,
+      take: paging.limit
+    })
+  ]);
+  return { items: items.map(mapMission), pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
+}
+
+export async function getMissionHistoryDetailForAdmin(id: string) {
+  const item = await getMissionById(id);
+  if (!item) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
+  return mapMission(item);
+}
+
 export async function confirmDepositPaid(creatorMissionId: string, accountId: string) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
   if (current.productReceiveOption !== "DEPOSIT_PRODUCT") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
@@ -381,6 +503,9 @@ export async function submitPurchaseProof(creatorMissionId: string, accountId: s
 export async function submitDraft(creatorMissionId: string, accountId: string, payload: { videoUrl: string; note?: string }) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
   if (!current.submissionId) throw new AppError("Mission submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
+  if (current.status === "DRAFT_PENDING") {
+    throw new AppError("Transcript must be approved first", 409, "CREATOR_MISSION_TRANSCRIPT_NOT_APPROVED");
+  }
   if (current.productReceiveOption === "CREATOR_BUY_FIRST" && current.productStatus !== "RECEIVED") {
     throw new AppError("Purchase proof is required before video submission", 409, "PURCHASE_PROOF_REQUIRED");
   }
@@ -690,6 +815,57 @@ export async function submitCreatorMissionVideo(accountId: string, creatorMissio
   return submitDraft(creatorMissionId, accountId, payload);
 }
 
+export async function submitCreatorMissionTranscript(accountId: string, creatorMissionId: string, transcript: string) {
+  const current = await getMissionByIdForAccount(creatorMissionId, accountId);
+  if (!current.submissionId) throw new AppError("Mission submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
+  if (current.status === "COMPLETED") throw new AppError("Mission already completed", 409, "CREATOR_MISSION_ALREADY_COMPLETED");
+  if (current.videoReviewStatus === "PENDING" || current.videoReviewStatus === "APPROVED") {
+    throw new AppError("Video review already started", 409, "CREATOR_MISSION_VIDEO_ALREADY_STARTED");
+  }
+  if (current.productReceiveOption === "CREATOR_BUY_FIRST" && current.productStatus !== "RECEIVED") {
+    throw new AppError("Purchase proof is required before transcript submission", 409, "PURCHASE_PROOF_REQUIRED");
+  }
+
+  const sanitizedHtml = normalizeTranscriptHtml(transcript.trim());
+  const plainText = transcriptHtmlToPlainText(sanitizedHtml);
+  if (!plainText) throw new AppError("Transcript is required", 422, "TRANSCRIPT_REQUIRED");
+  const transcriptFileUrl = await saveTextUpload({
+    content: plainText,
+    folder: "creator-transcript",
+    suffix: `mission-transcript-${creatorMissionId}`,
+    ext: "txt"
+  });
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.missionSubmission.update({
+      where: { id: current.submissionId! },
+      data: {
+        proofTextNote: sanitizedHtml,
+        fileUploadUrl: transcriptFileUrl,
+        status: "SUBMITTED",
+        lifecycleStatus: "SUBMITTED",
+        rejectReason: null,
+        reviewedById: null,
+        reviewedAt: null,
+        approvedAt: null
+      }
+    });
+    return tx.creatorMission.update({
+      where: { id: creatorMissionId },
+      data: {
+        status: "DRAFT_PENDING",
+        videoReviewStatus: "NOT_SUBMITTED",
+        videoReviewFeedback: null,
+        videoSubmittedAt: null,
+        videoReviewedAt: null
+      },
+      include: creatorMissionInclude
+    });
+  });
+
+  return mapMission(updated);
+}
+
 export async function submitCreatorMissionPublish(
   accountId: string,
   creatorMissionId: string,
@@ -753,6 +929,23 @@ function resolveBrandAvatar(input: { avatarUrl: string | null; ownedBrands: Arra
   return input.avatarUrl;
 }
 
+async function resolveBrandOwnerAccountId(accountId: string) {
+  const ownedBrand = await prisma.brand.findFirst({
+    where: { ownerAccountId: accountId },
+    select: { ownerAccountId: true },
+    orderBy: { createdAt: "desc" }
+  });
+  if (ownedBrand) return ownedBrand.ownerAccountId;
+
+  const membership = await prisma.brandMember.findFirst({
+    where: { accountId },
+    select: { brand: { select: { ownerAccountId: true } } },
+    orderBy: { createdAt: "desc" }
+  });
+  if (membership) return membership.brand.ownerAccountId;
+
+  throw new AppError("Brand access is not configured for this account", 403, "BRAND_ACCESS_NOT_CONFIGURED");
+}
 export async function listMissionApplicationsForAdmin(input: {
   query?: string;
   status?: ApplicationStatus;
@@ -1003,4 +1196,441 @@ export async function approveMissionFinalReviewByAdmin(actorId: string, id: stri
 
 export async function rejectMissionFinalReviewByAdmin(actorId: string, id: string, feedback: string) {
   return rejectPublishReportByAdmin(actorId, id, feedback);
+}
+
+export async function listMissionTranscriptReviewsForAdmin(input: {
+  query?: string;
+  campaignId?: string;
+  campaign?: string;
+  status?: "PENDING" | "APPROVED" | "REJECTED";
+  sort?: Sort;
+  page?: number;
+  limit?: number;
+}) {
+  const where: Prisma.CreatorMissionWhereInput = {
+    submission: { is: { proofTextNote: { not: null } } }
+  };
+
+  if (input.status === "PENDING") {
+    where.status = "DRAFT_PENDING";
+    where.submission = { is: { proofTextNote: { not: null }, status: "SUBMITTED" } };
+  } else if (input.status === "REJECTED") {
+    where.status = "DRAFT_PENDING";
+    where.submission = { is: { proofTextNote: { not: null }, status: "REJECTED" } };
+  } else if (input.status === "APPROVED") {
+    where.status = { not: "DRAFT_PENDING" };
+    where.submission = { is: { proofTextNote: { not: null }, status: "APPROVED" } };
+  } else {
+    where.status = "DRAFT_PENDING";
+  }
+
+  if (input.campaignId) where.campaignId = input.campaignId;
+  if (input.campaign?.trim()) {
+    where.campaign = { title: { contains: input.campaign.trim(), mode: "insensitive" } };
+  }
+  if (input.query?.trim()) {
+    const q = input.query.trim();
+    where.OR = [
+      { account: { displayName: { contains: q, mode: "insensitive" } } },
+      { account: { email: { contains: q, mode: "insensitive" } } },
+      { mission: { title: { contains: q, mode: "insensitive" } } },
+      { campaign: { title: { contains: q, mode: "insensitive" } } }
+    ];
+  }
+  const paging = toPagination(input.page, input.limit);
+  const [total, items] = await prisma.$transaction([
+    prisma.creatorMission.count({ where }),
+    prisma.creatorMission.findMany({
+      where,
+      include: creatorMissionInclude,
+      orderBy: { updatedAt: toOrder(input.sort) },
+      skip: paging.skip,
+      take: paging.limit
+    })
+  ]);
+  return { items: items.map(mapMission), pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
+}
+
+export async function getMissionTranscriptReviewDetailForAdmin(id: string) {
+  const item = await getMissionById(id);
+  if (!item || !item.submission?.proofTextNote) throw new AppError("Creator mission transcript not found", 404, "CREATOR_MISSION_TRANSCRIPT_NOT_FOUND");
+  return mapMission(item);
+}
+
+export async function approveMissionTranscriptReviewByAdmin(actorId: string, id: string) {
+  const current = await getMissionById(id);
+  if (!current || !current.submissionId || !current.submission?.proofTextNote) throw new AppError("Creator mission transcript not found", 404, "CREATOR_MISSION_TRANSCRIPT_NOT_FOUND");
+  if (current.status !== "DRAFT_PENDING" || current.submission.status !== "SUBMITTED") {
+    throw new AppError("Transcript is not pending review", 409, "CREATOR_MISSION_TRANSCRIPT_INVALID_STATUS");
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.missionSubmission.update({
+      where: { id: current.submissionId! },
+      data: {
+        status: "APPROVED",
+        lifecycleStatus: "APPROVED",
+        rejectReason: null,
+        reviewedById: actorId,
+        reviewedAt: now(),
+        approvedAt: now()
+      }
+    });
+
+    return tx.creatorMission.update({
+      where: { id },
+      data: {
+        status: "IN_PROGRESS",
+        videoReviewFeedback: null,
+        videoReviewStatus: "NOT_SUBMITTED",
+        videoReviewedAt: null
+      },
+      include: creatorMissionInclude
+    });
+  });
+
+  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_APPROVED", "Kich ban duoc duyet", "Ban co the nop video review.", { creatorMissionId: id, actorId });
+  return mapMission(updated);
+}
+
+export async function rejectMissionTranscriptReviewByAdmin(actorId: string, id: string, feedback: string) {
+  const current = await getMissionById(id);
+  if (!current || !current.submissionId || !current.submission?.proofTextNote) throw new AppError("Creator mission transcript not found", 404, "CREATOR_MISSION_TRANSCRIPT_NOT_FOUND");
+  if (current.status !== "DRAFT_PENDING" || current.submission.status !== "SUBMITTED") {
+    throw new AppError("Transcript is not pending review", 409, "CREATOR_MISSION_TRANSCRIPT_INVALID_STATUS");
+  }
+  const reason = feedback.trim();
+  if (!reason) throw new AppError("feedback is required", 422, "REJECT_REASON_REQUIRED");
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.missionSubmission.update({
+      where: { id: current.submissionId! },
+      data: {
+        status: "REJECTED",
+        lifecycleStatus: "REJECTED",
+        rejectReason: reason,
+        reviewedById: actorId,
+        reviewedAt: now(),
+        approvedAt: null
+      }
+    });
+
+    return tx.creatorMission.update({
+      where: { id },
+      data: {
+        status: "DRAFT_PENDING",
+        videoReviewFeedback: reason,
+        videoReviewStatus: "NOT_SUBMITTED",
+        videoReviewedAt: now()
+      },
+      include: creatorMissionInclude
+    });
+  });
+
+  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_REJECTED", "Kich ban bi tu choi", reason, { creatorMissionId: id, actorId });
+  return mapMission(updated);
+}
+
+export async function listMissionApplicationsForBrand(
+  accountId: string,
+  input: {
+    query?: string;
+    status?: ApplicationStatus;
+    campaignId?: string;
+    campaign?: string;
+    sort?: Sort;
+    page?: number;
+    limit?: number;
+  }
+) {
+  const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
+  const where: Prisma.MissionApplicationWhereInput = {
+    campaign: { brandId: brandOwnerAccountId }
+  };
+  if (input.status) where.status = input.status;
+  if (input.campaignId) where.campaignId = input.campaignId;
+  if (input.campaign?.trim()) {
+    where.campaign = {
+      brandId: brandOwnerAccountId,
+      title: { contains: input.campaign.trim(), mode: "insensitive" }
+    };
+  }
+  if (input.query?.trim()) {
+    const q = input.query.trim();
+    where.OR = [
+      { account: { displayName: { contains: q, mode: "insensitive" } } },
+      { account: { email: { contains: q, mode: "insensitive" } } },
+      { mission: { title: { contains: q, mode: "insensitive" } } },
+      { campaign: { title: { contains: q, mode: "insensitive" } } }
+    ];
+  }
+
+  const paging = toPagination(input.page, input.limit);
+  const [total, items] = await prisma.$transaction([
+    prisma.missionApplication.count({ where }),
+    prisma.missionApplication.findMany({
+      where,
+      include: {
+        account: { select: { id: true, displayName: true, email: true, creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true } } } },
+        campaign: { select: { id: true, title: true, slug: true } },
+        mission: { select: { id: true, title: true, rewardPoints: true, productReceiveOption: true, productLink: true } },
+        reviewedBy: { select: { id: true, displayName: true, email: true } }
+      },
+      orderBy: { createdAt: toOrder(input.sort) },
+      skip: paging.skip,
+      take: paging.limit
+    })
+  ]);
+  return { items, pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
+}
+
+export async function listMissionHistoryForBrand(accountId: string, input: MissionHistoryFilterInput) {
+  const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
+  const where: Prisma.CreatorMissionWhereInput = {};
+  applyMissionHistoryFilters(where, input, { brandId: brandOwnerAccountId });
+  const paging = toPagination(input.page, input.limit);
+  const [total, items] = await prisma.$transaction([
+    prisma.creatorMission.count({ where }),
+    prisma.creatorMission.findMany({
+      where,
+      include: creatorMissionInclude,
+      orderBy: { updatedAt: "desc" },
+      skip: paging.skip,
+      take: paging.limit
+    })
+  ]);
+  return { items: items.map(mapMission), pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
+}
+
+export async function getMissionHistoryDetailForBrand(accountId: string, id: string) {
+  const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
+  const item = await getMissionById(id);
+  if (!item) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
+  if (item.campaign.brandId !== brandOwnerAccountId) throw new AppError("Forbidden", 403, "BRAND_FORBIDDEN");
+  return mapMission(item);
+}
+
+export async function getMissionApplicationDetailForBrand(accountId: string, id: string) {
+  const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
+  const item = await getMissionApplicationDetailForAdmin(id);
+  if (item.campaign.brandId !== brandOwnerAccountId) throw new AppError("Forbidden", 403, "BRAND_FORBIDDEN");
+  return item;
+}
+
+export async function approveMissionApplicationByBrand(accountId: string, id: string) {
+  await getMissionApplicationDetailForBrand(accountId, id);
+  return approveMissionApplicationByAdmin(accountId, id);
+}
+
+export async function rejectMissionApplicationByBrand(accountId: string, id: string, rejectReason: string) {
+  await getMissionApplicationDetailForBrand(accountId, id);
+  return rejectMissionApplicationByAdmin(accountId, id, rejectReason);
+}
+
+export async function listMissionVideoReviewsForBrand(
+  accountId: string,
+  input: {
+    query?: string;
+    campaignId?: string;
+    campaign?: string;
+    videoReviewStatus?: CreatorMissionVideoReviewStatus;
+    sort?: Sort;
+    page?: number;
+    limit?: number;
+  }
+) {
+  const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
+  const where: Prisma.CreatorMissionWhereInput = {
+    campaign: { brandId: brandOwnerAccountId },
+    videoReviewStatus: input.videoReviewStatus ?? "PENDING"
+  };
+  if (input.campaignId) where.campaignId = input.campaignId;
+  if (input.campaign?.trim()) {
+    where.campaign = {
+      brandId: brandOwnerAccountId,
+      title: { contains: input.campaign.trim(), mode: "insensitive" }
+    };
+  }
+  if (input.query?.trim()) {
+    const q = input.query.trim();
+    where.OR = [
+      { account: { displayName: { contains: q, mode: "insensitive" } } },
+      { account: { email: { contains: q, mode: "insensitive" } } },
+      { mission: { title: { contains: q, mode: "insensitive" } } },
+      { campaign: { title: { contains: q, mode: "insensitive" } } }
+    ];
+  }
+  const paging = toPagination(input.page, input.limit);
+  const [total, items] = await prisma.$transaction([
+    prisma.creatorMission.count({ where }),
+    prisma.creatorMission.findMany({
+      where,
+      include: creatorMissionInclude,
+      orderBy: { videoSubmittedAt: toOrder(input.sort) },
+      skip: paging.skip,
+      take: paging.limit
+    })
+  ]);
+  return { items: items.map(mapMission), pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
+}
+
+export async function listMissionTranscriptReviewsForBrand(
+  accountId: string,
+  input: {
+    query?: string;
+    campaignId?: string;
+    campaign?: string;
+    status?: "PENDING" | "APPROVED" | "REJECTED";
+    sort?: Sort;
+    page?: number;
+    limit?: number;
+  }
+) {
+  const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
+  const where: Prisma.CreatorMissionWhereInput = {
+    campaign: { brandId: brandOwnerAccountId },
+    submission: { is: { proofTextNote: { not: null } } }
+  };
+
+  if (input.status === "PENDING") {
+    where.status = "DRAFT_PENDING";
+    where.submission = { is: { proofTextNote: { not: null }, status: "SUBMITTED" } };
+  } else if (input.status === "REJECTED") {
+    where.status = "DRAFT_PENDING";
+    where.submission = { is: { proofTextNote: { not: null }, status: "REJECTED" } };
+  } else if (input.status === "APPROVED") {
+    where.status = { not: "DRAFT_PENDING" };
+    where.submission = { is: { proofTextNote: { not: null }, status: "APPROVED" } };
+  } else {
+    where.status = "DRAFT_PENDING";
+  }
+
+  if (input.campaignId) where.campaignId = input.campaignId;
+  if (input.campaign?.trim()) {
+    where.campaign = {
+      brandId: brandOwnerAccountId,
+      title: { contains: input.campaign.trim(), mode: "insensitive" }
+    };
+  }
+  if (input.query?.trim()) {
+    const q = input.query.trim();
+    where.OR = [
+      { account: { displayName: { contains: q, mode: "insensitive" } } },
+      { account: { email: { contains: q, mode: "insensitive" } } },
+      { mission: { title: { contains: q, mode: "insensitive" } } },
+      { campaign: { title: { contains: q, mode: "insensitive" } } }
+    ];
+  }
+  const paging = toPagination(input.page, input.limit);
+  const [total, items] = await prisma.$transaction([
+    prisma.creatorMission.count({ where }),
+    prisma.creatorMission.findMany({
+      where,
+      include: creatorMissionInclude,
+      orderBy: { updatedAt: toOrder(input.sort) },
+      skip: paging.skip,
+      take: paging.limit
+    })
+  ]);
+  return { items: items.map(mapMission), pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
+}
+
+export async function getMissionTranscriptReviewDetailForBrand(accountId: string, id: string) {
+  const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
+  const item = await getMissionTranscriptReviewDetailForAdmin(id);
+  if (item.campaign.brandId !== brandOwnerAccountId) throw new AppError("Forbidden", 403, "BRAND_FORBIDDEN");
+  return item;
+}
+
+export async function approveMissionTranscriptReviewByBrand(accountId: string, id: string) {
+  await getMissionTranscriptReviewDetailForBrand(accountId, id);
+  return approveMissionTranscriptReviewByAdmin(accountId, id);
+}
+
+export async function rejectMissionTranscriptReviewByBrand(accountId: string, id: string, feedback: string) {
+  await getMissionTranscriptReviewDetailForBrand(accountId, id);
+  return rejectMissionTranscriptReviewByAdmin(accountId, id, feedback);
+}
+
+export async function getMissionVideoReviewDetailForBrand(accountId: string, id: string) {
+  const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
+  const item = await getMissionVideoReviewDetailForAdmin(id);
+  if (item.campaign.brandId !== brandOwnerAccountId) throw new AppError("Forbidden", 403, "BRAND_FORBIDDEN");
+  return item;
+}
+
+export async function approveMissionVideoReviewByBrand(accountId: string, id: string) {
+  await getMissionVideoReviewDetailForBrand(accountId, id);
+  return approveMissionVideoReviewByAdmin(accountId, id);
+}
+
+export async function rejectMissionVideoReviewByBrand(accountId: string, id: string, feedback: string) {
+  await getMissionVideoReviewDetailForBrand(accountId, id);
+  return rejectMissionVideoReviewByAdmin(accountId, id, feedback);
+}
+
+export async function listMissionFinalReviewsForBrand(
+  accountId: string,
+  input: {
+    query?: string;
+    campaignId?: string;
+    campaign?: string;
+    productReceiveOption?: ProductReceiveOption;
+    publishStatus?: CreatorMissionPublishStatus;
+    sort?: Sort;
+    page?: number;
+    limit?: number;
+  }
+) {
+  const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
+  const where: Prisma.CreatorMissionWhereInput = {
+    campaign: { brandId: brandOwnerAccountId },
+    publishStatus: input.publishStatus ?? "PENDING"
+  };
+  if (input.campaignId) where.campaignId = input.campaignId;
+  if (input.campaign?.trim()) {
+    where.campaign = {
+      brandId: brandOwnerAccountId,
+      title: { contains: input.campaign.trim(), mode: "insensitive" }
+    };
+  }
+  if (input.productReceiveOption) where.productReceiveOption = input.productReceiveOption;
+  if (input.query?.trim()) {
+    const q = input.query.trim();
+    where.OR = [
+      { account: { displayName: { contains: q, mode: "insensitive" } } },
+      { account: { email: { contains: q, mode: "insensitive" } } },
+      { mission: { title: { contains: q, mode: "insensitive" } } },
+      { campaign: { title: { contains: q, mode: "insensitive" } } }
+    ];
+  }
+  const paging = toPagination(input.page, input.limit);
+  const [total, items] = await prisma.$transaction([
+    prisma.creatorMission.count({ where }),
+    prisma.creatorMission.findMany({
+      where,
+      include: creatorMissionInclude,
+      orderBy: { publishSubmittedAt: toOrder(input.sort) },
+      skip: paging.skip,
+      take: paging.limit
+    })
+  ]);
+  return { items: items.map(mapMission), pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
+}
+
+export async function getMissionFinalReviewDetailForBrand(accountId: string, id: string) {
+  const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
+  const item = await getMissionFinalReviewDetailForAdmin(id);
+  if (item.campaign.brandId !== brandOwnerAccountId) throw new AppError("Forbidden", 403, "BRAND_FORBIDDEN");
+  return item;
+}
+
+export async function approveMissionFinalReviewByBrand(accountId: string, id: string, input?: { reimbursementAmountVnd?: number }) {
+  await getMissionFinalReviewDetailForBrand(accountId, id);
+  return approveMissionFinalReviewByAdmin(accountId, id, input);
+}
+
+export async function rejectMissionFinalReviewByBrand(accountId: string, id: string, feedback: string) {
+  await getMissionFinalReviewDetailForBrand(accountId, id);
+  return rejectMissionFinalReviewByAdmin(accountId, id, feedback);
 }
