@@ -1,4 +1,4 @@
-import { BrandMemberRole, BrandStatus, CampaignStatus, MissionAudience, MissionLifecycleStatus, Role, RoleRequestStatus, RoleRequestType } from "@prisma/client";
+import { BrandMemberRole, BrandStatus, CampaignStatus, MissionAudience, MissionLifecycleStatus, Prisma, Role, RoleRequestStatus, RoleRequestType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { approveProof, rejectProof } from "@/lib/services/mission.service";
@@ -30,6 +30,52 @@ function extractCoverImageMeta(brief: string) {
     .trim();
 
   return { coverImageUrl, cleanBrief };
+}
+
+async function createDefaultMissionsFromRequest(
+  tx: Prisma.TransactionClient,
+  campaignId: string,
+  missionTypes: string | null,
+  budgetVnd: number,
+  endsAt: Date | null
+) {
+  const labels = (missionTypes ?? "")
+    .split(/[,;|]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 5);
+
+  if (labels.length === 0) {
+    await tx.mission.create({
+      data: {
+        campaignId,
+        title: "Nhiệm vụ mặc định",
+        description: "Tham gia chiến dịch theo brief và nộp bằng chứng đúng hạn.",
+        rewardPoints: 0,
+        rewardCommissionVnd: Math.max(0, Math.floor(budgetVnd * 0.02)),
+        audience: "CREATOR",
+        productReceiveOption: "NO_PRODUCT_REQUIRED",
+        deadlineAt: endsAt
+      }
+    });
+    return;
+  }
+
+  const commissionPerMission = Math.max(0, Math.floor(budgetVnd * 0.02));
+  for (const label of labels) {
+    await tx.mission.create({
+      data: {
+        campaignId,
+        title: `Mission: ${label}`,
+        description: `Thực hiện nhiệm vụ "${label}" theo yêu cầu campaign và nộp proof để duyệt.`,
+        rewardPoints: 0,
+        rewardCommissionVnd: commissionPerMission,
+        audience: "CREATOR",
+        productReceiveOption: "NO_PRODUCT_REQUIRED",
+        deadlineAt: endsAt
+      }
+    });
+  }
 }
 
 export async function getAdminOverview() {
@@ -453,6 +499,14 @@ export async function decideCampaignReview(actorId: string, campaignId: string, 
           status: CampaignStatus.ACTIVE
         }
       });
+
+      await createDefaultMissionsFromRequest(
+        tx,
+        campaign.id,
+        request.missionTypes,
+        request.budgetVnd,
+        request.endsAt
+      );
 
       return tx.brandCampaignRequest.update({
         where: { id: request.id },

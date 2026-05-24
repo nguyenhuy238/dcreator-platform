@@ -20,6 +20,7 @@ import type {
   budgetTopupSchema,
   campaignBrandFeedbackSchema,
   campaignCreateSchema,
+  campaignMissionCreateSchema,
   campaignRequestSchema,
   creatorApplicationDecisionSchema,
   productSubmissionSchema,
@@ -35,6 +36,7 @@ type CampaignInput = z.infer<typeof campaignCreateSchema>;
 type CampaignBrandFeedbackInput = z.infer<typeof campaignBrandFeedbackSchema>;
 type CampaignRequestInput = z.infer<typeof campaignRequestSchema>;
 type RewardInput = z.infer<typeof rewardTierSchema>;
+type CampaignMissionInput = z.infer<typeof campaignMissionCreateSchema>;
 type CreatorApplicationDecisionInput = z.infer<typeof creatorApplicationDecisionSchema>;
 type ProofReviewDecisionInput = z.infer<typeof proofReviewDecisionSchema>;
 type BudgetLockInput = z.infer<typeof budgetLockSchema>;
@@ -1044,6 +1046,43 @@ export async function listCreatorApplications(accountId: string) {
         }
       }
     };
+  });
+}
+
+export async function addCampaignMissionForBrand(accountId: string, campaignId: string, input: CampaignMissionInput) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true });
+  const campaign = await getBrandScopedCampaign(campaignId, ctx.brandOwnerAccountId);
+
+  const deadlineAt = input.deadlineAt ? new Date(input.deadlineAt) : null;
+  if (deadlineAt && campaign.startsAt && deadlineAt < campaign.startsAt) {
+    throw new AppError("Mission deadline cannot be earlier than campaign start", 422, "MISSION_DEADLINE_INVALID");
+  }
+  if (deadlineAt && campaign.endsAt && deadlineAt > campaign.endsAt) {
+    throw new AppError("Mission deadline cannot be later than campaign end", 422, "MISSION_DEADLINE_INVALID");
+  }
+
+  return prisma.mission.create({
+    data: {
+      campaignId: campaign.id,
+      title: input.title,
+      description: input.description,
+      productLink: input.productLink || null,
+      rewardPoints: input.rewardPoints,
+      rewardCommissionVnd: input.rewardCommissionVnd,
+      audience: input.audience,
+      productReceiveOption: input.productReceiveOption,
+      allowRepeat: input.allowRepeat,
+      deadlineAt
+    }
+  });
+}
+
+export async function listCampaignMissionsForBrand(accountId: string, campaignId: string) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true });
+  const campaign = await getBrandScopedCampaign(campaignId, ctx.brandOwnerAccountId);
+  return prisma.mission.findMany({
+    where: { campaignId: campaign.id },
+    orderBy: { createdAt: "desc" }
   });
 }
 

@@ -6,14 +6,16 @@ import { createNotification } from "@/lib/services/notification.service";
 import { assertStateTransition } from "@/lib/services/admin-transition.service";
 import type { z } from "zod";
 import type { adminCampaignCreateSchema } from "@/lib/validators/admin-campaign";
+import type { campaignMissionCreateSchema } from "@/lib/validators/brand-dashboard";
 
 type AdminDecision = "APPROVE" | "REJECT" | "REQUEST_CHANGES" | "PAUSE";
 type AdminCampaignCreateInput = z.infer<typeof adminCampaignCreateSchema>;
+type CampaignMissionInput = z.infer<typeof campaignMissionCreateSchema>;
 
 const campaignTransitionMap: Record<AdminDecision, readonly CampaignStatus[]> = {
   APPROVE: ["DRAFT", "PAUSED"],
   REJECT: ["DRAFT", "PAUSED"],
-  REQUEST_CHANGES: ["DRAFT", "PAUSED"],
+  REQUEST_CHANGES: ["DRAFT", "PAUSED", "ACTIVE"],
   PAUSE: ["ACTIVE"]
 };
 
@@ -326,4 +328,51 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
   });
 
   return campaign;
+}
+
+export async function addCampaignMissionByAdmin(actorId: string, campaignId: string, input: CampaignMissionInput) {
+  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
+  if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
+
+  const deadlineAt = input.deadlineAt ? new Date(input.deadlineAt) : null;
+  if (deadlineAt && campaign.startsAt && deadlineAt < campaign.startsAt) {
+    throw new AppError("Mission deadline cannot be earlier than campaign start", 422, "MISSION_DEADLINE_INVALID");
+  }
+  if (deadlineAt && campaign.endsAt && deadlineAt > campaign.endsAt) {
+    throw new AppError("Mission deadline cannot be later than campaign end", 422, "MISSION_DEADLINE_INVALID");
+  }
+
+  const mission = await prisma.mission.create({
+    data: {
+      campaignId: campaign.id,
+      title: input.title,
+      description: input.description,
+      productLink: input.productLink || null,
+      rewardPoints: input.rewardPoints,
+      rewardCommissionVnd: input.rewardCommissionVnd,
+      audience: input.audience,
+      productReceiveOption: input.productReceiveOption,
+      allowRepeat: input.allowRepeat,
+      deadlineAt
+    }
+  });
+
+  await writeAuditLog({
+    actorId,
+    action: "ADMIN_CAMPAIGN_MISSION_CREATED",
+    targetType: "Mission",
+    targetId: mission.id,
+    metadata: { campaignId: campaign.id, audience: mission.audience }
+  });
+
+  return mission;
+}
+
+export async function listCampaignMissionsByAdmin(campaignId: string) {
+  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { id: true } });
+  if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
+  return prisma.mission.findMany({
+    where: { campaignId: campaign.id },
+    orderBy: { createdAt: "desc" }
+  });
 }

@@ -208,6 +208,7 @@ export default function BrandCampaignsPage() {
 
                       <div className="mt-4 flex flex-wrap gap-2">
                         <Link href={`/campaigns/${campaign.slug}`} className="dc-btn-secondary">Xem chi tiết</Link>
+                        <Link href={`/dashboard/brand/campaigns/${campaign.id}/missions`} className="dc-btn-secondary">Quản lý mission/job</Link>
                         {isDraft ? <button className="dc-btn-secondary" onClick={() => void campaignAction(campaign.id, "submit")}>Gửi duyệt Admin</button> : null}
                         {campaign.status === "PAUSED" ? <button className="dc-btn-secondary" onClick={() => void campaignAction(campaign.id, "approve")}>Brand duyệt publish</button> : null}
                         {!isActive ? <button className="dc-btn-secondary" onClick={() => void campaignAction(campaign.id, "feedback")}>Yêu cầu điều chỉnh</button> : null}
