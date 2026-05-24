@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { AdminAvatar } from "@/app/admin/_components/AdminAvatar";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data?: T; error?: string };
@@ -46,36 +47,6 @@ const statusOptions = [
 function fmtDate(value: string | null) {
   if (!value) return "-";
   return new Date(value).toLocaleString("vi-VN");
-}
-
-function normalizeImageUrl(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (trimmed.startsWith("/")) return trimmed;
-  return `/${trimmed}`;
-}
-
-function BrandAvatar({ name, avatarUrl, className }: { name: string; avatarUrl: string | null; className: string }) {
-  const [hasError, setHasError] = useState(false);
-  const resolvedUrl = avatarUrl ? normalizeImageUrl(avatarUrl) : "";
-
-  if (!resolvedUrl || hasError) {
-    return (
-      <div className={`flex items-center justify-center rounded-lg bg-zinc-900 text-xs font-bold text-white ${className}`}>
-        {(name || "B").charAt(0).toUpperCase()}
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={resolvedUrl}
-      alt={name || "Brand"}
-      className={`rounded-lg border border-zinc-200 object-cover ${className}`}
-      onError={() => setHasError(true)}
-    />
-  );
 }
 
 export default function AdminMissionApplicationsPage() {
@@ -216,7 +187,7 @@ export default function AdminMissionApplicationsPage() {
               items.map((item) => (
                 <article key={item.id} className={`dc-card p-4 ${selectedId === item.id ? "border-zinc-900" : ""}`}>
                   <div className="mb-2 flex items-center gap-2">
-                    <BrandAvatar name={item.campaign.brand.displayName} avatarUrl={item.campaign.brand.avatarUrl} className="h-8 w-8" />
+                    <AdminAvatar name={item.campaign.brand.displayName} imageUrl={item.campaign.brand.avatarUrl} className="h-8 w-8 rounded-lg" alt={item.campaign.brand.displayName || "Brand"} />
                     <p className="text-sm text-zinc-600">Brand: <span className="font-semibold text-zinc-900">{item.campaign.brand.displayName}</span></p>
                   </div>
                   <p className="font-semibold">{item.account.displayName}</p>
@@ -248,7 +219,7 @@ export default function AdminMissionApplicationsPage() {
             {detail && !detailLoading ? (
               <div className="mt-3 grid gap-2 text-sm">
                 <div className="mb-1 flex items-center gap-2">
-                  <BrandAvatar name={detail.campaign.brand.displayName} avatarUrl={detail.campaign.brand.avatarUrl} className="h-9 w-9" />
+                  <AdminAvatar name={detail.campaign.brand.displayName} imageUrl={detail.campaign.brand.avatarUrl} className="h-9 w-9 rounded-lg" alt={detail.campaign.brand.displayName || "Brand"} />
                   <p><strong>Brand:</strong> {detail.campaign.brand.displayName}</p>
                 </div>
                 <p><strong>Creator:</strong> {detail.account.displayName}</p>

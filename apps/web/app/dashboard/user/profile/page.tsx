@@ -49,6 +49,22 @@ function statusText(value?: unknown) {
   return "Chưa gửi";
 }
 
+function resolveAvatarSrc(input?: string | null) {
+  const raw = (input ?? "").trim();
+  if (!raw) return "";
+
+  try {
+    const parsed = new URL(raw);
+    if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+      return `${parsed.pathname}${parsed.search}`;
+    }
+    return raw;
+  } catch {
+    if (raw.startsWith("/")) return raw;
+    return "";
+  }
+}
+
 export default function UserProfilePage() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -60,6 +76,7 @@ export default function UserProfilePage() {
   const [submittingCreator, setSubmittingCreator] = useState(false);
   const [submittingBrand, setSubmittingBrand] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarLoadError, setAvatarLoadError] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -100,6 +117,11 @@ export default function UserProfilePage() {
   const sidebarItems = useMemo(() => {
     return nav;
   }, []);
+  const avatarSrc = useMemo(() => resolveAvatarSrc(data?.account.avatarUrl), [data?.account.avatarUrl]);
+
+  useEffect(() => {
+    setAvatarLoadError(false);
+  }, [avatarSrc]);
 
   async function submitCreator(event: FormEvent) {
     event.preventDefault();
@@ -203,6 +225,7 @@ export default function UserProfilePage() {
           }
         };
       });
+      setAvatarLoadError(false);
       setSuccess("Đã cập nhật ảnh đại diện.");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Không thể tải ảnh đại diện");
@@ -230,8 +253,14 @@ export default function UserProfilePage() {
           <div className="dc-card p-5">
             <h2 className="text-xl font-bold">Thông tin cá nhân</h2>
             <div className="mt-3 flex items-center gap-3">
-              {data.account.avatarUrl ? (
-                <div className="h-12 w-12 rounded-xl border border-zinc-200 bg-cover bg-center" style={{ backgroundImage: `url(${data.account.avatarUrl})` }} />
+              {avatarSrc && !avatarLoadError ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={avatarSrc}
+                  alt={data.account.displayName || "User avatar"}
+                  className="h-12 w-12 rounded-xl border border-zinc-200 object-cover"
+                  onError={() => setAvatarLoadError(true)}
+                />
               ) : (
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-900 text-sm font-bold text-white">
                   {data.account.displayName.slice(0, 1).toUpperCase() || "U"}

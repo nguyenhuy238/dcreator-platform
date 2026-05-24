@@ -747,6 +747,12 @@ function toOrder(sort?: Sort) {
   return sort === "oldest" ? "asc" : "desc";
 }
 
+function resolveBrandAvatar(input: { avatarUrl: string | null; ownedBrands: Array<{ logoUrl: string | null }> }) {
+  const logoUrl = input.ownedBrands.find((item) => Boolean(item.logoUrl?.trim()))?.logoUrl?.trim();
+  if (logoUrl) return logoUrl;
+  return input.avatarUrl;
+}
+
 export async function listMissionApplicationsForAdmin(input: {
   query?: string;
   status?: ApplicationStatus;
@@ -778,7 +784,25 @@ export async function listMissionApplicationsForAdmin(input: {
       where,
       include: {
         account: { select: { id: true, displayName: true, email: true, creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true } } } },
-        campaign: { select: { id: true, title: true, slug: true, brand: { select: { id: true, displayName: true, avatarUrl: true } } } },
+        campaign: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            brand: {
+              select: {
+                id: true,
+                displayName: true,
+                avatarUrl: true,
+                ownedBrands: {
+                  select: { logoUrl: true },
+                  orderBy: { updatedAt: "desc" },
+                  take: 1
+                }
+              }
+            }
+          }
+        },
         mission: { select: { id: true, title: true, rewardPoints: true, productReceiveOption: true, productLink: true } },
         reviewedBy: { select: { id: true, displayName: true, email: true } }
       },
@@ -787,7 +811,17 @@ export async function listMissionApplicationsForAdmin(input: {
       take: paging.limit
     })
   ]);
-  return { items, pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
+  const normalizedItems = items.map((item) => ({
+    ...item,
+    campaign: {
+      ...item.campaign,
+      brand: {
+        ...item.campaign.brand,
+        avatarUrl: resolveBrandAvatar(item.campaign.brand)
+      }
+    }
+  }));
+  return { items: normalizedItems, pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
 }
 
 export async function getMissionApplicationDetailForAdmin(id: string) {
@@ -795,13 +829,41 @@ export async function getMissionApplicationDetailForAdmin(id: string) {
     where: { id },
     include: {
       account: { select: { id: true, displayName: true, email: true, creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true, bio: true } } } },
-      campaign: { select: { id: true, title: true, slug: true, brandId: true, brand: { select: { id: true, displayName: true, avatarUrl: true } } } },
+      campaign: {
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          brandId: true,
+          brand: {
+            select: {
+              id: true,
+              displayName: true,
+              avatarUrl: true,
+              ownedBrands: {
+                select: { logoUrl: true },
+                orderBy: { updatedAt: "desc" },
+                take: 1
+              }
+            }
+          }
+        }
+      },
       mission: { select: { id: true, title: true, description: true, rewardPoints: true, productReceiveOption: true, productLink: true, deadlineAt: true } },
       reviewedBy: { select: { id: true, displayName: true, email: true } }
     }
   });
   if (!item) throw new AppError("Mission application not found", 404, "MISSION_APPLICATION_NOT_FOUND");
-  return item;
+  return {
+    ...item,
+    campaign: {
+      ...item.campaign,
+      brand: {
+        ...item.campaign.brand,
+        avatarUrl: resolveBrandAvatar(item.campaign.brand)
+      }
+    }
+  };
 }
 
 export async function approveMissionApplicationByAdmin(actorId: string, id: string) {
