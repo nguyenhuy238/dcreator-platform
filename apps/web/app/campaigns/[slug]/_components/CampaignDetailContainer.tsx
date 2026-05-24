@@ -1,19 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { CampaignDetailDTO } from "@/lib/dto/campaign-detail";
-import {
-  BackersSection,
-  CampaignStatsSection,
-  FaqPolicySection,
-  FundingSection,
-  HeroSection,
-  MissionsSection,
-  RewardsSection,
-  TimelineSection
-} from "./CampaignDetailSections";
+import { BriefTab, HeroSection, OverviewTab } from "./CampaignDetailSections";
 import { CreatorCampaignApplyButton } from "@/app/campaigns/_components/CreatorCampaignApplyButton";
-import { SupportModal } from "./SupportModal";
 
 type Props = { slug: string };
 
@@ -24,35 +14,12 @@ type ApiResponse = {
   code?: string;
 };
 
-function getCampaignCTA(data: CampaignDetailDTO, selectedRewardId: string | null) {
-  if (data.viewer.hasSupported) {
-    return { label: "Nhận voucher", disabled: false };
-  }
-  if (data.funding.isEnded) {
-    return { label: "Chiến dịch đã kết thúc", disabled: true };
-  }
-  if (!selectedRewardId) {
-    return data.viewer.isLoggedIn
-      ? { label: "Ủng hộ", disabled: true }
-      : { label: "Đăng nhập để ủng hộ", disabled: false };
-  }
-  const selectedReward = data.rewards.find((reward) => reward.id === selectedRewardId);
-  if (!selectedReward || selectedReward.isOutOfStock) {
-    return { label: "Hết lượt", disabled: true };
-  }
-  if (!data.viewer.isLoggedIn) {
-    return { label: "Đăng nhập để ủng hộ", disabled: false };
-  }
-  return { label: "Ủng hộ", disabled: false };
-}
-
 export function CampaignDetailContainer({ slug }: Props) {
   const [data, setData] = useState<CampaignDetailDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
-  const [selectedRewardId, setSelectedRewardId] = useState<string | null>(null);
-  const [isSupportOpen, setIsSupportOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "brief">("overview");
 
   useEffect(() => {
     let active = true;
@@ -78,10 +45,6 @@ export function CampaignDetailContainer({ slug }: Props) {
         }
 
         setData(body.data);
-        setSelectedRewardId((prev) => {
-          if (prev && body.data?.rewards.some((reward) => reward.id === prev)) return prev;
-          return body.data?.rewards.find((reward) => !reward.isOutOfStock)?.id ?? null;
-        });
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : "Cannot load campaign detail");
@@ -95,11 +58,6 @@ export function CampaignDetailContainer({ slug }: Props) {
       active = false;
     };
   }, [slug]);
-
-  const cta = useMemo(
-    () => (data ? getCampaignCTA(data, selectedRewardId) : { label: "Ủng hộ", disabled: true }),
-    [data, selectedRewardId]
-  );
 
   if (loading) {
     return (
@@ -134,46 +92,44 @@ export function CampaignDetailContainer({ slug }: Props) {
   }
 
   return (
-    <main className="container grid gap-4 py-6 lg:grid-cols-[1.5fr_1fr]">
-      <div className="grid gap-4">
-        <HeroSection hero={data.hero} />
-        <div className="grid gap-4">
-          <CampaignStatsSection data={data} />
-          <MissionsSection missions={data.missions} />
-          <TimelineSection timeline={data.timeline} />
-          <BackersSection socialProof={data.socialProof} />
-          <FaqPolicySection faqPolicy={data.faqPolicy} />
+    <main className="container py-6">
+      <div className="mx-auto grid w-full max-w-[1240px] gap-5">
+        <HeroSection
+          data={data}
+          applyCard={
+            <section id="apply" className="rounded-3xl border border-white/20 bg-black/40 p-5 backdrop-blur-sm">
+              <h2 className="text-2xl font-black text-white">Đăng ký chiến dịch Creator</h2>
+              <p className="mt-1 text-sm text-zinc-200">Nộp đơn để Brand/Admin duyệt trước khi nhận nhiệm vụ.</p>
+              <CreatorCampaignApplyButton slug={data.hero.slug} />
+            </section>
+          }
+        />
+        <section className="sticky top-16 z-10 border-y border-zinc-200 bg-white/95 backdrop-blur">
+          <div className="mx-auto flex w-full max-w-[960px] items-center gap-1 py-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab("overview")}
+              className={`rounded-xl px-4 py-2 text-sm font-bold uppercase tracking-wide ${activeTab === "overview" ? "bg-zinc-900 text-white" : "text-zinc-500"}`}
+            >
+              Tổng quan
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("brief")}
+              className={`rounded-xl px-4 py-2 text-sm font-bold uppercase tracking-wide ${activeTab === "brief" ? "bg-zinc-900 text-white" : "text-zinc-500"}`}
+            >
+              Yêu cầu & brief
+            </button>
+          </div>
+        </section>
+        <div className="mx-auto w-full max-w-[960px]">
+          {activeTab === "overview" ? <OverviewTab data={data} /> : <BriefTab data={data} />}
         </div>
-      </div>
-      <div className="grid gap-4">
-        <FundingSection funding={data.funding} hero={data.hero} />
-        <section className="dc-card p-4 md:p-5">
+        <section id="apply-mobile" className="dc-card p-4 lg:hidden md:p-5">
           <h2 className="text-2xl font-black text-zinc-900">Đăng ký chiến dịch Creator</h2>
           <p className="mt-1 text-sm text-slate-600">Nộp đơn để Brand/Admin duyệt trước khi nhận nhiệm vụ.</p>
           <CreatorCampaignApplyButton slug={data.hero.slug} />
         </section>
-        <RewardsSection
-          campaignTitle={data.hero.title}
-          rewards={data.rewards}
-          selectedRewardId={selectedRewardId}
-          onSelect={setSelectedRewardId}
-          cta={cta}
-          onSupport={() => {
-            if (data.viewer.hasSupported) {
-              window.location.href = "/vouchers";
-              return;
-            }
-            setIsSupportOpen(true);
-          }}
-        />
-        <SupportModal
-          open={isSupportOpen}
-          onClose={() => setIsSupportOpen(false)}
-          campaignId={data.hero.id}
-          campaignSlug={data.hero.slug}
-          rewards={data.rewards}
-          initialRewardId={selectedRewardId}
-        />
       </div>
     </main>
   );

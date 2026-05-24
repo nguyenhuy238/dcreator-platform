@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { ErrorState, PageHeader } from "@/app/components/dcreator/ui/base";
+import { getCampaignTypeLabel } from "@/lib/constants/campaign-type";
 
 type CampaignCategory = "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
 type CampaignType = "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
@@ -167,10 +168,7 @@ export default function AdminCreateCampaignPage() {
           <label className="grid gap-2 text-sm font-semibold text-zinc-700">
             <span>Campaign type</span>
             <select className="dc-input" value={form.campaignType} onChange={(event) => setField("campaignType", event.target.value as CampaignType)}>
-              <option value="COMMUNITY">COMMUNITY</option>
-              <option value="SPONSORSHIP">SPONSORSHIP</option>
-              <option value="PREORDER">PREORDER</option>
-              <option value="DONATION">DONATION</option>
+              <option value="COMMUNITY">{getCampaignTypeLabel()}</option>
             </select>
           </label>
           <label className="grid gap-2 text-sm font-semibold text-zinc-700">

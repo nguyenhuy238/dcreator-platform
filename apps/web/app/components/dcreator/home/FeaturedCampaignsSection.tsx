@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 type CampaignType = "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
-type FilterType = "ALL" | CampaignType;
+type FilterType = "ALL";
 type FeaturedCampaignItem = {
   slug: string;
   title: string;
@@ -17,23 +17,17 @@ type FeaturedCampaignItem = {
   creatorApplicants?: number;
 };
 
-const typeLabel: Record<FilterType, string> = {
-  ALL: "Tất cả",
-  DONATION: "Master Camp (Gọi vốn)",
-  PREORDER: "Preorder",
-  SPONSORSHIP: "Video Seeding",
-  COMMUNITY: "Community"
-};
+const typeLabel: Record<FilterType, string> = { ALL: "Video seeding" };
 
 export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCampaignItem[] }) {
   const [activeFilter, setActiveFilter] = useState<FilterType>("ALL");
   const [slideStart, setSlideStart] = useState(0);
-  const filters: FilterType[] = ["ALL", "DONATION", "PREORDER", "SPONSORSHIP", "COMMUNITY"];
+  const filters: FilterType[] = ["ALL"];
   const pageSize = 3;
 
   const filteredCampaigns = useMemo(() => {
     if (activeFilter === "ALL") return campaigns;
-    return campaigns.filter((campaign) => campaign.campaignType === activeFilter);
+    return campaigns;
   }, [activeFilter, campaigns]);
 
   useEffect(() => {
@@ -103,7 +97,7 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/55 via-zinc-950/10 to-transparent" />
                 <div className="absolute left-3 top-3 rounded-full border border-white/25 bg-zinc-900/65 px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-white">
-                  {typeLabel[campaign.campaignType]}
+                  Video seeding
                 </div>
               </div>
 
@@ -112,38 +106,16 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
 
                 <p className="mt-3 text-sm font-semibold text-zinc-600">Brand: {campaign.brand}</p>
 
-                {campaign.campaignType === "DONATION" ? (
-                  <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                    <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-                      <p className="text-zinc-500">Người ủng hộ</p>
-                      <p className="font-black text-zinc-900">{campaign.backers}</p>
-                    </div>
-                    <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-                      <p className="text-zinc-500">Hoàn thành</p>
-                      <p className="font-black text-zinc-900">{campaign.progressPercent}%</p>
-                    </div>
+                <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+                  <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+                    <p className="text-zinc-500">Creator ứng tuyển</p>
+                    <p className="font-black text-zinc-900">{campaign.creatorApplicants ?? 0}</p>
                   </div>
-                ) : null}
-
-                {campaign.campaignType === "SPONSORSHIP" ? (
-                  <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                    <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-                      <p className="text-zinc-500">Creator ứng tuyển</p>
-                      <p className="font-black text-zinc-900">{campaign.creatorApplicants ?? 0}</p>
-                    </div>
-                    <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-                      <p className="text-zinc-500">Hoàn thiện camp</p>
-                      <p className="font-black text-zinc-900">{campaign.progressPercent}%</p>
-                    </div>
-                  </div>
-                ) : null}
-
-                {campaign.campaignType !== "DONATION" && campaign.campaignType !== "SPONSORSHIP" ? (
-                  <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm">
-                    <p className="text-zinc-500">Mức độ hoàn thiện</p>
+                  <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+                    <p className="text-zinc-500">Hoàn thiện camp</p>
                     <p className="font-black text-zinc-900">{campaign.progressPercent}%</p>
                   </div>
-                ) : null}
+                </div>
 
                 <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-100">
                   <div className="h-full bg-zinc-900 transition-all" style={{ width: `${campaign.progressPercent}%` }} />

@@ -2,6 +2,7 @@
 
 import { FormEvent, type ReactNode, useEffect, useState } from "react";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
+import { getCampaignTypeLabel } from "@/lib/constants/campaign-type";
 
 type CampaignRequest = {
   id: string;
@@ -321,10 +322,7 @@ export default function CampaignSetupPage() {
                 </SectionField>
                 <SectionField label="Loại campaign">
                   <select className="dc-input" value={form.campaignType} onChange={(event) => setField("campaignType", event.target.value as RequestForm["campaignType"])}>
-                    <option value="COMMUNITY">Community</option>
-                    <option value="SPONSORSHIP">Sponsorship</option>
-                    <option value="PREORDER">Preorder</option>
-                    <option value="DONATION">Ủng hộ</option>
+                    <option value="COMMUNITY">{getCampaignTypeLabel()}</option>
                   </select>
                 </SectionField>
                 <SectionField label="Ngành hàng">
@@ -373,7 +371,7 @@ export default function CampaignSetupPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-xs font-bold uppercase tracking-[0.14em] text-zinc-500">/{request.requestedSlug}</p>
                         <p className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs font-semibold text-zinc-600">
-                          {request.campaignType}
+                          {getCampaignTypeLabel()}
                         </p>
                         <p className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs font-semibold text-zinc-600">
                           {request.category}

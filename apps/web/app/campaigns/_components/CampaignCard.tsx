@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { CreatorCampaignApplyButton } from "./CreatorCampaignApplyButton";
+import { getCampaignTypeLabel } from "@/lib/constants/campaign-type";
 
 const FALLBACK_COVER_IMAGE = "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200";
 
@@ -45,7 +46,7 @@ export function CampaignCard({ campaign }: { campaign: CampaignCardData }) {
       <div className="grid gap-2 p-4">
         <div className="flex flex-wrap gap-2">
           <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Đang mở</span>
-          <span className="inline-flex rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">{campaign.campaignType}</span>
+          <span className="inline-flex rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">{getCampaignTypeLabel()}</span>
         </div>
         <h3 className="text-lg font-bold text-zinc-900">{campaign.title}</h3>
         <p className="text-sm text-slate-600">Thương hiệu: {campaign.brand}</p>

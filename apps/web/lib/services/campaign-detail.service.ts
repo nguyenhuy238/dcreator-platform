@@ -50,6 +50,13 @@ export async function getCampaignDetailBySlug(slug: string, viewerId?: string): 
       brand: campaign.brand.displayName,
       creator: campaign.creator?.displayName ?? null,
       campaignType: campaign.campaignType,
+      category: campaign.category,
+      objective: campaign.objective,
+      priorityChannels: campaign.priorityChannels,
+      missionTypes: campaign.missionTypes,
+      creatorCommissionPercent: campaign.creatorCommissionPercent,
+      userCommissionPercent: campaign.userCommissionPercent,
+      bonusBudgetVnd: campaign.bonusBudgetVnd,
       status: campaign.status,
       deadline: campaign.endsAt?.toISOString() ?? null
     },
