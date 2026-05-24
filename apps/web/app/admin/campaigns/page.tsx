@@ -24,6 +24,24 @@ type CampaignRequestItem = {
   brand: { name: string; contactEmail: string };
   createdCampaign: { id: string; slug: string; title: string; status: string } | null;
 };
+type CampaignItem = {
+  id: string;
+  slug: string;
+  title: string;
+  brief: string;
+  status: string;
+  statusView?: string;
+  budgetVnd: number;
+  targetAmountVnd: number;
+  fundedAmountVnd: number;
+  backerCount: number;
+  brand: { id: string; displayName: string; email: string };
+  missions?: Array<{ id: string }>;
+  rewards?: Array<{ id: string }>;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  updatedAt?: string;
+};
 
 const statusOptions = [
   { value: "", label: "Tất cả" },
@@ -38,7 +56,8 @@ export default function AdminCampaignsPage() {
   const [error, setError] = useState("");
   const [status, setStatus] = useState("PENDING_REVIEW");
   const [query, setQuery] = useState("");
-  const [items, setItems] = useState<CampaignRequestItem[]>([]);
+  const [requestItems, setRequestItems] = useState<CampaignRequestItem[]>([]);
+  const [campaignItems, setCampaignItems] = useState<CampaignItem[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -47,10 +66,16 @@ export default function AdminCampaignsPage() {
       const params = new URLSearchParams();
       if (status) params.set("status", status);
       if (query.trim()) params.set("query", query.trim());
-      const res = await fetch(`/api/admin/dashboard/campaign-reviews?${params.toString()}`, { cache: "no-store" });
-      const body = (await res.json()) as ApiResult<CampaignRequestItem[]>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Không tải được yêu cầu campaign");
-      setItems(body.data);
+      const [reviewRes, campaignRes] = await Promise.all([
+        fetch(`/api/admin/dashboard/campaign-reviews?${params.toString()}`, { cache: "no-store" }),
+        fetch(`/api/admin/campaigns${query.trim() ? `?query=${encodeURIComponent(query.trim())}` : ""}`, { cache: "no-store" })
+      ]);
+      const reviewBody = (await reviewRes.json()) as ApiResult<CampaignRequestItem[]>;
+      const campaignBody = (await campaignRes.json()) as ApiResult<CampaignItem[]>;
+      if (!reviewRes.ok || !reviewBody.success) throw new Error(reviewBody.error ?? "Không tải được yêu cầu campaign");
+      if (!campaignRes.ok || !campaignBody.success) throw new Error(campaignBody.error ?? "Không tải được danh sách campaign hệ thống");
+      setRequestItems(reviewBody.data);
+      setCampaignItems(campaignBody.data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không tải được yêu cầu campaign");
     } finally {
@@ -112,12 +137,12 @@ export default function AdminCampaignsPage() {
 
       {!loading && !error ? (
         <section className="mt-4">
-          <SectionHeader title="Yêu cầu campaign chờ Admin" subtitle={`Tổng ${items.length} yêu cầu`} />
-          {items.length === 0 ? (
+          <SectionHeader title="Yêu cầu campaign chờ Admin" subtitle={`Tổng ${requestItems.length} yêu cầu`} />
+          {requestItems.length === 0 ? (
             <EmptyState title="Không có yêu cầu phù hợp" description="Không có dữ liệu theo bộ lọc hiện tại." />
           ) : (
             <div className="grid gap-3">
-              {items.map((item) => (
+              {requestItems.map((item) => (
                 <article key={item.id} className="dc-card p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
@@ -146,6 +171,43 @@ export default function AdminCampaignsPage() {
                     <button className="dc-btn-primary" onClick={() => void review(item.id, "APPROVED")}>Duyệt & publish</button>
                     <button className="dc-btn-secondary" onClick={() => void review(item.id, "REJECTED")}>Từ chối</button>
                     <button className="dc-btn-secondary" onClick={() => void review(item.id, "CHANGES_REQUESTED")}>Yêu cầu chỉnh sửa</button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {!loading && !error ? (
+        <section className="mt-6">
+          <SectionHeader title="Danh sách campaign hệ thống" subtitle={`Tổng ${campaignItems.length} campaign`} />
+          {campaignItems.length === 0 ? (
+            <EmptyState title="Chưa có campaign" description="Campaign sẽ hiển thị tại đây sau khi được tạo." />
+          ) : (
+            <div className="grid gap-3">
+              {campaignItems.map((campaign) => (
+                <article key={campaign.id} className="dc-card p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-zinc-900">{campaign.title}</p>
+                      <p className="text-sm text-zinc-600">/{campaign.slug} - #{campaign.id.slice(0, 8)}</p>
+                      <p className="text-sm text-zinc-600">Brand: {campaign.brand.displayName} - {campaign.brand.email}</p>
+                    </div>
+                    <StatusBadge status={(campaign.statusView ?? campaign.status).toLowerCase()} />
+                  </div>
+                  <p className="mt-3 line-clamp-2 text-sm text-zinc-600">{campaign.brief}</p>
+                  <div className="mt-3 grid gap-2 text-sm text-zinc-600 md:grid-cols-3">
+                    <p>Ngân sách: <span className="font-semibold text-zinc-900">{campaign.budgetVnd.toLocaleString("vi-VN")}đ</span></p>
+                    <p>Target: <span className="font-semibold text-zinc-900">{campaign.targetAmountVnd.toLocaleString("vi-VN")}đ</span></p>
+                    <p>Đã huy động: <span className="font-semibold text-zinc-900">{campaign.fundedAmountVnd.toLocaleString("vi-VN")}đ</span></p>
+                    <p>Backer: <span className="font-semibold text-zinc-900">{campaign.backerCount.toLocaleString("vi-VN")}</span></p>
+                    <p>Missions: <span className="font-semibold text-zinc-900">{campaign.missions?.length ?? 0}</span></p>
+                    <p>Rewards: <span className="font-semibold text-zinc-900">{campaign.rewards?.length ?? 0}</span></p>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Link className="dc-btn-secondary" href={`/admin/campaigns/${campaign.id}`}>Quản lý campaign</Link>
+                    <Link className="dc-btn-primary" href={`/admin/campaigns/${campaign.id}/missions`}>Quản lý mission/job</Link>
                   </div>
                 </article>
               ))}

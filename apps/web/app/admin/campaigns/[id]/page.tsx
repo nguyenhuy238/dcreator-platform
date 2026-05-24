@@ -108,6 +108,7 @@ export default function AdminCampaignDetailPage() {
         action={
           <div className="flex gap-2">
             <button className="dc-btn-secondary" onClick={() => router.push(`/admin/campaigns/${item.id}/applications`)}>Applications</button>
+            <button className="dc-btn-secondary" onClick={() => router.push(`/admin/campaigns/${item.id}/missions`)}>Quản lý mission/job</button>
             <button className="dc-btn-secondary" onClick={() => router.push("/admin/campaigns")}>Back</button>
           </div>
         }
