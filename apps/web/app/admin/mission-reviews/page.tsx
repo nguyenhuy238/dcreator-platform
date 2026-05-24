@@ -405,7 +405,13 @@ function AdminMissionApplicationsTab() {
     }
   }
 
-  async function loadDetail(id: string) {
+  async function loadDetail(id: string, options?: { force?: boolean }) {
+    if (!options?.force && selectedId === id) {
+      setSelectedId("");
+      setDetail(null);
+      setDetailLoading(false);
+      return;
+    }
     setSelectedId(id);
     setDetailLoading(true);
     try {
@@ -430,7 +436,7 @@ function AdminMissionApplicationsTab() {
       if (!res.ok || !body.success) throw new Error(body.error ?? "Duyệt thất bại");
       setNotice("Đã duyệt đơn xin nhiệm vụ.");
       await load();
-      if (selectedId === id) await loadDetail(id);
+      if (selectedId === id) await loadDetail(id, { force: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Duyệt thất bại");
     }
@@ -451,7 +457,7 @@ function AdminMissionApplicationsTab() {
       if (!res.ok || !body.success) throw new Error(body.error ?? "Từ chối thất bại");
       setNotice("Đã từ chối đơn xin nhiệm vụ.");
       await load();
-      if (selectedId === id) await loadDetail(id);
+      if (selectedId === id) await loadDetail(id, { force: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Từ chối thất bại");
     }
@@ -497,7 +503,9 @@ function AdminMissionApplicationsTab() {
                   <p className="text-sm">Hình thức nhận sản phẩm: {item.mission.productReceiveOption}</p>
                   <p className="text-xs text-zinc-500 mt-1">Trạng thái: {item.status} · Tạo lúc: {fmtDate(item.createdAt)}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>Chi tiết</button>
+                    <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
+                      {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
+                    </button>
                     {item.status === "PENDING_REVIEW" ? <button className="dc-btn-primary" onClick={() => void approve(item.id)}>Đồng ý</button> : null}
                     {item.status === "PENDING_REVIEW" ? <button className="dc-btn-secondary" onClick={() => void reject(item.id)}>Từ chối</button> : null}
                   </div>
