@@ -25,6 +25,17 @@ type CommissionLine = {
 };
 
 type CommissionData = { lines: CommissionLine[]; payoutRequests: PayoutHistory[] };
+type CreatorOverview = {
+  totalCommission: number;
+  nPointsBalance: number;
+};
+type CreatorMissionSummary = {
+  status: string;
+  completedAt: string | null;
+  mission: {
+    rewardPoints: number;
+  };
+};
 
 type ApiResponse<T> = { success: boolean; data?: T; error?: string };
 
@@ -46,6 +57,8 @@ function buildPayoutReason(available: number) {
 export default function CreatorWalletPage() {
   const [payout, setPayout] = useState<PayoutData | null>(null);
   const [commission, setCommission] = useState<CommissionData | null>(null);
+  const [overview, setOverview] = useState<CreatorOverview | null>(null);
+  const [missions, setMissions] = useState<CreatorMissionSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -58,13 +71,17 @@ export default function CreatorWalletPage() {
     setLoading(true);
     setError("");
     try {
-      const [payoutResponse, commissionResponse] = await Promise.all([
+      const [payoutResponse, commissionResponse, overviewResponse, missionsResponse] = await Promise.all([
         fetch("/api/creator/dashboard/payouts", { cache: "no-store" }),
-        fetch("/api/creator/dashboard/commission", { cache: "no-store" })
+        fetch("/api/creator/dashboard/commission", { cache: "no-store" }),
+        fetch("/api/creator/dashboard/overview", { cache: "no-store" }),
+        fetch("/api/me/mission", { cache: "no-store" })
       ]);
 
       const payoutPayload = (await payoutResponse.json()) as ApiResponse<PayoutData>;
       const commissionPayload = (await commissionResponse.json()) as ApiResponse<CommissionData>;
+      const overviewPayload = (await overviewResponse.json()) as ApiResponse<CreatorOverview>;
+      const missionsPayload = (await missionsResponse.json()) as ApiResponse<CreatorMissionSummary[]>;
 
       if (!payoutResponse.ok || !payoutPayload.success || !payoutPayload.data) {
         throw new Error(payoutPayload.error ?? "Không thể tải ví Creator");
@@ -72,9 +89,17 @@ export default function CreatorWalletPage() {
       if (!commissionResponse.ok || !commissionPayload.success || !commissionPayload.data) {
         throw new Error(commissionPayload.error ?? "Không thể tải lịch sử hoa hồng");
       }
+      if (!overviewResponse.ok || !overviewPayload.success || !overviewPayload.data) {
+        throw new Error(overviewPayload.error ?? "Không thể tải tổng quan Creator");
+      }
+      if (!missionsResponse.ok || !missionsPayload.success || !missionsPayload.data) {
+        throw new Error(missionsPayload.error ?? "Không thể tải nhiệm vụ Creator");
+      }
 
       setPayout(payoutPayload.data);
       setCommission(commissionPayload.data);
+      setOverview(overviewPayload.data);
+      setMissions(missionsPayload.data);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Không thể tải ví Creator");
     } finally {
@@ -87,19 +112,25 @@ export default function CreatorWalletPage() {
   }, []);
 
   const summary = useMemo(() => {
-    const available = payout?.availableBalanceVnd ?? 0;
-    const lines = commission?.lines ?? [];
-    const paid = payout?.history.filter((item) => item.status === "PAID").reduce((sum, item) => sum + item.amountVnd, 0) ?? 0;
-    const pendingReview = payout?.history.filter((item) => item.status === "PENDING" || item.status === "APPROVED").reduce((sum, item) => sum + item.amountVnd, 0) ?? 0;
-    const totalIncome = lines.reduce((sum, line) => sum + line.fixedFeeVnd + line.salesCommissionVnd, 0);
-    const monthKey = new Date().getMonth();
-    const monthIncome = (payout?.history ?? [])
-      .filter((item) => item.status === "PAID" && new Date(item.createdAt).getMonth() === monthKey)
-      .reduce((sum, item) => sum + item.amountVnd, 0);
-    return { available, pendingReview, totalIncome, paid, monthIncome };
-  }, [commission?.lines, payout?.availableBalanceVnd, payout?.history]);
+    const availablePoints = overview?.nPointsBalance ?? 0;
+    const totalCommissionPoints = overview?.totalCommission ?? 0;
+    const totalWithdrawnVnd = payout?.history.filter((item) => item.status === "PAID").reduce((sum, item) => sum + item.amountVnd, 0) ?? 0;
 
-  const payoutReason = buildPayoutReason(summary.available);
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const monthlyIncomePoints = missions
+      .filter((item) => item.status === "COMPLETED" && item.completedAt)
+      .filter((item) => {
+        const completedAt = new Date(item.completedAt ?? "");
+        return completedAt.getMonth() === currentMonth && completedAt.getFullYear() === currentYear;
+      })
+      .reduce((sum, item) => sum + (item.mission.rewardPoints ?? 0), 0);
+
+    return { availablePoints, totalCommissionPoints, monthlyIncomePoints, totalWithdrawnVnd };
+  }, [missions, overview?.nPointsBalance, overview?.totalCommission, payout?.history]);
+
+  const payoutReason = buildPayoutReason(payout?.availableBalanceVnd ?? 0);
   const canRequestPayout = payoutReason.length === 0;
 
   async function onRequestPayout(event: FormEvent<HTMLFormElement>) {
@@ -143,11 +174,10 @@ export default function CreatorWalletPage() {
       {!loading && payout && commission ? (
         <>
           <section className="dc-grid-dashboard">
-            <StatsCard title="Số dư khả dụng" value={formatVnd(summary.available)} />
-            <StatsCard title="Đang chờ đối soát" value={formatVnd(summary.pendingReview)} />
-            <StatsCard title="Tổng thu nhập" value={formatVnd(summary.totalIncome)} />
-            <StatsCard title="Tổng đã rút" value={formatVnd(summary.paid)} />
-            <StatsCard title="Thu nhập tháng này" value={formatVnd(summary.monthIncome)} />
+            <StatsCard title="Số dư khả dụng" value={`${summary.availablePoints.toLocaleString("vi-VN")} N-Points`} />
+            <StatsCard title="Số hoa hồng đã nhận" value={`${summary.totalCommissionPoints.toLocaleString("vi-VN")} N-Points`} />
+            <StatsCard title="Thu nhập tháng này" value={`${summary.monthlyIncomePoints.toLocaleString("vi-VN")} N-Points`} />
+            <StatsCard title="Tổng đã rút" value={formatVnd(summary.totalWithdrawnVnd)} />
           </section>
 
           <section className="mt-6 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
