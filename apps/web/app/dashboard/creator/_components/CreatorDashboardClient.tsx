@@ -33,7 +33,7 @@ type CreatorMissionItem = {
 
 const statusLabel: Record<string, string> = {
   PRODUCT_PENDING: "Xử lý sản phẩm",
-  DRAFT_PENDING: "Chờ gửi video",
+  DRAFT_PENDING: "Chờ duyệt kịch bản",
   IN_PROGRESS: "Đang thực hiện",
   COMPLETED: "Hoàn thành",
   CANCELLED: "Đã hủy"

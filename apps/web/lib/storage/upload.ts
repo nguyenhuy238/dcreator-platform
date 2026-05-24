@@ -3,10 +3,17 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { AppError } from "@/lib/errors";
 
-type UploadFolder = "creator-kyc" | "brand-kyc" | "onboarding-doc" | "creator-avatar";
+type UploadFolder = "creator-kyc" | "brand-kyc" | "onboarding-doc" | "creator-avatar" | "creator-transcript";
 
 type UploadInput = {
   file: File;
+  folder: UploadFolder;
+  suffix: string;
+  ext?: string;
+};
+
+type TextUploadInput = {
+  content: string;
   folder: UploadFolder;
   suffix: string;
   ext?: string;
@@ -21,6 +28,10 @@ function resolveFileExtension(file: File, ext?: string) {
 function makeFileName(file: File, suffix: string, ext?: string) {
   const extension = resolveFileExtension(file, ext);
   return `${Date.now()}-${randomUUID()}-${suffix}.${extension}`;
+}
+
+function makeTextFileName(suffix: string, ext = "txt") {
+  return `${Date.now()}-${randomUUID()}-${suffix}.${ext}`;
 }
 
 async function saveToLocalPublic(input: UploadInput) {
@@ -72,8 +83,62 @@ async function saveToSupabaseStorage(input: UploadInput) {
   return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/${bucket}/${objectPath}`;
 }
 
+async function saveTextToLocalPublic(input: TextUploadInput) {
+  const { content, folder, suffix, ext } = input;
+  const fileName = makeTextFileName(suffix, ext ?? "txt");
+  const relativeDir = path.join("uploads", folder);
+  const absoluteDir = path.join(process.cwd(), "public", relativeDir);
+  await mkdir(absoluteDir, { recursive: true });
+  await writeFile(path.join(absoluteDir, fileName), content, "utf8");
+  return `/${relativeDir.replace(/\\/g, "/")}/${fileName}`;
+}
+
+async function saveTextToSupabaseStorage(input: TextUploadInput) {
+  const { content, folder, suffix, ext } = input;
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const bucket = process.env.SUPABASE_STORAGE_BUCKET;
+
+  if (!supabaseUrl || !serviceRoleKey || !bucket) {
+    throw new AppError(
+      "Missing SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, or SUPABASE_STORAGE_BUCKET for production upload",
+      500,
+      "UPLOAD_STORAGE_CONFIG_MISSING"
+    );
+  }
+
+  const fileName = makeTextFileName(suffix, ext ?? "txt");
+  const objectPath = `${folder}/${fileName}`;
+  const uploadUrl = `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/${bucket}/${objectPath}`;
+  const body = Buffer.from(content, "utf8");
+
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${serviceRoleKey}`,
+      apikey: serviceRoleKey,
+      "x-upsert": "false",
+      "content-type": "text/plain; charset=utf-8"
+    },
+    body
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new AppError("Failed to upload text file to storage", 502, "UPLOAD_STORAGE_FAILED", details);
+  }
+
+  return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/${bucket}/${objectPath}`;
+}
+
 export async function saveUpload(input: UploadInput) {
   const isProduction = process.env.NODE_ENV === "production";
   if (isProduction) return saveToSupabaseStorage(input);
   return saveToLocalPublic(input);
+}
+
+export async function saveTextUpload(input: TextUploadInput) {
+  const isProduction = process.env.NODE_ENV === "production";
+  if (isProduction) return saveTextToSupabaseStorage(input);
+  return saveTextToLocalPublic(input);
 }

@@ -16,6 +16,10 @@ export const creatorMissionVideoSubmitSchema = z.object({
   note: z.string().trim().max(500).optional()
 });
 
+export const creatorMissionTranscriptSubmitSchema = z.object({
+  transcript: z.string().trim().min(10).max(5000)
+});
+
 export const creatorMissionPublishSubmitSchema = z
   .object({
     publicVideoUrl: z.string().trim().url().max(2000).optional(),
@@ -59,6 +63,20 @@ export const missionVideoReviewAdminQuerySchema = z.object({
 });
 
 export const missionVideoReviewRejectSchema = z.object({
+  feedback: z.string().trim().min(3).max(500)
+});
+
+export const missionTranscriptReviewAdminQuerySchema = z.object({
+  query: z.string().trim().min(1).max(120).optional(),
+  campaignId: z.string().trim().min(3).optional(),
+  campaign: z.string().trim().min(1).max(120).optional(),
+  status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
+  sort: z.enum(["newest", "oldest"]).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional()
+});
+
+export const missionTranscriptReviewRejectSchema = z.object({
   feedback: z.string().trim().min(3).max(500)
 });
 

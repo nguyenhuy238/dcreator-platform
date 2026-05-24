@@ -5,10 +5,11 @@ import { useSearchParams } from "next/navigation";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data?: T; error?: string };
-type TabKey = "applications" | "video-reviews" | "final-reviews";
+type TabKey = "transcript-reviews" | "applications" | "video-reviews" | "final-reviews";
 
 const tabs: Array<{ key: TabKey; label: string }> = [
   { key: "applications", label: "Nhận nhiệm vụ" },
+  { key: "transcript-reviews", label: "Duyệt kịch bản" },
   { key: "video-reviews", label: "Duyệt video" },
   { key: "final-reviews", label: "Duyệt hoàn thành" }
 ];
@@ -21,17 +22,17 @@ function fmtDate(value: string | null) {
 export default function AdminMissionReviewsPage() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const initialTab: TabKey = tabParam === "video-reviews" || tabParam === "final-reviews" || tabParam === "applications" ? tabParam : "applications";
+  const initialTab: TabKey = tabParam === "transcript-reviews" || tabParam === "video-reviews" || tabParam === "final-reviews" || tabParam === "applications" ? tabParam : "applications";
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
 
   useEffect(() => {
-    const nextTab: TabKey = tabParam === "video-reviews" || tabParam === "final-reviews" || tabParam === "applications" ? tabParam : "applications";
+    const nextTab: TabKey = tabParam === "transcript-reviews" || tabParam === "video-reviews" || tabParam === "final-reviews" || tabParam === "applications" ? tabParam : "applications";
     setActiveTab(nextTab);
   }, [tabParam]);
 
   return (
     <>
-      <PageHeader title="Duyệt nhiệm vụ Creator" subtitle="Gộp 3 luồng duyệt: nhận nhiệm vụ, duyệt video và duyệt hoàn thành." />
+      <PageHeader title="Duyệt nhiệm vụ Creator" subtitle="Gộp 4 luồng duyệt: kịch bản, nhận nhiệm vụ, duyệt video và duyệt hoàn thành." />
 
       <section className="dc-card p-3">
         <div className="flex flex-wrap gap-2">
@@ -48,10 +49,253 @@ export default function AdminMissionReviewsPage() {
         </div>
       </section>
 
+      {activeTab === "transcript-reviews" ? <AdminMissionTranscriptReviewsTab /> : null}
       {activeTab === "applications" ? <AdminMissionApplicationsTab /> : null}
       {activeTab === "video-reviews" ? <AdminMissionVideoReviewsTab /> : null}
       {activeTab === "final-reviews" ? <AdminMissionFinalReviewsTab /> : null}
     </>
+  );
+}
+
+type TranscriptItem = {
+  id: string;
+  status: string;
+  videoReviewFeedback: string | null;
+  account: {
+    id: string;
+    displayName: string;
+    email: string;
+    creatorProfile: { mainPlatform: string | null; socialUrl: string | null; followerCount: number | null; bio?: string | null } | null;
+  };
+  campaign: { id: string; title: string; slug: string; brandId: string };
+  mission: { id: string; title: string; description: string; rewardPoints: number; productReceiveOption: string; productLink: string | null; deadlineAt: string | null };
+  submission: {
+    proofTextNote: string | null;
+    fileUploadUrl: string | null;
+    status: string;
+    rejectReason: string | null;
+    updatedAt: string;
+    reviewedAt: string | null;
+  } | null;
+};
+
+type TranscriptListResponse = {
+  items: TranscriptItem[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+};
+
+const transcriptStatusOptions = [
+  { value: "", label: "Tất cả trạng thái" },
+  { value: "PENDING", label: "Chờ duyệt" },
+  { value: "REJECTED", label: "Đã từ chối" },
+  { value: "APPROVED", label: "Đã duyệt" }
+];
+
+function transcriptStatusLabel(item: TranscriptItem) {
+  if (item.status === "DRAFT_PENDING" && item.submission?.status === "SUBMITTED") return "PENDING";
+  if (item.status === "DRAFT_PENDING" && item.submission?.status === "REJECTED") return "REJECTED";
+  if (item.submission?.status === "APPROVED") return "APPROVED";
+  return item.submission?.status ?? "UNKNOWN";
+}
+
+function AdminMissionTranscriptReviewsTab() {
+  const [items, setItems] = useState<TranscriptItem[]>([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [selectedId, setSelectedId] = useState<string>("");
+  const [detail, setDetail] = useState<TranscriptItem | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("PENDING");
+  const [campaign, setCampaign] = useState("");
+  const [sort, setSort] = useState("newest");
+  const [page, setPage] = useState(1);
+
+  async function load(pageOverride?: number) {
+    const targetPage = pageOverride ?? page;
+    setLoading(true);
+    setError("");
+    try {
+      const params = new URLSearchParams();
+      if (query.trim()) params.set("query", query.trim());
+      if (status) params.set("status", status);
+      if (campaign.trim()) params.set("campaign", campaign.trim());
+      params.set("sort", sort);
+      params.set("page", String(targetPage));
+      params.set("limit", "20");
+
+      const res = await fetch(`/api/admin/mission-transcript-reviews?${params.toString()}`, { cache: "no-store" });
+      const body = (await res.json()) as ApiResult<TranscriptListResponse>;
+      if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? "Không thể tải danh sách");
+      setItems(body.data.items);
+      setPagination(body.data.pagination);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không thể tải danh sách");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadDetail(id: string) {
+    setSelectedId(id);
+    setDetailLoading(true);
+    try {
+      const res = await fetch(`/api/admin/mission-transcript-reviews/${id}`, { cache: "no-store" });
+      const body = (await res.json()) as ApiResult<TranscriptItem>;
+      if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? "Không thể tải chi tiết");
+      setDetail(body.data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không thể tải chi tiết");
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
+  async function approve(id: string) {
+    setNotice("");
+    setError("");
+    if (!window.confirm("Xác nhận duyệt kịch bản này?")) return;
+    try {
+      const res = await fetch(`/api/admin/mission-transcript-reviews/${id}/approve`, { method: "POST" });
+      const body = (await res.json()) as ApiResult<unknown>;
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Duyệt thất bại");
+      setNotice("Đã duyệt kịch bản. Creator có thể nộp video review.");
+      await load();
+      if (selectedId === id) await loadDetail(id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Duyệt thất bại");
+    }
+  }
+
+  async function reject(id: string) {
+    setNotice("");
+    setError("");
+    const feedback = window.prompt("Nhập lý do từ chối kịch bản:", "Kịch bản chưa đạt yêu cầu brief")?.trim();
+    if (!feedback) return;
+    try {
+      const res = await fetch(`/api/admin/mission-transcript-reviews/${id}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feedback })
+      });
+      const body = (await res.json()) as ApiResult<unknown>;
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Từ chối thất bại");
+      setNotice("Đã từ chối kịch bản. Creator có thể nộp lại.");
+      await load();
+      if (selectedId === id) await loadDetail(id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Từ chối thất bại");
+    }
+  }
+
+  useEffect(() => {
+    void load();
+  }, [page, sort]);
+
+  return (
+    <section className="mt-4 grid gap-4">
+      <section className="dc-card p-4">
+        <div className="grid gap-2 md:grid-cols-5">
+          <input className="dc-input md:col-span-2" placeholder="Tìm creator theo tên/email" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <select className="dc-input" value={status} onChange={(e) => setStatus(e.target.value)}>
+            {transcriptStatusOptions.map((s) => <option key={s.value || "all"} value={s.value}>{s.label}</option>)}
+          </select>
+          <input className="dc-input" placeholder="Tên campaign" value={campaign} onChange={(e) => setCampaign(e.target.value)} />
+          <select className="dc-input" value={sort} onChange={(e) => setSort(e.target.value)}>
+            <option value="newest">Mới nhất</option>
+            <option value="oldest">Cũ nhất</option>
+          </select>
+        </div>
+        <div className="mt-3 flex gap-2">
+          <button className="dc-btn-primary" onClick={() => { setPage(1); void load(1); }}>Lọc</button>
+          <button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>
+          <p className="text-sm text-zinc-500">Tổng {pagination.total} bản ghi</p>
+        </div>
+      </section>
+
+      {notice ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</p> : null}
+      {error ? <ErrorState title="Có lỗi" description={error} onRetry={() => void load()} /> : null}
+      {loading ? <LoadingSkeleton rows={5} /> : null}
+
+      {!loading && !error ? (
+        <section className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+          <div className="grid gap-3">
+            {items.length === 0 ? (
+              <EmptyState title="Không có kịch bản" description="Không có kịch bản nào phù hợp bộ lọc hiện tại." />
+            ) : (
+              items.map((item) => {
+                const statusLabel = transcriptStatusLabel(item);
+                const transcript = item.submission?.proofTextNote ?? "";
+                return (
+                  <article key={item.id} className={`dc-card p-4 ${selectedId === item.id ? "border-zinc-900" : ""}`}>
+                    <p className="font-semibold">{item.account.displayName}</p>
+                    <p className="text-xs text-zinc-500">{item.account.email} · {item.account.creatorProfile?.mainPlatform ?? "-"}</p>
+                    <p className="mt-1 text-sm">Campaign: {item.campaign.title}</p>
+                    <p className="text-sm">Nhiệm vụ: {item.mission.title}</p>
+                    <p className="text-xs text-zinc-500 mt-1">Trạng thái kịch bản: {statusLabel}</p>
+                    <p className="mt-2 line-clamp-3 text-sm text-zinc-700">{transcript || "Chưa có nội dung kịch bản"}</p>
+                    {item.submission?.fileUploadUrl ? (
+                      <a
+                        href={`/api/uploads/transcript-download?url=${encodeURIComponent(item.submission.fileUploadUrl)}`}
+                        className="mt-2 inline-flex text-sm font-semibold text-zinc-900 underline"
+                      >
+                        Tải file kịch bản
+                      </a>
+                    ) : null}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>Xem chi tiết</button>
+                      {statusLabel === "PENDING" ? <button className="dc-btn-primary" onClick={() => void approve(item.id)}>Duyệt</button> : null}
+                      {statusLabel === "PENDING" ? <button className="dc-btn-secondary" onClick={() => void reject(item.id)}>Từ chối</button> : null}
+                    </div>
+                  </article>
+                );
+              })
+            )}
+            <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white p-3">
+              <button className="dc-btn-secondary" disabled={pagination.page <= 1} onClick={() => setPage((x) => Math.max(1, x - 1))}>Trang trước</button>
+              <p className="text-sm text-zinc-500">Trang {pagination.page}/{pagination.totalPages}</p>
+              <button className="dc-btn-secondary" disabled={pagination.page >= pagination.totalPages} onClick={() => setPage((x) => Math.min(pagination.totalPages, x + 1))}>Trang sau</button>
+            </div>
+          </div>
+
+          <aside className="dc-card p-4">
+            <h2 className="font-semibold">Chi tiết kịch bản</h2>
+            {!selectedId ? <p className="text-sm text-zinc-500 mt-2">Chọn một item để xem chi tiết.</p> : null}
+            {detailLoading ? <div className="mt-3"><LoadingSkeleton rows={4} /></div> : null}
+            {detail && !detailLoading ? (
+              <div className="mt-3 grid gap-2 text-sm">
+                <p><strong>Creator:</strong> {detail.account.displayName}</p>
+                <p><strong>Email:</strong> {detail.account.email}</p>
+                <p><strong>Nền tảng chính:</strong> {detail.account.creatorProfile?.mainPlatform ?? "-"}</p>
+                <p><strong>Social URL:</strong> {detail.account.creatorProfile?.socialUrl ?? "-"}</p>
+                <p><strong>Follower:</strong> {(detail.account.creatorProfile?.followerCount ?? 0).toLocaleString("vi-VN")}</p>
+                <p><strong>Campaign:</strong> {detail.campaign.title}</p>
+                <p><strong>Nhiệm vụ:</strong> {detail.mission.title}</p>
+                <p><strong>Mô tả nhiệm vụ:</strong> {detail.mission.description}</p>
+                <p><strong>Hình thức nhận sản phẩm:</strong> {detail.mission.productReceiveOption}</p>
+                <p><strong>Link sản phẩm:</strong> {detail.mission.productLink ?? "-"}</p>
+                <p><strong>Deadline:</strong> {fmtDate(detail.mission.deadlineAt)}</p>
+                <p><strong>Kịch bản:</strong></p>
+                <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 whitespace-pre-wrap">{detail.submission?.proofTextNote ?? "-"}</div>
+                {detail.submission?.fileUploadUrl ? (
+                  <a
+                    href={`/api/uploads/transcript-download?url=${encodeURIComponent(detail.submission.fileUploadUrl)}`}
+                    className="inline-flex text-sm font-semibold text-zinc-900 underline"
+                  >
+                    Tải file kịch bản (.txt)
+                  </a>
+                ) : null}
+                <p><strong>Trạng thái:</strong> {transcriptStatusLabel(detail)}</p>
+                <p><strong>Lý do từ chối:</strong> {detail.submission?.rejectReason ?? detail.videoReviewFeedback ?? "-"}</p>
+              </div>
+            ) : null}
+          </aside>
+        </section>
+      ) : null}
+    </section>
   );
 }
 
