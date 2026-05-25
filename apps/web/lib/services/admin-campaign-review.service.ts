@@ -12,6 +12,14 @@ type AdminDecision = "APPROVE" | "REJECT" | "REQUEST_CHANGES" | "PAUSE";
 type AdminCampaignCreateInput = z.infer<typeof adminCampaignCreateSchema>;
 type CampaignMissionInput = z.infer<typeof campaignMissionCreateSchema>;
 
+async function trySyncCampaignNewFields(campaignId: string, benefits: string | null, participationRoadmap: string[]) {
+  try {
+    await prisma.$executeRaw`UPDATE "Campaign" SET "benefits" = ${benefits}, "participationRoadmap" = ${participationRoadmap} WHERE "id" = ${campaignId}`;
+  } catch {
+    // Backward compatibility when DB has not applied migration yet.
+  }
+}
+
 const campaignTransitionMap: Record<AdminDecision, readonly CampaignStatus[]> = {
   APPROVE: ["DRAFT", "PAUSED"],
   REJECT: ["DRAFT", "PAUSED"],
@@ -66,7 +74,19 @@ export async function listCampaignsForAdmin(input: { status?: CampaignStatus; qu
         : {})
     },
     orderBy: { updatedAt: "desc" },
-    include: {
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      brief: true,
+      status: true,
+      budgetVnd: true,
+      targetAmountVnd: true,
+      fundedAmountVnd: true,
+      backerCount: true,
+      startsAt: true,
+      endsAt: true,
+      updatedAt: true,
       brand: { select: { id: true, displayName: true, email: true } },
       creator: { select: { id: true, displayName: true, email: true } },
       rewards: { select: { id: true, stockTotal: true, stockRemaining: true, pointsCost: true } },
@@ -97,7 +117,19 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
   const prismaAny = prisma as any;
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },
-    include: {
+    select: {
+      id: true,
+      brandId: true,
+      slug: true,
+      title: true,
+      brief: true,
+      status: true,
+      startsAt: true,
+      endsAt: true,
+      budgetVnd: true,
+      targetAmountVnd: true,
+      fundedAmountVnd: true,
+      backerCount: true,
       brand: { select: { id: true, displayName: true, email: true } },
       creator: { select: { id: true, displayName: true, email: true } },
       rewards: true,
@@ -289,17 +321,18 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
       slug: input.slug,
       title: input.title,
       brief: input.brief,
-      budgetVnd: input.budgetVnd,
-      targetAmountVnd: input.targetAmountVnd ?? input.budgetVnd,
+      budgetVnd: 10000000,
+      targetAmountVnd: 10000000,
       category: input.category,
       campaignType: input.campaignType,
       setupSource: input.setupSource,
-      objective: input.objective || null,
-      priorityChannels: input.priorityChannels || null,
-      missionTypes: input.missionTypes || null,
-      creatorCommissionPercent: input.creatorCommissionPercent,
-      userCommissionPercent: input.userCommissionPercent,
-      bonusBudgetVnd: input.bonusBudgetVnd,
+      objective: input.benefits || null,
+      priorityChannels: input.participationRoadmap.join("\n"),
+      missionTypes: null,
+      creatorCommissionPercent: 0,
+      userCommissionPercent: 0,
+      bonusBudgetVnd: 0,
+      coverImageUrl: input.imageUrl || null,
       startsAt: input.startsAt ? new Date(input.startsAt) : null,
       endsAt: input.endsAt ? new Date(input.endsAt) : null,
       feasibilityStatus: input.publishNow ? "APPROVED" : "DRAFT",
@@ -307,6 +340,7 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
       status: input.publishNow ? "ACTIVE" : "DRAFT"
     }
   });
+  await trySyncCampaignNewFields(campaign.id, input.benefits || null, input.participationRoadmap);
 
   await writeAuditLog({
     actorId,

@@ -26,7 +26,7 @@ export function AdminShell({
       navItems={navItems}
       user={user}
       workspaceTitle="Bảng điều khiển Admin"
-      workspaceDescription="Trung tâm vận hành và kiểm duyệt"
+      workspaceDescription="Trung tâm vận hành và quản lý"
       loginRedirect="/admin"
     >
       {children}

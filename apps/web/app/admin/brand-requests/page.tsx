@@ -160,7 +160,7 @@ export default function AdminBrandRequestsPage() {
 
   return (
     <main>
-      <PageHeader title="Duyệt Brand" subtitle="Kiểm tra, duyệt hoặc yêu cầu bổ sung hồ sơ Brand/SME." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
+      <PageHeader title="Quản lý Brand" subtitle="Quản lý hồ sơ Brand/SME và quyết định duyệt hoặc yêu cầu bổ sung." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatsCard title="Tổng hồ sơ" value={String(stats.total)} />

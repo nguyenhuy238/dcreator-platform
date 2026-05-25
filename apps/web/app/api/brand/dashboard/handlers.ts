@@ -1,17 +1,16 @@
 import { NextRequest } from "next/server";
 import { ok } from "@/lib/api-response";
 import { requireBrandActor } from "@/lib/auth/brand-guard";
-import { toErrorResponse } from "@/lib/errors";
+import { AppError, toErrorResponse } from "@/lib/errors";
 import {
   addRewardTier,
   addCampaignMissionForBrand,
   approveCampaignForPublish,
-  createBrandCampaign,
   createBrandCampaignRequest,
   createProductSubmissionForReview,
   decideCreatorApplication,
-  editDraftCampaign,
   getBrandAnalytics,
+  getBrandCampaignTemplateConfig,
   getBrandBudget,
   getBrandOnboarding,
   getBrandOverview,
@@ -29,7 +28,6 @@ import {
   reviewBrandProof,
   requestCampaignAdjustment,
   respondBrandCampaignRequest,
-  submitCampaignForAdminReview,
   topupBrandFund,
   updateBrandMemberRole,
   updateBrandOnboarding,
@@ -51,7 +49,6 @@ import {
   budgetLockSchema,
   budgetTopupSchema,
   campaignBrandFeedbackSchema,
-  campaignCreateSchema,
   campaignMissionCreateSchema,
   campaignRequestSchema,
   creatorApplicationDecisionSchema,
@@ -116,21 +113,21 @@ export async function GET_campaigns(request: NextRequest) {
   return ok(await listBrandCampaigns(account.id));
 }
 
-export async function POST_campaigns(request: NextRequest) {
-  const account = await requireBrandActor(request);
-  const payload = campaignCreateSchema.parse(await request.json());
-  return ok(await createBrandCampaign(account.id, payload), 201);
+export async function POST_campaigns(request: NextRequest): Promise<Response> {
+  await requireBrandActor(request);
+  throw new AppError("Brand không còn tạo campaign trực tiếp. Vui lòng dùng form 'Yêu cầu Admin tạo campaign'.", 410, "BRAND_CAMPAIGN_DIRECT_CREATE_DISABLED");
 }
 
-export async function PUT_campaign(request: NextRequest, campaignId: string) {
-  const account = await requireBrandActor(request);
-  const payload = campaignCreateSchema.parse(await request.json());
-  return ok(await editDraftCampaign(account.id, campaignId, payload));
+export async function PUT_campaign(request: NextRequest, campaignId: string): Promise<Response> {
+  await requireBrandActor(request);
+  void campaignId;
+  throw new AppError("Luồng chỉnh sửa draft campaign từ Brand đã tắt. Vui lòng gửi thông tin qua form yêu cầu.", 410, "BRAND_CAMPAIGN_DRAFT_EDIT_DISABLED");
 }
 
-export async function POST_campaign_submit(request: NextRequest, campaignId: string) {
-  const account = await requireBrandActor(request);
-  return ok(await submitCampaignForAdminReview(account.id, campaignId));
+export async function POST_campaign_submit(request: NextRequest, campaignId: string): Promise<Response> {
+  await requireBrandActor(request);
+  void campaignId;
+  throw new AppError("Luồng submit campaign review từ Brand đã tắt. Vui lòng gửi thông tin qua form yêu cầu.", 410, "BRAND_CAMPAIGN_SUBMIT_REVIEW_DISABLED");
 }
 
 export async function GET_campaign_requests(request: NextRequest) {
@@ -142,6 +139,11 @@ export async function POST_campaign_requests(request: NextRequest) {
   const account = await requireBrandActor(request);
   const payload = campaignRequestSchema.parse(await request.json());
   return ok(await createBrandCampaignRequest(account.id, payload), 201);
+}
+
+export async function GET_campaign_template(request: NextRequest) {
+  const account = await requireBrandActor(request);
+  return ok(await getBrandCampaignTemplateConfig(account.id));
 }
 
 export async function POST_campaign_request_feedback(request: NextRequest, requestId: string) {

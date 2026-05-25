@@ -66,34 +66,6 @@ export default function BrandCampaignsPage() {
     }
   }
 
-  async function campaignAction(id: string, action: "submit" | "approve" | "feedback") {
-    try {
-      let endpoint = `/api/brand/dashboard/campaigns/${id}`;
-      const method: "POST" | "PUT" = "POST";
-      let body: Record<string, unknown> | undefined;
-
-      if (action === "submit") endpoint = `${endpoint}/submit-review`;
-      if (action === "approve") endpoint = `${endpoint}/brand-approve`;
-      if (action === "feedback") {
-        endpoint = `${endpoint}/brand-feedback`;
-        body = { feedback: "Brand đề nghị điều chỉnh trước khi publish." };
-      }
-
-      const response = await fetch(endpoint, {
-        method,
-        headers: body ? { "Content-Type": "application/json" } : undefined,
-        body: body ? JSON.stringify(body) : undefined
-      });
-      const payload = (await response.json()) as ApiResponse<unknown>;
-      if (!response.ok || !payload.success) throw new Error(payload.error ?? "Thao tác thất bại");
-      setToast("Cập nhật campaign thành công.");
-      setTimeout(() => setToast(""), 2200);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Thao tác thất bại");
-    }
-  }
-
   useEffect(() => {
     void load();
   }, []);
@@ -127,8 +99,8 @@ export default function BrandCampaignsPage() {
     <>
       <PageHeader
         title="Campaign / Job"
-        subtitle="Quản lý danh sách campaign, trạng thái setup và hiệu suất huy động."
-        action={<Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Tạo campaign mới</Link>}
+        subtitle="Theo dõi campaign hiện có và gửi yêu cầu để Admin tạo campaign mới."
+        action={<Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Gửi yêu cầu tạo campaign</Link>}
       />
 
       <section className="dc-card p-4">
@@ -164,15 +136,13 @@ export default function BrandCampaignsPage() {
           {filtered.length === 0 ? (
             <EmptyState
               title="Chưa có campaign"
-              description="Tạo campaign đầu tiên để bắt đầu thu hút creator và backer."
-              action={<Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Tạo campaign mới</Link>}
+              description="Gửi yêu cầu để Admin tạo campaign đầu tiên cho brand của bạn."
+              action={<Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Gửi yêu cầu tạo campaign</Link>}
             />
           ) : (
             <div className="grid gap-4 xl:grid-cols-2">
               {filtered.map((campaign) => {
                 const fundedProgress = progress(campaign.fundedAmountVnd, campaign.targetAmountVnd);
-                const isDraft = campaign.status === "DRAFT";
-                const isActive = campaign.status === "ACTIVE";
                 return (
                   <article key={campaign.id} className="dc-card overflow-hidden p-0">
                     <div className="flex h-40 items-end bg-zinc-100" style={campaign.coverImageUrl ? { backgroundImage: `url(${campaign.coverImageUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>
@@ -209,9 +179,6 @@ export default function BrandCampaignsPage() {
                       <div className="mt-4 flex flex-wrap gap-2">
                         <Link href={`/campaigns/${campaign.slug}`} className="dc-btn-secondary">Xem chi tiết</Link>
                         <Link href={`/dashboard/brand/campaigns/${campaign.id}/missions`} className="dc-btn-secondary">Quản lý mission/job</Link>
-                        {isDraft ? <button className="dc-btn-secondary" onClick={() => void campaignAction(campaign.id, "submit")}>Gửi duyệt Admin</button> : null}
-                        {campaign.status === "PAUSED" ? <button className="dc-btn-secondary" onClick={() => void campaignAction(campaign.id, "approve")}>Brand duyệt publish</button> : null}
-                        {!isActive ? <button className="dc-btn-secondary" onClick={() => void campaignAction(campaign.id, "feedback")}>Yêu cầu điều chỉnh</button> : null}
                       </div>
                     </div>
                   </article>

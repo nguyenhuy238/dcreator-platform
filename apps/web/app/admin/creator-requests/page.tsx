@@ -7,8 +7,8 @@ import { AccountRoleRequestsTab } from "./_components/AccountRoleRequestsTab";
 type TabKey = "social-review" | "account-review";
 
 const tabs: Array<{ key: TabKey; label: string }> = [
-  { key: "account-review", label: "Duyệt tài khoản" },
-  { key: "social-review", label: "Duyệt mạng xã hội" }
+  { key: "account-review", label: "Quản lý tài khoản" },
+  { key: "social-review", label: "Quản lý mạng xã hội" }
 ];
 
 export default function AdminCreatorRequestsPage() {

@@ -15,13 +15,6 @@ const categoryLabel: Record<CampaignDetailDTO["hero"]["category"], string> = {
   EDUCATION: "Giáo dục"
 };
 
-function splitByComma(value: string | null): string[] {
-  return (value ?? "")
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-}
-
 function buildHeroMeta(data: CampaignDetailDTO) {
   const startAt = data.timeline.approvedAt ?? data.timeline.createdAt;
   const endAt = data.hero.deadline;
@@ -34,6 +27,7 @@ function buildHeroMeta(data: CampaignDetailDTO) {
 }
 
 export function HeroSection({ data, applyCard }: { data: CampaignDetailDTO; applyCard: ReactNode }) {
+  const heroMeta = buildHeroMeta(data);
   return (
     <section className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-950 text-white">
       {data.hero.coverMediaType === "video" && data.hero.coverMediaUrl ? (
@@ -50,7 +44,17 @@ export function HeroSection({ data, applyCard }: { data: CampaignDetailDTO; appl
               {getCampaignTypeLabel()}
             </span>
             <h1 className="mt-4 max-w-4xl text-3xl font-black tracking-tight md:text-6xl">{data.hero.title}</h1>
-            <p className="mt-3 max-w-3xl text-base font-semibold text-zinc-100">Brand/SME: {data.hero.brand}</p>
+            <p className="mt-3 max-w-3xl text-sm text-zinc-100 md:text-base">{data.hero.description}</p>
+            <div className="mt-5 grid gap-x-8 gap-y-2 text-sm text-zinc-100 md:grid-cols-2">
+              <p>Brand/SME: {data.hero.brand}</p>
+              <p>Ngành hàng: {categoryLabel[data.hero.category]}</p>
+              <p>Loại sản phẩm: {data.rewards[0]?.title ?? "Đang cập nhật"}</p>
+              <p>Quyền lợi chính: {data.hero.benefits ?? "Đang cập nhật"}</p>
+              <p>Thời gian: {formatDateTime(heroMeta.startAt)} - {heroMeta.endAt ? formatDateTime(heroMeta.endAt) : "Đang cập nhật"}</p>
+              <p>Mốc đăng ký Creator: {formatDateTime(heroMeta.registerDeadline)}</p>
+              <p>Mốc nộp content: {heroMeta.submitDeadline ? formatDateTime(heroMeta.submitDeadline) : "Đang cập nhật"}</p>
+              <p>Lộ trình: {data.hero.participationRoadmap.length ? `${data.hero.participationRoadmap.length} bước` : "Đang cập nhật"}</p>
+            </div>
           </div>
           <div className="hidden lg:block">{applyCard}</div>
         </div>
@@ -60,19 +64,14 @@ export function HeroSection({ data, applyCard }: { data: CampaignDetailDTO; appl
 }
 
 export function OverviewTab({ data }: { data: CampaignDetailDTO }) {
-  const [activeStep, setActiveStep] = useState<number>(1);
   const [introExpanded, setIntroExpanded] = useState(false);
+  const [activeStep, setActiveStep] = useState<number>(1);
   const heroMeta = buildHeroMeta(data);
-  const missionTypes = splitByComma(data.hero.missionTypes);
-  const channels = splitByComma(data.hero.priorityChannels);
+  const channels = ["TikTok"];
+  const missionTypes = data.missions.map((mission) => mission.title).filter(Boolean);
   const journeySteps = useMemo(
-    () => [
-      { id: 1, title: "Bước 1: Apply chiến dịch", detail: "Bấm Apply, nộp link kênh TikTok và chờ Brand/Admin duyệt." },
-      { id: 2, title: "Bước 2: Nhận sản phẩm", detail: "Được gửi hàng hoặc tự mua theo chính sách và chuẩn bị nội dung review." },
-      { id: 3, title: "Bước 3: Sản xuất nội dung", detail: "Quay video theo brief, đảm bảo đúng key message và định dạng yêu cầu." },
-      { id: 4, title: "Bước 4: Đăng và nộp bài", detail: "Đăng video công khai, lấy mã Spark Ads, submit link và mã về dCreator." }
-    ],
-    []
+    () => data.hero.participationRoadmap.map((detail, idx) => ({ id: idx + 1, title: `Bước ${idx + 1}`, detail })),
+    [data.hero.participationRoadmap]
   );
 
   return (
@@ -165,17 +164,11 @@ export function OverviewTab({ data }: { data: CampaignDetailDTO }) {
           </div>
           <div>
             <p className="font-bold text-zinc-900">Loại nhiệm vụ</p>
-            <p className="text-slate-700">{missionTypes.length ? missionTypes.join(", ") : "Đang cập nhật"}</p>
+            <p className="text-slate-700">{data.missions.length ? `${data.missions.length} nhiệm vụ` : "Đang cập nhật"}</p>
           </div>
           <div>
-            <p className="font-bold text-zinc-900">Quyền lợi cho Creator</p>
-            <p className="text-slate-700">
-              Hoa hồng Creator: {data.hero.creatorCommissionPercent}% theo đơn, bonus quỹ thêm {data.hero.bonusBudgetVnd.toLocaleString("vi-VN")} VND.
-            </p>
-          </div>
-          <div>
-            <p className="font-bold text-zinc-900">Quyền lợi cho User</p>
-            <p className="text-slate-700">Hoa hồng User: {data.hero.userCommissionPercent}% và ưu đãi theo kênh {channels.join(", ") || "đang cập nhật"}.</p>
+            <p className="font-bold text-zinc-900">Quyền lợi</p>
+            <p className="text-slate-700">{data.hero.benefits ?? "Đang cập nhật"}</p>
           </div>
         </div>
       </article>
@@ -184,8 +177,6 @@ export function OverviewTab({ data }: { data: CampaignDetailDTO }) {
 }
 
 export function BriefTab({ data }: { data: CampaignDetailDTO }) {
-  const missionTypes = splitByComma(data.hero.missionTypes);
-  const channels = splitByComma(data.hero.priorityChannels);
   const submitGuide = [
     "Quay video review theo brief phía trên",
     "Đăng lên TikTok (chế độ công khai, không set private)",
@@ -199,11 +190,11 @@ export function BriefTab({ data }: { data: CampaignDetailDTO }) {
         <h3 className="text-2xl font-black text-zinc-900">Brief chi tiết cho Creator</h3>
         <div className="mt-3 grid gap-2 text-slate-700">
           <p>Mô tả sản phẩm/dự án: {data.hero.description}</p>
-          <p>Mục tiêu truyền thông: {data.hero.objective ?? "Đang cập nhật"}</p>
+          <p>Quyền lợi: {data.hero.benefits ?? "Đang cập nhật"}</p>
           <p>Định dạng nội dung: vertical 9:16, thời lượng từ 30-90 giây, tối thiểu 20 giây.</p>
           <p>Key message: bám sát brief campaign và thể hiện trải nghiệm chân thực.</p>
-          <p>Kênh đăng chính: {channels.length ? channels.join(", ") : "Đang cập nhật"}.</p>
-          <p>Loại nhiệm vụ: {missionTypes.length ? missionTypes.join(", ") : "Đang cập nhật"}.</p>
+          <p>Số bước tham gia: {data.hero.participationRoadmap.length || 0}.</p>
+          <p>Loại nhiệm vụ: {data.missions.length ? `${data.missions.length} nhiệm vụ` : "Đang cập nhật"}.</p>
           <p>Hashtag/caption gợi ý: #dCreator #VideoSeeding #ReviewThat.</p>
           <p>Quy định kịch bản: review chân thực, không nói quá, không claim sai quy định quảng cáo.</p>
         </div>

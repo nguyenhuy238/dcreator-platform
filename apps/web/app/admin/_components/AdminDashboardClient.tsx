@@ -34,10 +34,6 @@ type AdminOverview = {
   systemAlerts: string[];
 };
 
-function formatVnd(value: number) {
-  return `${value.toLocaleString("vi-VN")} VND`;
-}
-
 async function getOverview() {
   const res = await fetch("/api/admin/dashboard/overview", { cache: "no-store" });
   const body = (await res.json()) as ApiResult<AdminOverview>;
@@ -46,14 +42,12 @@ async function getOverview() {
 }
 
 const queueCards: Array<{ key: keyof AdminOverview["queues"]; title: string; href: string }> = [
-  { key: "brandPendingReview", title: "Brand chờ duyệt", href: "/admin/brand-applications" },
-  { key: "creatorPendingReview", title: "Creator chờ duyệt", href: "/admin/creator-applications" },
-  { key: "campaignPendingReview", title: "Campaign chờ duyệt", href: "/admin/campaigns" },
+  { key: "brandPendingReview", title: "Brand cần xử lý", href: "/admin/brand-applications" },
+  { key: "creatorPendingReview", title: "Creator cần xử lý", href: "/admin/creator-applications" },
+  { key: "campaignPendingReview", title: "Campaign cần xử lý", href: "/admin/campaigns" },
   { key: "creatorApplicationsPendingReview", title: "Creator applications", href: "/admin/creator-applications" },
-  { key: "contentSubmissionsPendingReview", title: "Video chờ duyệt", href: "/admin/mission-video-reviews" },
-  { key: "productInventoryPendingReview", title: "Product/Inventory review", href: "/admin/product-inventory" },
+  { key: "contentSubmissionsPendingReview", title: "Video cần xử lý", href: "/admin/mission-video-reviews" },
   { key: "fulfillmentPendingIssues", title: "Fulfillment lỗi/chờ xử lý", href: "/admin/fulfillment" },
-  { key: "payoutPendingReview", title: "Payout/commission chờ duyệt", href: "/admin/payouts" }
 ];
 
 export function AdminDashboardClient() {
@@ -108,8 +102,6 @@ export function AdminDashboardClient() {
         <StatsCard title="Campaign active" value={`${overview.totals.activeCampaigns}`} />
         <StatsCard title="Brand active" value={`${overview.totals.activeBrands}`} />
         <StatsCard title="Creator active" value={`${overview.totals.activeCreators}`} />
-        <StatsCard title="Doanh thu (contribution)" value={formatVnd(overview.totals.grossRevenueVnd)} />
-        <StatsCard title="Commission payout" value={formatVnd(overview.totals.commissionPayoutVnd)} />
       </section>
 
       <section className="mt-8">
