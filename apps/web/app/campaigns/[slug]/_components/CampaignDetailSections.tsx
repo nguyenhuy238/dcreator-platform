@@ -64,7 +64,11 @@ export function HeroSection({ data, applyCard }: { data: CampaignDetailDTO; appl
 }
 
 export function OverviewTab({ data }: { data: CampaignDetailDTO }) {
+  const [introExpanded, setIntroExpanded] = useState(false);
   const [activeStep, setActiveStep] = useState<number>(1);
+  const heroMeta = buildHeroMeta(data);
+  const channels = ["TikTok"];
+  const missionTypes = data.missions.map((mission) => mission.title).filter(Boolean);
   const journeySteps = useMemo(
     () => data.hero.participationRoadmap.map((detail, idx) => ({ id: idx + 1, title: `Bước ${idx + 1}`, detail })),
     [data.hero.participationRoadmap]
