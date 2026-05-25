@@ -44,17 +44,7 @@ export function HeroSection({ data, applyCard }: { data: CampaignDetailDTO; appl
               {getCampaignTypeLabel()}
             </span>
             <h1 className="mt-4 max-w-4xl text-3xl font-black tracking-tight md:text-6xl">{data.hero.title}</h1>
-            <p className="mt-3 max-w-3xl text-sm text-zinc-100 md:text-base">{data.hero.description}</p>
-            <div className="mt-5 grid gap-x-8 gap-y-2 text-sm text-zinc-100 md:grid-cols-2">
-              <p>Brand/SME: {data.hero.brand}</p>
-              <p>Ngành hàng: {categoryLabel[data.hero.category]}</p>
-              <p>Loại sản phẩm: {data.rewards[0]?.title ?? "Đang cập nhật"}</p>
-              <p>Quyền lợi chính: {data.hero.benefits ?? "Đang cập nhật"}</p>
-              <p>Thời gian: {formatDateTime(heroMeta.startAt)} - {heroMeta.endAt ? formatDateTime(heroMeta.endAt) : "Đang cập nhật"}</p>
-              <p>Mốc đăng ký Creator: {formatDateTime(heroMeta.registerDeadline)}</p>
-              <p>Mốc nộp content: {heroMeta.submitDeadline ? formatDateTime(heroMeta.submitDeadline) : "Đang cập nhật"}</p>
-              <p>Lộ trình: {data.hero.participationRoadmap.length ? `${data.hero.participationRoadmap.length} bước` : "Đang cập nhật"}</p>
-            </div>
+            <p className="mt-3 max-w-3xl text-sm text-zinc-100 md:text-base">Brand/SME: {data.hero.brand}</p>
           </div>
           <div className="hidden lg:block">{applyCard}</div>
         </div>
