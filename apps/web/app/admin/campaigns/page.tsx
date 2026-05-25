@@ -126,7 +126,7 @@ export default function AdminCampaignsPage() {
     <>
       <PageHeader
         title="Campaign CMS"
-        subtitle="Nhận yêu cầu từ Brand; khi duyệt, Admin tạo campaign thật và publish lên hệ thống."
+        subtitle="Quản lý yêu cầu từ Brand; khi duyệt, Admin tạo campaign thật và publish lên hệ thống."
         action={(
           <div className="flex gap-2">
             <Link className="dc-btn-primary" href="/admin/campaigns/create">Tạo campaign</Link>

@@ -42,11 +42,11 @@ async function getOverview() {
 }
 
 const queueCards: Array<{ key: keyof AdminOverview["queues"]; title: string; href: string }> = [
-  { key: "brandPendingReview", title: "Brand chờ duyệt", href: "/admin/brand-applications" },
-  { key: "creatorPendingReview", title: "Creator chờ duyệt", href: "/admin/creator-applications" },
-  { key: "campaignPendingReview", title: "Campaign chờ duyệt", href: "/admin/campaigns" },
+  { key: "brandPendingReview", title: "Brand cần xử lý", href: "/admin/brand-applications" },
+  { key: "creatorPendingReview", title: "Creator cần xử lý", href: "/admin/creator-applications" },
+  { key: "campaignPendingReview", title: "Campaign cần xử lý", href: "/admin/campaigns" },
   { key: "creatorApplicationsPendingReview", title: "Creator applications", href: "/admin/creator-applications" },
-  { key: "contentSubmissionsPendingReview", title: "Video chờ duyệt", href: "/admin/mission-video-reviews" },
+  { key: "contentSubmissionsPendingReview", title: "Video cần xử lý", href: "/admin/mission-video-reviews" },
   { key: "fulfillmentPendingIssues", title: "Fulfillment lỗi/chờ xử lý", href: "/admin/fulfillment" },
 ];
 

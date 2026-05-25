@@ -113,8 +113,8 @@ export function AccountRoleRequestsTab() {
   return (
     <section>
       <PageHeader
-        title="Duyệt yêu cầu tài khoản Creator"
-        subtitle="Duyệt các hồ sơ Creator từ bảng CreatorApplication. Khi duyệt sẽ nâng quyền Account và tạo CreatorProfile/CreatorSocialLink."
+        title="Quản lý yêu cầu tài khoản Creator"
+        subtitle="Quản lý các hồ sơ Creator từ bảng CreatorApplication. Khi duyệt sẽ nâng quyền Account và tạo CreatorProfile/CreatorSocialLink."
         action={
           <button className="dc-btn-secondary" type="button" onClick={() => void load()}>
             Làm mới

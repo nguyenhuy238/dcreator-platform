@@ -52,7 +52,7 @@ export default function AdminCreatorsPage() {
 
   return (
     <>
-      <PageHeader title="Yêu cầu Creator" subtitle="Duyệt hồ sơ nâng cấp Creator." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
+      <PageHeader title="Quản lý Creator" subtitle="Quản lý hồ sơ nâng cấp Creator và quyết định duyệt." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
       <section className="dc-card p-4">
         <div className="grid gap-2 md:grid-cols-5">
           <select className="dc-input" value={status} onChange={(e) => setStatus(e.target.value)}>

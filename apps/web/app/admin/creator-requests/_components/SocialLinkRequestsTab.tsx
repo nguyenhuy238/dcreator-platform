@@ -159,8 +159,8 @@ export default function AdminCreatorRequestsPage() {
   return (
     <main>
       <PageHeader
-        title="Duyệt yêu cầu kênh Creator"
-        subtitle="Kiểm tra, duyệt hoặc từ chối yêu cầu thêm kênh mạng xã hội của Creator."
+        title="Quản lý yêu cầu kênh Creator"
+        subtitle="Quản lý yêu cầu thêm kênh mạng xã hội của Creator và quyết định duyệt/từ chối."
         action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>}
       />
 
