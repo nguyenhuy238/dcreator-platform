@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 type CampaignType = "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
-type FilterType = "ALL";
+type FilterType = "ALL" | "MASTER";
 type FeaturedCampaignItem = {
   slug: string;
   title: string;
@@ -17,15 +17,16 @@ type FeaturedCampaignItem = {
   creatorApplicants?: number;
 };
 
-const typeLabel: Record<FilterType, string> = { ALL: "Video seeding" };
+const typeLabel: Record<FilterType, string> = { ALL: "Video seeding", MASTER: "Master Campaign" };
 
 export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCampaignItem[] }) {
   const [activeFilter, setActiveFilter] = useState<FilterType>("ALL");
   const [slideStart, setSlideStart] = useState(0);
-  const filters: FilterType[] = ["ALL"];
+  const filters: FilterType[] = ["ALL", "MASTER"];
   const pageSize = 3;
 
   const filteredCampaigns = useMemo(() => {
+    if (activeFilter === "MASTER") return campaigns;
     if (activeFilter === "ALL") return campaigns;
     return campaigns;
   }, [activeFilter, campaigns]);
