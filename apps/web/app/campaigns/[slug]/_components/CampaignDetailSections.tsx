@@ -1,210 +1,217 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import type { CampaignDetailDTO } from "@/lib/dto/campaign-detail";
-import { formatCurrencyVnd, formatDateTime } from "./campaign-detail.utils";
+import { getCampaignTypeLabel } from "@/lib/constants/campaign-type";
+import { formatDateTime } from "./campaign-detail.utils";
 
-type CTA = { label: string; disabled: boolean };
+const categoryLabel: Record<CampaignDetailDTO["hero"]["category"], string> = {
+  TECH: "Công nghệ",
+  FASHION: "Thời trang",
+  FOOD: "Ẩm thực",
+  BEAUTY: "Làm đẹp",
+  LIFESTYLE: "Lifestyle",
+  EDUCATION: "Giáo dục"
+};
 
-export function HeroSection({ hero }: { hero: CampaignDetailDTO["hero"] }) {
+function splitByComma(value: string | null): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function buildHeroMeta(data: CampaignDetailDTO) {
+  const startAt = data.timeline.approvedAt ?? data.timeline.createdAt;
+  const endAt = data.hero.deadline;
+  return {
+    startAt,
+    endAt,
+    registerDeadline: startAt,
+    submitDeadline: endAt
+  };
+}
+
+export function HeroSection({ data, applyCard }: { data: CampaignDetailDTO; applyCard: ReactNode }) {
+  const heroMeta = buildHeroMeta(data);
+  const channels = splitByComma(data.hero.priorityChannels);
+  const missionTypes = splitByComma(data.hero.missionTypes);
   return (
-    <section className="dc-card overflow-hidden p-4 md:p-5">
-      {hero.coverMediaType === "video" && hero.coverMediaUrl ? (
-        <video className="h-60 w-full rounded-2xl border border-zinc-200 object-cover md:h-80" src={hero.coverMediaUrl} controls />
+    <section className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-950 text-white">
+      {data.hero.coverMediaType === "video" && data.hero.coverMediaUrl ? (
+        <video className="h-[360px] w-full object-cover opacity-45 md:h-[460px]" src={data.hero.coverMediaUrl} autoPlay muted loop playsInline />
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
-        <img className="h-60 w-full rounded-2xl border border-zinc-200 object-cover md:h-80" src={hero.coverMediaUrl ?? "/globe.svg"} alt={hero.title} />
+        <img className="h-[360px] w-full object-cover opacity-45 md:h-[460px]" src={data.hero.coverMediaUrl ?? "/globe.svg"} alt={data.hero.title} />
       )}
-      <h1 className="mt-3 text-3xl font-black tracking-tight text-zinc-900">{hero.title}</h1>
-      <p className="mt-2 text-slate-600">{hero.description}</p>
-    </section>
-  );
-}
-
-export function FundingSection({ funding, hero }: { funding: CampaignDetailDTO["funding"]; hero: CampaignDetailDTO["hero"] }) {
-  return (
-    <section className="dc-card p-4 md:p-5">
-      <h2 className="text-2xl font-black text-zinc-900">Tiến độ ủng hộ</h2>
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
-          <p className="text-xs uppercase tracking-wider text-zinc-500">Mục tiêu</p>
-          <p className="mt-1 text-2xl font-black tracking-tight text-zinc-900">{formatCurrencyVnd(funding.targetAmountVnd)}</p>
+      <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/50 to-black/90" />
+      <div className="absolute inset-0 p-5 md:p-8">
+        <div className="grid h-full gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
+          <div>
+            <span className="inline-flex rounded-full border border-fuchsia-300/60 bg-fuchsia-500/20 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-fuchsia-100">
+              {getCampaignTypeLabel()}
+            </span>
+            <h1 className="mt-4 max-w-4xl text-3xl font-black tracking-tight md:text-6xl">{data.hero.title}</h1>
+            <p className="mt-3 max-w-3xl text-sm text-zinc-100 md:text-base">{data.hero.description}</p>
+            <div className="mt-5 grid gap-x-8 gap-y-2 text-sm text-zinc-100 md:grid-cols-2">
+              <p>Brand/SME: {data.hero.brand}</p>
+              <p>Ngành hàng: {categoryLabel[data.hero.category]}</p>
+              <p>Loại sản phẩm: {data.rewards[0]?.title ?? "Đang cập nhật"}</p>
+              <p>Mục tiêu chính: {data.hero.objective ?? "Đang cập nhật"}</p>
+              <p>Thời gian: {formatDateTime(heroMeta.startAt)} - {heroMeta.endAt ? formatDateTime(heroMeta.endAt) : "Đang cập nhật"}</p>
+              <p>Mốc đăng ký Creator: {formatDateTime(heroMeta.registerDeadline)}</p>
+              <p>Mốc nộp content: {heroMeta.submitDeadline ? formatDateTime(heroMeta.submitDeadline) : "Đang cập nhật"}</p>
+              <p>Kênh chính: {channels.length ? channels.join(", ") : "Đang cập nhật"}</p>
+              <p>Nhiệm vụ chính: {missionTypes.length ? missionTypes.join(", ") : "Đang cập nhật"}</p>
+            </div>
+          </div>
+          <div className="hidden lg:block">{applyCard}</div>
         </div>
-        <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
-          <p className="text-xs uppercase tracking-wider text-zinc-500">Đã ủng hộ</p>
-          <p className="mt-1 text-2xl font-black tracking-tight text-zinc-900">{formatCurrencyVnd(funding.fundedAmountVnd)}</p>
+      </div>
+    </section>
+  );
+}
+
+export function OverviewTab({ data }: { data: CampaignDetailDTO }) {
+  const [activeStep, setActiveStep] = useState<number>(1);
+  const missionTypes = splitByComma(data.hero.missionTypes);
+  const channels = splitByComma(data.hero.priorityChannels);
+  const journeySteps = useMemo(
+    () => [
+      { id: 1, title: "Bước 1: Apply chiến dịch", detail: "Bấm Apply, nộp link kênh TikTok và chờ Brand/Admin duyệt." },
+      { id: 2, title: "Bước 2: Nhận sản phẩm", detail: "Được gửi hàng hoặc tự mua theo chính sách và chuẩn bị nội dung review." },
+      { id: 3, title: "Bước 3: Sản xuất nội dung", detail: "Quay video theo brief, đảm bảo đúng key message và định dạng yêu cầu." },
+      { id: 4, title: "Bước 4: Đăng và nộp bài", detail: "Đăng video công khai, lấy mã Spark Ads, submit link và mã về dCreator." }
+    ],
+    []
+  );
+
+  return (
+    <section className="grid gap-4">
+      <article className="dc-card p-5">
+        <h3 className="text-2xl font-black text-zinc-900">Giới thiệu camp</h3>
+        <p className="mt-2 text-slate-700">{data.hero.description}</p>
+      </article>
+      <article className="dc-card p-5">
+        <h3 className="text-2xl font-black text-zinc-900">Tổng quan deal</h3>
+        <div className="mt-3 grid gap-3 md:grid-cols-3">
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Thù lao</p>
+            <p className="mt-2 text-2xl font-black text-emerald-900">Theo KPI</p>
+          </div>
+          <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-sky-700">Yêu cầu</p>
+            <p className="mt-2 text-2xl font-black text-sky-900">{Math.max(1, data.missions.length)} Video TikTok</p>
+          </div>
+          <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-violet-700">Kho thưởng</p>
+            <p className="mt-2 text-2xl font-black text-violet-900">{data.rewards.length} gói quyền lợi</p>
+          </div>
         </div>
-      </div>
-      <div className="mt-3 h-3 overflow-hidden rounded-full bg-zinc-100">
-        <div className="h-full bg-gradient-to-r from-zinc-900 to-zinc-500" style={{ width: `${funding.progressPercent}%` }} />
-      </div>
-      <p className="mt-2 text-3xl font-black tracking-tight text-zinc-900">{funding.progressPercent}%</p>
-      <div className="flex flex-wrap gap-4 text-sm text-slate-600">
-        <p>{funding.backerCount} backers</p>
-        <p>Còn lại: {funding.remainingTimeLabel}</p>
-      </div>
-      <div className="mt-4 grid gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
-        <p>Brand: {hero.brand}</p>
-        <p>Creator: {hero.creator ?? "Chưa có"}</p>
-        <p>Loại: {hero.campaignType}</p>
-        <p>Trạng thái: {hero.status}</p>
-        <p>Hạn chót: {formatDateTime(hero.deadline)}</p>
-      </div>
-    </section>
-  );
-}
-
-export function CampaignStatsSection({ data }: { data: CampaignDetailDTO }) {
-  const outOfStockCount = data.rewards.filter((reward) => reward.isOutOfStock).length;
-  const openMissionCount = data.missions.filter((mission) => mission.status === "OPEN").length;
-  const missionRewardPoints = data.missions.reduce((sum, mission) => sum + mission.rewardPoints, 0);
-
-  return (
-    <section className="dc-card p-4 md:p-5">
-      <h2 className="text-2xl font-black text-zinc-900">Chỉ số campaign</h2>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <article className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
-          <p className="text-xs uppercase tracking-wider text-zinc-500">Backers</p>
-          <p className="mt-1 text-xl font-black text-zinc-900">{data.funding.backerCount}</p>
-        </article>
-        <article className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
-          <p className="text-xs uppercase tracking-wider text-zinc-500">Tiến độ</p>
-          <p className="mt-1 text-xl font-black text-zinc-900">{data.funding.progressPercent}%</p>
-        </article>
-        <article className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
-          <p className="text-xs uppercase tracking-wider text-zinc-500">Mission đang mở</p>
-          <p className="mt-1 text-xl font-black text-zinc-900">{openMissionCount}</p>
-        </article>
-        <article className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
-          <p className="text-xs uppercase tracking-wider text-zinc-500">Reward hết lượt</p>
-          <p className="mt-1 text-xl font-black text-zinc-900">{outOfStockCount}</p>
-        </article>
-      </div>
-      <p className="mt-2 text-sm text-slate-600">Tổng điểm mission: {missionRewardPoints.toLocaleString("vi-VN")} points</p>
-    </section>
-  );
-}
-
-export function RewardsSection({
-  campaignTitle,
-  rewards,
-  selectedRewardId,
-  onSelect,
-  cta,
-  onSupport
-}: {
-  campaignTitle: string;
-  rewards: CampaignDetailDTO["rewards"];
-  selectedRewardId: string | null;
-  onSelect: (id: string) => void;
-  cta: CTA;
-  onSupport: () => void;
-}) {
-  return (
-    <section className="dc-card p-4 md:p-5">
-      <h2 className="text-2xl font-black text-zinc-900">Các mức reward</h2>
-      <p className="mt-1 text-sm text-slate-600">Chọn 1 reward để ủng hộ campaign {campaignTitle}.</p>
-      <div className="mt-3 grid gap-3">
-        {rewards.map((reward) => {
-          const selected = reward.id === selectedRewardId;
-          return (
-            <article
-              key={reward.id}
-              className={`relative rounded-2xl border p-4 ${selected ? "border-zinc-900 shadow-[0_0_0_2px_rgba(24,24,27,0.1)]" : "border-zinc-200 bg-white"}`}
+      </article>
+      <article className="dc-card p-5">
+        <h3 className="text-2xl font-black text-zinc-900">Sản phẩm review</h3>
+        <div className="mt-3 grid gap-2">
+          {data.rewards.map((reward) => (
+            <div key={reward.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
+              <p className="text-lg font-bold text-zinc-900">{reward.title}</p>
+              <p className="text-sm text-slate-600">{reward.description}</p>
+            </div>
+          ))}
+        </div>
+      </article>
+      <article className="dc-card p-5">
+        <h3 className="text-2xl font-black text-zinc-900">Lộ trình tham gia</h3>
+        <div className="mt-3 grid gap-2">
+          {journeySteps.map((step) => (
+            <button
+              key={step.id}
+              type="button"
+              onClick={() => setActiveStep(step.id)}
+              className={`rounded-2xl border p-4 text-left ${activeStep === step.id ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-200 bg-white text-zinc-900"}`}
             >
-              {reward.isOutOfStock ? <span className="absolute right-3 top-3 rounded-full bg-red-50 px-2 py-1 text-xs font-semibold text-red-700">Hết lượt</span> : null}
-              <h3 className="text-xl font-bold text-zinc-900">{reward.title}</h3>
-              <p className="mt-1 text-slate-600">{reward.description}</p>
-              <p className="mt-2 text-sm text-slate-700">
-                Giá: {reward.priceVnd ? formatCurrencyVnd(reward.priceVnd) : `${reward.pricePoints} points`}
-              </p>
-              <p className="text-sm text-slate-700">
-                Tồn kho: {reward.stockRemaining}/{reward.stockTotal}
-              </p>
-              <p className="text-sm text-slate-700">Dự kiến giao: {reward.estimatedDelivery}</p>
-              <div className="mt-2">
-                <button
-                  type="button"
-                  className={selected ? "dc-btn-primary" : "dc-btn-secondary"}
-                  onClick={() => onSelect(reward.id)}
-                  disabled={reward.isOutOfStock}
-                >
-                  {reward.isOutOfStock ? "Hết lượt" : selected ? "Đã chọn" : "Chọn reward"}
-                </button>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 pt-3">
-        <button type="button" className="dc-btn-primary" disabled={cta.disabled} onClick={onSupport}>
-          {cta.label}
-        </button>
-        <span className="text-sm text-slate-600">Ủng hộ campaign theo reward và phương thức thanh toán.</span>
-      </div>
+              <p className="font-bold">{step.title}</p>
+              {activeStep === step.id ? <p className="mt-1 text-sm text-zinc-100">{step.detail}</p> : null}
+            </button>
+          ))}
+        </div>
+      </article>
+      <article className="dc-card p-5">
+        <h3 className="text-2xl font-black text-zinc-900">Gói quyền lợi & KPI</h3>
+        <div className="mt-3 grid gap-4">
+          <div>
+            <p className="font-bold text-zinc-900">Chỉ số kỳ vọng</p>
+            <p className="text-slate-700">
+              Số video: {Math.max(1, data.missions.length)}. Số đơn mục tiêu: {Math.max(50, data.funding.backerCount * 5)}. GMV mục tiêu:{" "}
+              {data.funding.targetAmountVnd.toLocaleString("vi-VN")} VND. Tệp khách hàng: Gen Z, người dùng mua sắm online.
+            </p>
+          </div>
+          <div>
+            <p className="font-bold text-zinc-900">Loại nhiệm vụ</p>
+            <p className="text-slate-700">{missionTypes.length ? missionTypes.join(", ") : "Đang cập nhật"}</p>
+          </div>
+          <div>
+            <p className="font-bold text-zinc-900">Quyền lợi cho Creator</p>
+            <p className="text-slate-700">
+              Hoa hồng Creator: {data.hero.creatorCommissionPercent}% theo đơn, bonus quỹ thêm {data.hero.bonusBudgetVnd.toLocaleString("vi-VN")} VND.
+            </p>
+          </div>
+          <div>
+            <p className="font-bold text-zinc-900">Quyền lợi cho User</p>
+            <p className="text-slate-700">Hoa hồng User: {data.hero.userCommissionPercent}% và ưu đãi theo kênh {channels.join(", ") || "đang cập nhật"}.</p>
+          </div>
+        </div>
+      </article>
     </section>
   );
 }
 
-export function MissionsSection({ missions }: { missions: CampaignDetailDTO["missions"] }) {
-  return (
-    <section className="dc-card p-4 md:p-5">
-      <h2 className="text-2xl font-black text-zinc-900">Missions</h2>
-      <div className="mt-3 grid gap-3">
-        {missions.map((mission) => (
-          <article key={mission.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
-            <h3>{mission.title}</h3>
-            <p>Điểm thưởng: {mission.rewardPoints}</p>
-            <p>Hạn chót: {formatDateTime(mission.deadline)}</p>
-            <p>Điều kiện: {mission.eligibility}</p>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
+export function BriefTab({ data }: { data: CampaignDetailDTO }) {
+  const missionTypes = splitByComma(data.hero.missionTypes);
+  const channels = splitByComma(data.hero.priorityChannels);
+  const submitGuide = [
+    "Quay video review theo brief phía trên",
+    "Đăng lên TikTok (chế độ công khai, không set private)",
+    "Lấy mã Spark Ads từ TikTok Creator Tools",
+    "Quay lại dCreator -> vào Nhiệm Vụ -> Submit link video + mã Spark Ads"
+  ];
 
-export function TimelineSection({ timeline }: { timeline: CampaignDetailDTO["timeline"] }) {
   return (
-    <section className="dc-card p-4 md:p-5">
-      <h2 className="text-2xl font-black text-zinc-900">Mốc thời gian</h2>
-      <p>Tạo campaign: {formatDateTime(timeline.createdAt)}</p>
-      <p>Duyệt campaign: {formatDateTime(timeline.approvedAt)}</p>
-      <div className="mt-3 grid gap-3">
-        {timeline.milestoneUpdates.map((item, index) => (
-          <article key={`${item.at}-${index}`} className="rounded-2xl border border-zinc-200 bg-white p-4">
-            <strong>{item.label}</strong>
-            <p>{formatDateTime(item.at)}</p>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-export function BackersSection({ socialProof }: { socialProof: CampaignDetailDTO["socialProof"] }) {
-  return (
-    <section className="dc-card p-4 md:p-5">
-      <h2 className="text-2xl font-black text-zinc-900">Backers & social proof</h2>
-      <p>Tổng người ủng hộ: {socialProof.totalBackers}</p>
-      <div className="mt-3 grid gap-3">
-        {socialProof.recentContributions.map((contribution) => (
-          <article key={contribution.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
-            <p>{contribution.supporterMasked}</p>
-            <p>{formatCurrencyVnd(contribution.amountVnd)}</p>
-            <p>{formatDateTime(contribution.contributedAt)}</p>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-export function FaqPolicySection({ faqPolicy }: { faqPolicy: CampaignDetailDTO["faqPolicy"] }) {
-  return (
-    <section className="dc-card p-4 md:p-5">
-      <h2 className="text-2xl font-black text-zinc-900">FAQ/Chính sách</h2>
-      <p>Chính sách reward: {faqPolicy.rewardPolicy}</p>
-      <p>Chính sách hoàn tiền: {faqPolicy.refundPolicy}</p>
-      <p>Cách dùng voucher: {faqPolicy.voucherUsage}</p>
-      <p>Chính sách khi campaign thất bại: {faqPolicy.campaignFailurePolicy}</p>
+    <section className="grid gap-4">
+      <article className="dc-card p-5">
+        <h3 className="text-2xl font-black text-zinc-900">Brief chi tiết cho Creator</h3>
+        <div className="mt-3 grid gap-2 text-slate-700">
+          <p>Mô tả sản phẩm/dự án: {data.hero.description}</p>
+          <p>Mục tiêu truyền thông: {data.hero.objective ?? "Đang cập nhật"}</p>
+          <p>Định dạng nội dung: vertical 9:16, thời lượng từ 30-90 giây, tối thiểu 20 giây.</p>
+          <p>Key message: bám sát brief campaign và thể hiện trải nghiệm chân thực.</p>
+          <p>Kênh đăng chính: {channels.length ? channels.join(", ") : "Đang cập nhật"}.</p>
+          <p>Loại nhiệm vụ: {missionTypes.length ? missionTypes.join(", ") : "Đang cập nhật"}.</p>
+          <p>Hashtag/caption gợi ý: #dCreator #VideoSeeding #ReviewThat.</p>
+          <p>Quy định kịch bản: review chân thực, không nói quá, không claim sai quy định quảng cáo.</p>
+        </div>
+      </article>
+      <article className="dc-card p-5">
+        <h3 className="text-2xl font-black text-zinc-900">Điều kiện tham gia camp</h3>
+        <div className="mt-3 grid gap-2 text-slate-700">
+          <p>Creator tối thiểu 1,000 follower, có kênh phù hợp ngành hàng.</p>
+          <p>Khu vực áp dụng: toàn quốc (camp có gửi hàng và hỗ trợ online).</p>
+          <p>Số lượng Creator tối đa: 20, slot còn lại cập nhật theo thời gian thực.</p>
+          <p>Quy trình đăng ký: bấm Apply, nộp link kênh, chờ duyệt trong 24-72 giờ.</p>
+        </div>
+      </article>
+      <article className="rounded-3xl border border-zinc-800 bg-zinc-900 p-5 text-zinc-100">
+        <h3 className="text-2xl font-black">Hướng dẫn gửi bài</h3>
+        <ol className="mt-3 grid gap-2">
+          {submitGuide.map((step, index) => (
+            <li key={step} className="flex items-start gap-2">
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-zinc-700 text-sm font-bold">{index + 1}</span>
+              <span>{step}</span>
+            </li>
+          ))}
+        </ol>
+      </article>
     </section>
   );
 }

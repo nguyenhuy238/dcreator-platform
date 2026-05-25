@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 type StatusState =
   | "LOGIN_REQUIRED"
@@ -35,19 +36,17 @@ type Props = {
   compact?: boolean;
 };
 
-function LoginHint({ path }: { path: string }) {
-  return (
-    <a className="text-xs text-zinc-600 underline" href={`/auth/login?next=${encodeURIComponent(path)}`}>
-      Đăng nhập để tiếp tục
-    </a>
-  );
-}
-
 export function CreatorCampaignApplyButton({ slug, compact = false }: Props) {
   const [status, setStatus] = useState<StatusPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [actionNotice, setActionNotice] = useState<{ href: string } | null>(null);
+  const [portalReady, setPortalReady] = useState(false);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -80,33 +79,44 @@ export function CreatorCampaignApplyButton({ slug, compact = false }: Props) {
     };
   }, [slug]);
 
+  const missingAction = useMemo(() => {
+    if (!status) return null as { href: string; label: string } | null;
+
+    if (status.state === "LOGIN_REQUIRED") {
+      const next = typeof window === "undefined" ? `/campaigns/${slug}` : window.location.pathname;
+      return { href: `/auth/login?next=${encodeURIComponent(next)}`, label: "Đăng nhập để tiếp tục" };
+    }
+
+    if (status.state === "NOT_CREATOR") {
+      return { href: "/dashboard/user/profile#role-requests", label: "Đăng ký quyền Creator" };
+    }
+
+    if (status.state === "PROFILE_REQUIRED") {
+      return { href: "/dashboard/creator/channels", label: "Hoàn thiện kênh Creator" };
+    }
+
+    return null;
+  }, [slug, status]);
+
   const buttonLabel = useMemo(() => {
     if (loading) return "Đang kiểm tra...";
     if (!status) return "Nộp đơn đăng ký";
     if (submitting) return "Đang gửi đơn...";
+    if (missingAction) return "Đăng ký tham gia campaign";
     return status.label;
-  }, [loading, status, submitting]);
+  }, [loading, status, submitting, missingAction]);
 
   const buttonDisabled = useMemo(() => {
     if (loading || submitting) return true;
     if (!status) return true;
-    if (status.state === "LOGIN_REQUIRED") return false;
-    return status.disabled;
-  }, [loading, status, submitting]);
+    return status.disabled && !missingAction;
+  }, [loading, status, submitting, missingAction]);
 
   async function applyCampaign() {
     if (!status) return;
 
-    if (status.state === "LOGIN_REQUIRED") {
-      window.location.href = `/auth/login?next=${encodeURIComponent(window.location.pathname)}`;
-      return;
-    }
-
-    if (status.state === "PROFILE_REQUIRED") {
-      setNotice({
-        type: "error",
-        text: "Bạn cần hoàn thiện hồ sơ Creator và chọn nền tảng chính trước khi xin làm nhiệm vụ."
-      });
+    if (missingAction) {
+      setActionNotice({ href: missingAction.href });
       return;
     }
 
@@ -145,9 +155,6 @@ export function CreatorCampaignApplyButton({ slug, compact = false }: Props) {
       <button type="button" className="dc-btn-primary" disabled={buttonDisabled} onClick={() => void applyCampaign()}>
         {buttonLabel}
       </button>
-      {!compact && status?.state === "LOGIN_REQUIRED" ? (
-        <LoginHint path={typeof window === "undefined" ? "/campaigns" : window.location.pathname} />
-      ) : null}
       {notice ? (
         <p
           className={`rounded-xl border px-3 py-2 text-sm ${
@@ -165,6 +172,18 @@ export function CreatorCampaignApplyButton({ slug, compact = false }: Props) {
           {status.state === "REJECTED" && status.rejectReason ? ` Lý do: ${status.rejectReason}` : ""}
         </p>
       ) : null}
+      {portalReady && actionNotice
+        ? createPortal(
+            <div className="fixed bottom-4 right-4 z-[9999] w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-xl">
+              <p className="font-semibold">Bạn đang chưa điền tài khoản mạng xã hội của mình hãy vào đây <a href={actionNotice.href} className="font-semibold underline">"Hồ Sơ Cá Nhân"</a> để hoàn thiện hồ sơ của mình nhé.</p>
+
+              <button type="button" className="mt-3 text-xs font-semibold underline" onClick={() => setActionNotice(null)}>
+                Đóng
+              </button>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }

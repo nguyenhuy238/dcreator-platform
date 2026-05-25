@@ -9,7 +9,7 @@ type CampaignItem = {
   description: string;
   cover: string;
   status: "active" | "review" | "ended" | "full";
-  campaignType: "Sponsorship" | "Voucher" | "Product Launch";
+  campaignType: "Video seeding";
   brand: string;
   creator: string;
   fundedAmount: number;

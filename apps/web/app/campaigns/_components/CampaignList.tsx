@@ -15,7 +15,6 @@ type CampaignListResponse = {
 
 const defaultFilters: CampaignFilterState = {
   search: "",
-  type: "",
   category: "",
   status: "ACTIVE",
   rewardAvailable: false,
@@ -41,7 +40,6 @@ export function CampaignList() {
   const queryString = useMemo(() => {
     const query = new URLSearchParams();
     if (debouncedSearch) query.set("search", debouncedSearch);
-    if (filters.type) query.set("type", filters.type);
     if (filters.category) query.set("category", filters.category);
     if (filters.status) query.set("status", filters.status);
     if (filters.rewardAvailable) query.set("rewardAvailable", "true");
@@ -49,7 +47,7 @@ export function CampaignList() {
     query.set("page", String(page));
     query.set("limit", "12");
     return query.toString();
-  }, [filters.type, filters.category, filters.status, filters.rewardAvailable, filters.sort, debouncedSearch, page]);
+  }, [filters.category, filters.status, filters.rewardAvailable, filters.sort, debouncedSearch, page]);
 
   useEffect(() => {
     const controller = new AbortController();
