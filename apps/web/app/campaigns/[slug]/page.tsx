@@ -18,7 +18,14 @@ export default async function CampaignDetailPage({ params }: Props) {
   const content = <CampaignDetailContainer slug={resolvedSlug} />;
 
   return (
-    <CreatorWorkspaceGate fallback={<><PublicHeader />{content}</>}>
+    <CreatorWorkspaceGate
+      fallback={
+        <>
+          <PublicHeader />
+          <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-6 md:px-6">{content}</main>
+        </>
+      }
+    >
       {content}
     </CreatorWorkspaceGate>
   );
