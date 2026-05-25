@@ -129,10 +129,12 @@ export default async function HomePage() {
 
         <FeaturedCampaignsSection campaigns={featuredCampaigns.items} />
 
-        <section className="mt-10 rounded-[2rem] border border-zinc-200 bg-zinc-50 p-6 md:p-8">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">Sứ mệnh</p>
-          <h2 className="mt-2 text-3xl font-black text-zinc-900 md:text-4xl">Sứ mệnh của dCreator</h2>
-          <div className="mt-4 max-w-4xl space-y-3 text-base leading-8 text-zinc-700 md:text-lg">
+        <section className="relative mt-10 overflow-hidden rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6 text-white shadow-[0_25px_60px_-25px_rgba(0,0,0,0.8)] md:p-8">
+          <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl" />
+          <div className="pointer-events-none absolute -left-20 bottom-0 h-60 w-60 rounded-full bg-cyan-400/10 blur-3xl" />
+          <p className="inline-flex rounded-full border border-zinc-700 bg-zinc-900/80 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-zinc-200 backdrop-blur">Sứ mệnh</p>
+          <h2 className="mt-3 max-w-3xl text-3xl font-black leading-[1.15] text-white md:text-4xl">Sứ mệnh của dCreator</h2>
+          <div className="mt-5 max-w-3xl space-y-5 text-base leading-7 text-zinc-200 md:text-lg md:leading-8">
             <p>
               dCreator mang sứ mệnh giúp thương hiệu tăng trưởng doanh thu thông qua sức mạnh của nội dung số và cộng đồng sáng tạo.
             </p>
@@ -142,18 +144,18 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <section className="mt-8 rounded-[2rem] border border-zinc-200 bg-white px-4 py-6 md:px-6 md:py-7">
-          <div className="mx-auto max-w-4xl text-center">
+        <section className="mt-8 rounded-[2rem] border border-zinc-200 bg-white px-4 py-5 md:px-6 md:py-6">
+          <div className="mx-auto max-w-3xl text-center">
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-zinc-500">The Flywheel Engine</p>
-            <h2 className="mt-2 text-3xl font-black leading-[0.95] text-zinc-900 md:text-5xl">Win-Win-Win Flywheel</h2>
-            <p className="mx-auto mt-3 max-w-3xl text-lg leading-tight text-zinc-600 md:text-xl">
+            <h2 className="mt-2 text-2xl font-black leading-[0.95] text-zinc-900 md:text-4xl">Win-Win-Win Flywheel</h2>
+            <p className="mx-auto mt-2 max-w-2xl text-base leading-tight text-zinc-600 md:text-lg">
               Dòng chảy giá trị khép kín giữa Thương hiệu, Creator và Người tiêu dùng.
               <br />
               Công bằng, minh bạch và cộng sinh.
             </p>
           </div>
 
-          <div className="mx-auto mt-8 max-w-4xl text-center">
+          <div className="mx-auto mt-6 max-w-3xl text-center">
             <p className="text-lg font-black uppercase tracking-[0.16em] text-zinc-900 md:text-xl">BRAND</p>
             <p className="mt-2 text-sm font-bold text-zinc-400 md:text-base">Inventory &amp; Margin</p>
             <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-zinc-700 md:text-lg">
@@ -161,30 +163,38 @@ export default async function HomePage() {
             </p>
           </div>
 
-          <div className="relative mx-auto mt-6 h-[320px] w-full max-w-[560px] md:h-[400px]">
+          <div className="relative mx-auto mt-5 h-[260px] w-full max-w-[460px] md:h-[320px]">
             <div className="flywheel-pulse absolute left-1/2 top-1/2 h-[86%] w-[86%] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed border-zinc-300/70" />
             <div className="absolute left-1/2 top-1/2 h-[62%] w-[62%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-zinc-300/65" />
             <div className="absolute left-1/2 top-1/2 h-[46%] w-[46%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-zinc-300/55" />
             <div className="absolute left-1/2 top-1/2 h-[30%] w-[30%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-zinc-300/45" />
 
-            <div className="absolute left-1/2 top-[18%] h-[56%] w-[56%] -translate-x-1/2">
-              <div className="absolute left-1/2 top-[16%] h-[62%] w-px -translate-x-1/2 bg-zinc-300/50" />
-              <div className="absolute bottom-[10%] left-[8%] h-px w-[45%] rotate-[58deg] bg-zinc-300/50 origin-left" />
-              <div className="absolute bottom-[10%] right-[8%] h-px w-[45%] -rotate-[58deg] bg-zinc-300/50 origin-right" />
+            <svg
+              viewBox="0 0 100 100"
+              className="pointer-events-none absolute left-1/2 top-1/2 h-[78%] w-[78%] -translate-x-1/2 -translate-y-1/2"
+              aria-hidden="true"
+            >
+              <polygon
+                points="50,15 17,74 83,74"
+                fill="none"
+                stroke="rgb(212 212 216 / 0.75)"
+                strokeWidth="1.1"
+                strokeLinejoin="round"
+              />
+            </svg>
+
+            <div className="flywheel-fade absolute left-1/2 top-[14%] flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl border border-zinc-200 bg-white shadow-sm">
+              <span className="text-2xl">🏢</span>
+            </div>
+            <div className="flywheel-fade absolute left-[22%] top-[78%] flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl border border-zinc-200 bg-white shadow-sm [animation-delay:160ms]">
+              <span className="text-2xl">👥</span>
+            </div>
+            <div className="flywheel-fade absolute right-[22%] top-[78%] flex h-12 w-12 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl border border-zinc-200 bg-white shadow-sm [animation-delay:320ms]">
+              <span className="text-2xl">📷</span>
             </div>
 
-            <div className="flywheel-fade absolute left-1/2 top-[14%] flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl border border-zinc-200 bg-white shadow-sm">
-              <span className="text-3xl">🏢</span>
-            </div>
-            <div className="flywheel-fade absolute left-[22%] top-[78%] flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl border border-zinc-200 bg-white shadow-sm [animation-delay:160ms]">
-              <span className="text-3xl">👥</span>
-            </div>
-            <div className="flywheel-fade absolute right-[22%] top-[78%] flex h-14 w-14 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl border border-zinc-200 bg-white shadow-sm [animation-delay:320ms]">
-              <span className="text-3xl">📷</span>
-            </div>
-
-            <div className="flywheel-fade absolute left-1/2 top-1/2 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white [animation-delay:120ms]">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 text-3xl font-black text-white">d</div>
+            <div className="flywheel-fade absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white [animation-delay:120ms]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-2xl font-black text-white">d</div>
             </div>
           </div>
 
@@ -233,7 +243,7 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <section className="mt-10 rounded-[2rem] border border-zinc-200 bg-zinc-50 p-6 md:p-8">
+        <section className="relative mt-10 overflow-hidden rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6 text-white shadow-[0_25px_60px_-25px_rgba(0,0,0,0.8)] md:p-8">
           <h2 className="text-2xl font-black text-zinc-900">Câu hỏi thường gặp</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             {faqs.map((item) => (
@@ -257,7 +267,7 @@ export default async function HomePage() {
         <section className="mt-10 rounded-[2rem] border border-zinc-200 bg-white p-6 md:p-8">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">Đối tác</p>
+              <p className="inline-flex rounded-full border border-zinc-700 bg-zinc-900/80 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-zinc-200 backdrop-blur">Đối tác</p>
               <h2 className="mt-2 text-2xl font-black text-zinc-900">Các Brand đã hợp tác với dCreator</h2>
             </div>
             <p className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-sm font-semibold text-zinc-700">
@@ -312,5 +322,9 @@ export default async function HomePage() {
     </>
   );
 }
+
+
+
+
 
 

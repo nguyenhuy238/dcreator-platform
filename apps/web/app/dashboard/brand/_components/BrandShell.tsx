@@ -26,7 +26,7 @@ export function BrandShell({
       navItems={navItems}
       user={user}
       workspaceTitle="Bảng điều khiển Nhãn hàng"
-      workspaceDescription="Quản lý onboarding, campaign, creator và quỹ Brand"
+      workspaceDescription="Quản lý onboarding, campaign, creator"
       loginRedirect="/dashboard/brand"
     >
       {children}
