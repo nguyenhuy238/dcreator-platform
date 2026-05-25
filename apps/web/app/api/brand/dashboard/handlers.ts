@@ -35,6 +35,7 @@ import {
   upsertProduct,
   inviteBrandMember
 } from "@/lib/services/brand-dashboard.service";
+import { getBrandSubscriptionState, purchaseBrandSubscription } from "@/lib/services/brand-subscription.service";
 import {
   createBrandNPointTopupRequest,
   getBrandNPointWallet,
@@ -52,6 +53,7 @@ import {
   campaignMissionCreateSchema,
   campaignRequestSchema,
   creatorApplicationDecisionSchema,
+  brandSubscriptionPurchaseSchema,
   productSchema,
   productSubmissionSchema,
   proofReviewDecisionSchema,
@@ -262,6 +264,17 @@ export async function POST_npoint_refund_info(request: NextRequest, requestId: s
   const account = await requireBrandActor(request);
   const payload = brandNPointRefundInfoSchema.parse(await request.json());
   return ok(await submitBrandNPointRefundInfo(account.id, requestId, payload));
+}
+
+export async function GET_subscriptions(request: NextRequest) {
+  const account = await requireBrandActor(request);
+  return ok(await getBrandSubscriptionState(account.id));
+}
+
+export async function POST_subscriptions_purchase(request: NextRequest) {
+  const account = await requireBrandActor(request);
+  const payload = brandSubscriptionPurchaseSchema.parse(await request.json());
+  return ok(await purchaseBrandSubscription(account.id, payload.packageCode));
 }
 
 export async function withHandler(handler: () => Promise<Response>) {

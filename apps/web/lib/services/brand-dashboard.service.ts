@@ -1312,7 +1312,7 @@ export async function lockCampaignBudget(accountId: string, input: BudgetLockInp
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true });
   const campaign = await getBrandScopedCampaign(input.campaignId, ctx.brandOwnerAccountId);
   const wallet = await ensureWalletByAccountId(ctx.brandOwnerAccountId);
-  if (wallet.pointsBalance < input.amountVnd / 100) {
+  if (wallet.pointsBalance < input.amountVnd) {
     throw new AppError("Insufficient prepaid fund balance", 409, "INSUFFICIENT_PREPAID_BALANCE");
   }
 

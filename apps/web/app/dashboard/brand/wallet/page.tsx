@@ -49,7 +49,7 @@ const INITIAL_REFUND_FORM: RefundForm = {
   refundRequestNote: ""
 };
 
-const POINT_RATE = 100;
+const POINT_RATE = 1;
 
 function formatVnd(value: number) {
   return `${value.toLocaleString("vi-VN")} VNĐ`;

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { topupConfirmSchema } from "@/lib/validators/wallet";
 
-const TOPUP_POINT_RATE = 100;
+const TOPUP_POINT_RATE = 1;
 const PAYOS_WEBHOOK_SECRET = process.env.PAYOS_WEBHOOK_SECRET ?? "";
 
 type ConfirmPayload = z.infer<typeof topupConfirmSchema>;

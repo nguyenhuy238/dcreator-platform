@@ -51,6 +51,12 @@ enum BrandStatus {
   PENDING_VERIFICATION
 }
 
+enum BrandSubscriptionPackageCode {
+  FREE
+  UGC_15_VIDEO
+  UGC_50_VIDEO
+}
+
 enum FulfillmentType {
   NONE_WAREHOUSE
   BRAND_FULFILLMENT
@@ -426,14 +432,14 @@ model Account {
   reviewedBrandApplications     BrandApplication[]     @relation("BrandApplicationReviewer")
   reviewedBrands                Brand[]                @relation("BrandReviewer")
   reviewedBrandCampaignRequests BrandCampaignRequest[] @relation("BrandCampaignRequestReviewer")
-  ownedBrands Brand[] @relation("BrandOwner")
-  reviewedProductSubmissions ProductSubmission[] @relation("ProductSubmissionReviewer")
-  creatorFulfillmentOrders FulfillmentOrder[] @relation("FulfillmentCreator")
-  supportTicketsRequested SupportTicket[] @relation("SupportTicketRequester")
-  supportTicketsAssigned SupportTicket[] @relation("SupportTicketAssignee")
-  supportTicketComments SupportTicketComment[] @relation("SupportTicketCommentAuthor")
-  creatorMissions CreatorMission[]
-  settings       AccountSettings?
+  ownedBrands                   Brand[]                @relation("BrandOwner")
+  reviewedProductSubmissions    ProductSubmission[]    @relation("ProductSubmissionReviewer")
+  creatorFulfillmentOrders      FulfillmentOrder[]     @relation("FulfillmentCreator")
+  supportTicketsRequested       SupportTicket[]        @relation("SupportTicketRequester")
+  supportTicketsAssigned        SupportTicket[]        @relation("SupportTicketAssignee")
+  supportTicketComments         SupportTicketComment[] @relation("SupportTicketCommentAuthor")
+  creatorMissions               CreatorMission[]
+  settings                      AccountSettings?
   appliedMissionApplications    MissionApplication[]   @relation("MissionApplicationAccount")
   reviewedMissionApplications   MissionApplication[]   @relation("MissionApplicationReviewer")
   requestedNPointTopups         NPointTopupRequest[]   @relation("NPointTopupRequester")
@@ -633,13 +639,25 @@ model Brand {
   createdAt                   DateTime    @default(now())
   updatedAt                   DateTime    @updatedAt
 
-  owner              Account                @relation("BrandOwner", fields: [ownerAccountId], references: [id], onDelete: Restrict)
-  reviewedBy         Account?               @relation("BrandReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-  members            BrandMember[]
-  products           BrandProduct[]
-  campaignRequests   BrandCampaignRequest[]
-  productSubmissions ProductSubmission[]
+  owner               Account                @relation("BrandOwner", fields: [ownerAccountId], references: [id], onDelete: Restrict)
+  reviewedBy          Account?               @relation("BrandReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  members             BrandMember[]
+  products            BrandProduct[]
+  campaignRequests    BrandCampaignRequest[]
+  productSubmissions  ProductSubmission[]
   nPointTopupRequests NPointTopupRequest[]
+  subscription        BrandSubscription?
+}
+
+model BrandSubscription {
+  id          String                       @id @default(cuid())
+  brandId     String                       @unique
+  packageCode BrandSubscriptionPackageCode @default(FREE)
+  activatedAt DateTime?
+  createdAt   DateTime                     @default(now())
+  updatedAt   DateTime                     @updatedAt
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
 }
 
 model BrandCampaignRequest {
@@ -756,14 +774,14 @@ model AuthSession {
 }
 
 model AccountSettings {
-  id                           String   @id @default(cuid())
-  accountId                    String   @unique
-  notifyReviewStatusEmail      Boolean  @default(true)
-  notifyVoucherMissionEmail    Boolean  @default(true)
-  createdAt                    DateTime @default(now())
-  updatedAt                    DateTime @updatedAt
+  id                        String   @id @default(cuid())
+  accountId                 String   @unique
+  notifyReviewStatusEmail   Boolean  @default(true)
+  notifyVoucherMissionEmail Boolean  @default(true)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
-  account                      Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@index([accountId, updatedAt])
 }
@@ -1159,8 +1177,8 @@ model WalletTransaction {
   idempotencyKey      String?
   createdAt           DateTime              @default(now())
 
-  wallet  Wallet  @relation(fields: [walletId], references: [id])
-  account Account @relation(fields: [accountId], references: [id])
+  wallet               Wallet               @relation(fields: [walletId], references: [id])
+  account              Account              @relation(fields: [accountId], references: [id])
   nPointApprovedTopups NPointTopupRequest[] @relation("NPointTopupWalletTransaction")
 
   @@unique([walletId, idempotencyKey])
@@ -1169,35 +1187,35 @@ model WalletTransaction {
 }
 
 model NPointTopupRequest {
-  id                  String                   @id @default(cuid())
-  brandId             String
-  requesterAccountId  String
-  amountVnd           Int
-  requestedPoints     Int
-  transferNote        String
+  id                   String                   @id @default(cuid())
+  brandId              String
+  requesterAccountId   String
+  amountVnd            Int
+  requestedPoints      Int
+  transferNote         String
   bankTransferProofUrl String
-  status              NPointTopupRequestStatus @default(PENDING_ADMIN_REVIEW)
-  adminDecisionReason String?
-  reviewedById        String?
-  reviewedAt          DateTime?
-  approvedAt          DateTime?
-  walletTransactionId String?                  @unique
-  refundBankName      String?
-  refundAccountName   String?
-  refundAccountNumber String?
-  refundRequestNote   String?
-  refundSubmittedAt   DateTime?
-  refundProofUrl      String?
-  refundProcessedNote String?
-  refundProcessedById String?
-  refundProcessedAt   DateTime?
-  createdAt           DateTime                 @default(now())
-  updatedAt           DateTime                 @updatedAt
+  status               NPointTopupRequestStatus @default(PENDING_ADMIN_REVIEW)
+  adminDecisionReason  String?
+  reviewedById         String?
+  reviewedAt           DateTime?
+  approvedAt           DateTime?
+  walletTransactionId  String?                  @unique
+  refundBankName       String?
+  refundAccountName    String?
+  refundAccountNumber  String?
+  refundRequestNote    String?
+  refundSubmittedAt    DateTime?
+  refundProofUrl       String?
+  refundProcessedNote  String?
+  refundProcessedById  String?
+  refundProcessedAt    DateTime?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
 
-  brand             Brand             @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  requester         Account           @relation("NPointTopupRequester", fields: [requesterAccountId], references: [id], onDelete: Restrict)
-  reviewedBy        Account?          @relation("NPointTopupReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-  refundProcessedBy Account?          @relation("NPointRefundProcessor", fields: [refundProcessedById], references: [id], onDelete: SetNull)
+  brand             Brand              @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  requester         Account            @relation("NPointTopupRequester", fields: [requesterAccountId], references: [id], onDelete: Restrict)
+  reviewedBy        Account?           @relation("NPointTopupReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  refundProcessedBy Account?           @relation("NPointRefundProcessor", fields: [refundProcessedById], references: [id], onDelete: SetNull)
   walletTransaction WalletTransaction? @relation("NPointTopupWalletTransaction", fields: [walletTransactionId], references: [id], onDelete: SetNull)
 
   @@index([brandId, status, createdAt])
