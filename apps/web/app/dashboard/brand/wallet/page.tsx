@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatsCard } from "@/app/components/dcreator/ui/base";
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string };
@@ -91,12 +92,7 @@ function statusLabel(status: TopupRequest["status"]) {
 function SampleQr() {
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-3">
-      <div className="mx-auto grid w-40 grid-cols-9 gap-1 rounded-lg bg-white p-2">
-        {Array.from({ length: 81 }).map((_, index) => {
-          const active = [0, 1, 2, 3, 4, 9, 13, 18, 22, 27, 31, 36, 40, 45, 49, 54, 58, 63, 67, 72, 73, 74, 75, 76, 80].includes(index);
-          return <span key={index} className={`h-3 w-3 rounded-sm ${active ? "bg-zinc-900" : "bg-zinc-100"}`} />;
-        })}
-      </div>
+      <Image src="/qr-dcreator.jpg" alt="QR của dCreator" width={320} height={320} className="mx-auto h-40 w-40 rounded-lg border border-zinc-100 object-contain" />
       <p className="mt-2 text-center text-xs text-zinc-500">QR của dCreator</p>
     </div>
   );
