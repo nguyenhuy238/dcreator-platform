@@ -264,10 +264,10 @@ export default function CreatorProfilePage() {
       <PageHeader title="Hồ sơ Creator" subtitle="Quản lý thông tin cá nhân, kênh xã hội và lĩnh vực nội dung." />
 
       <div className="mb-4 flex gap-2 border-b border-zinc-200 pb-2">
-        <a href="?tab=profile" className={`rounded-full px-4 py-2 text-sm font-semibold ${activeTab === "profile" ? "bg-zinc-900 text-white" : "text-zinc-600 hover:bg-zinc-100"}`}>
+        <a href="?tab=profile" className={`rounded-full px-4 py-2 text-sm font-semibold ${activeTab === "profile" ? "bg-zinc-900 !text-white" : "text-zinc-600 hover:bg-zinc-100"}`}>
           Thông tin cơ bản
         </a>
-        <a href="?tab=channels" className={`rounded-full px-4 py-2 text-sm font-semibold ${activeTab === "channels" ? "bg-zinc-900 text-white" : "text-zinc-600 hover:bg-zinc-100"}`}>
+        <a href="?tab=channels" className={`rounded-full px-4 py-2 text-sm font-semibold ${activeTab === "channels" ? "bg-zinc-900 !text-white" : "text-zinc-600 hover:bg-zinc-100"}`}>
           Kênh mạng xã hội
         </a>
       </div>

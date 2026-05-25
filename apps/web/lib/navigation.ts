@@ -34,7 +34,6 @@ const creatorNavItems: readonly NavItem[] = [
   { href: "/dashboard/creator", label: "T\u1ed5ng quan Creator", description: "Ti\u1ebfn \u0111\u1ed9 nhi\u1ec7m v\u1ee5 v\u00e0 hoa h\u1ed3ng" },
   { href: "/dashboard/creator/jobs", label: "Campaign / Job", description: "Chi\u1ebfn d\u1ecbch c\u00f3 th\u1ec3 tham gia" },
   { href: "/dashboard/creator/missions", label: "Nhi\u1ec7m v\u1ee5 c\u1ee7a t\u00f4i", description: "Danh s\u00e1ch nhi\u1ec7m v\u1ee5 Creator" },
-  { href: "/dashboard/creator/profile?tab=channels", label: "K\u00eanh m\u1ea1ng x\u00e3 h\u1ed9i", description: "Qu\u1ea3n l\u00fd social channels" },
   { href: "/dashboard/creator/profile", label: "H\u1ed3 s\u01a1 Creator", description: "Portfolio v\u00e0 th\u00f4ng tin Creator" },
   { href: "/dashboard/creator/wallet", label: "V\u00ed Creator", description: "Hoa h\u1ed3ng v\u00e0 payout" }
 ];
