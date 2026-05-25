@@ -33,6 +33,7 @@ type RequestForm = {
   title: string;
   brief: string;
   coverImageUrl: string;
+  contentFileUrl: string;
   objective: string;
   priorityChannels: string;
   missionTypes: string;
@@ -48,12 +49,23 @@ type RequestForm = {
 };
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string };
+type ApiErrorPayload = {
+  success: false;
+  error?: string;
+  code?: string;
+  details?: {
+    formErrors?: string[];
+    fieldErrors?: Record<string, string[]>;
+  };
+};
+type FormFieldErrors = Partial<Record<keyof RequestForm, string[]>>;
 
 const defaultForm: RequestForm = {
   requestedSlug: "",
   title: "",
   brief: "",
   coverImageUrl: "",
+  contentFileUrl: "",
   objective: "",
   priorityChannels: "",
   missionTypes: "",
@@ -73,20 +85,28 @@ function toDateTime(value: string) {
 }
 
 const COVER_MARKER = "[[COVER_IMAGE_URL]]:";
+const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
 
 function stripCoverImageMeta(brief: string) {
   return brief
     .split("\n")
-    .filter((line) => !line.trim().startsWith(COVER_MARKER))
+    .filter((line) => !line.trim().startsWith(COVER_MARKER) && !line.trim().startsWith(CONTENT_FILE_MARKER))
     .join("\n")
     .trim();
 }
 
-function attachCoverImageMeta(brief: string, coverImageUrl: string) {
+function getContentFileUrlFromBrief(brief: string) {
+  const line = brief
+    .split("\n")
+    .find((item) => item.trim().startsWith(CONTENT_FILE_MARKER));
+  return line ? line.trim().slice(CONTENT_FILE_MARKER.length).trim() : "";
+}
+
+function attachCampaignMeta(brief: string, coverImageUrl: string) {
   const cleanBrief = stripCoverImageMeta(brief);
-  const url = coverImageUrl.trim();
-  if (!url) return cleanBrief;
-  return `${cleanBrief}\n${COVER_MARKER}${url}`.trim();
+  const lines = [cleanBrief];
+  if (coverImageUrl.trim()) lines.push(`${COVER_MARKER}${coverImageUrl.trim()}`);
+  return lines.filter(Boolean).join("\n").trim();
 }
 
 function requestStatusLabel(status: CampaignRequest["status"]) {
@@ -125,19 +145,45 @@ function formatIntForInput(value: number) {
 function SectionField({
   label,
   children,
-  hint
+  hint,
+  error
 }: {
   label: string;
   hint?: string;
-    children: ReactNode;
+  error?: string;
+  children: ReactNode;
 }) {
   return (
     <label className="grid gap-2 text-sm font-semibold text-zinc-700">
       <span>{label}</span>
       {children}
+      {error ? <span className="text-xs font-semibold text-rose-600">{error}</span> : null}
       {hint ? <span className="text-xs font-medium text-zinc-500">{hint}</span> : null}
     </label>
   );
+}
+
+function normalizeSlug(raw: string) {
+  return raw
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+}
+
+function mapFieldErrors(details?: ApiErrorPayload["details"]): FormFieldErrors {
+  const fieldErrors = details?.fieldErrors ?? {};
+  const entries = Object.entries(fieldErrors) as Array<[string, string[]]>;
+  const mapped: FormFieldErrors = {};
+  for (const [key, value] of entries) {
+    if (key in defaultForm) {
+      mapped[key as keyof RequestForm] = value;
+    }
+  }
+  return mapped;
 }
 
 export default function CampaignSetupPage() {
@@ -147,8 +193,10 @@ export default function CampaignSetupPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingContentFile, setUploadingContentFile] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FormFieldErrors>({});
 
   async function loadRequests() {
     setLoading(true);
@@ -171,6 +219,7 @@ export default function CampaignSetupPage() {
 
   function setField<K extends keyof RequestForm>(name: K, value: RequestForm[K]) {
     setForm((current) => ({ ...current, [name]: value }));
+    setFieldErrors((current) => ({ ...current, [name]: undefined }));
   }
 
   async function createRequest(event: FormEvent) {
@@ -178,21 +227,27 @@ export default function CampaignSetupPage() {
     setSaving(true);
     setError("");
     setSuccess("");
+    setFieldErrors({});
     try {
       const response = await fetch("/api/brand/dashboard/campaign-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
-          brief: attachCoverImageMeta(form.brief, form.coverImageUrl),
+          brief: attachCampaignMeta(form.brief, form.coverImageUrl),
           setupSource: "BRAND_REQUESTED",
           startsAt: toDateTime(form.startsAt),
           endsAt: toDateTime(form.endsAt)
         })
       });
-      const payload = (await response.json()) as ApiResponse<CampaignRequest>;
-      if (!response.ok || !payload.success) throw new Error(payload.success ? "Không thể gửi yêu cầu campaign" : payload.error);
+      const payload = (await response.json()) as ApiResponse<CampaignRequest> | ApiErrorPayload;
+      if (!response.ok || !payload.success) {
+        const apiError = payload as ApiErrorPayload;
+        setFieldErrors(mapFieldErrors(apiError.details));
+        throw new Error(apiError.error ?? "Không thể gửi yêu cầu campaign");
+      }
       setForm(defaultForm);
+      setFieldErrors({});
       setSuccess("Đã gửi yêu cầu campaign cho Admin.");
       await loadRequests();
     } catch (requestError) {
@@ -218,6 +273,25 @@ export default function CampaignSetupPage() {
       setError(requestError instanceof Error ? requestError.message : "Không thể tải ảnh campaign");
     } finally {
       setUploadingCover(false);
+    }
+  }
+
+  async function uploadCampaignContentFile(file: File) {
+    setUploadingContentFile(true);
+    setError("");
+    try {
+      const formData = new FormData();
+      formData.append("contractDocument", file);
+      const response = await fetch("/api/uploads/onboarding-doc", { method: "POST", body: formData });
+      const payload = (await response.json()) as ApiResponse<{ contractDocumentUrl: string }>;
+      if (!response.ok || !payload.success || !payload.data?.contractDocumentUrl) {
+        throw new Error(payload.success ? "Không thể tải file nội dung campaign" : payload.error);
+      }
+      setField("contentFileUrl", payload.data.contractDocumentUrl);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Không thể tải file nội dung campaign");
+    } finally {
+      setUploadingContentFile(false);
     }
   }
 
@@ -262,11 +336,27 @@ export default function CampaignSetupPage() {
             <div className="rounded-2xl border border-zinc-100 bg-zinc-50/70 p-4">
               <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-zinc-500">Thông tin cơ bản</h3>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <SectionField label="Slug campaign" hint="Dùng cho URL nội bộ, không có dấu cách.">
-                  <input className="dc-input" value={form.requestedSlug} onChange={(event) => setField("requestedSlug", event.target.value)} placeholder="vd: tet-sale-2026" />
+                <SectionField label="Slug campaign" hint="Dùng cho URL nội bộ, không có dấu cách." error={fieldErrors.requestedSlug?.[0]}>
+                  <input
+                    className={`dc-input ${fieldErrors.requestedSlug?.length ? "border-rose-400 focus:border-rose-500" : ""}`}
+                    value={form.requestedSlug}
+                    onChange={(event) => setField("requestedSlug", event.target.value)}
+                    onBlur={() => setField("requestedSlug", normalizeSlug(form.requestedSlug))}
+                    placeholder="vd: tet-sale-2026"
+                  />
                 </SectionField>
-                <SectionField label="Tên campaign" hint="Tên hiển thị công khai cho Creator/User.">
-                  <input className="dc-input" value={form.title} onChange={(event) => setField("title", event.target.value)} placeholder="vd: Tết 2026 cùng Brand A" />
+                <SectionField label="Tên campaign" hint="Tên hiển thị công khai cho Creator/User." error={fieldErrors.title?.[0]}>
+                  <input
+                    className="dc-input"
+                    value={form.title}
+                    onChange={(event) => setField("title", event.target.value)}
+                    onBlur={() => {
+                      if (!form.requestedSlug.trim()) {
+                        setField("requestedSlug", normalizeSlug(form.title));
+                      }
+                    }}
+                    placeholder="vd: Tết 2026 cùng Brand A"
+                  />
                 </SectionField>
                 <SectionField label="Ảnh cover campaign" hint="Tải ảnh lên để hiển thị ở danh sách campaign/public.">
                   <div className="grid gap-2">
@@ -275,7 +365,7 @@ export default function CampaignSetupPage() {
                       if (file) void uploadCoverImage(file);
                       event.currentTarget.value = "";
                     }} disabled={uploadingCover} />
-                    <input className="dc-input" type="url" value={form.coverImageUrl} onChange={(event) => setField("coverImageUrl", event.target.value.trim())} placeholder="https://... (URL ảnh sau khi upload)" />
+                    <input className="dc-input" type="text" value={form.coverImageUrl} onChange={(event) => setField("coverImageUrl", event.target.value.trim())} placeholder="/uploads/... hoặc https://..." />
                     {uploadingCover ? <span className="text-xs font-medium text-zinc-500">Đang tải ảnh...</span> : null}
                     {form.coverImageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -283,8 +373,19 @@ export default function CampaignSetupPage() {
                     ) : null}
                   </div>
                 </SectionField>
+                <SectionField label="File nội dung campaign" hint="Đính kèm brief chi tiết: PDF/DOC/DOCX/JPG/PNG/TXT (tối đa 10MB)." error={fieldErrors.contentFileUrl?.[0]}>
+                  <div className="grid gap-2">
+                    <input className="dc-input bg-white" type="file" accept=".pdf,.doc,.docx,.txt,image/png,image/jpeg" onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      if (file) void uploadCampaignContentFile(file);
+                      event.currentTarget.value = "";
+                    }} disabled={uploadingContentFile} />
+                    <input className={`dc-input ${fieldErrors.contentFileUrl?.length ? "border-rose-400 focus:border-rose-500" : ""}`} type="text" value={form.contentFileUrl} onChange={(event) => setField("contentFileUrl", event.target.value.trim())} placeholder="/uploads/... hoặc https://..." required />
+                    {uploadingContentFile ? <span className="text-xs font-medium text-zinc-500">Đang tải file...</span> : null}
+                  </div>
+                </SectionField>
                 <div className="md:col-span-2">
-                  <SectionField label="Mô tả ngắn" hint="Tóm tắt ngắn: mục tiêu, lợi ích, sản phẩm/voucher chính.">
+                  <SectionField label="Mô tả ngắn" hint="Tóm tắt ngắn: mục tiêu, lợi ích, sản phẩm/voucher chính." error={fieldErrors.brief?.[0]}>
                     <textarea className="dc-input min-h-28" value={form.brief} onChange={(event) => setField("brief", event.target.value)} placeholder="Mô tả ngắn gọn về chiến dịch, quà tặng, voucher, hàng tồn kho, hoặc mục tiêu kích hoạt..." />
                   </SectionField>
                 </div>
@@ -311,13 +412,13 @@ export default function CampaignSetupPage() {
             <div className="rounded-2xl border border-zinc-100 bg-white p-4">
               <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-zinc-500">Ngân sách và lịch chạy</h3>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <SectionField label="Ngân sách dự kiến" hint="Đơn vị: VND. Chỉ nhập số, không nhập ký tự tiền tệ.">
+                <SectionField label="Ngân sách dự kiến" hint="Đơn vị: VND. Chỉ nhập số, không nhập ký tự tiền tệ." error={fieldErrors.budgetVnd?.[0]}>
                   <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={formatIntForInput(form.budgetVnd)} onChange={(event) => setField("budgetVnd", parseNonNegativeInt(event.target.value))} />
                 </SectionField>
                 <SectionField label="Ngân sách thưởng thêm" hint="Đơn vị: VND. Dùng cho bonus ngoài ngân sách chính.">
                   <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={formatIntForInput(form.bonusBudgetVnd)} onChange={(event) => setField("bonusBudgetVnd", parseNonNegativeInt(event.target.value))} />
                 </SectionField>
-                <SectionField label="Target amount" hint="Đơn vị: VND. Mục tiêu doanh thu/đóng góp kỳ vọng.">
+                <SectionField label="Target amount" hint="Đơn vị: VND. Mục tiêu doanh thu/đóng góp kỳ vọng." error={fieldErrors.targetAmountVnd?.[0]}>
                   <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={formatIntForInput(form.targetAmountVnd)} onChange={(event) => setField("targetAmountVnd", parseNonNegativeInt(event.target.value))} />
                 </SectionField>
                 <SectionField label="Loại campaign">
@@ -335,16 +436,16 @@ export default function CampaignSetupPage() {
                     <option value="EDUCATION">Education</option>
                   </select>
                 </SectionField>
-                <SectionField label="Hoa hồng Creator (%)" hint="Đơn vị: phần trăm (%), từ 0 đến 100.">
+                <SectionField label="Hoa hồng Creator (%)" hint="Đơn vị: phần trăm (%), từ 0 đến 100." error={fieldErrors.creatorCommissionPercent?.[0]}>
                   <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={form.creatorCommissionPercent === 0 ? "" : String(form.creatorCommissionPercent)} onChange={(event) => setField("creatorCommissionPercent", parsePercent(event.target.value))} />
                 </SectionField>
-                <SectionField label="Hoa hồng User (%)" hint="Đơn vị: phần trăm (%), từ 0 đến 100.">
+                <SectionField label="Hoa hồng User (%)" hint="Đơn vị: phần trăm (%), từ 0 đến 100." error={fieldErrors.userCommissionPercent?.[0]}>
                   <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={form.userCommissionPercent === 0 ? "" : String(form.userCommissionPercent)} onChange={(event) => setField("userCommissionPercent", parsePercent(event.target.value))} />
                 </SectionField>
-                <SectionField label="Ngày bắt đầu mong muốn" hint="Nhập theo lịch hệ thống, API lưu chuẩn ISO.">
+                <SectionField label="Ngày bắt đầu mong muốn" hint="Nhập theo lịch hệ thống, API lưu chuẩn ISO." error={fieldErrors.startsAt?.[0]}>
                   <input className="dc-input" type="datetime-local" value={form.startsAt} onChange={(event) => setField("startsAt", event.target.value)} />
                 </SectionField>
-                <SectionField label="Ngày kết thúc mong muốn" hint="Nhập theo lịch hệ thống, API lưu chuẩn ISO.">
+                <SectionField label="Ngày kết thúc mong muốn" hint="Nhập theo lịch hệ thống, API lưu chuẩn ISO." error={fieldErrors.endsAt?.[0]}>
                   <input className="dc-input" type="datetime-local" value={form.endsAt} onChange={(event) => setField("endsAt", event.target.value)} />
                 </SectionField>
               </div>
@@ -406,6 +507,11 @@ export default function CampaignSetupPage() {
                     <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
                       Campaign đã publish: {request.createdCampaign.title} /{request.createdCampaign.slug}
                     </p>
+                  ) : null}
+                  {getContentFileUrlFromBrief(request.brief) ? (
+                    <a className="w-fit rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100" href={getContentFileUrlFromBrief(request.brief)} target="_blank" rel="noreferrer">
+                      Mở file nội dung campaign
+                    </a>
                   ) : null}
                   {request.status === "NEEDS_REVISION" ? (
                     <div className="grid gap-2">

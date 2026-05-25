@@ -127,8 +127,8 @@ export default function BrandCampaignsPage() {
     <>
       <PageHeader
         title="Campaign / Job"
-        subtitle="Quản lý danh sách campaign, trạng thái setup và hiệu suất huy động."
-        action={<Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Tạo campaign mới</Link>}
+        subtitle="Theo dõi campaign hiện có và gửi yêu cầu để Admin tạo campaign mới."
+        action={<Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Gửi yêu cầu tạo campaign</Link>}
       />
 
       <section className="dc-card p-4">
@@ -164,8 +164,8 @@ export default function BrandCampaignsPage() {
           {filtered.length === 0 ? (
             <EmptyState
               title="Chưa có campaign"
-              description="Tạo campaign đầu tiên để bắt đầu thu hút creator và backer."
-              action={<Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Tạo campaign mới</Link>}
+              description="Gửi yêu cầu để Admin tạo campaign đầu tiên cho brand của bạn."
+              action={<Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Gửi yêu cầu tạo campaign</Link>}
             />
           ) : (
             <div className="grid gap-4 xl:grid-cols-2">

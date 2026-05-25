@@ -32,17 +32,16 @@ export function BrandDashboardClient() {
     setLoading(true);
     setError("");
     try {
-      const [overview, profile, products, campaigns, applications, proofs, budget, analytics] = await Promise.all([
+      const [overview, profile, campaigns, applications, proofs, budget, analytics] = await Promise.all([
         load("/api/brand/dashboard/overview"),
         load("/api/brand/dashboard/profile"),
-        load("/api/brand/dashboard/products"),
         load("/api/brand/dashboard/campaigns"),
         load("/api/brand/dashboard/creator-applications"),
         load("/api/brand/dashboard/proofs"),
         load("/api/brand/dashboard/budget"),
         load("/api/brand/dashboard/analytics")
       ]);
-      setData({ overview, profile, products, campaigns, applications, proofs, budget, analytics });
+      setData({ overview, profile, campaigns, applications, proofs, budget, analytics });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Tải dữ liệu thất bại");
     } finally {
@@ -66,7 +65,6 @@ export function BrandDashboardClient() {
 
   const overview = data.overview as { activeCampaigns: number; totalBudget: number; prepaidFundBalance: number; totalCreators: number; totalVideosSubmitted: number; totalSalesConversions: number };
   const profile = data.profile as { brandName: string; logoUrl: string; businessInfo: string; verificationStatus: string };
-  const products = data.products as Array<{ id: string; name: string; sku: string; stockQty: number; voucherStock: number; campaignEligibility: boolean }>;
   const campaigns = data.campaigns as Array<{ id: string; title: string; status: string }>;
   const applications = data.applications as Array<{
     id: string;
@@ -100,7 +98,7 @@ export function BrandDashboardClient() {
       <PageHeader
         title="Bảng điều khiển Nhãn hàng"
         subtitle="Theo dõi duyệt hồ sơ, campaign, creator application và proof review."
-        action={<Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Tạo campaign</Link>}
+        action={<Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Yêu cầu Admin tạo campaign</Link>}
       />
       {message ? <ActionToast message={message === "Thành công" ? "Cập nhật thành công" : message} /> : null}
       <section>
@@ -129,22 +127,6 @@ export function BrandDashboardClient() {
       </section>
 
       <section>
-        <SectionHeader title="Sản phẩm & tồn kho" action={<Link href="/dashboard/brand/products" className="dc-btn-secondary">Quản lý sản phẩm</Link>} />
-        {products?.length ? (
-          <div className="grid gap-3 md:grid-cols-2">
-            {products.slice(0, 6).map((p) => (
-              <article key={p.id} className="dc-card p-4">
-                <p className="font-semibold text-zinc-900">{p.name}</p>
-                <p className="text-sm text-zinc-600">SKU: {p.sku}</p>
-                <p className="text-sm text-zinc-600">Tồn kho: {p.stockQty} | Voucher stock: {p.voucherStock}</p>
-                <p className="text-sm text-zinc-600">Campaign eligibility: {p.campaignEligibility ? "Sẵn sàng" : "Chưa đủ điều kiện"}</p>
-              </article>
-            ))}
-          </div>
-        ) : <EmptyState title="Chưa có sản phẩm" description="Thêm sản phẩm để dùng trong campaign và reward." />}
-      </section>
-
-      <section>
         <SectionHeader title="Quản lý campaign" action={<Link href="/brand" className="dc-btn-secondary">Xem campaign public</Link>} />
         {campaigns?.length ? (
           <div className="grid gap-3">
@@ -160,17 +142,16 @@ export function BrandDashboardClient() {
               </article>
             ))}
           </div>
-        ) : <EmptyState title="Chưa có campaign" description="Tạo campaign/job để bắt đầu tuyển Creator." />}
+        ) : <EmptyState title="Chưa có campaign" description="Gửi yêu cầu để Admin tạo campaign/job cho brand." />}
       </section>
 
       <section>
         <SectionHeader title="Reward / voucher" subtitle="Thiết lập reward theo campaign bằng dữ liệu thật." />
         <div className="dc-card p-4">
           <p className="text-sm text-zinc-600">
-            Tạo reward/voucher tại màn hình quản lý sản phẩm và campaign setup để đồng bộ tồn kho, giá và trạng thái duyệt.
+            Tạo reward/voucher tại màn hình campaign setup để đồng bộ vận hành chiến dịch.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Link href="/dashboard/brand/products" className="dc-btn-secondary">Quản lý sản phẩm</Link>
             <Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Thiết lập campaign</Link>
           </div>
         </div>

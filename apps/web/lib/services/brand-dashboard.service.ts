@@ -46,6 +46,8 @@ type ProductSubmissionInput = z.infer<typeof productSubmissionSchema>;
 type BrandMemberInviteInput = z.infer<typeof brandMemberInviteSchema>;
 type BrandMemberRoleUpdateInput = z.infer<typeof brandMemberRoleUpdateSchema>;
 type BrandMemberRemoveInput = z.infer<typeof brandMemberRemoveSchema>;
+const COVER_MARKER = "[[COVER_IMAGE_URL]]:";
+const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
 
 type BrandProductWithBatches = BrandProduct & { batches: BrandInventoryBatch[] };
 
@@ -892,12 +894,27 @@ export async function listBrandCampaignRequests(accountId: string) {
 export async function createBrandCampaignRequest(accountId: string, input: CampaignRequestInput) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true });
   const brand = ctx.brand;
+  const coverMatch = input.brief
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.startsWith(COVER_MARKER));
+  const coverMeta = coverMatch ? `\n${coverMatch}` : "";
+  const normalizedBrief = input.brief
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim();
+      return !trimmed.startsWith(COVER_MARKER) && !trimmed.startsWith(CONTENT_FILE_MARKER);
+    })
+    .join("\n")
+    .trim();
+  const briefWithMeta = `${normalizedBrief}${coverMeta}\n${CONTENT_FILE_MARKER}${input.contentFileUrl}`.trim();
+
   return prisma.brandCampaignRequest.create({
     data: {
       brandId: brand.id,
       requestedSlug: input.requestedSlug,
       title: input.title,
-      brief: input.brief,
+      brief: briefWithMeta,
       setupSource: input.setupSource,
       objective: input.objective || null,
       priorityChannels: input.priorityChannels || null,

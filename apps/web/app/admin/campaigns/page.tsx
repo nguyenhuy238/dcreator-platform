@@ -51,6 +51,20 @@ const statusOptions = [
   { value: "REJECTED", label: "Từ chối" }
 ];
 
+const COVER_MARKER = "[[COVER_IMAGE_URL]]:";
+const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
+
+function parseRequestBrief(rawBrief: string) {
+  const lines = rawBrief.split("\n");
+  const contentFileLine = lines.find((line) => line.trim().startsWith(CONTENT_FILE_MARKER));
+  const contentFileUrl = contentFileLine ? contentFileLine.trim().slice(CONTENT_FILE_MARKER.length).trim() : "";
+  const cleanBrief = lines
+    .filter((line) => !line.trim().startsWith(COVER_MARKER) && !line.trim().startsWith(CONTENT_FILE_MARKER))
+    .join("\n")
+    .trim();
+  return { cleanBrief, contentFileUrl };
+}
+
 export default function AdminCampaignsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -144,6 +158,10 @@ export default function AdminCampaignsPage() {
             <div className="grid gap-3">
               {requestItems.map((item) => (
                 <article key={item.id} className="dc-card p-4">
+                  {(() => {
+                    const { cleanBrief, contentFileUrl } = parseRequestBrief(item.brief);
+                    return (
+                      <>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="font-semibold text-zinc-900">{item.title}</p>
@@ -152,7 +170,12 @@ export default function AdminCampaignsPage() {
                     </div>
                     <StatusBadge status={item.status.toLowerCase()} />
                   </div>
-                  <p className="mt-3 text-sm text-zinc-600">{item.brief}</p>
+                  <p className="mt-3 text-sm text-zinc-600">{cleanBrief}</p>
+                  {contentFileUrl ? (
+                    <a className="mt-3 inline-flex w-fit rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100" href={contentFileUrl} target="_blank" rel="noreferrer">
+                      Mở file nội dung campaign
+                    </a>
+                  ) : null}
                   <div className="mt-3 grid gap-2 text-sm text-zinc-600 md:grid-cols-3">
                     <p>Mục tiêu: <span className="font-semibold text-zinc-900">{item.objective || "Không có"}</span></p>
                     <p>Kênh: <span className="font-semibold text-zinc-900">{item.priorityChannels || "Không có"}</span></p>
@@ -172,6 +195,9 @@ export default function AdminCampaignsPage() {
                     <button className="dc-btn-secondary" onClick={() => void review(item.id, "REJECTED")}>Từ chối</button>
                     <button className="dc-btn-secondary" onClick={() => void review(item.id, "CHANGES_REQUESTED")}>Yêu cầu chỉnh sửa</button>
                   </div>
+                      </>
+                    );
+                  })()}
                 </article>
               ))}
             </div>

@@ -1,5 +1,19 @@
 import { z } from "zod";
 
+const campaignSlugSchema = z
+  .string()
+  .trim()
+  .min(3)
+  .max(120)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug chỉ gồm chữ thường, số và dấu gạch ngang (-), không có khoảng trắng.");
+
+const uploadPathOrHttpUrlSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(400)
+  .refine((value) => value.startsWith("/uploads/") || /^https?:\/\//.test(value), "File URL không hợp lệ.");
+
 export const brandProfileSchema = z.object({
   brandName: z.string().trim().min(2).max(160),
   contactName: z.string().trim().min(2).max(120).optional().or(z.literal("")),
@@ -96,7 +110,7 @@ export const brandOnboardingSchema = z.object({
 });
 
 export const campaignCreateSchema = z.object({
-  slug: z.string().trim().min(3).max(120),
+  slug: campaignSlugSchema,
   title: z.string().trim().min(3).max(200),
   brief: z.string().trim().min(10).max(3000),
   budgetVnd: z.number().int().positive(),
@@ -112,6 +126,13 @@ export const campaignCreateSchema = z.object({
   bonusBudgetVnd: z.number().int().min(0).default(0),
   startsAt: z.string().datetime().optional(),
   endsAt: z.string().datetime().optional()
+}).superRefine((value, ctx) => {
+  if (value.startsAt && value.endsAt && new Date(value.endsAt) <= new Date(value.startsAt)) {
+    ctx.addIssue({ code: "custom", path: ["endsAt"], message: "Ngày kết thúc phải sau ngày bắt đầu." });
+  }
+  if (value.creatorCommissionPercent + value.userCommissionPercent > 100) {
+    ctx.addIssue({ code: "custom", path: ["userCommissionPercent"], message: "Tổng hoa hồng Creator + User không được vượt quá 100%." });
+  }
 });
 
 export const campaignBrandFeedbackSchema = z.object({
@@ -119,9 +140,10 @@ export const campaignBrandFeedbackSchema = z.object({
 });
 
 export const campaignRequestSchema = z.object({
-  requestedSlug: z.string().trim().min(3).max(120),
+  requestedSlug: campaignSlugSchema,
   title: z.string().trim().min(3).max(200),
   brief: z.string().trim().min(10).max(3000),
+  contentFileUrl: uploadPathOrHttpUrlSchema,
   budgetVnd: z.number().int().positive(),
   targetAmountVnd: z.number().int().positive().optional(),
   category: z.enum(["TECH", "FASHION", "FOOD", "BEAUTY", "LIFESTYLE", "EDUCATION"]),
@@ -135,6 +157,13 @@ export const campaignRequestSchema = z.object({
   bonusBudgetVnd: z.number().int().min(0).default(0),
   startsAt: z.string().datetime().optional(),
   endsAt: z.string().datetime().optional()
+}).superRefine((value, ctx) => {
+  if (value.startsAt && value.endsAt && new Date(value.endsAt) <= new Date(value.startsAt)) {
+    ctx.addIssue({ code: "custom", path: ["endsAt"], message: "Ngày kết thúc phải sau ngày bắt đầu." });
+  }
+  if (value.creatorCommissionPercent + value.userCommissionPercent > 100) {
+    ctx.addIssue({ code: "custom", path: ["userCommissionPercent"], message: "Tổng hoa hồng Creator + User không được vượt quá 100%." });
+  }
 });
 
 export const rewardTierSchema = z.object({
