@@ -455,7 +455,7 @@ export async function reviewCreatorApplication(actorId: string, applicationId: s
     });
 
     if (status === "APPROVED") {
-      await tx.creatorProfile.upsert({
+      const profile = await tx.creatorProfile.upsert({
         where: { accountId: app.accountId },
         create: {
           accountId: app.accountId,
@@ -497,6 +497,33 @@ export async function reviewCreatorApplication(actorId: string, applicationId: s
           maxJobsPerMonth: app.maxJobsPerMonth
         }
       });
+
+      await tx.creatorSocialLink.upsert({
+        where: {
+          creatorProfileId_platform_socialUrl: {
+            creatorProfileId: profile.id,
+            platform: app.mainPlatform,
+            socialUrl: app.socialUrl
+          }
+        },
+        create: {
+          creatorProfileId: profile.id,
+          platform: app.mainPlatform,
+          socialUrl: app.socialUrl,
+          followers: app.followerCount ?? 0,
+          status: "APPROVED",
+          reviewedById: actorId,
+          reviewedAt: new Date()
+        },
+        update: {
+          followers: app.followerCount ?? 0,
+          status: "APPROVED",
+          rejectReason: null,
+          reviewedById: actorId,
+          reviewedAt: new Date()
+        }
+      });
+
       await assignRole(tx, app.accountId, Role.CREATOR);
       await tx.account.update({ where: { id: app.accountId }, data: { role: Role.CREATOR } });
     }
