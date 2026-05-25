@@ -164,6 +164,7 @@ export default async function HomePage() {
           </div>
 
           <div className="relative mx-auto mt-5 h-[260px] w-full max-w-[460px] md:h-[320px]">
+            <div className="pointer-events-none absolute left-1/2 top-1/2 h-[84%] w-[84%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-sky-100/35 via-transparent to-emerald-100/30 blur-2xl" />
             <div className="flywheel-pulse absolute left-1/2 top-1/2 h-[86%] w-[86%] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed border-zinc-300/70" />
             <div className="absolute left-1/2 top-1/2 h-[62%] w-[62%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-zinc-300/65" />
             <div className="absolute left-1/2 top-1/2 h-[46%] w-[46%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-zinc-300/55" />
@@ -180,21 +181,24 @@ export default async function HomePage() {
                 stroke="rgb(212 212 216 / 0.75)"
                 strokeWidth="1.1"
                 strokeLinejoin="round"
+                strokeDasharray="3 2"
+                className="animate-[dash_6s_linear_infinite]"
               />
             </svg>
 
-            <div className="flywheel-fade absolute left-1/2 top-[14%] flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl border border-zinc-200 bg-white shadow-sm">
+            <div className="flywheel-fade absolute left-1/2 top-[14%] flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl border border-zinc-200 bg-white shadow-sm animate-[floatY_3.6s_ease-in-out_infinite]">
               <span className="text-2xl">🏢</span>
             </div>
-            <div className="flywheel-fade absolute left-[22%] top-[78%] flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl border border-zinc-200 bg-white shadow-sm [animation-delay:160ms]">
+            <div className="flywheel-fade absolute left-[22%] top-[78%] flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl border border-zinc-200 bg-white shadow-sm animate-[floatY_4.1s_ease-in-out_infinite] [animation-delay:160ms]">
               <span className="text-2xl">👥</span>
             </div>
-            <div className="flywheel-fade absolute right-[22%] top-[78%] flex h-12 w-12 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl border border-zinc-200 bg-white shadow-sm [animation-delay:320ms]">
+            <div className="flywheel-fade absolute right-[22%] top-[78%] flex h-12 w-12 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl border border-zinc-200 bg-white shadow-sm animate-[floatY_3.8s_ease-in-out_infinite] [animation-delay:320ms]">
               <span className="text-2xl">📷</span>
             </div>
 
             <div className="flywheel-fade absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white [animation-delay:120ms]">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-2xl font-black text-white">d</div>
+              <div className="absolute inset-0 rounded-full bg-zinc-900/15 blur-md animate-pulse" />
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-2xl font-black text-white">d</div>
             </div>
           </div>
 
@@ -243,7 +247,7 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <section className="relative mt-10 overflow-hidden rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6 text-white shadow-[0_25px_60px_-25px_rgba(0,0,0,0.8)] md:p-8">
+        <section className="relative mt-10 overflow-hidden rounded-[2rem] border border-zinc-200 bg-white p-6 text-white shadow-none md:p-8">
           <h2 className="text-2xl font-black text-zinc-900">Câu hỏi thường gặp</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             {faqs.map((item) => (
@@ -318,10 +322,13 @@ export default async function HomePage() {
           </div>
         </section>
       </main>
-      <PublicFooter />
-    </>
+      <PublicFooter />`r`n</>
   );
 }
+
+
+
+
 
 
 
