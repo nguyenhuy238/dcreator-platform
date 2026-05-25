@@ -176,7 +176,7 @@ export default function CampaignSetupPage() {
           }} disabled={uploadingContentFile} />
           <input className="dc-input" value={form.contentFileUrl} onChange={(event) => setField("contentFileUrl", event.target.value.trim())} placeholder="/uploads/... hoặc https://..." required />
           {templateUrl ? (
-            <a className="text-xs font-semibold text-sky-700 underline" href={templateUrl} target="_blank" rel="noreferrer">
+            <a className="text-xs font-semibold text-sky-700 underline" href={`/api/uploads/onboarding-doc-download?url=${encodeURIComponent(templateUrl)}`} target="_blank" rel="noreferrer">
               Tải template form nội dung campaign
             </a>
           ) : (
@@ -208,7 +208,7 @@ export default function CampaignSetupPage() {
                   <p className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-sm font-semibold text-zinc-700">{requestStatusLabel(request.status)}</p>
                 </div>
                 {getContentFileUrlFromBrief(request.brief) ? (
-                  <a className="w-fit rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100" href={getContentFileUrlFromBrief(request.brief)} target="_blank" rel="noreferrer">
+                  <a className="w-fit rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100" href={`/api/uploads/onboarding-doc-download?url=${encodeURIComponent(getContentFileUrlFromBrief(request.brief))}`} target="_blank" rel="noreferrer">
                     Mở file nội dung đã gửi
                   </a>
                 ) : null}
@@ -227,4 +227,3 @@ export default function CampaignSetupPage() {
     </>
   );
 }
-
