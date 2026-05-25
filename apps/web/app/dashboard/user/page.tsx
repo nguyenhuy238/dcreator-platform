@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import type { Role } from "@prisma/client";
 import { AppShell } from "@/app/components/dcreator/layout/shell";
 import {
@@ -71,7 +71,7 @@ function contributionStatusLabel(status: MyContribution["status"]) {
   return "Thất bại";
 }
 
-export default function UserDashboardPage() {
+function UserDashboardPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -306,5 +306,13 @@ export default function UserDashboardPage() {
         </section>
       </AppShell>
     </>
+  );
+}
+
+export default function UserDashboardPage() {
+  return (
+    <Suspense fallback={<AppShell sidebarItems={nav}><LoadingSkeleton rows={4} /></AppShell>}>
+      <UserDashboardPageContent />
+    </Suspense>
   );
 }

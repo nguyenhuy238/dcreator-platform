@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { Role } from "@prisma/client";
 import { DashboardSwitcher } from "@/app/components/dcreator/layout/dashboard-switcher";
@@ -249,7 +249,7 @@ export function MobileBottomNav({ items }: { items: NavItem[] }) {
   );
 }
 
-export function AppShell({ children, sidebarItems }: { children: React.ReactNode; sidebarItems?: NavItem[] }) {
+function AppShellInner({ children, sidebarItems }: { children: React.ReactNode; sidebarItems?: NavItem[] }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [roles, setRoles] = useState<Role[]>([]);
@@ -335,5 +335,25 @@ export function AppShell({ children, sidebarItems }: { children: React.ReactNode
       <DashboardSwitcher roles={roles} />
       {children}
     </DashboardShell>
+  );
+}
+
+export function AppShell({ children, sidebarItems }: { children: React.ReactNode; sidebarItems?: NavItem[] }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-zinc-50">
+          <div className="mx-auto flex w-full max-w-7xl">
+            <div className="hidden w-80 shrink-0 border-r border-zinc-200 bg-white lg:block" />
+            <div className="min-w-0 flex-1 px-4 pb-10 pt-5 md:px-6">
+              <div className="mb-4 h-10 w-56 animate-pulse rounded-xl bg-zinc-200" />
+              <div className="h-48 animate-pulse rounded-2xl bg-zinc-100" />
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <AppShellInner sidebarItems={sidebarItems}>{children}</AppShellInner>
+    </Suspense>
   );
 }

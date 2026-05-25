@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/app/components/dcreator/layout/shell";
@@ -69,7 +69,7 @@ function onlyDigits(raw: string) {
   return raw.replace(/\D/g, "");
 }
 
-export default function UserProfilePage() {
+function UserProfilePageContent() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -341,5 +341,19 @@ export default function UserProfilePage() {
         </section>
       </AppShell>
     </>
+  );
+}
+
+export default function UserProfilePage() {
+  return (
+    <Suspense
+      fallback={
+        <AppShell sidebarItems={nav}>
+          <div className="dc-card p-6">Đang tải hồ sơ...</div>
+        </AppShell>
+      }
+    >
+      <UserProfilePageContent />
+    </Suspense>
   );
 }

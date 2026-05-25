@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data?: T; error?: string };
@@ -53,7 +54,7 @@ function transcriptPlainText(value: string | null | undefined) {
     .trim();
 }
 
-export default function AdminMissionReviewsPage() {
+function AdminMissionReviewsPageContent() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
   const initialTab: TabKey = tabParam === "transcript-reviews" || tabParam === "video-reviews" || tabParam === "final-reviews" || tabParam === "applications" ? tabParam : "applications";
@@ -88,6 +89,14 @@ export default function AdminMissionReviewsPage() {
       {activeTab === "video-reviews" ? <AdminMissionVideoReviewsTab /> : null}
       {activeTab === "final-reviews" ? <AdminMissionFinalReviewsTab /> : null}
     </>
+  );
+}
+
+export default function AdminMissionReviewsPage() {
+  return (
+    <Suspense fallback={<LoadingSkeleton rows={4} />}>
+      <AdminMissionReviewsPageContent />
+    </Suspense>
   );
 }
 
