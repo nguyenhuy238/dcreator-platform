@@ -12,6 +12,7 @@ type AdminSettingsPayload = {
   requireRejectReason: boolean;
   requireRequestChangesReason: boolean;
   maintenanceMessage: string;
+  campaignContentTemplateUrl: string;
 };
 
 const defaultSettings: AdminSettingsPayload = {
@@ -20,15 +21,16 @@ const defaultSettings: AdminSettingsPayload = {
   fraudScoreThreshold: 70,
   requireRejectReason: true,
   requireRequestChangesReason: true,
-  maintenanceMessage: ""
+  maintenanceMessage: "",
+  campaignContentTemplateUrl: ""
 };
 
 async function getOrCreateSettings() {
   await prisma.$executeRaw`
     INSERT INTO "AdminSetting"
-      ("id", "scope", "reviewSlaHours", "payoutAutoThresholdVnd", "fraudScoreThreshold", "requireRejectReason", "requireRequestChangesReason", "maintenanceMessage", "createdAt", "updatedAt")
+      ("id", "scope", "reviewSlaHours", "payoutAutoThresholdVnd", "fraudScoreThreshold", "requireRejectReason", "requireRequestChangesReason", "maintenanceMessage", "campaignContentTemplateUrl", "createdAt", "updatedAt")
     VALUES
-      ('admin-settings-global', 'global', ${defaultSettings.reviewSlaHours}, ${defaultSettings.payoutAutoThresholdVnd}, ${defaultSettings.fraudScoreThreshold}, ${defaultSettings.requireRejectReason}, ${defaultSettings.requireRequestChangesReason}, ${defaultSettings.maintenanceMessage}, now(), now())
+      ('admin-settings-global', 'global', ${defaultSettings.reviewSlaHours}, ${defaultSettings.payoutAutoThresholdVnd}, ${defaultSettings.fraudScoreThreshold}, ${defaultSettings.requireRejectReason}, ${defaultSettings.requireRequestChangesReason}, ${defaultSettings.maintenanceMessage}, ${defaultSettings.campaignContentTemplateUrl}, now(), now())
     ON CONFLICT ("scope") DO NOTHING
   `;
   const rows = await prisma.$queryRaw<Array<AdminSettingsPayload>>`
@@ -38,7 +40,8 @@ async function getOrCreateSettings() {
       "fraudScoreThreshold",
       "requireRejectReason",
       "requireRequestChangesReason",
-      "maintenanceMessage"
+      "maintenanceMessage",
+      "campaignContentTemplateUrl"
     FROM "AdminSetting"
     WHERE "scope" = 'global'
     LIMIT 1
@@ -71,7 +74,8 @@ export async function POST(request: NextRequest) {
     fraudScoreThreshold: Number(body.fraudScoreThreshold ?? current.fraudScoreThreshold),
     requireRejectReason: Boolean(body.requireRejectReason ?? current.requireRejectReason),
     requireRequestChangesReason: Boolean(body.requireRequestChangesReason ?? current.requireRequestChangesReason),
-    maintenanceMessage: String(body.maintenanceMessage ?? current.maintenanceMessage)
+    maintenanceMessage: String(body.maintenanceMessage ?? current.maintenanceMessage),
+    campaignContentTemplateUrl: String(body.campaignContentTemplateUrl ?? current.campaignContentTemplateUrl)
   };
   if (next.reviewSlaHours < 1 || next.reviewSlaHours > 168) {
     return NextResponse.json({ success: false, error: "reviewSlaHours phải từ 1 đến 168." }, { status: 400 });
@@ -88,6 +92,7 @@ export async function POST(request: NextRequest) {
       "requireRejectReason" = ${next.requireRejectReason},
       "requireRequestChangesReason" = ${next.requireRequestChangesReason},
       "maintenanceMessage" = ${next.maintenanceMessage},
+      "campaignContentTemplateUrl" = ${next.campaignContentTemplateUrl},
       "updatedAt" = now()
     WHERE "scope" = 'global'
   `;

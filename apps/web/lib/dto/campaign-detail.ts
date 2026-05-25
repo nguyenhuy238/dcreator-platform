@@ -10,12 +10,8 @@ export type CampaignDetailDTO = {
     creator: string | null;
     campaignType: "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
     category: "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
-    objective: string | null;
-    priorityChannels: string | null;
-    missionTypes: string | null;
-    creatorCommissionPercent: number;
-    userCommissionPercent: number;
-    bonusBudgetVnd: number;
+    benefits: string | null;
+    participationRoadmap: string[];
     status: "DRAFT" | "ACTIVE" | "PAUSED" | "COMPLETED" | "ARCHIVED";
     deadline: string | null;
   };

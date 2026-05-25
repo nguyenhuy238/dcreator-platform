@@ -136,9 +136,6 @@ export function BrandDashboardClient() {
                   <p className="font-semibold text-zinc-900">{c.title}</p>
                   <StatusBadge status={c.status.toLowerCase()} />
                 </div>
-                <div className="mt-3">
-                  <button className="dc-btn-secondary" onClick={() => postJson(`/api/brand/dashboard/campaigns/${c.id}/submit-review`, {})}>Gửi duyệt</button>
-                </div>
               </article>
             ))}
           </div>

@@ -11,12 +11,10 @@ type CampaignRequestItem = {
   title: string;
   brief: string;
   status: string;
-  objective: string | null;
-  priorityChannels: string | null;
-  missionTypes: string | null;
-  creatorCommissionPercent: number;
-  userCommissionPercent: number;
-  bonusBudgetVnd: number;
+  benefits: string | null;
+  participationRoadmap: string[];
+  objective?: string | null;
+  priorityChannels?: string | null;
   adminNote: string | null;
   brandFeedback: string | null;
   budgetVnd: number;
@@ -101,32 +99,11 @@ export default function AdminCampaignsPage() {
     void load();
   }, [load]);
 
-  async function review(id: string, decision: "APPROVED" | "REJECTED" | "CHANGES_REQUESTED") {
-    const actionLabel = decision === "APPROVED" ? "duyệt & publish" : decision === "REJECTED" ? "từ chối" : "yêu cầu chỉnh sửa";
-    if (!window.confirm(`Xác nhận ${actionLabel} yêu cầu campaign này?`)) return;
-    let reason: string | undefined;
-    if (decision !== "APPROVED") {
-      reason = window.prompt("Nhập lý do:", decision === "REJECTED" ? "Không phù hợp policy" : "Cần chỉnh sửa giá, hoa hồng hoặc KPI")?.trim();
-      if (!reason) return;
-    }
-    const res = await fetch(`/api/admin/dashboard/campaign-reviews/${id}/decision`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(reason ? { decision, reason } : { decision })
-    });
-    const body = await res.json();
-    if (!res.ok || !body.success) {
-      setError(body.error ?? "Không xử lý được yêu cầu campaign");
-      return;
-    }
-    await load();
-  }
-
   return (
     <>
       <PageHeader
         title="Campaign CMS"
-        subtitle="Quản lý yêu cầu từ Brand; khi duyệt, Admin tạo campaign thật và publish lên hệ thống."
+        subtitle="Tiếp nhận thông tin từ Brand; Admin chủ động tạo campaign trong hệ thống."
         action={(
           <div className="flex gap-2">
             <Link className="dc-btn-primary" href="/admin/campaigns/create">Tạo campaign</Link>
@@ -177,12 +154,8 @@ export default function AdminCampaignsPage() {
                     </a>
                   ) : null}
                   <div className="mt-3 grid gap-2 text-sm text-zinc-600 md:grid-cols-3">
-                    <p>Mục tiêu: <span className="font-semibold text-zinc-900">{item.objective || "Không có"}</span></p>
-                    <p>Kênh: <span className="font-semibold text-zinc-900">{item.priorityChannels || "Không có"}</span></p>
-                    <p>Nhiệm vụ: <span className="font-semibold text-zinc-900">{item.missionTypes || "Không có"}</span></p>
-                    <p>Hoa hồng Creator: <span className="font-semibold text-zinc-900">{item.creatorCommissionPercent}%</span></p>
-                    <p>Hoa hồng User: <span className="font-semibold text-zinc-900">{item.userCommissionPercent}%</span></p>
-                    <p>Thưởng thêm: <span className="font-semibold text-zinc-900">{item.bonusBudgetVnd.toLocaleString("vi-VN")}đ</span></p>
+                    <p>Quyền lợi: <span className="font-semibold text-zinc-900">{item.benefits || item.objective || "Không có"}</span></p>
+                    <p>Lộ trình tham gia: <span className="font-semibold text-zinc-900">{item.participationRoadmap?.length ? `${item.participationRoadmap.length} bước` : item.priorityChannels || "Không có"}</span></p>
                     <p>Ngân sách: <span className="font-semibold text-zinc-900">{item.budgetVnd.toLocaleString("vi-VN")}đ</span></p>
                     <p>Target: <span className="font-semibold text-zinc-900">{item.targetAmountVnd.toLocaleString("vi-VN")}đ</span></p>
                     <p>Trạng thái request: <span className="font-semibold text-zinc-900">{item.status}</span></p>
@@ -191,9 +164,7 @@ export default function AdminCampaignsPage() {
                   {item.brandFeedback ? <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">Brand phản hồi: {item.brandFeedback}</p> : null}
                   {item.createdCampaign ? <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">Đã tạo campaign: {item.createdCampaign.title} /{item.createdCampaign.slug}</p> : null}
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button className="dc-btn-primary" onClick={() => void review(item.id, "APPROVED")}>Duyệt & publish</button>
-                    <button className="dc-btn-secondary" onClick={() => void review(item.id, "REJECTED")}>Từ chối</button>
-                    <button className="dc-btn-secondary" onClick={() => void review(item.id, "CHANGES_REQUESTED")}>Yêu cầu chỉnh sửa</button>
+                    <Link className="dc-btn-primary" href="/admin/campaigns/create">Tạo campaign từ thông tin này</Link>
                   </div>
                       </>
                     );

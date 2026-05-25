@@ -49,6 +49,22 @@ type BrandMemberRemoveInput = z.infer<typeof brandMemberRemoveSchema>;
 const COVER_MARKER = "[[COVER_IMAGE_URL]]:";
 const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
 
+async function trySyncCampaignNewFields(campaignId: string, benefits: string | null, participationRoadmap: string[]) {
+  try {
+    await prisma.$executeRaw`UPDATE "Campaign" SET "benefits" = ${benefits}, "participationRoadmap" = ${participationRoadmap} WHERE "id" = ${campaignId}`;
+  } catch {
+    // Backward compatibility when DB has not applied migration yet.
+  }
+}
+
+async function trySyncCampaignRequestNewFields(requestId: string, benefits: string | null, participationRoadmap: string[]) {
+  try {
+    await prisma.$executeRaw`UPDATE "BrandCampaignRequest" SET "benefits" = ${benefits}, "participationRoadmap" = ${participationRoadmap} WHERE "id" = ${requestId}`;
+  } catch {
+    // Backward compatibility when DB has not applied migration yet.
+  }
+}
+
 type BrandProductWithBatches = BrandProduct & { batches: BrandInventoryBatch[] };
 
 type BrandMeta = {
@@ -680,17 +696,18 @@ export async function createBrandCampaign(accountId: string, input: CampaignInpu
       slug: input.slug,
       title: input.title,
       brief: input.brief,
-      budgetVnd: input.budgetVnd,
-      targetAmountVnd: input.targetAmountVnd ?? input.budgetVnd,
+      budgetVnd: 10000000,
+      targetAmountVnd: 10000000,
       category: input.category,
       campaignType: input.campaignType,
       setupSource: input.setupSource,
-      objective: input.objective || null,
-      priorityChannels: input.priorityChannels || null,
-      missionTypes: input.missionTypes || null,
-      creatorCommissionPercent: input.creatorCommissionPercent,
-      userCommissionPercent: input.userCommissionPercent,
-      bonusBudgetVnd: input.bonusBudgetVnd,
+      objective: input.benefits || null,
+      priorityChannels: input.participationRoadmap.join("\n"),
+      missionTypes: null,
+      creatorCommissionPercent: 0,
+      userCommissionPercent: 0,
+      bonusBudgetVnd: 0,
+      coverImageUrl: input.imageUrl || null,
       feasibilityStatus: "DRAFT",
       brandApprovalStatus: "DRAFT",
       startsAt: input.startsAt ? new Date(input.startsAt) : null,
@@ -722,6 +739,7 @@ export async function createBrandCampaign(accountId: string, input: CampaignInpu
     metadata: { campaignId: campaign.id, brandId: ctx.brand.id },
     excludeAccountId: accountId
   });
+  await trySyncCampaignNewFields(campaign.id, input.benefits || null, input.participationRoadmap);
 
   return campaign;
 }
@@ -731,27 +749,30 @@ export async function editDraftCampaign(accountId: string, campaignId: string, i
   const campaign = await getBrandScopedCampaign(campaignId, ctx.brandOwnerAccountId);
   if (campaign.status !== "DRAFT") throw new AppError("Only draft campaign can be edited", 409, "CAMPAIGN_NOT_DRAFT");
 
-  return prisma.campaign.update({
+  const updated = await prisma.campaign.update({
     where: { id: campaignId },
     data: {
       slug: input.slug,
       title: input.title,
       brief: input.brief,
-      budgetVnd: input.budgetVnd,
-      targetAmountVnd: input.targetAmountVnd ?? input.budgetVnd,
+      budgetVnd: 10000000,
+      targetAmountVnd: 10000000,
       category: input.category,
       campaignType: input.campaignType,
       setupSource: input.setupSource,
-      objective: input.objective || null,
-      priorityChannels: input.priorityChannels || null,
-      missionTypes: input.missionTypes || null,
-      creatorCommissionPercent: input.creatorCommissionPercent,
-      userCommissionPercent: input.userCommissionPercent,
-      bonusBudgetVnd: input.bonusBudgetVnd,
+      objective: input.benefits || null,
+      priorityChannels: input.participationRoadmap.join("\n"),
+      missionTypes: null,
+      creatorCommissionPercent: 0,
+      userCommissionPercent: 0,
+      bonusBudgetVnd: 0,
+      coverImageUrl: input.imageUrl || null,
       startsAt: input.startsAt ? new Date(input.startsAt) : null,
       endsAt: input.endsAt ? new Date(input.endsAt) : null
     }
   });
+  await trySyncCampaignNewFields(campaignId, input.benefits || null, input.participationRoadmap);
+  return updated;
 }
 
 export async function submitCampaignForAdminReview(accountId: string, campaignId: string) {
@@ -886,7 +907,31 @@ export async function listBrandCampaignRequests(accountId: string) {
   const brand = ctx.brand;
   return prisma.brandCampaignRequest.findMany({
     where: { brandId: brand.id },
-    include: { createdCampaign: { select: { id: true, slug: true, title: true, status: true } } },
+    select: {
+      id: true,
+      requestedSlug: true,
+      title: true,
+      brief: true,
+      setupSource: true,
+      objective: true,
+      priorityChannels: true,
+      missionTypes: true,
+      creatorCommissionPercent: true,
+      userCommissionPercent: true,
+      bonusBudgetVnd: true,
+      budgetVnd: true,
+      targetAmountVnd: true,
+      campaignType: true,
+      category: true,
+      startsAt: true,
+      endsAt: true,
+      status: true,
+      adminNote: true,
+      brandFeedback: true,
+      createdAt: true,
+      updatedAt: true,
+      createdCampaign: { select: { id: true, slug: true, title: true, status: true } }
+    },
     orderBy: { createdAt: "desc" }
   });
 }
@@ -894,43 +939,61 @@ export async function listBrandCampaignRequests(accountId: string) {
 export async function createBrandCampaignRequest(accountId: string, input: CampaignRequestInput) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true });
   const brand = ctx.brand;
-  const coverMatch = input.brief
-    .split("\n")
-    .map((line) => line.trim())
-    .find((line) => line.startsWith(COVER_MARKER));
-  const coverMeta = coverMatch ? `\n${coverMatch}` : "";
-  const normalizedBrief = input.brief
-    .split("\n")
-    .filter((line) => {
-      const trimmed = line.trim();
-      return !trimmed.startsWith(COVER_MARKER) && !trimmed.startsWith(CONTENT_FILE_MARKER);
-    })
-    .join("\n")
-    .trim();
-  const briefWithMeta = `${normalizedBrief}${coverMeta}\n${CONTENT_FILE_MARKER}${input.contentFileUrl}`.trim();
+  const slugBase = input.title
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-")
+    .slice(0, 80) || "campaign-request";
+  const requestedSlug = `${slugBase}-${Date.now().toString().slice(-6)}`;
+  const briefWithMeta = [
+    `Yêu cầu tạo campaign từ Brand: ${input.title}`,
+    input.imageUrl ? `${COVER_MARKER}${input.imageUrl}` : "",
+    `${CONTENT_FILE_MARKER}${input.contentFileUrl}`
+  ].filter(Boolean).join("\n");
 
-  return prisma.brandCampaignRequest.create({
+  const created = await prisma.brandCampaignRequest.create({
     data: {
       brandId: brand.id,
-      requestedSlug: input.requestedSlug,
+      requestedSlug,
       title: input.title,
       brief: briefWithMeta,
-      setupSource: input.setupSource,
-      objective: input.objective || null,
-      priorityChannels: input.priorityChannels || null,
-      missionTypes: input.missionTypes || null,
-      creatorCommissionPercent: input.creatorCommissionPercent,
-      userCommissionPercent: input.userCommissionPercent,
-      bonusBudgetVnd: input.bonusBudgetVnd,
-      budgetVnd: input.budgetVnd,
-      targetAmountVnd: input.targetAmountVnd ?? input.budgetVnd,
-      category: input.category,
-      campaignType: input.campaignType,
-      startsAt: input.startsAt ? new Date(input.startsAt) : null,
-      endsAt: input.endsAt ? new Date(input.endsAt) : null,
+      setupSource: "BRAND_REQUESTED",
+      objective: null,
+      priorityChannels: null,
+      missionTypes: null,
+      creatorCommissionPercent: 0,
+      userCommissionPercent: 0,
+      bonusBudgetVnd: 0,
+      budgetVnd: 10000000,
+      targetAmountVnd: 10000000,
+      category: "LIFESTYLE",
+      campaignType: "COMMUNITY",
+      startsAt: null,
+      endsAt: null,
       status: "PENDING_REVIEW"
     }
   });
+  await trySyncCampaignRequestNewFields(created.id, null, []);
+  return created;
+}
+
+export async function getBrandCampaignTemplateConfig(accountId: string) {
+  await resolveBrandActorContext(accountId, { provisionIfOwner: true });
+  try {
+    const rows = await prisma.$queryRaw<Array<{ campaignContentTemplateUrl: string }>>`
+      SELECT "campaignContentTemplateUrl"
+      FROM "AdminSetting"
+      WHERE "scope" = 'global'
+      LIMIT 1
+    `;
+    return { campaignContentTemplateUrl: rows[0]?.campaignContentTemplateUrl ?? "" };
+  } catch {
+    return { campaignContentTemplateUrl: "" };
+  }
 }
 
 export async function respondBrandCampaignRequest(accountId: string, requestId: string, input: CampaignBrandFeedbackInput) {

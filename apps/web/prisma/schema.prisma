@@ -637,6 +637,8 @@ model BrandCampaignRequest {
   title                    String
   brief                    String
   setupSource              CampaignSetupSource        @default(BRAND_REQUESTED)
+  benefits                 String?
+  participationRoadmap     String[]                   @default([])
   objective                String?
   priorityChannels         String?
   missionTypes             String?
@@ -796,6 +798,8 @@ model Campaign {
   coverImageUrl            String?
   campaignType             CampaignType                @default(COMMUNITY)
   setupSource              CampaignSetupSource         @default(BRAND_REQUESTED)
+  benefits                 String?
+  participationRoadmap     String[]                    @default([])
   objective                String?
   priorityChannels         String?
   missionTypes             String?
@@ -1358,6 +1362,7 @@ model AdminSetting {
   requireRejectReason         Boolean  @default(true)
   requireRequestChangesReason Boolean  @default(true)
   maintenanceMessage          String   @default("")
+  campaignContentTemplateUrl  String   @default("")
   createdAt                   DateTime @default(now())
   updatedAt                   DateTime @updatedAt
 }
