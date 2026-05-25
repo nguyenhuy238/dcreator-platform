@@ -34,38 +34,37 @@ const creatorNavItems: readonly NavItem[] = [
   { href: "/dashboard/creator", label: "T\u1ed5ng quan Creator", description: "Ti\u1ebfn \u0111\u1ed9 nhi\u1ec7m v\u1ee5 v\u00e0 hoa h\u1ed3ng" },
   { href: "/dashboard/creator/jobs", label: "Campaign / Job", description: "Chi\u1ebfn d\u1ecbch c\u00f3 th\u1ec3 tham gia" },
   { href: "/dashboard/creator/missions", label: "Nhi\u1ec7m v\u1ee5 c\u1ee7a t\u00f4i", description: "Danh s\u00e1ch nhi\u1ec7m v\u1ee5 Creator" },
-  { href: "/dashboard/creator/profile?tab=channels", label: "K\u00eanh m\u1ea1ng x\u00e3 h\u1ed9i", description: "Qu\u1ea3n l\u00fd social channels" },
   { href: "/dashboard/creator/profile", label: "H\u1ed3 s\u01a1 Creator", description: "Portfolio v\u00e0 th\u00f4ng tin Creator" },
   { href: "/dashboard/creator/wallet", label: "V\u00ed Creator", description: "Hoa h\u1ed3ng v\u00e0 payout" }
 ];
 
 const brandNavItems: readonly NavItem[] = [
-  { href: "/dashboard/brand", label: "Tổng quan Brand", description: "Toàn cảnh vận hành Brand" },
-  { href: "/dashboard/brand/onboarding", label: "Onboarding / BCC", description: "Hồ sơ pháp lý và BCC" },
-  { href: "/dashboard/brand/profile", label: "Hồ sơ nhãn hàng", description: "Thông tin nhãn hàng" },
-  { href: "/dashboard/brand/campaigns", label: "Campaign / Job", description: "Tạo và quản lý campaign" },
-  { href: "/dashboard/brand/applications", label: "Creator ứng tuyển", description: "Đơn ứng tuyển từ Creator" },
-  { href: "/dashboard/brand/mission-reviews", label: "Duyệt nhiệm vụ Creator", description: "Duyệt kịch bản, nhận nhiệm vụ, video và hoàn thành" },
-  { href: "/dashboard/brand/mission-history", label: "Lịch sử nhiệm vụ", description: "Toàn bộ Creator Mission theo campaign của Brand" },
-  { href: "/dashboard/brand/proofs", label: "Duyệt proof / video", description: "Duyệt nội dung nộp lên" },
-  { href: "/dashboard/brand/analytics", label: "KPI / Analytics", description: "Phân tích hiệu quả campaign" },
-  { href: "/dashboard/brand/wallet", label: "Quỹ Brand", description: "Quỹ prepaid và giao dịch" },
-  { href: "/dashboard/brand/members", label: "Thành viên Brand", description: "Quản lý team nhãn hàng" },
-  { href: "/dashboard/brand/settings", label: "Cài đặt Brand", description: "Thiết lập vận hành Brand" }
+  { href: "/dashboard/brand", label: "T\u1ed5ng quan Brand", description: "To\u00e0n c\u1ea3nh v\u1eadn h\u00e0nh Brand" },
+  { href: "/dashboard/brand/subscriptions", label: "M\u1ee5c ti\u00eau g\u00f3i", description: "Ch\u1ecdn g\u00f3i \u0111\u0103ng k\u00fd d\u00e0nh cho Brand" },
+  { href: "/dashboard/brand/wallet", label: "V\u00ed N-Point", description: "S\u1ed1 d\u01b0 N-Point v\u00e0 y\u00eau c\u1ea7u n\u1ea1p/ho\u00e0n ti\u1ec1n" },
+  { href: "/dashboard/brand/onboarding", label: "Onboarding / BCC", description: "H\u1ed3 s\u01a1 ph\u00e1p l\u00fd v\u00e0 BCC" },
+  { href: "/dashboard/brand/profile", label: "H\u1ed3 s\u01a1 nh\u00e3n h\u00e0ng", description: "Th\u00f4ng tin nh\u00e3n h\u00e0ng" },
+  { href: "/dashboard/brand/products", label: "S\u1ea3n ph\u1ea9m & l\u00f4 h\u00e0ng", description: "Qu\u1ea3n l\u00fd s\u1ea3n ph\u1ea9m v\u00e0 t\u1ed3n kho" },
+  { href: "/dashboard/brand/campaigns", label: "Campaign / Job", description: "T\u1ea1o v\u00e0 qu\u1ea3n l\u00fd campaign" },
+  { href: "/dashboard/brand/mission-reviews", label: "Duy\u1ec7t nhi\u1ec7m v\u1ee5 Creator", description: "Duy\u1ec7t k\u1ecbch b\u1ea3n, video v\u00e0 ho\u00e0n th\u00e0nh" },
+  { href: "/dashboard/brand/mission-history", label: "L\u1ecbch s\u1eed nhi\u1ec7m v\u1ee5", description: "To\u00e0n b\u1ed9 Creator Mission theo campaign" },
+  { href: "/dashboard/brand/settings", label: "C\u00e0i \u0111\u1eb7t Brand", description: "Thi\u1ebft l\u1eadp v\u1eadn h\u00e0nh Brand" }
 ];
 
 const adminNavItems: readonly NavItem[] = [
-  { href: "/admin", label: "Tổng quan Admin", description: "Toàn cảnh hệ thống" },
-  { href: "/admin/users", label: "Người dùng", description: "Quản lý tài khoản người dùng" },
-  { href: "/admin/creator-requests", label: "Quản lý Creator", description: "Quản lý hồ sơ Creator và quyết định duyệt" },
-  { href: "/admin/brand-requests", label: "Quản lý Brand", description: "Quản lý hồ sơ Brand và quyết định duyệt" },
-  { href: "/admin/campaigns", label: "Quản lý campaign", description: "Quản lý campaign/job và quy trình duyệt" },
-  { href: "/admin/mission-reviews", label: "Quản lý nhiệm vụ Creator", description: "Quản lý kịch bản, nhận nhiệm vụ, video và hoàn thành" },
-  { href: "/admin/mission-history", label: "Lịch sử nhiệm vụ", description: "Toàn bộ lịch sử Creator Mission trong hệ thống" },
-  { href: "/admin/finance", label: "Finance / payout", description: "Tài chính và chi trả" },
-  { href: "/admin/audit", label: "Audit log", description: "Nhật ký vận hành hệ thống" },
-  { href: "/admin/notifications", label: "Notification", description: "Thông báo hệ thống" },
-  { href: "/admin/settings", label: "System settings", description: "Thiết lập hệ thống" }
+  { href: "/admin", label: "T\u1ed5ng quan Admin", description: "To\u00e0n c\u1ea3nh h\u1ec7 th\u1ed1ng" },
+  { href: "/admin/users", label: "Ng\u01b0\u1eddi d\u00f9ng", description: "Qu\u1ea3n l\u00fd t\u00e0i kho\u1ea3n ng\u01b0\u1eddi d\u00f9ng" },
+  { href: "/admin/creator-requests", label: "Duy\u1ec7t Creator", description: "Duy\u1ec7t h\u1ed3 s\u01a1 Creator" },
+  { href: "/admin/brand-requests", label: "Duy\u1ec7t Brand", description: "Duy\u1ec7t h\u1ed3 s\u01a1 Brand" },
+  { href: "/admin/products", label: "Duy\u1ec7t s\u1ea3n ph\u1ea9m", description: "Ki\u1ec3m duy\u1ec7t s\u1ea3n ph\u1ea9m/l\u00f4 h\u00e0ng" },
+  { href: "/admin/campaigns", label: "Duy\u1ec7t campaign", description: "Ki\u1ec3m duy\u1ec7t campaign/job" },
+  { href: "/admin/mission-reviews", label: "Duy\u1ec7t nhi\u1ec7m v\u1ee5 Creator", description: "G\u1ed9p duy\u1ec7t k\u1ecbch b\u1ea3n, video v\u00e0 ho\u00e0n th\u00e0nh" },
+  { href: "/admin/mission-history", label: "L\u1ecbch s\u1eed nhi\u1ec7m v\u1ee5", description: "To\u00e0n b\u1ed9 l\u1ecbch s\u1eed Creator Mission" },
+  { href: "/admin/finance", label: "Finance / payout", description: "T\u00e0i ch\u00ednh v\u00e0 chi tr\u1ea3" },
+  { href: "/admin/n-point-requests", label: "X\u1eed l\u00fd n\u1ea1p N-Point", description: "Duy\u1ec7t n\u1ea1p \u0111i\u1ec3m v\u00e0 x\u1eed l\u00fd ho\u00e0n ti\u1ec1n" },
+  { href: "/admin/audit", label: "Audit log", description: "Nh\u1eadt k\u00fd v\u1eadn h\u00e0nh h\u1ec7 th\u1ed1ng" },
+  { href: "/admin/notifications", label: "Notification", description: "Th\u00f4ng b\u00e1o h\u1ec7 th\u1ed1ng" },
+  { href: "/admin/settings", label: "System settings", description: "Thi\u1ebft l\u1eadp h\u1ec7 th\u1ed1ng" }
 ];
 
 const WORKSPACES: readonly WorkspaceConfig[] = [
@@ -159,6 +158,7 @@ const breadcrumbLabelMap: Record<string, string> = {
   "/dashboard/creator/profile": "H\u1ed3 s\u01a1 Creator",
   "/dashboard/creator/wallet": "V\u00ed Creator",
   "/dashboard/brand": "Brand Dashboard",
+  "/dashboard/brand/subscriptions": "M\u1ee5c ti\u00eau g\u00f3i",
   "/dashboard/brand/onboarding": "Onboarding / BCC",
   "/dashboard/brand/profile": "Hồ sơ nhãn hàng",
   "/dashboard/brand/campaigns": "Campaign / Job",
@@ -167,7 +167,7 @@ const breadcrumbLabelMap: Record<string, string> = {
   "/dashboard/brand/mission-history": "L\u1ecbch s\u1eed nhi\u1ec7m v\u1ee5",
   "/dashboard/brand/proofs": "Duy\u1ec7t proof / video",
   "/dashboard/brand/analytics": "KPI / Analytics",
-  "/dashboard/brand/wallet": "Qu\u1ef9 Brand",
+  "/dashboard/brand/wallet": "V\u00ed N-Point",
   "/dashboard/brand/members": "Th\u00e0nh vi\u00ean Brand",
   "/dashboard/brand/settings": "C\u00e0i \u0111\u1eb7t Brand",
   "/admin": "Admin",
@@ -182,6 +182,7 @@ const breadcrumbLabelMap: Record<string, string> = {
   "/admin/mission-video-reviews": "Duyệt video",
   "/admin/mission-final-reviews": "Duyệt hoàn thành",
   "/admin/finance": "Finance / payout",
+  "/admin/n-point-requests": "X\u1eed l\u00fd n\u1ea1p N-Point",
   "/admin/audit": "Audit log",
   "/admin/notifications": "Notification",
   "/admin/settings": "System settings"

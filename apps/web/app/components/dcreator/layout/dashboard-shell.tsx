@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { Role } from "@prisma/client";
@@ -65,6 +66,12 @@ export function DashboardShell({
   const activeHref = useMemo(() => getActiveHref(pathname, navItems), [pathname, navItems]);
   const activeTitle = navItems.find((item) => item.href === activeHref)?.label ?? workspaceTitle;
   const userInitials = initials(user.displayName || user.email || "U");
+  const profileHref = useMemo(() => {
+    if (user.roles.includes("ADMIN")) return "/admin";
+    if (user.roles.includes("BRAND")) return "/dashboard/brand";
+    if (user.roles.includes("CREATOR")) return "/dashboard/creator";
+    return "/dashboard/user/profile";
+  }, [user.roles]);
 
   async function onLogout() {
     try {
@@ -79,8 +86,15 @@ export function DashboardShell({
       <div className="mx-auto flex w-full max-w-7xl">
         <aside className="sticky top-0 hidden h-screen w-80 shrink-0 border-r border-zinc-200 bg-white lg:block">
           <div className="border-b border-zinc-200 px-5 py-4">
-            <p className="text-sm font-black text-zinc-900">{workspaceTitle}</p>
-            <p className="mt-1 text-xs text-zinc-500">{workspaceDescription}</p>
+            <div className="flex items-center gap-3">
+              <Link href="/" className="inline-flex items-center" aria-label="Về trang chủ dCreator">
+                <Image src="/uploads/dCreator-logo-new.png" alt="dCreator logo" width={120} height={32} className="h-8 w-auto" priority />
+              </Link>
+              <div>
+                <p className="text-sm font-black text-zinc-900">{workspaceTitle}</p>
+                <p className="mt-1 text-xs text-zinc-500">{workspaceDescription}</p>
+              </div>
+            </div>
           </div>
           <nav className="h-[calc(100vh-73px)] overflow-y-auto p-3">
             {navItems.map((item) => {
@@ -146,7 +160,7 @@ export function DashboardShell({
                         <p className="mt-1 text-xs text-zinc-500">Vai trò: {user.roles.join(", ")}</p>
                       </div>
                       <div className="mt-2 grid gap-1">
-                        <Link href="/dashboard/user/profile" className="rounded-lg px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100">Hồ sơ</Link>
+                        <Link href={profileHref} className="rounded-lg px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100">Hồ sơ</Link>
                         <button type="button" onClick={onLogout} className="rounded-lg px-3 py-2 text-left text-sm font-semibold text-red-700 hover:bg-red-50">Đăng xuất</button>
                       </div>
                     </div>
@@ -163,9 +177,15 @@ export function DashboardShell({
         <div className="fixed inset-0 z-50 bg-black/40 lg:hidden" onClick={() => setMobileOpen(false)}>
           <aside className="h-full w-80 max-w-[85vw] bg-white p-3" onClick={(event) => event.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between border-b border-zinc-200 pb-3">
-              <p className="font-black text-zinc-900">{workspaceTitle}</p>
+              <div className="flex items-center gap-3">
+                <Link href="/" className="inline-flex items-center" aria-label="Về trang chủ dCreator" onClick={() => setMobileOpen(false)}>
+                  <Image src="/uploads/dCreator-logo-new.png" alt="dCreator logo" width={120} height={32} className="h-8 w-auto" />
+                </Link>
+                <p className="font-black text-zinc-900">{workspaceTitle}</p>
+              </div>
               <button type="button" className="rounded-lg border border-zinc-200 px-2 py-1 text-sm" onClick={() => setMobileOpen(false)}>Đóng</button>
             </div>
+            <p className="mb-3 text-xs text-zinc-500">{workspaceDescription}</p>
             <nav>
               {navItems.map((item) => (
                 <Link
@@ -187,3 +207,5 @@ export function DashboardShell({
     </div>
   );
 }
+
+

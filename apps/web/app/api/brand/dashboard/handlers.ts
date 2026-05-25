@@ -36,6 +36,11 @@ import {
   inviteBrandMember
 } from "@/lib/services/brand-dashboard.service";
 import {
+  createBrandNPointTopupRequest,
+  getBrandNPointWallet,
+  submitBrandNPointRefundInfo
+} from "@/lib/services/n-point-topup.service";
+import {
   brandMemberInviteSchema,
   brandMemberRemoveSchema,
   brandMemberRoleUpdateSchema,
@@ -52,6 +57,7 @@ import {
   proofReviewDecisionSchema,
   rewardTierSchema
 } from "@/lib/validators/brand-dashboard";
+import { brandNPointRefundInfoSchema, brandNPointTopupCreateSchema } from "@/lib/validators/n-point-topup";
 
 export async function GET_overview(request: NextRequest) {
   const account = await requireBrandActor(request);
@@ -239,6 +245,23 @@ export async function DELETE_members(request: NextRequest) {
   const account = await requireBrandActor(request);
   const payload = brandMemberRemoveSchema.parse(await request.json());
   return ok(await removeBrandMember(account.id, payload));
+}
+
+export async function GET_npoint_wallet(request: NextRequest) {
+  const account = await requireBrandActor(request);
+  return ok(await getBrandNPointWallet(account.id));
+}
+
+export async function POST_npoint_topup_request(request: NextRequest) {
+  const account = await requireBrandActor(request);
+  const payload = brandNPointTopupCreateSchema.parse(await request.json());
+  return ok(await createBrandNPointTopupRequest(account.id, payload), 201);
+}
+
+export async function POST_npoint_refund_info(request: NextRequest, requestId: string) {
+  const account = await requireBrandActor(request);
+  const payload = brandNPointRefundInfoSchema.parse(await request.json());
+  return ok(await submitBrandNPointRefundInfo(account.id, requestId, payload));
 }
 
 export async function withHandler(handler: () => Promise<Response>) {

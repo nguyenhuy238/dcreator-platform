@@ -1,106 +1,406 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatsCard, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatsCard } from "@/app/components/dcreator/ui/base";
 
-type WalletTx = {
+type ApiResponse<T> = { success: true; data: T } | { success: false; error: string };
+
+type TopupRequest = {
   id: string;
-  type: string;
-  pointsDelta: number;
-  cashDeltaVnd: number;
-  referenceType: string | null;
-  referenceId: string | null;
+  amountVnd: number;
+  requestedPoints: number;
+  transferNote: string;
+  bankTransferProofUrl: string;
+  status: "PENDING_ADMIN_REVIEW" | "APPROVED" | "REJECTED" | "REFUND_INFO_SUBMITTED" | "REFUND_COMPLETED";
+  adminDecisionReason: string | null;
+  refundBankName: string | null;
+  refundAccountName: string | null;
+  refundAccountNumber: string | null;
+  refundRequestNote: string | null;
+  refundSubmittedAt: string | null;
+  refundProofUrl: string | null;
+  refundProcessedNote: string | null;
+  refundProcessedAt: string | null;
   createdAt: string;
+  updatedAt: string;
+  requester: { id: string; displayName: string; email: string };
+  reviewedBy: { id: string; displayName: string; email: string } | null;
+  refundProcessedBy: { id: string; displayName: string; email: string } | null;
 };
 
 type WalletPayload = {
-  prepaidFundBalance: number;
-  transactionHistory: {
-    items?: WalletTx[];
-    pagination?: { totalItems: number };
-  } | WalletTx[];
+  brand: { id: string; name: string; ownerAccountId: string };
+  currentPoints: number;
+  requests: TopupRequest[];
 };
 
-type ApiResponse<T> = { success: boolean; data?: T; error?: string };
+type RefundForm = {
+  refundBankName: string;
+  refundAccountName: string;
+  refundAccountNumber: string;
+  refundRequestNote: string;
+};
+
+const INITIAL_REFUND_FORM: RefundForm = {
+  refundBankName: "",
+  refundAccountName: "",
+  refundAccountNumber: "",
+  refundRequestNote: ""
+};
+
+const POINT_RATE = 100;
 
 function formatVnd(value: number) {
   return `${value.toLocaleString("vi-VN")} VNĐ`;
+}
+
+function statusStyle(status: TopupRequest["status"]) {
+  switch (status) {
+    case "PENDING_ADMIN_REVIEW":
+      return "bg-amber-50 text-amber-700 border-amber-200";
+    case "APPROVED":
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    case "REJECTED":
+      return "bg-red-50 text-red-700 border-red-200";
+    case "REFUND_INFO_SUBMITTED":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+    case "REFUND_COMPLETED":
+      return "bg-zinc-100 text-zinc-700 border-zinc-200";
+    default:
+      return "bg-zinc-100 text-zinc-700 border-zinc-200";
+  }
+}
+
+function statusLabel(status: TopupRequest["status"]) {
+  switch (status) {
+    case "PENDING_ADMIN_REVIEW":
+      return "Chờ admin duyệt";
+    case "APPROVED":
+      return "Đã duyệt";
+    case "REJECTED":
+      return "Từ chối";
+    case "REFUND_INFO_SUBMITTED":
+      return "Đã gửi thông tin hoàn tiền";
+    case "REFUND_COMPLETED":
+      return "Đã hoàn tiền";
+    default:
+      return status;
+  }
+}
+
+function SampleQr() {
+  return (
+    <div className="rounded-2xl border border-zinc-200 bg-white p-3">
+      <Image src="/qr-dcreator.jpg" alt="QR của dCreator" width={320} height={320} className="mx-auto h-40 w-40 rounded-lg border border-zinc-100 object-contain" />
+      <p className="mt-2 text-center text-xs text-zinc-500">QR của dCreator</p>
+    </div>
+  );
 }
 
 export default function BrandWalletPage() {
   const [data, setData] = useState<WalletPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
+  const [amountVnd, setAmountVnd] = useState(200000);
+  const [transferNote, setTransferNote] = useState("");
+  const [billUrl, setBillUrl] = useState("");
+  const [uploadingBill, setUploadingBill] = useState(false);
+  const [submittingTopup, setSubmittingTopup] = useState(false);
+  const [refundForms, setRefundForms] = useState<Record<string, RefundForm>>({});
+  const [submittingRefundId, setSubmittingRefundId] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/brand/dashboard/budget", { cache: "no-store" });
-      const payload = (await res.json()) as ApiResponse<WalletPayload>;
-      if (!res.ok || !payload.success || !payload.data) throw new Error(payload.error ?? "Không thể tải quỹ Brand");
+      const response = await fetch("/api/brand/dashboard/n-point-wallet", { cache: "no-store" });
+      const payload = (await response.json()) as ApiResponse<WalletPayload>;
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.success ? "Không thể tải ví N-Point" : payload.error);
+      }
       setData(payload.data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Không thể tải quỹ Brand");
+      const shortBrandId = payload.data.brand.id.slice(-6).toUpperCase();
+      setTransferNote((current) => current || `NAP NPOINT ${shortBrandId}`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không thể tải ví N-Point");
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
-  const txItems = useMemo(() => {
-    if (!data) return [] as WalletTx[];
-    const tx = data.transactionHistory;
-    if (Array.isArray(tx)) return tx;
-    return tx.items ?? [];
-  }, [data]);
+  const pointEstimate = useMemo(() => Math.floor(amountVnd / POINT_RATE), [amountVnd]);
+  const approvedTotal = useMemo(
+    () => (data?.requests ?? []).filter((item) => item.status === "APPROVED").reduce((sum, item) => sum + item.requestedPoints, 0),
+    [data]
+  );
+  const pendingCount = useMemo(
+    () => (data?.requests ?? []).filter((item) => item.status === "PENDING_ADMIN_REVIEW" || item.status === "REFUND_INFO_SUBMITTED").length,
+    [data]
+  );
 
-  const totals = useMemo(() => {
-    const topup = txItems.filter((item) => item.type.includes("TOPUP")).reduce((sum, item) => sum + Math.max(0, item.cashDeltaVnd), 0);
-    const spent = txItems.filter((item) => item.type.includes("LOCK") || item.type.includes("SUPPORT") || item.type.includes("REWARD")).reduce((sum, item) => sum + Math.abs(Math.min(0, item.cashDeltaVnd)), 0);
-    const locked = txItems.filter((item) => item.type.includes("LOCK")).reduce((sum, item) => sum + Math.abs(Math.min(0, item.cashDeltaVnd)), 0);
-    return { topup, spent, locked };
-  }, [txItems]);
+  async function uploadBill(file: File) {
+    setUploadingBill(true);
+    setError("");
+    try {
+      const formData = new FormData();
+      formData.append("bill", file);
+      const response = await fetch("/api/uploads/n-point-bill", { method: "POST", body: formData });
+      const payload = await response.json();
+      if (!response.ok || !payload.success || !payload.data?.billUrl) {
+        throw new Error(payload.error ?? "Không thể tải ảnh biên lai");
+      }
+      setBillUrl(payload.data.billUrl as string);
+      setToast("Đã tải ảnh biên lai thành công");
+      setTimeout(() => setToast(""), 1500);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không thể tải ảnh biên lai");
+    } finally {
+      setUploadingBill(false);
+    }
+  }
+
+  async function onBillFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await uploadBill(file);
+  }
+
+  async function submitTopupRequest() {
+    if (amountVnd < 10000) {
+      setError("Số tiền nạp tối thiểu là 10.000 VNĐ.");
+      return;
+    }
+    if (!transferNote.trim()) {
+      setError("Bạn cần nhập nội dung chuyển khoản.");
+      return;
+    }
+    if (!billUrl.trim()) {
+      setError("Bạn cần tải ảnh biên lai chuyển khoản.");
+      return;
+    }
+
+    setSubmittingTopup(true);
+    setError("");
+    try {
+      const response = await fetch("/api/brand/dashboard/n-point-wallet/topup-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amountVnd,
+          transferNote: transferNote.trim(),
+          bankTransferProofUrl: billUrl.trim()
+        })
+      });
+      const payload = (await response.json()) as ApiResponse<unknown>;
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.success ? "Không thể gửi yêu cầu nạp điểm" : payload.error);
+      }
+
+      setBillUrl("");
+      setToast("Đã gửi yêu cầu nạp N-Point sang admin");
+      setTimeout(() => setToast(""), 1800);
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không thể gửi yêu cầu nạp điểm");
+    } finally {
+      setSubmittingTopup(false);
+    }
+  }
+
+  function setRefundField(requestId: string, field: keyof RefundForm, value: string) {
+    setRefundForms((prev) => ({
+      ...prev,
+      [requestId]: {
+        ...(prev[requestId] ?? INITIAL_REFUND_FORM),
+        [field]: value
+      }
+    }));
+  }
+
+  async function submitRefundInfo(requestId: string) {
+    const form = refundForms[requestId] ?? INITIAL_REFUND_FORM;
+    if (!form.refundBankName.trim() || !form.refundAccountName.trim() || !form.refundAccountNumber.trim()) {
+      setError("Vui lòng nhập đầy đủ thông tin ngân hàng để hoàn tiền.");
+      return;
+    }
+
+    setSubmittingRefundId(requestId);
+    setError("");
+    try {
+      const response = await fetch(`/api/brand/dashboard/n-point-wallet/topup-requests/${requestId}/refund-info`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          refundBankName: form.refundBankName.trim(),
+          refundAccountName: form.refundAccountName.trim(),
+          refundAccountNumber: form.refundAccountNumber.trim(),
+          refundRequestNote: form.refundRequestNote.trim() || undefined
+        })
+      });
+      const payload = (await response.json()) as ApiResponse<unknown>;
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.success ? "Không thể gửi thông tin hoàn tiền" : payload.error);
+      }
+
+      setToast("Đã gửi thông tin hoàn tiền sang admin");
+      setTimeout(() => setToast(""), 1800);
+      setRefundForms((prev) => {
+        const next = { ...prev };
+        delete next[requestId];
+        return next;
+      });
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không thể gửi thông tin hoàn tiền");
+    } finally {
+      setSubmittingRefundId(null);
+    }
+  }
 
   return (
     <>
-      <PageHeader title="Quỹ Brand" subtitle="Quản lý số dư prepaid và lịch sử giao dịch quỹ Brand." />
+      <PageHeader title="Ví N-Point" subtitle="Theo dõi số dư N-Point và gửi yêu cầu nạp/hoàn tiền với admin." />
 
-      {error ? <ErrorState title="Không thể tải quỹ" description={error} onRetry={() => void load()} /> : null}
+      {error ? <ErrorState title="Không thể xử lý ví N-Point" description={error} onRetry={() => void load()} /> : null}
       {loading ? <LoadingSkeleton rows={4} /> : null}
 
       {!loading && data ? (
         <>
           <section className="dc-grid-dashboard">
-            <StatsCard title="Số dư quỹ prepaid" value={formatVnd(data.prepaidFundBalance)} />
-            <StatsCard title="Tổng đã nạp" value={formatVnd(totals.topup)} />
-            <StatsCard title="Tổng đã dùng" value={formatVnd(totals.spent)} />
-            <StatsCard title="Đang lock" value={formatVnd(totals.locked)} />
-            <StatsCard title="Khả dụng" value={formatVnd(Math.max(0, data.prepaidFundBalance - totals.locked))} />
+            <StatsCard title="Số dư N-Point hiện tại" value={`${data.currentPoints.toLocaleString("vi-VN")} điểm`} />
+            <StatsCard title="N-Point ước tính lượt nạp này" value={`${pointEstimate.toLocaleString("vi-VN")} điểm`} hint={`Tỷ lệ quy đổi: 1 N-Point = ${POINT_RATE.toLocaleString("vi-VN")} VNĐ`} />
+            <StatsCard title="Tổng điểm đã duyệt nạp" value={`${approvedTotal.toLocaleString("vi-VN")} điểm`} />
+            <StatsCard title="Yêu cầu đang xử lý" value={String(pendingCount)} />
+          </section>
+
+          <section className="mt-6 grid gap-4 lg:grid-cols-2">
+            <article className="dc-card p-5">
+              <SectionHeader title="Thông tin chuyển khoản mẫu" subtitle="Brand chuyển khoản thủ công rồi gửi yêu cầu nạp cho admin." />
+              <div className="grid gap-3 text-sm text-zinc-700">
+                <p><strong>Ngân hàng:</strong> MB Bank</p>
+                <p><strong>Số tài khoản:</strong> 0344 000 496</p>
+                <p><strong>Chủ tài khoản:</strong>  Nguyễn Thị Thanh Nhàn</p>
+                <p><strong>Nội dung chuyển khoản mẫu:</strong> {transferNote || "NAP NPOINT [MÃ BRAND]"}</p>
+              </div>
+            </article>
+
+            <article className="dc-card p-5">
+              <SectionHeader title="Mã QR" subtitle="Brand có thể quét QR để thao tác nhanh." />
+              <SampleQr />
+            </article>
+          </section>
+
+          <section className="mt-6 dc-card p-5">
+            <SectionHeader title="Gửi yêu cầu nạp N-Point" subtitle="Nhập số tiền và upload ảnh biên lai chuyển khoản để gửi admin duyệt." />
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="grid gap-1 text-sm text-zinc-700">
+                <span>Số tiền nạp (VNĐ)</span>
+                <input
+                  className="dc-input"
+                  type="number"
+                  min={10000}
+                  step={1000}
+                  value={amountVnd}
+                  onChange={(event) => setAmountVnd(Number(event.target.value || 0))}
+                />
+              </label>
+              <label className="grid gap-1 text-sm text-zinc-700">
+                <span>Nội dung chuyển khoản</span>
+                <input className="dc-input" value={transferNote} onChange={(event) => setTransferNote(event.target.value)} />
+              </label>
+              <div className="grid gap-1 text-sm text-zinc-700 md:col-span-2">
+                <span>Ảnh/PDF biên lai chuyển tiền</span>
+                <input className="dc-input bg-white" type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={onBillFileChange} disabled={uploadingBill} />
+                {uploadingBill ? <p className="text-xs text-zinc-500">Đang tải biên lai...</p> : null}
+                {billUrl ? (
+                  <p className="text-xs text-zinc-600">
+                    Biên lai đã tải:{" "}
+                    <a href={billUrl} target="_blank" rel="noreferrer" className="underline">
+                      {billUrl}
+                    </a>
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            <div className="mt-4">
+              <button type="button" className="dc-btn-primary" onClick={() => void submitTopupRequest()} disabled={submittingTopup || uploadingBill}>
+                {submittingTopup ? "Đang gửi..." : "Chuyển tiền & gửi yêu cầu"}
+              </button>
+            </div>
           </section>
 
           <section className="mt-6">
-            <SectionHeader title="Lịch sử giao dịch" subtitle={`${txItems.length} giao dịch`} action={<button className="dc-btn-secondary" onClick={() => window.print()}>Xuất lịch sử</button>} />
-            {txItems.length === 0 ? (
-              <EmptyState title="Chưa có giao dịch quỹ" description="Giao dịch quỹ Brand sẽ xuất hiện sau khi nạp hoặc phân bổ ngân sách campaign." />
+            <SectionHeader title="Lịch sử yêu cầu nạp/hoàn tiền" subtitle={`${data.requests.length} yêu cầu`} />
+            {data.requests.length === 0 ? (
+              <EmptyState title="Chưa có yêu cầu nào" description="Khi Brand gửi yêu cầu nạp N-Point, lịch sử sẽ hiển thị tại đây." />
             ) : (
               <div className="grid gap-3">
-                {txItems.map((item) => (
+                {data.requests.map((item) => (
                   <article key={item.id} className="dc-card p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="font-semibold text-zinc-900">{item.type}</p>
-                      <StatusBadge status={item.cashDeltaVnd >= 0 ? "SUCCESS" : "PENDING"} />
+                      <p className="font-semibold text-zinc-900">{formatVnd(item.amountVnd)} • {item.requestedPoints.toLocaleString("vi-VN")} N-Point</p>
+                      <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusStyle(item.status)}`}>{statusLabel(item.status)}</span>
                     </div>
-                    <div className="mt-1 grid gap-1 text-sm text-zinc-600 md:grid-cols-2">
-                      <p>Biến động tiền: {formatVnd(item.cashDeltaVnd)}</p>
-                      <p>Biến động điểm: {item.pointsDelta.toLocaleString("vi-VN")}</p>
-                      <p>Campaign/Ref type: {item.referenceType ?? "Không có"}</p>
-                      <p>Thời gian: {new Date(item.createdAt).toLocaleString("vi-VN")}</p>
+                    <div className="mt-2 grid gap-1 text-sm text-zinc-600 md:grid-cols-2">
+                      <p>Nội dung chuyển khoản: {item.transferNote}</p>
+                      <p>Người gửi yêu cầu: {item.requester.displayName || item.requester.email}</p>
+                      <p>Thời gian gửi: {new Date(item.createdAt).toLocaleString("vi-VN")}</p>
+                      <p>Admin xử lý: {item.reviewedBy?.displayName ?? "Chưa xử lý"}</p>
                     </div>
-                    {item.referenceId ? <p className="mt-1 text-xs text-zinc-500">Ref ID: {item.referenceId}</p> : null}
+                    <p className="mt-1 text-xs text-zinc-500">
+                      Biên lai chuyển tiền:{" "}
+                      <a href={item.bankTransferProofUrl} target="_blank" rel="noreferrer" className="underline">
+                        Xem biên lai
+                      </a>
+                    </p>
+
+                    {item.adminDecisionReason ? (
+                      <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                        Lý do từ admin: {item.adminDecisionReason}
+                      </p>
+                    ) : null}
+
+                    {item.status === "REJECTED" ? (
+                      <div className="mt-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+                        <p className="text-sm font-semibold text-zinc-900">Nhập thông tin ngân hàng để hoàn tiền</p>
+                        <div className="mt-2 grid gap-2 md:grid-cols-2">
+                          <input className="dc-input" placeholder="Tên ngân hàng" value={refundForms[item.id]?.refundBankName ?? ""} onChange={(event) => setRefundField(item.id, "refundBankName", event.target.value)} />
+                          <input className="dc-input" placeholder="Tên chủ tài khoản" value={refundForms[item.id]?.refundAccountName ?? ""} onChange={(event) => setRefundField(item.id, "refundAccountName", event.target.value)} />
+                          <input className="dc-input" placeholder="Số tài khoản" value={refundForms[item.id]?.refundAccountNumber ?? ""} onChange={(event) => setRefundField(item.id, "refundAccountNumber", event.target.value)} />
+                          <input className="dc-input" placeholder="Ghi chú hoàn tiền (tuỳ chọn)" value={refundForms[item.id]?.refundRequestNote ?? ""} onChange={(event) => setRefundField(item.id, "refundRequestNote", event.target.value)} />
+                        </div>
+                        <button className="dc-btn-primary mt-3" onClick={() => void submitRefundInfo(item.id)} disabled={submittingRefundId === item.id}>
+                          {submittingRefundId === item.id ? "Đang gửi..." : "Gửi thông tin hoàn tiền"}
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {item.status === "REFUND_INFO_SUBMITTED" ? (
+                      <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+                        Đã gửi thông tin hoàn tiền. Admin đang xử lý chuyển khoản hoàn.
+                      </div>
+                    ) : null}
+
+                    {item.status === "REFUND_COMPLETED" ? (
+                      <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                        <p>Admin đã hoàn tiền vào tài khoản bạn cung cấp.</p>
+                        {item.refundProofUrl ? (
+                          <p className="mt-1">
+                            Biên lai hoàn tiền:{" "}
+                            <a href={item.refundProofUrl} target="_blank" rel="noreferrer" className="underline">
+                              Xem biên lai
+                            </a>
+                          </p>
+                        ) : null}
+                        {item.refundProcessedNote ? <p className="mt-1">Ghi chú: {item.refundProcessedNote}</p> : null}
+                      </div>
+                    ) : null}
                   </article>
                 ))}
               </div>
@@ -108,6 +408,8 @@ export default function BrandWalletPage() {
           </section>
         </>
       ) : null}
+
+      {toast ? <ActionToast message={toast} /> : null}
     </>
   );
 }

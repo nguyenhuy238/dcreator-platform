@@ -70,11 +70,16 @@ export function PublicHeader() {
 
   const canAccessAdmin = currentUser ? currentUser.roles.includes("ADMIN") || currentUser.roles.includes("OPS") : false;
   const isCreator = currentUser ? currentUser.roles.includes(ROLE.CREATOR) : false;
-  const isBrand = currentUser ? currentUser.roles.includes(ROLE.BRAND_OWNER) || currentUser.roles.includes(ROLE.BRAND_STAFF) : false;
-  const profileHref =
-    isBrand
-      ? "/dashboard/brand/profile"
-      : "/dashboard/user/profile";
+  const isBrand = currentUser ? currentUser.roles.includes("BRAND") : false;
+  const profileHref = currentUser
+    ? currentUser.roles.includes("ADMIN")
+      ? "/admin"
+      : currentUser.roles.includes("BRAND")
+        ? "/dashboard/brand"
+        : currentUser.roles.includes("CREATOR")
+          ? "/dashboard/creator"
+          : "/dashboard/user/profile"
+    : "/dashboard/user/profile";
   const campaignHref = isCreator ? "/dashboard/creator/jobs" : isBrand ? "/brand" : "/campaigns";
 
   return (
