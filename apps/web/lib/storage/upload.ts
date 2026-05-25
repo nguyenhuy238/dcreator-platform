@@ -19,9 +19,46 @@ type TextUploadInput = {
   ext?: string;
 };
 
+const MIME_EXTENSION_MAP: Record<string, string> = {
+  "application/pdf": "pdf",
+  "application/msword": "doc",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/svg+xml": "svg",
+  "text/plain": "txt"
+};
+
+function sanitizeExt(ext: string) {
+  return ext.trim().toLowerCase().replace(/^\./, "");
+}
+
+function extensionFromFileName(name: string) {
+  const parsed = path.parse(name);
+  const rawExt = parsed.ext.replace(/^\./, "").trim().toLowerCase();
+  return rawExt || null;
+}
+
 function resolveFileExtension(file: File, ext?: string) {
-  if (ext) return ext;
-  const fromMime = file.type.split("/")[1];
+  const safeExt = ext ? sanitizeExt(ext) : "";
+  if (safeExt) {
+    if (safeExt === "jpeg") return "jpg";
+    if (safeExt === "plain") return "txt";
+    if (safeExt === "vnd.openxmlformats-officedocument.wordprocessingml.document") return "docx";
+    return safeExt;
+  }
+
+  const mappedByMime = MIME_EXTENSION_MAP[file.type];
+  if (mappedByMime) return mappedByMime;
+
+  const fromName = extensionFromFileName(file.name);
+  if (fromName) {
+    if (fromName === "jpeg") return "jpg";
+    return fromName;
+  }
+
+  const fromMime = sanitizeExt(file.type.split("/")[1] || "");
   return fromMime || "bin";
 }
 

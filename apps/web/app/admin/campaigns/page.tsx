@@ -149,7 +149,7 @@ export default function AdminCampaignsPage() {
                   </div>
                   <p className="mt-3 text-sm text-zinc-600">{cleanBrief}</p>
                   {contentFileUrl ? (
-                    <a className="mt-3 inline-flex w-fit rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100" href={contentFileUrl} target="_blank" rel="noreferrer">
+                    <a className="mt-3 inline-flex w-fit rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100" href={`/api/uploads/onboarding-doc-download?url=${encodeURIComponent(contentFileUrl)}`} target="_blank" rel="noreferrer">
                       Mở file nội dung campaign
                     </a>
                   ) : null}
