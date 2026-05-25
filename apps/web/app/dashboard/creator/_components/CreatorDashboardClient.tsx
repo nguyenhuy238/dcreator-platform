@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -12,10 +12,6 @@ type Overview = {
   approvedVideos: number;
   totalCommission: number;
   nPointsBalance: number;
-};
-type CreatorApplicationSnapshot = {
-  status: "DRAFT" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_REVISION";
-  application: { rejectReason: string | null; reviewNote: string | null } | null;
 };
 
 type CreatorMissionItem = {
@@ -66,30 +62,17 @@ export function CreatorDashboardClient() {
   const [error, setError] = useState("");
   const [overview, setOverview] = useState<Overview | null>(null);
   const [missions, setMissions] = useState<CreatorMissionItem[]>([]);
-  const [marketplaceJobs, setMarketplaceJobs] = useState<Array<{ id: string; title: string; rewardPoints: number; rewardCommissionVnd: number; deadlineAt: string | null; campaign: { title: string; category: string; status: string } }>>([]);
-  const [creatorApplication, setCreatorApplication] = useState<CreatorApplicationSnapshot | null>(null);
-  const [analytics, setAnalytics] = useState<{ proofApproved: number; proofSubmitted: number; commissionEarned: number } | null>(null);
 
   async function loadDashboard() {
     setLoading(true);
     setError("");
     try {
-      const [overviewData, missionData, marketplaceData, creatorApplicationData, analyticsData] = await Promise.all([
+      const [overviewData, missionData] = await Promise.all([
         fetcher<Overview>("/api/creator/dashboard/overview"),
-        fetcher<CreatorMissionItem[]>("/api/me/mission"),
-        fetcher<Array<{ id: string; title: string; rewardPoints: number; rewardCommissionVnd: number; deadlineAt: string | null; campaign: { title: string; category: string; status: string } }>>("/api/creator/dashboard/marketplace?campaignStatus=ACTIVE"),
-        fetcher<CreatorApplicationSnapshot>("/api/profile/creator-application"),
-        fetcher<{ proofApproved?: number; proofSubmitted?: number; commissionEarned?: number }>("/api/creator/dashboard/analytics")
+        fetcher<CreatorMissionItem[]>("/api/me/mission")
       ]);
       setOverview(overviewData);
       setMissions(missionData);
-      setMarketplaceJobs(marketplaceData);
-      setCreatorApplication(creatorApplicationData);
-      setAnalytics({
-        proofApproved: Number(analyticsData?.proofApproved ?? 0),
-        proofSubmitted: Number(analyticsData?.proofSubmitted ?? 0),
-        commissionEarned: Number(analyticsData?.commissionEarned ?? 0)
-      });
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Không thể tải dữ liệu dashboard");
     } finally {
@@ -105,6 +88,18 @@ export function CreatorDashboardClient() {
     () => missions.filter((item) => item.status === "COMPLETED").length,
     [missions]
   );
+  const submittedMissions = useMemo(
+    () => missions.filter((item) => item.status !== "PRODUCT_PENDING").length,
+    [missions]
+  );
+  const approvedMissions = useMemo(
+    () => missions.filter((item) => item.status === "COMPLETED").length,
+    [missions]
+  );
+  const approvalRate = useMemo(() => {
+    if (submittedMissions === 0) return 0;
+    return Math.round((approvedMissions / submittedMissions) * 100);
+  }, [approvedMissions, submittedMissions]);
 
   return (
     <div className="space-y-8">
@@ -130,42 +125,12 @@ export function CreatorDashboardClient() {
               value={`${(overview?.nPointsBalance ?? 0).toLocaleString("vi-VN")} N-Points`}
               hint={`${completedJobs.toLocaleString("vi-VN")} nhiệm vụ đã hoàn thành`}
             />
+            <StatsCard
+              title="Tỉ lệ được duyệt"
+              value={`${approvalRate}%`}
+              hint={`${approvedMissions.toLocaleString("vi-VN")}/${submittedMissions.toLocaleString("vi-VN")} mission`}
+            />
           </section>
-          {creatorApplication ? (
-            <section className="rounded-2xl border border-zinc-200 bg-white p-4">
-              <p className="text-sm font-semibold text-zinc-900">Trạng thái hồ sơ Creator: {creatorApplication.status}</p>
-              {creatorApplication.application?.rejectReason ? (
-                <p className="mt-1 text-sm text-red-700">Lý do từ chối: {creatorApplication.application.rejectReason}</p>
-              ) : null}
-              {creatorApplication.application?.reviewNote ? (
-                <p className="mt-1 text-sm text-zinc-600">Ghi chú duyệt: {creatorApplication.application.reviewNote}</p>
-              ) : null}
-            </section>
-          ) : null}
-          <section>
-            <SectionHeader title="Chiến dịch/job có thể ứng tuyển" />
-            {marketplaceJobs.length === 0 ? (
-              <EmptyState title="Không có job phù hợp" description="Hiện chưa có nhiệm vụ Creator đang mở theo điều kiện hiện tại." />
-            ) : (
-              <div className="grid gap-3 md:grid-cols-2">
-                {marketplaceJobs.slice(0, 6).map((job) => (
-                  <div key={job.id} className="rounded-xl border border-zinc-200 bg-white p-3">
-                    <p className="font-semibold text-zinc-900">{job.title}</p>
-                    <p className="text-sm text-zinc-600">{job.campaign.title} • {job.campaign.category}</p>
-                    <p className="text-sm text-zinc-600">Thưởng: {job.rewardPoints} N-Points • Phí video: {job.rewardCommissionVnd.toLocaleString("vi-VN")}đ</p>
-                    <p className="text-sm text-zinc-600">Deadline: {formatDate(job.deadlineAt)}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-          {analytics ? (
-            <section className="dc-grid-dashboard">
-              <StatsCard title="Proof đã nộp" value={(analytics.proofSubmitted ?? 0).toLocaleString("vi-VN")} />
-              <StatsCard title="Proof đã duyệt" value={(analytics.proofApproved ?? 0).toLocaleString("vi-VN")} />
-              <StatsCard title="Tổng hoa hồng" value={`${analytics.commissionEarned.toLocaleString("vi-VN")}đ`} />
-            </section>
-          ) : null}
 
           <section>
             <SectionHeader

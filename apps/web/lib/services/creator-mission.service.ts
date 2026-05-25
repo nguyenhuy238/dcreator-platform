@@ -30,7 +30,7 @@ const creatorMissionInclude = {
       deadlineAt: true
     }
   },
-  campaign: { select: { id: true, title: true, slug: true, brandId: true } },
+  campaign: { select: { id: true, title: true, slug: true, brandId: true, brand: { select: { displayName: true } } } },
   account: {
     select: {
       id: true,

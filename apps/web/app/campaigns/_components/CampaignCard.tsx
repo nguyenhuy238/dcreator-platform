@@ -1,7 +1,5 @@
 import Link from "next/link";
 import Image from "next/image";
-import { CreatorCampaignApplyButton } from "./CreatorCampaignApplyButton";
-import { getCampaignTypeLabel } from "@/lib/constants/campaign-type";
 
 const FALLBACK_COVER_IMAGE = "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200";
 
@@ -16,6 +14,7 @@ export type CampaignCardData = {
   targetAmount: number;
   progressPercent: number;
   backers: number;
+  creatorApplicants?: number;
   rewardsLeft: number;
   deadline: string | Date | null;
 };
@@ -35,38 +34,49 @@ function resolveCoverImageSrc(url: string | null) {
 
 export function CampaignCard({ campaign }: { campaign: CampaignCardData }) {
   return (
-    <article className="dc-card overflow-hidden">
-      <Image
-        className="aspect-video w-full object-cover bg-zinc-200"
-        src={resolveCoverImageSrc(campaign.coverImageUrl)}
-        alt={campaign.title}
-        width={1200}
-        height={675}
-      />
-      <div className="grid gap-2 p-4">
-        <div className="flex flex-wrap gap-2">
-          <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Đang mở</span>
-          <span className="inline-flex rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">{getCampaignTypeLabel()}</span>
+    <article className="dc-card overflow-hidden p-0">
+      <div className="relative aspect-[16/9] w-full overflow-hidden bg-zinc-100">
+        <Image
+          src={resolveCoverImageSrc(campaign.coverImageUrl)}
+          alt={campaign.title}
+          fill
+          className="object-cover transition duration-500 hover:scale-[1.03]"
+          sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/55 via-zinc-950/10 to-transparent" />
+        <div className="absolute left-3 top-3 rounded-full border border-white/25 bg-zinc-900/65 px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-white">
+          Video seeding
         </div>
-        <h3 className="text-lg font-bold text-zinc-900">{campaign.title}</h3>
-        <p className="text-sm text-slate-600">Thương hiệu: {campaign.brand}</p>
-        <p className="text-sm text-slate-600">Creator: {campaign.creator ?? "Chưa chỉ định"}</p>
-        <p className="text-sm text-slate-600">
-          Đã ủng hộ: {campaign.fundedAmount.toLocaleString("vi-VN")} / {campaign.targetAmount.toLocaleString("vi-VN")} VND
-        </p>
-        <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
-          <div className="h-full bg-gradient-to-r from-zinc-900 to-zinc-500" style={{ width: `${campaign.progressPercent}%` }} />
+      </div>
+
+      <div className="p-5">
+        <h3 className="line-clamp-2 text-2xl font-black leading-tight text-zinc-900">{campaign.title}</h3>
+        <p className="mt-3 text-sm font-semibold text-zinc-600">Brand: {campaign.brand}</p>
+
+        <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+          <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+            <p className="text-zinc-500">{"Creator \u1ee9ng tuy\u1ec3n"}</p>
+            <p className="font-black text-zinc-900">{campaign.creatorApplicants ?? 0}</p>
+          </div>
+          <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+            <p className="text-zinc-500">{"Ho\u00e0n thi\u1ec7n camp"}</p>
+            <p className="font-black text-zinc-900">{campaign.progressPercent}%</p>
+          </div>
         </div>
-        <p className="text-sm text-slate-600">Backer: {campaign.backers}</p>
-        <p className="text-sm text-slate-600">Reward còn lại: {campaign.rewardsLeft}</p>
-        <p className="text-sm text-slate-600">
-          Hạn chót: {campaign.deadline ? new Date(campaign.deadline).toLocaleDateString("vi-VN") : "Không giới hạn"}
-        </p>
-        <div className="mt-1 flex flex-wrap gap-2">
-          <Link href={`/campaigns/${campaign.slug}`} className="dc-btn-primary">
-            Chọn reward
+
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-100">
+          <div className="h-full bg-zinc-900 transition-all" style={{ width: `${campaign.progressPercent}%` }} />
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <Link
+            href={`/campaigns/${campaign.slug}`}
+            className="inline-flex items-center gap-2 rounded-full border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
+            aria-label={`Xem chi ti\u1ebft ${campaign.title}`}
+          >
+            {"Xem chi ti\u1ebft"}
+            <span className="text-base font-bold">→</span>
           </Link>
-          <CreatorCampaignApplyButton slug={campaign.slug} compact />
         </div>
       </div>
     </article>

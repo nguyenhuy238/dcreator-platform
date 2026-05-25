@@ -1,5 +1,6 @@
 import { CampaignDetailContainer } from "./_components/CampaignDetailContainer";
 import { CreatorWorkspaceGate } from "@/app/dashboard/creator/_components/CreatorWorkspaceGate";
+import { PublicHeader } from "@/app/components/dcreator/layout/shell";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -17,7 +18,7 @@ export default async function CampaignDetailPage({ params }: Props) {
   const content = <CampaignDetailContainer slug={resolvedSlug} />;
 
   return (
-    <CreatorWorkspaceGate fallback={content}>
+    <CreatorWorkspaceGate fallback={<><PublicHeader />{content}</>}>
       {content}
     </CreatorWorkspaceGate>
   );

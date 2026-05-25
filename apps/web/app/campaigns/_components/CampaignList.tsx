@@ -21,7 +21,7 @@ const defaultFilters: CampaignFilterState = {
   sort: "trending"
 };
 
-export function CampaignList() {
+export function CampaignList({ excludeSlugs = [] }: { excludeSlugs?: string[] }) {
   const [filters, setFilters] = useState<CampaignFilterState>(defaultFilters);
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<CampaignCardData[]>([]);
@@ -29,6 +29,7 @@ export function CampaignList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState(filters.search);
+  const excludedSlugSet = useMemo(() => new Set(excludeSlugs), [excludeSlugs]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -59,7 +60,7 @@ export function CampaignList() {
       .then(async (res) => {
         const payload = (await res.json()) as CampaignListResponse;
         if (!res.ok || !payload.success) {
-          throw new Error("Không thể tải campaigns");
+          throw new Error("Khong the tai campaigns");
         }
         if (!mounted) return;
         setItems(payload.data.items);
@@ -68,7 +69,7 @@ export function CampaignList() {
       .catch((err: unknown) => {
         if (err instanceof Error && err.name === "AbortError") return;
         if (!mounted) return;
-        setError(err instanceof Error ? err.message : "Lỗi không xác định");
+        setError(err instanceof Error ? err.message : "Loi khong xac dinh");
       })
       .finally(() => {
         if (!mounted) return;
@@ -86,6 +87,11 @@ export function CampaignList() {
     setPage(1);
   }
 
+  const visibleItems = useMemo(
+    () => items.filter((campaign) => !excludedSlugSet.has(campaign.slug)),
+    [items, excludedSlugSet]
+  );
+
   return (
     <section className="grid gap-4">
       <CampaignFilters value={filters} onChange={onFilterChange} />
@@ -94,19 +100,19 @@ export function CampaignList() {
         <LoadingSkeleton rows={6} />
       ) : null}
 
-      {!loading && error ? <ErrorState title="Không thể tải chiến dịch" description={error} /> : null}
-      {!loading && !error && items.length === 0 ? <EmptyState title="Chưa có chiến dịch phù hợp" description="Thử nới bộ lọc hoặc đổi từ khóa tìm kiếm." /> : null}
+      {!loading && error ? <ErrorState title="Khong the tai chien dich" description={error} /> : null}
+      {!loading && !error && visibleItems.length === 0 ? <EmptyState title="Chua co chien dich phu hop" description="Thu noi bo loc hoac doi tu khoa tim kiem." /> : null}
 
-      {!loading && !error && items.length > 0 ? (
+      {!loading && !error && visibleItems.length > 0 ? (
         <>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {items.map((campaign) => (
+            {visibleItems.map((campaign) => (
               <CampaignCard key={campaign.slug} campaign={campaign} />
             ))}
           </div>
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-3">
             <button className="dc-btn-secondary" disabled={page <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
-              Trang trước
+              Trang truoc
             </button>
             <span className="text-sm text-zinc-600">
               Trang {page}/{totalPages}

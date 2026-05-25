@@ -108,9 +108,9 @@ function toSnapshot(
       lifecycleStatus: "DOING"
     },
     REJECTED: {
-      label: "Đơn đã bị từ chối",
-      disabled: true,
-      message: "Đơn đăng ký đã bị từ chối.",
+      label: "Đăng ký lại",
+      disabled: false,
+      message: "Đơn trước đã bị từ chối, bạn có thể gửi lại.",
       rejectReason: null,
       submissionId: null,
       missionId: null,
@@ -225,10 +225,47 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
         accountId
       }
     },
-    select: { id: true }
+    select: { id: true, status: true }
   });
   if (existing) {
-    throw new AppError("Creator has already applied to this campaign", 409, "CREATOR_CAMPAIGN_ALREADY_APPLIED");
+    if (existing.status !== "REJECTED") {
+      throw new AppError("Creator has already applied to this campaign", 409, "CREATOR_CAMPAIGN_ALREADY_APPLIED");
+    }
+
+    const reapplied = await prisma.missionApplication.update({
+      where: { id: existing.id },
+      data: {
+        status: "PENDING_REVIEW",
+        rejectReason: null,
+        reviewedById: null,
+        reviewedAt: null,
+        note: appendCreatorCampaignApplicationTag(null, slug)
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: accountId,
+        action: "CREATOR_CAMPAIGN_APPLICATION_RESUBMITTED",
+        targetType: "MissionApplication",
+        targetId: reapplied.id,
+        metadata: {
+          campaignId: campaign.id,
+          missionId: firstMission.id
+        }
+      }
+    });
+
+    return {
+      submissionId: reapplied.id,
+      missionId: reapplied.missionId,
+      lifecycleStatus: "ACCEPTED" as const,
+      status: toSnapshot("PENDING_REVIEW", {
+        submissionId: reapplied.id,
+        missionId: reapplied.missionId,
+        lifecycleStatus: "ACCEPTED"
+      })
+    };
   }
 
   const application = await prisma.missionApplication.create({
