@@ -29,7 +29,8 @@ export default function AdminProductDetailPage() {
   const router = useRouter();
   const id = params?.id;
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [toast, setToast] = useState("");
   const [item, setItem] = useState<ProductDetail | null>(null);
   const [acting, setActing] = useState(false);
@@ -43,14 +44,14 @@ export default function AdminProductDetailPage() {
   const load = useCallback(async () => {
     if (!id) return;
     setLoading(true);
-    setError("");
+    setLoadError("");
     try {
       const res = await fetch(`/api/admin/products/${id}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<ProductDetail>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Load product detail failed");
       setItem(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load product detail failed");
+      setLoadError(e instanceof Error ? e.message : "Load product detail failed");
     } finally {
       setLoading(false);
     }
@@ -64,11 +65,11 @@ export default function AdminProductDetailPage() {
     if (!item) return;
     const normalizedReason = reason.trim() || undefined;
     if (action !== "approve" && !normalizedReason) {
-      setError("Reason is required for reject/request changes.");
+      setActionError("Reason is required for reject/request changes.");
       return;
     }
     setActing(true);
-    setError("");
+    setActionError("");
     try {
       const res = await fetch(`/api/admin/products/${item.id}/${action}`, {
         method: "PATCH",
@@ -87,7 +88,7 @@ export default function AdminProductDetailPage() {
       setTimeout(() => setToast(""), 1800);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Thao tác thất bại");
+      setActionError(e instanceof Error ? e.message : "Thao tác thất bại");
     } finally {
       setActing(false);
     }
@@ -102,14 +103,18 @@ export default function AdminProductDetailPage() {
     );
   }
 
-  if (error || !item) {
-    return <ErrorState title="Không tải được Product detail" description={error || "Lỗi không xác định"} onRetry={() => void load()} />;
+  if (loadError || !item) {
+    return <ErrorState title="Không tải được Product detail" description={loadError || "Lỗi không xác định"} onRetry={() => void load()} />;
   }
+
+  const canApprove = item.reviewStatus === "PENDING_REVIEW" || item.reviewStatus === "CHANGES_REQUESTED";
+  const canRequestDecision = item.reviewStatus === "PENDING_REVIEW" || item.reviewStatus === "CHANGES_REQUESTED";
+  const isFinalDecision = item.reviewStatus === "APPROVED" || item.reviewStatus === "REJECTED";
 
   return (
     <>
       <PageHeader title={item.name} subtitle={`Brand: ${item.brand.name}`} action={<button className="dc-btn-secondary" onClick={() => router.push("/admin/products")}>Back</button>} />
-      {error ? <div className="mb-4"><ErrorState title="Có lỗi thao tác" description={error} onRetry={() => void load()} /></div> : null}
+      {actionError ? <div className="mb-4"><ErrorState title="Có lỗi thao tác" description={actionError} onRetry={() => void load()} /></div> : null}
       <SectionCard title="Review status">
         <div className="flex items-center justify-between">
           <StatusBadge status={item.reviewStatus.toLowerCase()} />
@@ -154,12 +159,18 @@ export default function AdminProductDetailPage() {
       </SectionCard>
 
       <SectionCard title="Quyết định" className="mt-4">
-        <textarea className="dc-input min-h-24" placeholder="Reason (required for reject/request changes)" value={reason} onChange={(e) => setReason(e.target.value)} />
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button className="dc-btn-primary" disabled={acting} onClick={() => void decide("approve")}>Approve product</button>
-          <button className="dc-btn-secondary" disabled={acting} onClick={() => setPendingAction("reject")}>Reject product</button>
-          <button className="dc-btn-secondary" disabled={acting} onClick={() => setPendingAction("request-changes")}>Request changes</button>
-        </div>
+        {isFinalDecision ? (
+          <p className="text-sm font-medium text-zinc-600">Sản phẩm đã có quyết định cuối: {item.reviewStatus}.</p>
+        ) : (
+          <>
+            <textarea className="dc-input min-h-24" placeholder="Reason (required for reject/request changes)" value={reason} onChange={(e) => setReason(e.target.value)} />
+            <div className="mt-3 flex flex-wrap gap-2">
+              {canApprove ? <button className="dc-btn-primary" disabled={acting} onClick={() => void decide("approve")}>Approve product</button> : null}
+              {canRequestDecision ? <button className="dc-btn-secondary" disabled={acting} onClick={() => setPendingAction("reject")}>Reject product</button> : null}
+              {canRequestDecision ? <button className="dc-btn-secondary" disabled={acting} onClick={() => setPendingAction("request-changes")}>Request changes</button> : null}
+            </div>
+          </>
+        )}
       </SectionCard>
 
       <ConfirmDialog

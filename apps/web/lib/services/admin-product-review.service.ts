@@ -33,9 +33,53 @@ function buildReviewNote(input: {
   return JSON.stringify(payload);
 }
 
+function toOpsReviewStatus(status: ProductReviewStatus) {
+  if (status === "APPROVED") return "APPROVED";
+  if (status === "REJECTED") return "REJECTED";
+  return "PENDING_REVIEW";
+}
+
+async function backfillBrandProductsForAdminReview() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const prismaAny = prisma as any;
+  const products = await prismaAny.brandProduct.findMany({
+    include: { batches: true },
+    orderBy: { createdAt: "asc" }
+  });
+
+  for (const product of products) {
+    const existingSubmission = await prismaAny.productSubmission.findFirst({
+      where: { brandId: product.brandId, sku: product.sku },
+      select: { id: true }
+    });
+    if (existingSubmission) continue;
+
+    await prismaAny.productSubmission.create({
+      data: {
+        brandId: product.brandId,
+        name: product.name,
+        sku: product.sku,
+        description: product.description,
+        unitPriceVnd: product.suggestedPriceVnd || product.priceVnd || 0,
+        reviewStatus: "PENDING_REVIEW",
+        inventoryBatches: {
+          create: product.batches.map((batch: { quantity: number; expiryDate: Date | null }) => ({
+            batchCode: product.sku,
+            quantityTotal: batch.quantity,
+            quantityRemaining: batch.quantity,
+            stockStatus: batch.quantity > 0 ? "IN_STOCK" : "OUT_OF_STOCK",
+            expiresAt: batch.expiryDate
+          }))
+        }
+      }
+    });
+  }
+}
+
 export async function listProductSubmissionsForAdmin(status?: ProductReviewStatus, query?: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const prismaAny = prisma as any;
+  await backfillBrandProductsForAdminReview();
   return prismaAny.productSubmission.findMany({
     where: {
       ...(status ? { reviewStatus: status } : {}),
@@ -112,6 +156,29 @@ export async function decideProductSubmissionByAdmin(input: {
       })
     }
   });
+
+  if (current.sku) {
+    const brandProduct = await prismaAny.brandProduct.findFirst({
+      where: { brandId: current.brandId, sku: current.sku },
+      select: { id: true }
+    });
+    if (brandProduct) {
+      await prismaAny.brandProduct.update({
+        where: { id: brandProduct.id },
+        data: {
+          campaignEligibility: input.campaignEligible ?? input.decision === "APPROVED"
+        }
+      });
+      await prismaAny.brandInventoryBatch.updateMany({
+        where: { productId: brandProduct.id },
+        data: {
+          opsStatus: toOpsReviewStatus(input.decision),
+          viableMarginPercent: input.proposedMarginPercent ?? undefined,
+          opsNote: input.reason ?? input.note ?? null
+        }
+      });
+    }
+  }
 
   await writeAuditLog({
     actorId: input.actorId,

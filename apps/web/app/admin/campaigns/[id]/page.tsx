@@ -9,6 +9,7 @@ type CampaignDetail = {
   id: string;
   title: string;
   brief: string;
+  coverImageUrl: string | null;
   status: string;
   statusView: string;
   startsAt: string | null;
@@ -100,6 +101,12 @@ export default function AdminCampaignDetailPage() {
     return <ErrorState title="Không tải được campaign detail" description={error || "Lỗi không xác định"} onRetry={() => void load()} />;
   }
 
+  const canApprove = item.status === "DRAFT" || item.status === "PAUSED";
+  const canRequestChanges = item.status === "DRAFT" || item.status === "PAUSED" || item.status === "ACTIVE";
+  const canPause = item.status === "ACTIVE";
+  const canReject = item.status === "DRAFT" || item.status === "PAUSED";
+  const hasReviewActions = canApprove || canRequestChanges || canPause || canReject;
+
   return (
     <>
       <PageHeader
@@ -116,6 +123,12 @@ export default function AdminCampaignDetailPage() {
       {error ? <div className="mb-4"><ErrorState title="Có lỗi thao tác" description={error} onRetry={() => void load()} /></div> : null}
 
       <SectionCard title="Campaign status">
+        {item.coverImageUrl ? (
+          <div className="mb-4 overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={item.coverImageUrl} alt={item.title} className="h-64 w-full object-cover" />
+          </div>
+        ) : null}
         <div className="flex items-center justify-between">
           <StatusBadge status={item.statusView.toLowerCase()} />
         </div>
@@ -175,13 +188,19 @@ export default function AdminCampaignDetailPage() {
 
       <section className="mt-4">
         <SectionCard title="Quyết định">
-        <textarea className="dc-input mt-3 min-h-24" placeholder="Reason for reject/request changes/pause" value={reason} onChange={(e) => setReason(e.target.value)} />
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button className="dc-btn-primary" disabled={acting} onClick={() => void act("approve")}>Approve & Publish</button>
-          <button className="dc-btn-secondary" disabled={acting} onClick={() => setConfirmAction("request-changes")}>Request changes</button>
-          <button className="dc-btn-secondary" disabled={acting} onClick={() => setConfirmAction("pause")}>Pause</button>
-          <button className="dc-btn-secondary" disabled={acting} onClick={() => setConfirmAction("reject")}>Reject</button>
-        </div>
+          {hasReviewActions ? (
+            <>
+              <textarea className="dc-input mt-3 min-h-24" placeholder="Reason for reject/request changes/pause" value={reason} onChange={(e) => setReason(e.target.value)} />
+              <div className="mt-3 flex flex-wrap gap-2">
+                {canApprove ? <button className="dc-btn-primary" disabled={acting} onClick={() => void act("approve")}>Approve & Publish</button> : null}
+                {canRequestChanges ? <button className="dc-btn-secondary" disabled={acting} onClick={() => setConfirmAction("request-changes")}>Request changes</button> : null}
+                {canPause ? <button className="dc-btn-secondary" disabled={acting} onClick={() => setConfirmAction("pause")}>Pause</button> : null}
+                {canReject ? <button className="dc-btn-secondary" disabled={acting} onClick={() => setConfirmAction("reject")}>Reject</button> : null}
+              </div>
+            </>
+          ) : (
+            <p className="text-sm font-medium text-zinc-600">Campaign đang ở trạng thái {item.statusView}. Không có thao tác duyệt khả dụng.</p>
+          )}
         </SectionCard>
       </section>
 

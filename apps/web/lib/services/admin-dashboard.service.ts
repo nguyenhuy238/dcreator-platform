@@ -32,6 +32,25 @@ function extractCoverImageMeta(brief: string) {
   return { coverImageUrl, cleanBrief };
 }
 
+export async function getCampaignReviewDetail(campaignId: string) {
+  const request = await prisma.brandCampaignRequest.findUnique({
+    where: { id: campaignId },
+    include: {
+      brand: { select: { id: true, name: true, ownerAccountId: true, contactEmail: true } },
+      createdCampaign: { select: { id: true, slug: true, title: true, status: true } },
+      reviewedBy: { select: { id: true, displayName: true, email: true } }
+    }
+  });
+  if (!request) throw new AppError("Campaign request not found", 404, "CAMPAIGN_REQUEST_NOT_FOUND");
+
+  const { coverImageUrl, cleanBrief } = extractCoverImageMeta(request.brief);
+  return {
+    ...request,
+    coverImageUrl,
+    cleanBrief
+  };
+}
+
 async function createDefaultMissionsFromRequest(
   tx: Prisma.TransactionClient,
   campaignId: string,

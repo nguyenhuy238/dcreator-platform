@@ -220,7 +220,7 @@ export default function BrandProductsPage() {
                   if (file) void uploadProductImage(file);
                   event.currentTarget.value = "";
                 }} disabled={uploadingImage} />
-                <input className="dc-input" type="url" value={form.imageUrl} onChange={(event) => setField("imageUrl", event.target.value.trim())} placeholder="https://..." />
+                <input className="dc-input" type="text" value={form.imageUrl} onChange={(event) => setField("imageUrl", event.target.value.trim())} placeholder="https://... hoặc /uploads/..." />
               </div>
               <span className="text-xs font-medium text-zinc-500">Nhập URL ảnh đầy đủ, ví dụ `https://...`.</span>
               {uploadingImage ? <span className="text-xs font-medium text-zinc-500">Đang tải ảnh...</span> : null}

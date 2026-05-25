@@ -168,6 +168,7 @@ export default function AdminCampaignsPage() {
                   {item.brandFeedback ? <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">Brand phản hồi: {item.brandFeedback}</p> : null}
                   {item.createdCampaign ? <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">Đã tạo campaign: {item.createdCampaign.title} /{item.createdCampaign.slug}</p> : null}
                   <div className="mt-3 flex flex-wrap gap-2">
+                    <Link className="dc-btn-secondary" href={`/admin/campaigns/requests/${item.id}`}>Xem chi tiết</Link>
                     <button className="dc-btn-primary" onClick={() => void review(item.id, "APPROVED")}>Duyệt & publish</button>
                     <button className="dc-btn-secondary" onClick={() => void review(item.id, "REJECTED")}>Từ chối</button>
                     <button className="dc-btn-secondary" onClick={() => void review(item.id, "CHANGES_REQUESTED")}>Yêu cầu chỉnh sửa</button>

@@ -1,5 +1,23 @@
 import { z } from "zod";
 
+const uploadedAssetUrl = z
+  .string()
+  .trim()
+  .max(400)
+  .refine(
+    (value) => {
+      if (!value) return true;
+      if (value.startsWith("/uploads/") && !value.includes("..")) return true;
+      try {
+        const parsed = new URL(value);
+        return parsed.protocol === "http:" || parsed.protocol === "https:";
+      } catch {
+        return false;
+      }
+    },
+    { message: "URL ảnh không hợp lệ." }
+  );
+
 export const brandProfileSchema = z.object({
   brandName: z.string().trim().min(2).max(160),
   contactName: z.string().trim().min(2).max(120).optional().or(z.literal("")),
@@ -14,7 +32,7 @@ export const productSchema = z.object({
   sku: z.string().trim().min(1).max(80),
   name: z.string().trim().min(1).max(160),
   description: z.string().trim().max(2000).optional().or(z.literal("")),
-  imageUrl: z.url().max(400).optional().or(z.literal("")),
+  imageUrl: uploadedAssetUrl.optional().or(z.literal("")),
   stockQty: z.number().int().min(0),
   voucherStock: z.number().int().min(0),
   campaignEligibility: z.boolean().default(true),

@@ -8,6 +8,7 @@ import {
   approveRoleRequestByAdmin,
   decideCampaignReview,
   decideProofByAdmin,
+  getCampaignReviewDetail,
   getAdminOverview,
   getAdminAnalytics,
   getAuditLogs,
@@ -113,6 +114,11 @@ export async function POST_brand_verification_reject(request: NextRequest, reque
 export async function GET_campaign_reviews(request: NextRequest) {
   await requireAdminOps(request);
   return ok(await listPendingCampaignReviews());
+}
+
+export async function GET_campaign_review_detail(request: NextRequest, campaignId: string) {
+  await requireAdminOps(request);
+  return ok(await getCampaignReviewDetail(campaignId));
 }
 
 export async function POST_campaign_decision(request: NextRequest, campaignId: string) {

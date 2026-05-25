@@ -264,6 +264,103 @@ function toBrandProductDto(product: BrandProductWithBatches) {
   };
 }
 
+function productReviewToOpsStatus(status: string) {
+  if (status === "APPROVED") return "APPROVED";
+  if (status === "REJECTED") return "REJECTED";
+  return "PENDING_REVIEW";
+}
+
+async function syncBrandProductStatusesFromSubmissions(brandId: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const prismaAny = prisma as any;
+  const submissions = await prismaAny.productSubmission.findMany({
+    where: { brandId, sku: { not: null } },
+    orderBy: { updatedAt: "desc" },
+    select: { sku: true, reviewStatus: true, reviewNote: true }
+  });
+  const latestBySku = new Map<string, { reviewStatus: string; reviewNote: string | null }>();
+  for (const submission of submissions) {
+    if (!submission.sku || latestBySku.has(submission.sku)) continue;
+    latestBySku.set(submission.sku, {
+      reviewStatus: submission.reviewStatus,
+      reviewNote: submission.reviewNote ?? null
+    });
+  }
+
+  for (const [sku, submission] of latestBySku) {
+    const product = await prismaAny.brandProduct.findFirst({
+      where: { brandId, sku },
+      select: { id: true }
+    });
+    if (!product) continue;
+    await prismaAny.brandInventoryBatch.updateMany({
+      where: { productId: product.id },
+      data: {
+        opsStatus: productReviewToOpsStatus(submission.reviewStatus),
+        opsNote: submission.reviewNote
+      }
+    });
+  }
+}
+
+async function syncProductSubmissionForReview(
+  tx: Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">,
+  brandId: string,
+  input: ProductInput
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const txAny = tx as any;
+  const batch = input.batches[0];
+  const existingSubmission = await txAny.productSubmission.findFirst({
+    where: {
+      brandId,
+      sku: input.sku,
+      reviewStatus: { in: ["DRAFT", "PENDING_REVIEW", "CHANGES_REQUESTED"] }
+    },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true }
+  });
+  const submissionData = {
+    brandId,
+    campaignId: null,
+    name: input.name,
+    sku: input.sku || null,
+    description: input.description || null,
+    unitPriceVnd: input.suggestedPriceVnd ?? input.priceVnd ?? 0,
+    reviewStatus: "PENDING_REVIEW",
+    reviewNote: null,
+    reviewedById: null,
+    reviewedAt: null
+  };
+
+  const submission = existingSubmission
+    ? await txAny.productSubmission.update({
+        where: { id: existingSubmission.id },
+        data: submissionData,
+        select: { id: true }
+      })
+    : await txAny.productSubmission.create({
+        data: submissionData,
+        select: { id: true }
+      });
+
+  await txAny.inventoryBatch.deleteMany({ where: { productSubmissionId: submission.id } });
+  if (batch) {
+    await txAny.inventoryBatch.create({
+      data: {
+        productSubmissionId: submission.id,
+        batchCode: input.sku || null,
+        quantityTotal: batch.quantity,
+        quantityRemaining: batch.quantity,
+        stockStatus: batch.quantity > 0 ? "IN_STOCK" : "OUT_OF_STOCK",
+        expiresAt: batch.expiryDate ? new Date(batch.expiryDate) : null
+      }
+    });
+  }
+
+  return submission;
+}
+
 export async function getBrandOverview(accountId: string) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true });
   const wallet = await ensureWalletByAccountId(ctx.brandOwnerAccountId);
@@ -598,6 +695,7 @@ export async function updateBrandProfile(accountId: string, input: BrandProfileI
 export async function listProducts(accountId: string) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true });
   const brand = ctx.brand;
+  await syncBrandProductStatusesFromSubmissions(brand.id);
   const products = await prisma.brandProduct.findMany({
     where: { brandId: brand.id },
     include: { batches: { orderBy: { createdAt: "desc" } } },
@@ -645,6 +743,8 @@ export async function upsertProduct(accountId: string, input: ProductInput) {
         }))
       });
     }
+
+    await syncProductSubmissionForReview(tx, brand.id, input);
 
     return tx.brandProduct.findUniqueOrThrow({
       where: { id: savedProduct.id },
