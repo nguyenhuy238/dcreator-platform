@@ -22,6 +22,7 @@ type AuthUser = {
 export function PublicHeader() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -68,15 +69,13 @@ export function PublicHeader() {
   }
 
   const canAccessAdmin = currentUser ? currentUser.roles.includes("ADMIN") || currentUser.roles.includes("OPS") : false;
-  const dashboardHref = currentUser ? "/dashboard/user" : null;
+  const isCreator = currentUser ? currentUser.roles.includes(ROLE.CREATOR) : false;
+  const isBrand = currentUser ? currentUser.roles.includes(ROLE.BRAND_OWNER) || currentUser.roles.includes(ROLE.BRAND_STAFF) : false;
   const profileHref =
-    currentUser?.roles.includes(ROLE.BRAND_OWNER) || currentUser?.roles.includes(ROLE.BRAND_STAFF)
+    isBrand
       ? "/dashboard/brand/profile"
       : "/dashboard/user/profile";
-  const campaignHref =
-    currentUser?.roles.includes(ROLE.BRAND_OWNER) || currentUser?.roles.includes(ROLE.BRAND_STAFF)
-      ? "/brand"
-      : "/campaigns";
+  const campaignHref = isCreator ? "/dashboard/creator/jobs" : isBrand ? "/brand" : "/campaigns";
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/70 bg-white/90 backdrop-blur">
@@ -93,23 +92,41 @@ export function PublicHeader() {
             <div className="h-10 w-44 animate-pulse rounded-full bg-zinc-200" />
           ) : currentUser ? (
             <>
-              {currentUser ? (
-                <Link href={dashboardHref ?? "/dashboard/user"} className="dc-btn-secondary hidden md:inline-flex">Tài khoản cá nhân</Link>
-              ) : null}
               <Link href={campaignHref} className="dc-btn-secondary hidden md:inline-flex">Campaign</Link>
-              <Link href="/dashboard/user/wallet" className="dc-btn-secondary hidden md:inline-flex">Ví / N-Points</Link>
+              {isCreator ? <Link href="/dashboard/creator/wallet" className="dc-btn-secondary hidden md:inline-flex">Ví / N-Points</Link> : null}
               {canAccessAdmin ? (
                 <>
                   <Link href="/admin" className="dc-btn-secondary hidden xl:inline-flex">Admin</Link>
                 </>
               ) : null}
-              <Link href={profileHref} className="dc-focus inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100">
-                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">
-                  {initials}
-                </span>
-                <span className="max-w-28 truncate">{currentUser.displayName}</span>
-              </Link>
-              <button type="button" onClick={handleLogout} className="dc-btn-secondary">Đăng xuất</button>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen((prev) => !prev)}
+                  className="dc-focus inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
+                >
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">
+                    {initials}
+                  </span>
+                  <span className="max-w-28 truncate">{currentUser.displayName}</span>
+                </button>
+                {menuOpen ? (
+                  <div className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-zinc-200 bg-white p-2 shadow-lg">
+                    <div className="rounded-lg bg-zinc-50 px-3 py-2">
+                      <p className="text-sm font-semibold text-zinc-900">{currentUser.displayName}</p>
+                      <p className="truncate text-xs text-zinc-500">{currentUser.email}</p>
+                    </div>
+                    <div className="mt-2 grid gap-1">
+                      <Link href={profileHref} className="rounded-lg px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100">
+                        Hồ sơ
+                      </Link>
+                      <button type="button" onClick={handleLogout} className="rounded-lg px-3 py-2 text-left text-sm font-semibold text-red-700 hover:bg-red-50">
+                        Đăng xuất
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </>
           ) : (
             <>

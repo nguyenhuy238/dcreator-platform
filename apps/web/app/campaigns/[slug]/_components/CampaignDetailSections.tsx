@@ -34,9 +34,6 @@ function buildHeroMeta(data: CampaignDetailDTO) {
 }
 
 export function HeroSection({ data, applyCard }: { data: CampaignDetailDTO; applyCard: ReactNode }) {
-  const heroMeta = buildHeroMeta(data);
-  const channels = splitByComma(data.hero.priorityChannels);
-  const missionTypes = splitByComma(data.hero.missionTypes);
   return (
     <section className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-950 text-white">
       {data.hero.coverMediaType === "video" && data.hero.coverMediaUrl ? (
@@ -53,18 +50,7 @@ export function HeroSection({ data, applyCard }: { data: CampaignDetailDTO; appl
               {getCampaignTypeLabel()}
             </span>
             <h1 className="mt-4 max-w-4xl text-3xl font-black tracking-tight md:text-6xl">{data.hero.title}</h1>
-            <p className="mt-3 max-w-3xl text-sm text-zinc-100 md:text-base">{data.hero.description}</p>
-            <div className="mt-5 grid gap-x-8 gap-y-2 text-sm text-zinc-100 md:grid-cols-2">
-              <p>Brand/SME: {data.hero.brand}</p>
-              <p>Ngành hàng: {categoryLabel[data.hero.category]}</p>
-              <p>Loại sản phẩm: {data.rewards[0]?.title ?? "Đang cập nhật"}</p>
-              <p>Mục tiêu chính: {data.hero.objective ?? "Đang cập nhật"}</p>
-              <p>Thời gian: {formatDateTime(heroMeta.startAt)} - {heroMeta.endAt ? formatDateTime(heroMeta.endAt) : "Đang cập nhật"}</p>
-              <p>Mốc đăng ký Creator: {formatDateTime(heroMeta.registerDeadline)}</p>
-              <p>Mốc nộp content: {heroMeta.submitDeadline ? formatDateTime(heroMeta.submitDeadline) : "Đang cập nhật"}</p>
-              <p>Kênh chính: {channels.length ? channels.join(", ") : "Đang cập nhật"}</p>
-              <p>Nhiệm vụ chính: {missionTypes.length ? missionTypes.join(", ") : "Đang cập nhật"}</p>
-            </div>
+            <p className="mt-3 max-w-3xl text-base font-semibold text-zinc-100">Brand/SME: {data.hero.brand}</p>
           </div>
           <div className="hidden lg:block">{applyCard}</div>
         </div>
@@ -75,6 +61,8 @@ export function HeroSection({ data, applyCard }: { data: CampaignDetailDTO; appl
 
 export function OverviewTab({ data }: { data: CampaignDetailDTO }) {
   const [activeStep, setActiveStep] = useState<number>(1);
+  const [introExpanded, setIntroExpanded] = useState(false);
+  const heroMeta = buildHeroMeta(data);
   const missionTypes = splitByComma(data.hero.missionTypes);
   const channels = splitByComma(data.hero.priorityChannels);
   const journeySteps = useMemo(
@@ -89,9 +77,37 @@ export function OverviewTab({ data }: { data: CampaignDetailDTO }) {
 
   return (
     <section className="grid gap-4">
-      <article className="dc-card p-5">
-        <h3 className="text-2xl font-black text-zinc-900">Giới thiệu camp</h3>
-        <p className="mt-2 text-slate-700">{data.hero.description}</p>
+      <article className="dc-card overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setIntroExpanded((prev) => !prev)}
+          className="w-full px-5 py-5 text-left"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-2xl font-black text-zinc-900">{"Gi\u1edbi thi\u1ec7u camp"}</h3>
+              <p className="mt-2 text-slate-700">{data.hero.description}</p>
+            </div>
+            <span className="mt-1 text-xs font-bold uppercase tracking-wide text-zinc-500">
+              {introExpanded ? "Thu g\u1ecdn" : "Xem th\u00eam"}
+            </span>
+          </div>
+        </button>
+        {introExpanded ? (
+          <div className="border-t border-zinc-100 px-5 pb-5 pt-4">
+            <div className="grid gap-x-8 gap-y-2 text-sm text-zinc-700 md:grid-cols-2">
+              <p>Brand/SME: {data.hero.brand}</p>
+              <p>{"Ng\u00e0nh h\u00e0ng"}: {categoryLabel[data.hero.category]}</p>
+              <p>{"Lo\u1ea1i s\u1ea3n ph\u1ea9m"}: {data.rewards[0]?.title ?? "\u0110ang c\u1eadp nh\u1eadt"}</p>
+              <p>{"M\u1ee5c ti\u00eau ch\u00ednh"}: {data.hero.objective ?? "\u0110ang c\u1eadp nh\u1eadt"}</p>
+              <p>{"Th\u1eddi gian"}: {formatDateTime(heroMeta.startAt)} - {heroMeta.endAt ? formatDateTime(heroMeta.endAt) : "\u0110ang c\u1eadp nh\u1eadt"}</p>
+              <p>{"M\u1ed1c \u0111\u0103ng k\u00fd Creator"}: {formatDateTime(heroMeta.registerDeadline)}</p>
+              <p>{"M\u1ed1c n\u1ed9p content"}: {heroMeta.submitDeadline ? formatDateTime(heroMeta.submitDeadline) : "\u0110ang c\u1eadp nh\u1eadt"}</p>
+              <p>{"K\u00eanh ch\u00ednh"}: {channels.length ? channels.join(", ") : "\u0110ang c\u1eadp nh\u1eadt"}</p>
+              <p>{"Nhi\u1ec7m v\u1ee5 ch\u00ednh"}: {missionTypes.length ? missionTypes.join(", ") : "\u0110ang c\u1eadp nh\u1eadt"}</p>
+            </div>
+          </div>
+        ) : null}
       </article>
       <article className="dc-card p-5">
         <h3 className="text-2xl font-black text-zinc-900">Tổng quan deal</h3>

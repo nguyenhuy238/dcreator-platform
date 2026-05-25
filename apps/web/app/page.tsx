@@ -142,26 +142,26 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <section className="mt-10 rounded-[2rem] border border-zinc-200 bg-white px-6 py-10 md:px-10 md:py-14">
-          <div className="mx-auto max-w-5xl text-center">
+        <section className="mt-10 rounded-[2rem] border border-zinc-200 bg-white px-5 py-8 md:px-8 md:py-10">
+          <div className="mx-auto max-w-4xl text-center">
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-zinc-500">The Flywheel Engine</p>
-            <h2 className="mt-4 text-5xl font-black leading-[0.95] text-zinc-900 md:text-8xl">Win-Win-Win Flywheel</h2>
-            <p className="mx-auto mt-8 max-w-4xl text-2xl leading-tight text-zinc-600 md:text-4xl">
+            <h2 className="mt-3 text-4xl font-black leading-[0.95] text-zinc-900 md:text-6xl">Win-Win-Win Flywheel</h2>
+            <p className="mx-auto mt-5 max-w-3xl text-xl leading-tight text-zinc-600 md:text-2xl">
               Dòng chảy giá trị khép kín giữa Thương hiệu, Creator và Người tiêu dùng.
               <br />
               Công bằng, minh bạch và cộng sinh.
             </p>
           </div>
 
-          <div className="mx-auto mt-20 max-w-5xl text-center">
-            <p className="text-2xl font-black uppercase tracking-[0.16em] text-zinc-900 md:text-3xl">BRAND</p>
+          <div className="mx-auto mt-12 max-w-4xl text-center">
+            <p className="text-xl font-black uppercase tracking-[0.16em] text-zinc-900 md:text-2xl">BRAND</p>
             <p className="mt-2 text-sm font-bold text-zinc-400 md:text-base">Inventory &amp; Margin</p>
-            <p className="mx-auto mt-3 max-w-xl text-lg leading-8 text-zinc-700 md:text-2xl">
+            <p className="mx-auto mt-3 max-w-xl text-base leading-7 text-zinc-700 md:text-xl">
               Tăng doanh thu bằng UGC hiệu quả và tối ưu chi phí marketing.
             </p>
           </div>
 
-          <div className="relative mx-auto mt-10 h-[620px] w-full max-w-[860px] md:h-[760px]">
+          <div className="relative mx-auto mt-8 h-[460px] w-full max-w-[720px] md:h-[560px]">
             <div className="flywheel-pulse absolute left-1/2 top-1/2 h-[86%] w-[86%] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed border-zinc-300/70" />
             <div className="absolute left-1/2 top-1/2 h-[62%] w-[62%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-zinc-300/65" />
             <div className="absolute left-1/2 top-1/2 h-[46%] w-[46%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-zinc-300/55" />
@@ -173,33 +173,33 @@ export default async function HomePage() {
               <div className="absolute bottom-[10%] right-[8%] h-px w-[45%] -rotate-[58deg] bg-zinc-300/50 origin-right" />
             </div>
 
-            <div className="flywheel-fade absolute left-1/2 top-[14%] flex h-24 w-24 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[2rem] border border-zinc-200 bg-white shadow-sm">
+            <div className="flywheel-fade absolute left-1/2 top-[14%] flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[1.5rem] border border-zinc-200 bg-white shadow-sm">
               <span className="text-3xl">🏢</span>
             </div>
-            <div className="flywheel-fade absolute left-[22%] top-[78%] flex h-24 w-24 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[2rem] border border-zinc-200 bg-white shadow-sm [animation-delay:160ms]">
+            <div className="flywheel-fade absolute left-[22%] top-[78%] flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[1.5rem] border border-zinc-200 bg-white shadow-sm [animation-delay:160ms]">
               <span className="text-3xl">👥</span>
             </div>
-            <div className="flywheel-fade absolute right-[22%] top-[78%] flex h-24 w-24 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[2rem] border border-zinc-200 bg-white shadow-sm [animation-delay:320ms]">
+            <div className="flywheel-fade absolute right-[22%] top-[78%] flex h-20 w-20 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[1.5rem] border border-zinc-200 bg-white shadow-sm [animation-delay:320ms]">
               <span className="text-3xl">📷</span>
             </div>
 
-            <div className="flywheel-fade absolute left-1/2 top-1/2 flex h-36 w-36 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white [animation-delay:120ms]">
-              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-zinc-900 text-5xl font-black text-white">d</div>
+            <div className="flywheel-fade absolute left-1/2 top-1/2 flex h-28 w-28 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white [animation-delay:120ms]">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 text-4xl font-black text-white">d</div>
             </div>
           </div>
 
-          <div className="mx-auto mt-2 grid max-w-5xl gap-8 text-center md:grid-cols-2">
+          <div className="mx-auto mt-0 grid max-w-4xl gap-6 text-center md:grid-cols-2">
             <article>
-              <p className="text-2xl font-black uppercase tracking-[0.16em] text-zinc-900 md:text-3xl">USER</p>
+              <p className="text-xl font-black uppercase tracking-[0.16em] text-zinc-900 md:text-2xl">USER</p>
               <p className="mt-2 text-sm font-bold text-zinc-400 md:text-base">Experience &amp; Value</p>
-              <p className="mt-3 text-lg leading-8 text-zinc-700 md:text-2xl">
+              <p className="mt-3 text-base leading-7 text-zinc-700 md:text-xl">
                 Đồng sáng tạo nội dung và trở thành micro-creator.
               </p>
             </article>
             <article>
-              <p className="text-2xl font-black uppercase tracking-[0.16em] text-zinc-900 md:text-3xl">CREATOR</p>
+              <p className="text-xl font-black uppercase tracking-[0.16em] text-zinc-900 md:text-2xl">CREATOR</p>
               <p className="mt-2 text-sm font-bold text-zinc-400 md:text-base">Content &amp; Influence</p>
-              <p className="mt-3 text-lg leading-8 text-zinc-700 md:text-2xl">
+              <p className="mt-3 text-base leading-7 text-zinc-700 md:text-xl">
                 Nhận campaign, phát triển cá nhân và tạo thu nhập minh bạch.
               </p>
             </article>
