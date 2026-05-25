@@ -121,7 +121,7 @@ export function WalletPageClient() {
     await load();
   };
 
-  const topupPointEstimate = useMemo(() => Math.floor(amountVnd / 100), [amountVnd]);
+  const topupPointEstimate = useMemo(() => amountVnd, [amountVnd]);
 
   return (
     <>

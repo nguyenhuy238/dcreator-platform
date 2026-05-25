@@ -212,3 +212,7 @@ export const brandMemberRoleUpdateSchema = z.object({
 export const brandMemberRemoveSchema = z.object({
   memberId: z.string().trim().min(3)
 });
+
+export const brandSubscriptionPurchaseSchema = z.object({
+  packageCode: z.enum(["FREE", "UGC_15_VIDEO", "UGC_50_VIDEO"])
+});
