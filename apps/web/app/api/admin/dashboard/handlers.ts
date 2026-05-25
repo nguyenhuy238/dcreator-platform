@@ -27,6 +27,12 @@ import {
   unlockUserByAdmin
 } from "@/lib/services/admin-dashboard.service";
 import {
+  approveAdminNPointTopupRequest,
+  completeAdminNPointRefund,
+  listAdminNPointTopupRequests,
+  rejectAdminNPointTopupRequest
+} from "@/lib/services/n-point-topup.service";
+import {
   adminAuditQuerySchema,
   adminCampaignDecisionSchema,
   adminCreatorCampaignApplicationQuerySchema,
@@ -36,6 +42,12 @@ import {
   adminRejectSchema,
   adminUserQuerySchema
 } from "@/lib/validators/admin-dashboard";
+import {
+  adminNPointRefundCompleteSchema,
+  adminNPointTopupApproveSchema,
+  adminNPointTopupRejectSchema,
+  adminNPointTopupStatusQuerySchema
+} from "@/lib/validators/n-point-topup";
 import { voucherAdminQuerySchema } from "@/lib/validators/voucher";
 
 function optionalQueryParam(request: NextRequest, key: string) {
@@ -224,4 +236,30 @@ export async function POST_creator_mission_decision(request: NextRequest, creato
       payload.purchaseAmountVnd
     )
   );
+}
+
+export async function GET_npoint_topup_requests(request: NextRequest) {
+  await requireAdminOps(request);
+  const parsed = adminNPointTopupStatusQuerySchema.parse({
+    status: optionalQueryParam(request, "status")
+  });
+  return ok(await listAdminNPointTopupRequests(parsed.status));
+}
+
+export async function POST_npoint_topup_approve(request: NextRequest, requestId: string) {
+  const actor = await requireAdminOps(request);
+  const payload = adminNPointTopupApproveSchema.parse(await request.json());
+  return ok(await approveAdminNPointTopupRequest(actor.id, requestId, payload));
+}
+
+export async function POST_npoint_topup_reject(request: NextRequest, requestId: string) {
+  const actor = await requireAdminOps(request);
+  const payload = adminNPointTopupRejectSchema.parse(await request.json());
+  return ok(await rejectAdminNPointTopupRequest(actor.id, requestId, payload.reason));
+}
+
+export async function POST_npoint_refund_complete(request: NextRequest, requestId: string) {
+  const actor = await requireAdminOps(request);
+  const payload = adminNPointRefundCompleteSchema.parse(await request.json());
+  return ok(await completeAdminNPointRefund(actor.id, requestId, payload));
 }

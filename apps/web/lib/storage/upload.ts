@@ -3,7 +3,15 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { AppError } from "@/lib/errors";
 
-type UploadFolder = "creator-kyc" | "brand-kyc" | "onboarding-doc" | "brand-logo" | "avatar" | "creator-avatar" | "creator-transcript";
+type UploadFolder =
+  | "creator-kyc"
+  | "brand-kyc"
+  | "onboarding-doc"
+  | "brand-logo"
+  | "avatar"
+  | "creator-avatar"
+  | "creator-transcript"
+  | "n-point-bill";
 
 type UploadInput = {
   file: File;

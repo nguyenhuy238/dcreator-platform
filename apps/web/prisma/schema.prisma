@@ -233,6 +233,14 @@ enum WalletTransactionType {
   ADJUSTMENT
 }
 
+enum NPointTopupRequestStatus {
+  PENDING_ADMIN_REVIEW
+  APPROVED
+  REJECTED
+  REFUND_INFO_SUBMITTED
+  REFUND_COMPLETED
+}
+
 enum PaymentTransactionStatus {
   PENDING
   SUCCESS
@@ -428,6 +436,9 @@ model Account {
   settings       AccountSettings?
   appliedMissionApplications    MissionApplication[]   @relation("MissionApplicationAccount")
   reviewedMissionApplications   MissionApplication[]   @relation("MissionApplicationReviewer")
+  requestedNPointTopups         NPointTopupRequest[]   @relation("NPointTopupRequester")
+  reviewedNPointTopups          NPointTopupRequest[]   @relation("NPointTopupReviewer")
+  processedNPointRefunds        NPointTopupRequest[]   @relation("NPointRefundProcessor")
 }
 
 model AccountRole {
@@ -628,6 +639,7 @@ model Brand {
   products           BrandProduct[]
   campaignRequests   BrandCampaignRequest[]
   productSubmissions ProductSubmission[]
+  nPointTopupRequests NPointTopupRequest[]
 }
 
 model BrandCampaignRequest {
@@ -1145,10 +1157,48 @@ model WalletTransaction {
 
   wallet  Wallet  @relation(fields: [walletId], references: [id])
   account Account @relation(fields: [accountId], references: [id])
+  nPointApprovedTopups NPointTopupRequest[] @relation("NPointTopupWalletTransaction")
 
   @@unique([walletId, idempotencyKey])
   @@index([walletId, createdAt])
   @@index([accountId, createdAt])
+}
+
+model NPointTopupRequest {
+  id                  String                   @id @default(cuid())
+  brandId             String
+  requesterAccountId  String
+  amountVnd           Int
+  requestedPoints     Int
+  transferNote        String
+  bankTransferProofUrl String
+  status              NPointTopupRequestStatus @default(PENDING_ADMIN_REVIEW)
+  adminDecisionReason String?
+  reviewedById        String?
+  reviewedAt          DateTime?
+  approvedAt          DateTime?
+  walletTransactionId String?                  @unique
+  refundBankName      String?
+  refundAccountName   String?
+  refundAccountNumber String?
+  refundRequestNote   String?
+  refundSubmittedAt   DateTime?
+  refundProofUrl      String?
+  refundProcessedNote String?
+  refundProcessedById String?
+  refundProcessedAt   DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+
+  brand             Brand             @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  requester         Account           @relation("NPointTopupRequester", fields: [requesterAccountId], references: [id], onDelete: Restrict)
+  reviewedBy        Account?          @relation("NPointTopupReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  refundProcessedBy Account?          @relation("NPointRefundProcessor", fields: [refundProcessedById], references: [id], onDelete: SetNull)
+  walletTransaction WalletTransaction? @relation("NPointTopupWalletTransaction", fields: [walletTransactionId], references: [id], onDelete: SetNull)
+
+  @@index([brandId, status, createdAt])
+  @@index([requesterAccountId, createdAt])
+  @@index([status, updatedAt])
 }
 
 model PaymentTransaction {

@@ -40,6 +40,8 @@ const creatorNavItems: readonly NavItem[] = [
 
 const brandNavItems: readonly NavItem[] = [
   { href: "/dashboard/brand", label: "T\u1ed5ng quan Brand", description: "To\u00e0n c\u1ea3nh v\u1eadn h\u00e0nh Brand" },
+  { href: "/dashboard/brand/subscriptions", label: "M\u1ee5c ti\u00eau g\u00f3i", description: "Ch\u1ecdn g\u00f3i \u0111\u0103ng k\u00fd d\u00e0nh cho Brand" },
+  { href: "/dashboard/brand/wallet", label: "V\u00ed N-Point", description: "S\u1ed1 d\u01b0 N-Point v\u00e0 y\u00eau c\u1ea7u n\u1ea1p/ho\u00e0n ti\u1ec1n" },
   { href: "/dashboard/brand/onboarding", label: "Onboarding / BCC", description: "H\u1ed3 s\u01a1 ph\u00e1p l\u00fd v\u00e0 BCC" },
   { href: "/dashboard/brand/profile", label: "H\u1ed3 s\u01a1 nh\u00e3n h\u00e0ng", description: "Th\u00f4ng tin nh\u00e3n h\u00e0ng" },
   { href: "/dashboard/brand/products", label: "S\u1ea3n ph\u1ea9m & l\u00f4 h\u00e0ng", description: "Qu\u1ea3n l\u00fd s\u1ea3n ph\u1ea9m v\u00e0 t\u1ed3n kho" },
@@ -59,6 +61,7 @@ const adminNavItems: readonly NavItem[] = [
   { href: "/admin/mission-reviews", label: "Duy\u1ec7t nhi\u1ec7m v\u1ee5 Creator", description: "G\u1ed9p duy\u1ec7t k\u1ecbch b\u1ea3n, video v\u00e0 ho\u00e0n th\u00e0nh" },
   { href: "/admin/mission-history", label: "L\u1ecbch s\u1eed nhi\u1ec7m v\u1ee5", description: "To\u00e0n b\u1ed9 l\u1ecbch s\u1eed Creator Mission" },
   { href: "/admin/finance", label: "Finance / payout", description: "T\u00e0i ch\u00ednh v\u00e0 chi tr\u1ea3" },
+  { href: "/admin/n-point-requests", label: "X\u1eed l\u00fd n\u1ea1p N-Point", description: "Duy\u1ec7t n\u1ea1p \u0111i\u1ec3m v\u00e0 x\u1eed l\u00fd ho\u00e0n ti\u1ec1n" },
   { href: "/admin/audit", label: "Audit log", description: "Nh\u1eadt k\u00fd v\u1eadn h\u00e0nh h\u1ec7 th\u1ed1ng" },
   { href: "/admin/notifications", label: "Notification", description: "Th\u00f4ng b\u00e1o h\u1ec7 th\u1ed1ng" },
   { href: "/admin/settings", label: "System settings", description: "Thi\u1ebft l\u1eadp h\u1ec7 th\u1ed1ng" }
@@ -155,6 +158,7 @@ const breadcrumbLabelMap: Record<string, string> = {
   "/dashboard/creator/profile": "H\u1ed3 s\u01a1 Creator",
   "/dashboard/creator/wallet": "V\u00ed Creator",
   "/dashboard/brand": "Brand Dashboard",
+  "/dashboard/brand/subscriptions": "M\u1ee5c ti\u00eau g\u00f3i",
   "/dashboard/brand/onboarding": "Onboarding / BCC",
   "/dashboard/brand/profile": "H\u1ed3 s\u01a1 nh\u00e3n h\u00e0ng",
   "/dashboard/brand/products": "S\u1ea3n ph\u1ea9m & l\u00f4 h\u00e0ng",
@@ -164,7 +168,7 @@ const breadcrumbLabelMap: Record<string, string> = {
   "/dashboard/brand/mission-history": "L\u1ecbch s\u1eed nhi\u1ec7m v\u1ee5",
   "/dashboard/brand/proofs": "Duy\u1ec7t proof / video",
   "/dashboard/brand/analytics": "KPI / Analytics",
-  "/dashboard/brand/wallet": "Qu\u1ef9 Brand",
+  "/dashboard/brand/wallet": "V\u00ed N-Point",
   "/dashboard/brand/members": "Th\u00e0nh vi\u00ean Brand",
   "/dashboard/brand/settings": "C\u00e0i \u0111\u1eb7t Brand",
   "/admin": "Admin",
@@ -180,6 +184,7 @@ const breadcrumbLabelMap: Record<string, string> = {
   "/admin/mission-video-reviews": "Duy\u1ec7t video",
   "/admin/mission-final-reviews": "Duy\u1ec7t ho\u00e0n th\u00e0nh",
   "/admin/finance": "Finance / payout",
+  "/admin/n-point-requests": "X\u1eed l\u00fd n\u1ea1p N-Point",
   "/admin/audit": "Audit log",
   "/admin/notifications": "Notification",
   "/admin/settings": "System settings"
