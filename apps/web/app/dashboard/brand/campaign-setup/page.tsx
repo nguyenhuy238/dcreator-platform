@@ -23,6 +23,7 @@ type RequestForm = {
 };
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string };
+type FieldErrors = Partial<Record<keyof RequestForm, string>>;
 
 const defaultForm: RequestForm = {
   title: "",
@@ -56,6 +57,7 @@ export default function CampaignSetupPage() {
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingContentFile, setUploadingContentFile] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [success, setSuccess] = useState("");
   const [templateUrl, setTemplateUrl] = useState("");
 
@@ -85,12 +87,36 @@ export default function CampaignSetupPage() {
 
   function setField<K extends keyof RequestForm>(name: K, value: RequestForm[K]) {
     setForm((current) => ({ ...current, [name]: value }));
+    setFieldErrors((current) => ({ ...current, [name]: undefined }));
+  }
+
+  function validateForm() {
+    const nextErrors: FieldErrors = {};
+    const imageUrl = form.imageUrl.trim();
+    const contentFileUrl = form.contentFileUrl.trim();
+    if (form.title.trim().length < 3) nextErrors.title = "Tên campaign cần tối thiểu 3 ký tự.";
+    if (imageUrl && !imageUrl.startsWith("/uploads/") && !/^https?:\/\//.test(imageUrl)) {
+      nextErrors.imageUrl = "Ảnh campaign phải bắt đầu bằng /uploads/ hoặc http(s)://";
+    }
+    if (!contentFileUrl) nextErrors.contentFileUrl = "Vui lòng tải lên hoặc dán link file nội dung campaign.";
+    else if (!contentFileUrl.startsWith("/uploads/") && !/^https?:\/\//.test(contentFileUrl)) {
+      nextErrors.contentFileUrl = "File nội dung phải bắt đầu bằng /uploads/ hoặc http(s)://";
+    }
+    return nextErrors;
   }
 
   async function createRequest(event: FormEvent) {
     event.preventDefault();
+    const nextErrors = validateForm();
+    if (Object.values(nextErrors).some(Boolean)) {
+      setFieldErrors(nextErrors);
+      setError("Vui lòng kiểm tra các trường được đánh dấu đỏ.");
+      setSuccess("");
+      return;
+    }
     setSaving(true);
     setError("");
+    setFieldErrors({});
     setSuccess("");
     try {
       const response = await fetch("/api/brand/dashboard/campaign-requests", {
@@ -101,6 +127,7 @@ export default function CampaignSetupPage() {
       const payload = (await response.json()) as ApiResponse<CampaignRequest>;
       if (!response.ok || !payload.success) throw new Error(payload.success ? "Không thể gửi yêu cầu" : payload.error);
       setForm(defaultForm);
+      setFieldErrors({});
       setSuccess("Đã gửi thông tin cho Admin để tạo campaign.");
       await loadRequests();
     } catch (requestError) {
@@ -156,7 +183,8 @@ export default function CampaignSetupPage() {
       <form className="dc-card mt-6 grid gap-4 p-5 md:grid-cols-2" onSubmit={createRequest}>
         <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
           Tên campaign
-          <input className="dc-input" value={form.title} onChange={(event) => setField("title", event.target.value)} placeholder="Nhập tên campaign" required />
+          <input className={`dc-input ${fieldErrors.title ? "border-red-500 ring-1 ring-red-300" : ""}`} value={form.title} onChange={(event) => setField("title", event.target.value)} placeholder="Nhập tên campaign" required />
+          {fieldErrors.title ? <span className="text-xs text-red-600">{fieldErrors.title}</span> : null}
         </label>
         <label className="grid gap-2 text-sm font-semibold text-zinc-700">
           Ảnh campaign
@@ -165,7 +193,8 @@ export default function CampaignSetupPage() {
             if (file) void uploadCoverImage(file);
             event.currentTarget.value = "";
           }} disabled={uploadingCover} />
-          <input className="dc-input" value={form.imageUrl} onChange={(event) => setField("imageUrl", event.target.value.trim())} placeholder="/uploads/... hoặc https://..." />
+          <input className={`dc-input ${fieldErrors.imageUrl ? "border-red-500 ring-1 ring-red-300" : ""}`} value={form.imageUrl} onChange={(event) => setField("imageUrl", event.target.value.trim())} placeholder="/uploads/... hoặc https://..." />
+          {fieldErrors.imageUrl ? <span className="text-xs text-red-600">{fieldErrors.imageUrl}</span> : null}
         </label>
         <label className="grid gap-2 text-sm font-semibold text-zinc-700">
           File nội dung campaign
@@ -174,7 +203,8 @@ export default function CampaignSetupPage() {
             if (file) void uploadCampaignContentFile(file);
             event.currentTarget.value = "";
           }} disabled={uploadingContentFile} />
-          <input className="dc-input" value={form.contentFileUrl} onChange={(event) => setField("contentFileUrl", event.target.value.trim())} placeholder="/uploads/... hoặc https://..." required />
+          <input className={`dc-input ${fieldErrors.contentFileUrl ? "border-red-500 ring-1 ring-red-300" : ""}`} value={form.contentFileUrl} onChange={(event) => setField("contentFileUrl", event.target.value.trim())} placeholder="/uploads/... hoặc https://..." required />
+          {fieldErrors.contentFileUrl ? <span className="text-xs text-red-600">{fieldErrors.contentFileUrl}</span> : null}
           {templateUrl ? (
             <a className="text-xs font-semibold text-sky-700 underline" href={`/api/uploads/onboarding-doc-download?url=${encodeURIComponent(templateUrl)}`} target="_blank" rel="noreferrer">
               Tải template form nội dung campaign

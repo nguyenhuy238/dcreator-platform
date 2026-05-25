@@ -28,6 +28,7 @@ type FormState = {
 };
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string };
+type FieldErrors = Partial<Record<keyof FormState, string>> & { participationRoadmap?: string };
 
 const defaultForm: FormState = {
   brandAccountId: "",
@@ -55,6 +56,7 @@ export default function AdminCreateCampaignPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [success, setSuccess] = useState("");
   const [brandOptions, setBrandOptions] = useState<BrandOption[]>([]);
 
@@ -62,6 +64,7 @@ export default function AdminCreateCampaignPage() {
 
   function setField<K extends keyof FormState>(name: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [name]: value }));
+    setFieldErrors((current) => ({ ...current, [name]: undefined }));
   }
 
   function setRoadmapStep(index: number, value: string) {
@@ -69,6 +72,7 @@ export default function AdminCreateCampaignPage() {
       ...current,
       participationRoadmap: current.participationRoadmap.map((item, idx) => (idx === index ? value : item))
     }));
+    setFieldErrors((current) => ({ ...current, participationRoadmap: undefined }));
   }
 
   function addRoadmapStep() {
@@ -112,10 +116,40 @@ export default function AdminCreateCampaignPage() {
     }
   }
 
+  function validateForm() {
+    const nextErrors: FieldErrors = {};
+    const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+    const imageUrl = form.imageUrl.trim();
+    if (!form.brandAccountId.trim()) nextErrors.brandAccountId = "Vui lòng chọn Brand từ danh sách gợi ý.";
+    if (form.slug.trim().length < 3) nextErrors.slug = "Slug cần tối thiểu 3 ký tự.";
+    else if (!slugPattern.test(form.slug.trim())) nextErrors.slug = "Slug chỉ gồm chữ thường, số và dấu gạch ngang (-).";
+    if (form.title.trim().length < 3) nextErrors.title = "Tên campaign cần tối thiểu 3 ký tự.";
+    if (form.brief.trim().length < 10) nextErrors.brief = "Brief cần tối thiểu 10 ký tự.";
+    if (form.benefits.trim().length < 3) nextErrors.benefits = "Quyền lợi cần tối thiểu 3 ký tự.";
+    if (imageUrl && !imageUrl.startsWith("/uploads/") && !/^https?:\/\//.test(imageUrl)) {
+      nextErrors.imageUrl = "Ảnh phải là URL bắt đầu bằng /uploads/ hoặc http(s)://";
+    }
+    if (!form.participationRoadmap.some((item) => item.trim().length > 0)) {
+      nextErrors.participationRoadmap = "Cần ít nhất 1 bước lộ trình tham gia.";
+    }
+    if (form.startsAt && form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) {
+      nextErrors.endsAt = "Ngày kết thúc phải sau ngày bắt đầu.";
+    }
+    return nextErrors;
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
+    const nextErrors = validateForm();
+    if (Object.values(nextErrors).some(Boolean)) {
+      setFieldErrors(nextErrors);
+      setError("Vui lòng kiểm tra các trường được đánh dấu đỏ.");
+      setSuccess("");
+      return;
+    }
     setSaving(true);
     setError("");
+    setFieldErrors({});
     setSuccess("");
     try {
       const response = await fetch("/api/admin/campaigns", {
@@ -132,6 +166,7 @@ export default function AdminCreateCampaignPage() {
       if (!response.ok || !payload.success) throw new Error(payload.success ? "Không thể tạo campaign" : payload.error);
       setSuccess(`Đã tạo campaign: ${payload.data.title}`);
       setForm(defaultForm);
+      setFieldErrors({});
       setBrandOptions([]);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Không thể tạo campaign");
@@ -155,7 +190,7 @@ export default function AdminCreateCampaignPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <label className="grid gap-2 text-sm font-semibold text-zinc-700">
             <span>Brand Account ID</span>
-            <input className="dc-input" value={form.brandKeyword} onChange={(event) => void searchBrand(event.target.value)} placeholder="Nhập tên brand để tìm" required />
+            <input className={`dc-input ${fieldErrors.brandAccountId ? "border-red-500 ring-1 ring-red-300" : ""}`} value={form.brandKeyword} onChange={(event) => void searchBrand(event.target.value)} placeholder="Nhập tên brand để tìm" required />
             {brandOptions.length > 0 ? (
               <div className="rounded-xl border border-zinc-200 bg-white p-2">
                 {brandOptions.map((option) => (
@@ -174,22 +209,26 @@ export default function AdminCreateCampaignPage() {
               </div>
             ) : null}
             <span className="text-xs font-medium text-zinc-500">ID đã chọn: {form.brandAccountId || "Chưa chọn"}</span>
+            {fieldErrors.brandAccountId ? <span className="text-xs text-red-600">{fieldErrors.brandAccountId}</span> : null}
           </label>
           <label className="grid gap-2 text-sm font-semibold text-zinc-700">
             <span>Đường dẫn công khai</span>
             <div className="flex overflow-hidden rounded-xl border border-zinc-200">
               <span className="bg-zinc-100 px-3 py-2 text-xs text-zinc-600">https://dcreator-platform.vercel.app/</span>
-              <input className="min-w-0 flex-1 px-3 py-2 text-sm outline-none" value={form.slug} onChange={(event) => setField("slug", event.target.value)} placeholder="ten-campaign-cong-khai" required />
+              <input className={`min-w-0 flex-1 px-3 py-2 text-sm outline-none ${fieldErrors.slug ? "border-l border-red-500 bg-red-50" : ""}`} value={form.slug} onChange={(event) => setField("slug", event.target.value)} placeholder="ten-campaign-cong-khai" required />
             </div>
             <span className="text-xs font-medium text-zinc-500">Preview: {publicPathPreview}</span>
+            {fieldErrors.slug ? <span className="text-xs text-red-600">{fieldErrors.slug}</span> : null}
           </label>
           <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
             <span>Tên campaign</span>
-            <input className="dc-input" value={form.title} onChange={(event) => setField("title", event.target.value)} required />
+            <input className={`dc-input ${fieldErrors.title ? "border-red-500 ring-1 ring-red-300" : ""}`} value={form.title} onChange={(event) => setField("title", event.target.value)} required />
+            {fieldErrors.title ? <span className="text-xs text-red-600">{fieldErrors.title}</span> : null}
           </label>
           <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
             <span>Brief</span>
-            <textarea className="dc-input min-h-28" value={form.brief} onChange={(event) => setField("brief", event.target.value)} required />
+            <textarea className={`dc-input min-h-28 ${fieldErrors.brief ? "border-red-500 ring-1 ring-red-300" : ""}`} value={form.brief} onChange={(event) => setField("brief", event.target.value)} required />
+            {fieldErrors.brief ? <span className="text-xs text-red-600">{fieldErrors.brief}</span> : null}
           </label>
 
           <label className="grid gap-2 text-sm font-semibold text-zinc-700">
@@ -226,28 +265,33 @@ export default function AdminCreateCampaignPage() {
               </div>
             ))}
             <button type="button" className="dc-btn-secondary w-fit" onClick={addRoadmapStep}>+ Thêm bước</button>
+            {fieldErrors.participationRoadmap ? <span className="text-xs text-red-600">{fieldErrors.participationRoadmap}</span> : null}
           </div>
 
           <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
             <span>Quyền lợi</span>
-            <textarea className="dc-input min-h-24" value={form.benefits} onChange={(event) => setField("benefits", event.target.value)} required />
+            <textarea className={`dc-input min-h-24 ${fieldErrors.benefits ? "border-red-500 ring-1 ring-red-300" : ""}`} value={form.benefits} onChange={(event) => setField("benefits", event.target.value)} required />
+            {fieldErrors.benefits ? <span className="text-xs text-red-600">{fieldErrors.benefits}</span> : null}
           </label>
 
           <div className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
             <span>Ảnh</span>
             <input className="dc-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadImage(file); }} />
-            <input className="dc-input" value={form.imageUrl} onChange={(event) => setField("imageUrl", event.target.value)} placeholder="/uploads/... hoặc https://..." />
+            <input className={`dc-input ${fieldErrors.imageUrl ? "border-red-500 ring-1 ring-red-300" : ""}`} value={form.imageUrl} onChange={(event) => setField("imageUrl", event.target.value)} placeholder="/uploads/... hoặc https://..." />
             {uploading ? <span className="text-xs text-zinc-500">Đang tải ảnh...</span> : null}
+            {fieldErrors.imageUrl ? <span className="text-xs text-red-600">{fieldErrors.imageUrl}</span> : null}
             {form.imageUrl ? <img src={form.imageUrl} alt="Campaign cover" className="h-32 w-full rounded-xl border border-zinc-200 object-cover md:h-44" /> : null}
           </div>
 
           <label className="grid gap-2 text-sm font-semibold text-zinc-700">
             <span>Starts at</span>
-            <input className="dc-input" type="datetime-local" value={form.startsAt} onChange={(event) => setField("startsAt", event.target.value)} />
+            <input className={`dc-input ${fieldErrors.startsAt ? "border-red-500 ring-1 ring-red-300" : ""}`} type="datetime-local" value={form.startsAt} onChange={(event) => setField("startsAt", event.target.value)} />
+            {fieldErrors.startsAt ? <span className="text-xs text-red-600">{fieldErrors.startsAt}</span> : null}
           </label>
           <label className="grid gap-2 text-sm font-semibold text-zinc-700">
             <span>Ends at</span>
-            <input className="dc-input" type="datetime-local" value={form.endsAt} onChange={(event) => setField("endsAt", event.target.value)} />
+            <input className={`dc-input ${fieldErrors.endsAt ? "border-red-500 ring-1 ring-red-300" : ""}`} type="datetime-local" value={form.endsAt} onChange={(event) => setField("endsAt", event.target.value)} />
+            {fieldErrors.endsAt ? <span className="text-xs text-red-600">{fieldErrors.endsAt}</span> : null}
           </label>
         </div>
 
@@ -269,4 +313,3 @@ export default function AdminCreateCampaignPage() {
     </>
   );
 }
-
