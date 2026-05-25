@@ -66,6 +66,12 @@ export function DashboardShell({
   const activeHref = useMemo(() => getActiveHref(pathname, navItems), [pathname, navItems]);
   const activeTitle = navItems.find((item) => item.href === activeHref)?.label ?? workspaceTitle;
   const userInitials = initials(user.displayName || user.email || "U");
+  const profileHref = useMemo(() => {
+    if (user.roles.includes("ADMIN")) return "/admin";
+    if (user.roles.includes("BRAND")) return "/dashboard/brand";
+    if (user.roles.includes("CREATOR")) return "/dashboard/creator";
+    return "/dashboard/user/profile";
+  }, [user.roles]);
 
   async function onLogout() {
     try {
@@ -154,7 +160,7 @@ export function DashboardShell({
                         <p className="mt-1 text-xs text-zinc-500">Vai trò: {user.roles.join(", ")}</p>
                       </div>
                       <div className="mt-2 grid gap-1">
-                        <Link href="/dashboard/user/profile" className="rounded-lg px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100">Hồ sơ</Link>
+                        <Link href={profileHref} className="rounded-lg px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100">Hồ sơ</Link>
                         <button type="button" onClick={onLogout} className="rounded-lg px-3 py-2 text-left text-sm font-semibold text-red-700 hover:bg-red-50">Đăng xuất</button>
                       </div>
                     </div>
@@ -201,3 +207,5 @@ export function DashboardShell({
     </div>
   );
 }
+
+
