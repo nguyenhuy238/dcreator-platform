@@ -24,6 +24,13 @@ function isVideoUrl(url: string | null) {
   return /\.(mp4|webm|mov)$/i.test(url);
 }
 
+function parseRoadmap(value: string | null): string[] {
+  return (value ?? "")
+    .split(/\r?\n/)
+    .map((step) => step.trim())
+    .filter(Boolean);
+}
+
 export async function getCampaignDetailBySlug(slug: string, viewerId?: string): Promise<CampaignDetailDTO> {
   const result = await findPublicCampaignDetailBySlug(slug, viewerId);
   if (!result) {
@@ -51,12 +58,8 @@ export async function getCampaignDetailBySlug(slug: string, viewerId?: string): 
       creator: campaign.creator?.displayName ?? null,
       campaignType: campaign.campaignType,
       category: campaign.category,
-      objective: campaign.objective,
-      priorityChannels: campaign.priorityChannels,
-      missionTypes: campaign.missionTypes,
-      creatorCommissionPercent: campaign.creatorCommissionPercent,
-      userCommissionPercent: campaign.userCommissionPercent,
-      bonusBudgetVnd: campaign.bonusBudgetVnd,
+      benefits: campaign.objective,
+      participationRoadmap: parseRoadmap(campaign.priorityChannels),
       status: campaign.status,
       deadline: campaign.endsAt?.toISOString() ?? null
     },

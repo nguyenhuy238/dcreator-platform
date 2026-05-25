@@ -454,7 +454,29 @@ export async function rejectRoleRequestByAdmin(actorId: string, requestId: strin
 export async function listPendingCampaignReviews() {
   return prisma.brandCampaignRequest.findMany({
     where: { status: { in: ["PENDING_REVIEW", "NEEDS_REVISION"] } },
-    include: {
+    select: {
+      id: true,
+      requestedSlug: true,
+      title: true,
+      brief: true,
+      status: true,
+      setupSource: true,
+      objective: true,
+      priorityChannels: true,
+      missionTypes: true,
+      creatorCommissionPercent: true,
+      userCommissionPercent: true,
+      bonusBudgetVnd: true,
+      budgetVnd: true,
+      targetAmountVnd: true,
+      campaignType: true,
+      category: true,
+      startsAt: true,
+      endsAt: true,
+      adminNote: true,
+      brandFeedback: true,
+      createdAt: true,
+      updatedAt: true,
       brand: { select: { id: true, name: true, ownerAccountId: true, contactEmail: true } },
       createdCampaign: { select: { id: true, slug: true, title: true, status: true } }
     },
@@ -499,6 +521,14 @@ export async function decideCampaignReview(actorId: string, campaignId: string, 
           status: CampaignStatus.ACTIVE
         }
       });
+      const requestRoadmap = request.priorityChannels
+        ? request.priorityChannels.split("\n").map((item) => item.trim()).filter(Boolean)
+        : [];
+      try {
+        await tx.$executeRaw`UPDATE "Campaign" SET "benefits" = ${request.objective}, "participationRoadmap" = ${requestRoadmap} WHERE "id" = ${campaign.id}`;
+      } catch {
+        // Backward compatibility when DB has not applied migration yet.
+      }
 
       await createDefaultMissionsFromRequest(
         tx,

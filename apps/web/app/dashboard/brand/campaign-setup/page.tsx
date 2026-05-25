@@ -1,8 +1,7 @@
 "use client";
 
-import { FormEvent, type ReactNode, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
-import { getCampaignTypeLabel } from "@/lib/constants/campaign-type";
 
 type CampaignRequest = {
   id: string;
@@ -10,17 +9,6 @@ type CampaignRequest = {
   title: string;
   brief: string;
   status: "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_REVISION";
-  setupSource: "JOIN_EXISTING_DCREATOR_CAMP" | "BRAND_REQUESTED";
-  objective: string | null;
-  priorityChannels: string | null;
-  missionTypes: string | null;
-  creatorCommissionPercent: number;
-  userCommissionPercent: number;
-  bonusBudgetVnd: number;
-  budgetVnd: number;
-  targetAmountVnd: number;
-  campaignType: "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
-  category: "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
   adminNote: string | null;
   brandFeedback: string | null;
   createdCampaign: { id: string; slug: string; title: string; status: string } | null;
@@ -29,135 +17,61 @@ type CampaignRequest = {
 };
 
 type RequestForm = {
-  requestedSlug: string;
   title: string;
-  brief: string;
-  coverImageUrl: string;
-  objective: string;
-  priorityChannels: string;
-  missionTypes: string;
-  creatorCommissionPercent: number;
-  userCommissionPercent: number;
-  bonusBudgetVnd: number;
-  budgetVnd: number;
-  targetAmountVnd: number;
-  campaignType: CampaignRequest["campaignType"];
-  category: CampaignRequest["category"];
-  startsAt: string;
-  endsAt: string;
+  imageUrl: string;
+  contentFileUrl: string;
 };
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string };
 
 const defaultForm: RequestForm = {
-  requestedSlug: "",
   title: "",
-  brief: "",
-  coverImageUrl: "",
-  objective: "",
-  priorityChannels: "",
-  missionTypes: "",
-  creatorCommissionPercent: 0,
-  userCommissionPercent: 0,
-  bonusBudgetVnd: 0,
-  budgetVnd: 10000000,
-  targetAmountVnd: 10000000,
-  campaignType: "COMMUNITY",
-  category: "LIFESTYLE",
-  startsAt: "",
-  endsAt: ""
+  imageUrl: "",
+  contentFileUrl: ""
 };
 
-function toDateTime(value: string) {
-  return value ? new Date(value).toISOString() : undefined;
-}
+const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
 
-const COVER_MARKER = "[[COVER_IMAGE_URL]]:";
-
-function stripCoverImageMeta(brief: string) {
-  return brief
-    .split("\n")
-    .filter((line) => !line.trim().startsWith(COVER_MARKER))
-    .join("\n")
-    .trim();
-}
-
-function attachCoverImageMeta(brief: string, coverImageUrl: string) {
-  const cleanBrief = stripCoverImageMeta(brief);
-  const url = coverImageUrl.trim();
-  if (!url) return cleanBrief;
-  return `${cleanBrief}\n${COVER_MARKER}${url}`.trim();
+function getContentFileUrlFromBrief(brief: string) {
+  const line = brief.split("\n").find((item) => item.trim().startsWith(CONTENT_FILE_MARKER));
+  return line ? line.trim().slice(CONTENT_FILE_MARKER.length).trim() : "";
 }
 
 function requestStatusLabel(status: CampaignRequest["status"]) {
-  if (status === "APPROVED") return "Admin đã tạo & publish campaign";
+  if (status === "APPROVED") return "Admin đã tạo campaign";
   if (status === "REJECTED") return "Admin từ chối";
-  if (status === "NEEDS_REVISION") return "Admin yêu cầu chỉnh sửa";
-  return "Chờ Admin duyệt";
+  if (status === "NEEDS_REVISION") return "Admin yêu cầu bổ sung";
+  return "Chờ Admin xử lý";
 }
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleString("vi-VN", {
-    dateStyle: "short",
-    timeStyle: "short"
-  });
-}
-
-function onlyDigits(raw: string) {
-  return raw.replace(/\D/g, "");
-}
-
-function parseNonNegativeInt(raw: string) {
-  const digits = onlyDigits(raw);
-  if (!digits) return 0;
-  return Number.parseInt(digits, 10);
-}
-
-function parsePercent(raw: string) {
-  return Math.min(100, parseNonNegativeInt(raw));
-}
-
-function formatIntForInput(value: number) {
-  if (!Number.isFinite(value) || value <= 0) return "";
-  return value.toLocaleString("vi-VN");
-}
-
-function SectionField({
-  label,
-  children,
-  hint
-}: {
-  label: string;
-  hint?: string;
-    children: ReactNode;
-}) {
-  return (
-    <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-      <span>{label}</span>
-      {children}
-      {hint ? <span className="text-xs font-medium text-zinc-500">{hint}</span> : null}
-    </label>
-  );
+  return new Date(value).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" });
 }
 
 export default function CampaignSetupPage() {
   const [requests, setRequests] = useState<CampaignRequest[]>([]);
   const [form, setForm] = useState<RequestForm>(defaultForm);
-  const [feedback, setFeedback] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingContentFile, setUploadingContentFile] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [templateUrl, setTemplateUrl] = useState("");
 
   async function loadRequests() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/brand/dashboard/campaign-requests", { cache: "no-store" });
-      const payload = (await response.json()) as ApiResponse<CampaignRequest[]>;
-      if (!response.ok || !payload.success) throw new Error(payload.success ? "Không thể tải yêu cầu campaign" : payload.error);
-      setRequests(payload.data);
+      const [requestRes, templateRes] = await Promise.all([
+        fetch("/api/brand/dashboard/campaign-requests", { cache: "no-store" }),
+        fetch("/api/brand/dashboard/campaign-template", { cache: "no-store" })
+      ]);
+      const requestPayload = (await requestRes.json()) as ApiResponse<CampaignRequest[]>;
+      const templatePayload = (await templateRes.json()) as ApiResponse<{ campaignContentTemplateUrl: string }>;
+      if (!requestRes.ok || !requestPayload.success) throw new Error(requestPayload.success ? "Không thể tải yêu cầu campaign" : requestPayload.error);
+      setRequests(requestPayload.data);
+      if (templateRes.ok && templatePayload.success) setTemplateUrl(templatePayload.data.campaignContentTemplateUrl ?? "");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Không thể tải yêu cầu campaign");
     } finally {
@@ -182,21 +96,15 @@ export default function CampaignSetupPage() {
       const response = await fetch("/api/brand/dashboard/campaign-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          brief: attachCoverImageMeta(form.brief, form.coverImageUrl),
-          setupSource: "BRAND_REQUESTED",
-          startsAt: toDateTime(form.startsAt),
-          endsAt: toDateTime(form.endsAt)
-        })
+        body: JSON.stringify(form)
       });
       const payload = (await response.json()) as ApiResponse<CampaignRequest>;
-      if (!response.ok || !payload.success) throw new Error(payload.success ? "Không thể gửi yêu cầu campaign" : payload.error);
+      if (!response.ok || !payload.success) throw new Error(payload.success ? "Không thể gửi yêu cầu" : payload.error);
       setForm(defaultForm);
-      setSuccess("Đã gửi yêu cầu campaign cho Admin.");
+      setSuccess("Đã gửi thông tin cho Admin để tạo campaign.");
       await loadRequests();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Không thể gửi yêu cầu campaign");
+      setError(requestError instanceof Error ? requestError.message : "Không thể gửi yêu cầu");
     } finally {
       setSaving(false);
     }
@@ -210,10 +118,8 @@ export default function CampaignSetupPage() {
       formData.append("logo", file);
       const response = await fetch("/api/uploads/brand-logo", { method: "POST", body: formData });
       const payload = (await response.json()) as ApiResponse<{ logoUrl: string }>;
-      if (!response.ok || !payload.success || !payload.data?.logoUrl) {
-        throw new Error(payload.success ? "Không thể tải ảnh campaign" : payload.error);
-      }
-      setField("coverImageUrl", payload.data.logoUrl);
+      if (!response.ok || !payload.success || !payload.data?.logoUrl) throw new Error(payload.success ? "Không thể tải ảnh campaign" : payload.error);
+      setField("imageUrl", payload.data.logoUrl);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Không thể tải ảnh campaign");
     } finally {
@@ -221,215 +127,104 @@ export default function CampaignSetupPage() {
     }
   }
 
-  async function sendFeedback(requestId: string) {
+  async function uploadCampaignContentFile(file: File) {
+    setUploadingContentFile(true);
     setError("");
-    setSuccess("");
     try {
-      const response = await fetch(`/api/brand/dashboard/campaign-requests/${requestId}/feedback`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ feedback: feedback[requestId] ?? "" })
-      });
-      const payload = (await response.json()) as ApiResponse<CampaignRequest>;
-      if (!response.ok || !payload.success) throw new Error(payload.success ? "Không thể gửi phản hồi" : payload.error);
-      setSuccess("Đã gửi phản hồi lại cho Admin.");
-      await loadRequests();
+      const formData = new FormData();
+      formData.append("contractDocument", file);
+      const response = await fetch("/api/uploads/onboarding-doc", { method: "POST", body: formData });
+      const payload = (await response.json()) as ApiResponse<{ contractDocumentUrl: string }>;
+      if (!response.ok || !payload.success || !payload.data?.contractDocumentUrl) throw new Error(payload.success ? "Không thể tải file nội dung campaign" : payload.error);
+      setField("contentFileUrl", payload.data.contractDocumentUrl);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Không thể gửi phản hồi");
+      setError(requestError instanceof Error ? requestError.message : "Không thể tải file nội dung campaign");
+    } finally {
+      setUploadingContentFile(false);
     }
   }
 
   return (
     <>
-      
-      <>
-        <PageHeader
-          title="Yêu cầu campaign"
-          subtitle="Brand gửi yêu cầu, Admin duyệt rồi tạo campaign thật và publish lên hệ thống Creator/User."
-        />
-        {error ? <ErrorState title="Không thể xử lý yêu cầu campaign" description={error} onRetry={() => void loadRequests()} /> : null}
-        {success ? <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p> : null}
+      <PageHeader
+        title="Gửi thông tin tạo campaign"
+        subtitle="Brand chỉ cung cấp thông tin đầu vào, Admin sẽ trực tiếp tạo campaign trong hệ thống."
+      />
+      {error ? <ErrorState title="Không thể xử lý yêu cầu campaign" description={error} onRetry={() => void loadRequests()} /> : null}
+      {success ? <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p> : null}
 
-        <form className="dc-card mt-6 grid gap-6 p-5" onSubmit={createRequest}>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <SectionHeader title="Tạo yêu cầu campaign" />
-            <p className="max-w-2xl text-sm text-zinc-500">
-              Điền đầy đủ thông tin để Admin có thể duyệt nhanh: tên campaign, nội dung, mục tiêu, kênh, ngân sách và tỉ lệ chia.
-            </p>
-          </div>
-
-          <div className="grid gap-6">
-            <div className="rounded-2xl border border-zinc-100 bg-zinc-50/70 p-4">
-              <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-zinc-500">Thông tin cơ bản</h3>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <SectionField label="Slug campaign" hint="Dùng cho URL nội bộ, không có dấu cách.">
-                  <input className="dc-input" value={form.requestedSlug} onChange={(event) => setField("requestedSlug", event.target.value)} placeholder="vd: tet-sale-2026" />
-                </SectionField>
-                <SectionField label="Tên campaign" hint="Tên hiển thị công khai cho Creator/User.">
-                  <input className="dc-input" value={form.title} onChange={(event) => setField("title", event.target.value)} placeholder="vd: Tết 2026 cùng Brand A" />
-                </SectionField>
-                <SectionField label="Ảnh cover campaign" hint="Tải ảnh lên để hiển thị ở danh sách campaign/public.">
-                  <div className="grid gap-2">
-                    <input className="dc-input bg-white" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(event) => {
-                      const file = event.target.files?.[0] ?? null;
-                      if (file) void uploadCoverImage(file);
-                      event.currentTarget.value = "";
-                    }} disabled={uploadingCover} />
-                    <input className="dc-input" type="url" value={form.coverImageUrl} onChange={(event) => setField("coverImageUrl", event.target.value.trim())} placeholder="https://... (URL ảnh sau khi upload)" />
-                    {uploadingCover ? <span className="text-xs font-medium text-zinc-500">Đang tải ảnh...</span> : null}
-                    {form.coverImageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={form.coverImageUrl} alt="Campaign cover preview" className="h-28 w-full rounded-xl border border-zinc-200 object-cover" />
-                    ) : null}
-                  </div>
-                </SectionField>
-                <div className="md:col-span-2">
-                  <SectionField label="Mô tả ngắn" hint="Tóm tắt ngắn: mục tiêu, lợi ích, sản phẩm/voucher chính.">
-                    <textarea className="dc-input min-h-28" value={form.brief} onChange={(event) => setField("brief", event.target.value)} placeholder="Mô tả ngắn gọn về chiến dịch, quà tặng, voucher, hàng tồn kho, hoặc mục tiêu kích hoạt..." />
-                  </SectionField>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-zinc-100 bg-white p-4">
-              <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-zinc-500">Chiến lược campaign</h3>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <div className="md:col-span-2">
-                  <SectionField label="Mục tiêu campaign" hint="Nêu KPI chính, ví dụ tăng nhận diện hoặc tăng chuyển đổi.">
-                    <textarea className="dc-input min-h-24" value={form.objective} onChange={(event) => setField("objective", event.target.value)} placeholder="vd: Tăng nhận biết, đẩy voucher, kích hoạt creator, xả tồn kho..." />
-                  </SectionField>
-                </div>
-                <SectionField label="Kênh ưu tiên" hint="Nhập dạng danh sách, ngăn cách bằng dấu phẩy.">
-                  <input className="dc-input" value={form.priorityChannels} onChange={(event) => setField("priorityChannels", event.target.value)} placeholder="vd: TikTok, Facebook, Livestream, Shop..." />
-                </SectionField>
-                <SectionField label="Loại nhiệm vụ" hint="Ví dụ: review, livestream, check-in, short video.">
-                  <input className="dc-input" value={form.missionTypes} onChange={(event) => setField("missionTypes", event.target.value)} placeholder="vd: review, check-in, share, video..." />
-                </SectionField>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-zinc-100 bg-white p-4">
-              <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-zinc-500">Ngân sách và lịch chạy</h3>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <SectionField label="Ngân sách dự kiến" hint="Đơn vị: VND. Chỉ nhập số, không nhập ký tự tiền tệ.">
-                  <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={formatIntForInput(form.budgetVnd)} onChange={(event) => setField("budgetVnd", parseNonNegativeInt(event.target.value))} />
-                </SectionField>
-                <SectionField label="Ngân sách thưởng thêm" hint="Đơn vị: VND. Dùng cho bonus ngoài ngân sách chính.">
-                  <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={formatIntForInput(form.bonusBudgetVnd)} onChange={(event) => setField("bonusBudgetVnd", parseNonNegativeInt(event.target.value))} />
-                </SectionField>
-                <SectionField label="Target amount" hint="Đơn vị: VND. Mục tiêu doanh thu/đóng góp kỳ vọng.">
-                  <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={formatIntForInput(form.targetAmountVnd)} onChange={(event) => setField("targetAmountVnd", parseNonNegativeInt(event.target.value))} />
-                </SectionField>
-                <SectionField label="Loại campaign">
-                  <select className="dc-input" value={form.campaignType} onChange={(event) => setField("campaignType", event.target.value as RequestForm["campaignType"])}>
-                    <option value="COMMUNITY">{getCampaignTypeLabel()}</option>
-                  </select>
-                </SectionField>
-                <SectionField label="Ngành hàng">
-                  <select className="dc-input" value={form.category} onChange={(event) => setField("category", event.target.value as RequestForm["category"])}>
-                    <option value="LIFESTYLE">Lifestyle</option>
-                    <option value="FOOD">Food</option>
-                    <option value="BEAUTY">Beauty</option>
-                    <option value="FASHION">Fashion</option>
-                    <option value="TECH">Tech</option>
-                    <option value="EDUCATION">Education</option>
-                  </select>
-                </SectionField>
-                <SectionField label="Hoa hồng Creator (%)" hint="Đơn vị: phần trăm (%), từ 0 đến 100.">
-                  <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={form.creatorCommissionPercent === 0 ? "" : String(form.creatorCommissionPercent)} onChange={(event) => setField("creatorCommissionPercent", parsePercent(event.target.value))} />
-                </SectionField>
-                <SectionField label="Hoa hồng User (%)" hint="Đơn vị: phần trăm (%), từ 0 đến 100.">
-                  <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={form.userCommissionPercent === 0 ? "" : String(form.userCommissionPercent)} onChange={(event) => setField("userCommissionPercent", parsePercent(event.target.value))} />
-                </SectionField>
-                <SectionField label="Ngày bắt đầu mong muốn" hint="Nhập theo lịch hệ thống, API lưu chuẩn ISO.">
-                  <input className="dc-input" type="datetime-local" value={form.startsAt} onChange={(event) => setField("startsAt", event.target.value)} />
-                </SectionField>
-                <SectionField label="Ngày kết thúc mong muốn" hint="Nhập theo lịch hệ thống, API lưu chuẩn ISO.">
-                  <input className="dc-input" type="datetime-local" value={form.endsAt} onChange={(event) => setField("endsAt", event.target.value)} />
-                </SectionField>
-              </div>
-            </div>
-          </div>
-
-          <button className="dc-btn-primary w-fit" type="submit" disabled={saving}>
-            {saving ? "Đang gửi..." : "Gửi yêu cầu cho Admin"}
-          </button>
-        </form>
-
-        <section className="mt-8">
-          <SectionHeader title="Danh sách yêu cầu campaign" subtitle={`Tổng ${requests.length} yêu cầu`} />
-          {loading ? (
-            <LoadingSkeleton rows={4} />
-          ) : requests.length === 0 ? (
-            <EmptyState title="Chưa có yêu cầu campaign" description="Tạo yêu cầu để Admin tạo campaign và publish." />
+      <form className="dc-card mt-6 grid gap-4 p-5 md:grid-cols-2" onSubmit={createRequest}>
+        <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
+          Tên campaign
+          <input className="dc-input" value={form.title} onChange={(event) => setField("title", event.target.value)} placeholder="Nhập tên campaign" required />
+        </label>
+        <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+          Ảnh campaign
+          <input className="dc-input bg-white" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(event) => {
+            const file = event.target.files?.[0] ?? null;
+            if (file) void uploadCoverImage(file);
+            event.currentTarget.value = "";
+          }} disabled={uploadingCover} />
+          <input className="dc-input" value={form.imageUrl} onChange={(event) => setField("imageUrl", event.target.value.trim())} placeholder="/uploads/... hoặc https://..." />
+        </label>
+        <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+          File nội dung campaign
+          <input className="dc-input bg-white" type="file" accept=".pdf,.doc,.docx,.txt,image/png,image/jpeg" onChange={(event) => {
+            const file = event.target.files?.[0] ?? null;
+            if (file) void uploadCampaignContentFile(file);
+            event.currentTarget.value = "";
+          }} disabled={uploadingContentFile} />
+          <input className="dc-input" value={form.contentFileUrl} onChange={(event) => setField("contentFileUrl", event.target.value.trim())} placeholder="/uploads/... hoặc https://..." required />
+          {templateUrl ? (
+            <a className="text-xs font-semibold text-sky-700 underline" href={templateUrl} target="_blank" rel="noreferrer">
+              Tải template form nội dung campaign
+            </a>
           ) : (
-            <div className="grid gap-4">
-              {requests.map((request) => (
-                <article key={request.id} className="dc-card grid gap-4 p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-zinc-500">/{request.requestedSlug}</p>
-                        <p className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs font-semibold text-zinc-600">
-                          {getCampaignTypeLabel()}
-                        </p>
-                        <p className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs font-semibold text-zinc-600">
-                          {request.category}
-                        </p>
-                      </div>
-                      <h2 className="mt-1 text-xl font-black text-zinc-900">{request.title}</h2>
-                      <p className="mt-1 text-sm text-zinc-600">{stripCoverImageMeta(request.brief)}</p>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <p className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-sm font-semibold text-zinc-700">
-                        {requestStatusLabel(request.status)}
-                      </p>
-                      <p className="text-xs text-zinc-500">Tạo lúc {formatDate(request.createdAt)}</p>
-                    </div>
-                  </div>
-                  <div className="grid gap-2 text-sm text-zinc-600 md:grid-cols-2 xl:grid-cols-4">
-                    <p>Đối tượng: <span className="font-semibold text-zinc-900">{request.objective || "Chưa khai báo"}</span></p>
-                    <p>Kênh: <span className="font-semibold text-zinc-900">{request.priorityChannels || "Chưa khai báo"}</span></p>
-                    <p>Nhiệm vụ: <span className="font-semibold text-zinc-900">{request.missionTypes || "Chưa khai báo"}</span></p>
-                    <p>Hoa hồng Creator: <span className="font-semibold text-zinc-900">{request.creatorCommissionPercent}%</span></p>
-                    <p>Hoa hồng User: <span className="font-semibold text-zinc-900">{request.userCommissionPercent}%</span></p>
-                    <p>Thưởng thêm: <span className="font-semibold text-zinc-900">{request.bonusBudgetVnd.toLocaleString("vi-VN")}đ</span></p>
-                    <p>Ngân sách: <span className="font-semibold text-zinc-900">{request.budgetVnd.toLocaleString("vi-VN")}đ</span></p>
-                    <p>Target: <span className="font-semibold text-zinc-900">{request.targetAmountVnd.toLocaleString("vi-VN")}đ</span></p>
-                    <p>Trạng thái duyệt: <span className="font-semibold text-zinc-900">{request.status}</span></p>
-                    <p>Setup source: <span className="font-semibold text-zinc-900">{request.setupSource}</span></p>
-                    <p>Cập nhật lúc: <span className="font-semibold text-zinc-900">{formatDate(request.updatedAt)}</span></p>
-                  </div>
-                  {request.adminNote ? <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">Admin phản hồi: {request.adminNote}</p> : null}
-                  {request.brandFeedback ? <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">Brand phản hồi: {request.brandFeedback}</p> : null}
-                  {request.createdCampaign ? (
-                    <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                      Campaign đã publish: {request.createdCampaign.title} /{request.createdCampaign.slug}
-                    </p>
-                  ) : null}
-                  {request.status === "NEEDS_REVISION" ? (
-                    <div className="grid gap-2">
-                      <textarea
-                        className="dc-input min-h-20"
-                        value={feedback[request.id] ?? ""}
-                        onChange={(event) => setFeedback((current) => ({ ...current, [request.id]: event.target.value }))}
-                        placeholder="Brand phản hồi Admin điều chỉnh giá, hoa hồng, KPI..."
-                      />
-                      <button className="dc-btn-outline w-fit" type="button" onClick={() => void sendFeedback(request.id)}>
-                        Gửi lại cho Admin
-                      </button>
-                    </div>
-                  ) : null}
-                </article>
-              ))}
-            </div>
+            <span className="text-xs text-zinc-500">Template nội dung đang chờ Admin cấu hình.</span>
           )}
-        </section>
-      </>
+        </label>
+        <div className="md:col-span-2">
+          <button className="dc-btn-primary" type="submit" disabled={saving || uploadingCover || uploadingContentFile}>
+            {saving ? "Đang gửi..." : "Gửi thông tin cho Admin"}
+          </button>
+        </div>
+      </form>
+
+      <section className="mt-8">
+        <SectionHeader title="Lịch sử yêu cầu" subtitle={`Tổng ${requests.length} yêu cầu`} />
+        {loading ? (
+          <LoadingSkeleton rows={4} />
+        ) : requests.length === 0 ? (
+          <EmptyState title="Chưa có yêu cầu" description="Gửi thông tin để Admin tạo campaign giúp bạn." />
+        ) : (
+          <div className="grid gap-4">
+            {requests.map((request) => (
+              <article key={request.id} className="dc-card grid gap-3 p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-zinc-500">/{request.requestedSlug}</p>
+                    <h2 className="mt-1 text-xl font-black text-zinc-900">{request.title}</h2>
+                  </div>
+                  <p className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-sm font-semibold text-zinc-700">{requestStatusLabel(request.status)}</p>
+                </div>
+                {getContentFileUrlFromBrief(request.brief) ? (
+                  <a className="w-fit rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100" href={getContentFileUrlFromBrief(request.brief)} target="_blank" rel="noreferrer">
+                    Mở file nội dung đã gửi
+                  </a>
+                ) : null}
+                {request.adminNote ? <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">Admin phản hồi: {request.adminNote}</p> : null}
+                {request.createdCampaign ? (
+                  <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                    Campaign đã tạo: {request.createdCampaign.title} /{request.createdCampaign.slug}
+                  </p>
+                ) : null}
+                <p className="text-xs text-zinc-500">Cập nhật: {formatDate(request.updatedAt)}</p>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
     </>
   );
 }
-
-
-
 

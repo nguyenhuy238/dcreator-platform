@@ -1,0 +1,91 @@
+None O2O Growth Engine — System Context (Source of Truth)
+Mục tiêu: Tài liệu này cung cấp cái nhìn toàn diện về kiến trúc, techstack, và nghiệp vụ của dự án None O2O dành cho kỹ thuật viên và AI.
+
+1. Tổng quan dự án (Project Overview)
+Tên dự án: None (Thương hiệu: None O2O)
+Mô hình: B2B SaaS "Growth Engine" dành cho doanh nghiệp SME (F&B và Bán lẻ) tại Việt Nam.
+Triết lý sản phẩm: Anti-ERP — Không tập trung vào quản trị cồng kềnh mà tập trung vào Bán hàng, Chốt đơn 1-chạm (1-tap checkout), Thương mại video dọc (vertical video commerce), và Chuyển đổi Online-to-Offline (O2O).
+Trải nghiệm cốt lõi:
+Storefronts (samsua.online): Các cửa hàng trực tuyến đa thương hiệu (multi-tenant).
+Platform (kocogi.vn): Cổng quản lý cho Merchant, Ops CMS, nền tảng dCreator, và Explore marketplace.
+"Bộ Ba" Logic Nghiệp vụ (The Trinity Logic)
+Inventory as Capital: Hàng hóa vật lý do các Brand đóng góp sẽ trở thành "Vốn chiến dịch" (campaign_capital).
+One-Way Token Flow: Dòng tiền một chiều: VNĐ → N-Points → Vouchers (Không thể đổi ngược lại trừ trường hợp đặc biệt).
+O2O Redemption: Voucher kỹ thuật số được sử dụng để "đốt" hàng tồn kho vật lý tại các Station (cửa hàng O2O).
+2. Kiến trúc & Công nghệ (Tech Stack)
+Lớp (Layer)	Công nghệ sử dụng	Lưu ý
+Framework	Next.js 16 (App Router)	Sử dụng Route Groups ((main), (merchant), (pos), v.v.)
+Frontend	React 19, TypeScript	Strict type checking (Canonical types: 
+src/types.ts
+)
+Styling	Tailwind CSS v4 + tw-animate-css	Thiết kế theo hệ thống Token, không code cứng màu sắc
+Animations	Framer Motion	Hiệu ứng mượt mà (Glassmorphism, 100dvh)
+UI Components	Radix UI + shadcn/ui	Icon set duy nhất: Phosphor Icons (fill cho active, regular cho inactive)
+Backend/BaaS	Supabase	Auth, PostgreSQL, Storage, Realtime
+ORM	Prisma	Quản lý schema và migration
+State	Zustand + React Context	Tách biệt Cart, UI, và Engine state
+Payment	PayOS (VietQR)	Thanh toán qua ngân hàng với QR động
+Maps	Goong Maps JS	Tính phí vận chuyển và tìm chi nhánh gần nhất
+Package Manager	Bun	Tốc độ cao, ưu tiên hàng đầu
+3. Cấu trúc thư mục Key (Directory Structure)
+text
+src/
+├── app/                  # Routing chính (App Router)
+│   ├── (main)/           # User-facing (explore, checkout, profile)
+│   ├── (storefront)/     # Cửa hàng riêng của Brand (Theme-based)
+│   ├── (merchant)/       # Cổng quản lý của Merchant (17+ routes)
+│   ├── (pos)/            # Giao diện bán hàng cho máy POS
+│   └── ops/              # Admin CMS (26+ routes)
+├── actions/              # Server Actions (16+ files) — TẤT CẢ logic nghiệp vụ (mutations) ở đây
+├── components/           # UI Components (Phân theo module: store, checkout, pos, ui...)
+├── hooks/                # Custom hooks (useCustomers, useOrders, useCurrentBrand...)
+├── utils/                # Tiện ích
+│   └── supabase/         # 4 pattern client (client, server, admin, middleware) — PHẢI TUÂN THỦ
+└── types.ts              # File định nghĩa Type tập trung (560+ dòng)
+4. Quy tắc kỹ thuật bắt buộc (Critical Engineering Rules)
+4.1 Quy tắc về Dữ liệu & Database
+Cột giá tiền: LUÔN đặt tên là price_vnd (không dùng price hay amount). Đơn vị mặc định là VNĐ.
+Video URLs: Cột video_url hỗ trợ cả link TikTok full hoặc ID số. Component TikTokPlayer sẽ tự tách ID.
+Stock (Kho): Phân biệt rõ stock_total (tổng kho) và stock_locked (kho đã khóa cho chiến dịch).
+Supabase Clients:
+Client component: createClient() từ @/utils/supabase/client.
+Server component/action: await createClient() từ @/utils/supabase/server.
+Webhooks/Cron: createAdminClient() (Bypasses RLS).
+4.2 Quy tắc UI/UX (Hệ thiết kế Japandi Minimalism)
+Màu sắc: Sử dụng bảng màu Stone/Zinc (stone-50 cho nền, stone-900 cho text). Tuyệt đối KHÔNG dùng màu Tím (Purple/Violet) làm chủ đạo.
+Rounding: Bo góc cực lớn (rounded-2xl cho card, rounded-[32px] cho button).
+Viewport: Luôn sử dụng 100dvh cho các màn hình full-screen để tránh lỗi trên mobile Safari.
+Icons: Chỉ sử dụng Phosphor Icons. Không trộn lẫn Lucide hay Heroicons.
+5. Các Luồng nghiệp vụ chính (Core Business Flows)
+5.1 1-Tap Checkout & Digital Salesclerk
+Hệ thống hỗ trợ cả Guest (không cần đăng nhập) và Member.
+Digital Salesclerk: Hook useCustomerMemory lưu tên và đơn hàng cuối của khách vào localStorage (Guest) hoặc Supabase (Member). Khi khách quay lại, chào tên và gợi ý Re-order 1-chạm.
+5.2 CRM & Order Attribution
+Khi Member đặt hàng hộ (khác tên/SĐT), hệ thống tự tách thành 2 bản ghi CRM: 1 cho người đặt (giữ lịch sử chi tiêu) và 1 cho người nhận (Guest CRM).
+Churn tracking được kích hoạt ngay khi đơn hàng ở trạng thái INSERT.
+5.3 N-Point & Wallet
+Người dùng nạp VNĐ qua VietQR (PayOS) → Nhận N-Point.
+N-Point dùng để tham gia dCreator (Crowdfunding) hoặc mua sắm tại Storefront.
+Chỉ Creator mới có quyền Cash-out (rút tiền mặt) sau khi hoàn thành nhiệm vụ và đối soát thuế.
+6. Trạng thái hiện tại & Nợ kỹ thuật (Current Status & Debt)
+dCreator: Hiện vẫn đang dùng Mock Data (useNoneEngine.ts), cần tích hợp Supabase hoàn toàn.
+Build Errors: Đang tạm thời bật ignoreBuildErrors: true trong 
+next.config.ts
+.
+Đa ngôn ngữ: next-intl đã cài nhưng chưa áp dụng triệt để (giao diện đang trộn lẫn Việt-Anh).
+Supabase Clients: Cần hợp nhất legacy client ở lib/supabaseClient.ts sang pattern chuẩn ở utils/supabase/.
+7. Môi trường (Environment)
+Các biến bắt buộc trong 
+.env.local
+:
+
+NEXT_PUBLIC_SUPABASE_URL & ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+PAYOS_* (Payment)
+NEXT_PUBLIC_GOONG_* (Maps)
+RESEND_API_KEY (Email)
+Ghi chú: Đây là dự án thực tế đang trong giai đoạn hoàn thiện. Mọi thay đổi code cần kiểm tra tính mobile-first (ưu tiên hiển thị di động).
+
+
+Comment
+Ctrl+Alt+M

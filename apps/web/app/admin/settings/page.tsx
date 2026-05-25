@@ -10,6 +10,7 @@ type Settings = {
   requireRejectReason: boolean;
   requireRequestChangesReason: boolean;
   maintenanceMessage: string;
+  campaignContentTemplateUrl: string;
 };
 
 function onlyDigits(raw: string) {
@@ -42,7 +43,8 @@ export default function AdminSettingsPage() {
     fraudScoreThreshold: 70,
     requireRejectReason: true,
     requireRequestChangesReason: true,
-    maintenanceMessage: ""
+    maintenanceMessage: "",
+    campaignContentTemplateUrl: ""
   });
 
   async function load() {
@@ -82,6 +84,25 @@ export default function AdminSettingsPage() {
     setTimeout(() => setToast(""), 2000);
   }
 
+  async function uploadTemplate(file: File) {
+    setSubmitting(true);
+    setError("");
+    try {
+      const formData = new FormData();
+      formData.append("contractDocument", file);
+      const response = await fetch("/api/uploads/onboarding-doc", { method: "POST", body: formData });
+      const payload = await response.json();
+      if (!response.ok || !payload.success || !payload.data?.contractDocumentUrl) {
+        throw new Error(payload.error ?? "Tải template thất bại.");
+      }
+      setForm((prev) => ({ ...prev, campaignContentTemplateUrl: payload.data.contractDocumentUrl }));
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "Tải template thất bại.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   if (loading) return <LoadingSkeleton rows={4} />;
   if (error && !submitting) return <ErrorState title="Không thể tải trang cài đặt" description={error} onRetry={() => void load()} />;
 
@@ -118,6 +139,15 @@ export default function AdminSettingsPage() {
         <label className="grid gap-1 text-sm font-medium text-zinc-700 md:col-span-2">
           Thông báo bảo trì (tuỳ chọn)
           <textarea className="dc-input min-h-24" value={form.maintenanceMessage} onChange={(e) => setForm((prev) => ({ ...prev, maintenanceMessage: e.target.value }))} />
+        </label>
+        <label className="grid gap-2 text-sm font-medium text-zinc-700 md:col-span-2">
+          Template nội dung campaign cho Brand
+          <input className="dc-input" type="file" accept=".pdf,.doc,.docx,.txt,image/png,image/jpeg" onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void uploadTemplate(file);
+            e.currentTarget.value = "";
+          }} />
+          <input className="dc-input" value={form.campaignContentTemplateUrl} onChange={(e) => setForm((prev) => ({ ...prev, campaignContentTemplateUrl: e.target.value.trim() }))} placeholder="/uploads/... hoặc https://..." />
         </label>
         <div className="md:col-span-2">
           <button className="dc-btn-primary" disabled={submitting}>{submitting ? "Đang lưu..." : "Lưu cấu hình"}</button>

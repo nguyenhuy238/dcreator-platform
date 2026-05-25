@@ -1,5 +1,19 @@
 import { z } from "zod";
 
+const campaignSlugSchema = z
+  .string()
+  .trim()
+  .min(3)
+  .max(120)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug chỉ gồm chữ thường, số và dấu gạch ngang (-), không có khoảng trắng.");
+
+const uploadPathOrHttpUrlSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(400)
+  .refine((value) => value.startsWith("/uploads/") || /^https?:\/\//.test(value), "File URL không hợp lệ.");
+
 export const brandProfileSchema = z.object({
   brandName: z.string().trim().min(2).max(160),
   contactName: z.string().trim().min(2).max(120).optional().or(z.literal("")),
@@ -96,22 +110,21 @@ export const brandOnboardingSchema = z.object({
 });
 
 export const campaignCreateSchema = z.object({
-  slug: z.string().trim().min(3).max(120),
+  slug: campaignSlugSchema,
   title: z.string().trim().min(3).max(200),
   brief: z.string().trim().min(10).max(3000),
-  budgetVnd: z.number().int().positive(),
-  targetAmountVnd: z.number().int().positive().optional(),
   category: z.enum(["TECH", "FASHION", "FOOD", "BEAUTY", "LIFESTYLE", "EDUCATION"]),
   campaignType: z.enum(["DONATION", "PREORDER", "SPONSORSHIP", "COMMUNITY"]),
   setupSource: z.enum(["JOIN_EXISTING_DCREATOR_CAMP", "BRAND_REQUESTED"]).default("BRAND_REQUESTED"),
-  objective: z.string().trim().max(1000).optional().or(z.literal("")),
-  priorityChannels: z.string().trim().max(500).optional().or(z.literal("")),
-  missionTypes: z.string().trim().max(500).optional().or(z.literal("")),
-  creatorCommissionPercent: z.number().int().min(0).max(100).default(0),
-  userCommissionPercent: z.number().int().min(0).max(100).default(0),
-  bonusBudgetVnd: z.number().int().min(0).default(0),
+  benefits: z.string().trim().min(3).max(2000),
+  participationRoadmap: z.array(z.string().trim().min(1).max(300)).min(1),
+  imageUrl: uploadPathOrHttpUrlSchema.optional().or(z.literal("")),
   startsAt: z.string().datetime().optional(),
   endsAt: z.string().datetime().optional()
+}).superRefine((value, ctx) => {
+  if (value.startsAt && value.endsAt && new Date(value.endsAt) <= new Date(value.startsAt)) {
+    ctx.addIssue({ code: "custom", path: ["endsAt"], message: "Ngày kết thúc phải sau ngày bắt đầu." });
+  }
 });
 
 export const campaignBrandFeedbackSchema = z.object({
@@ -119,22 +132,9 @@ export const campaignBrandFeedbackSchema = z.object({
 });
 
 export const campaignRequestSchema = z.object({
-  requestedSlug: z.string().trim().min(3).max(120),
   title: z.string().trim().min(3).max(200),
-  brief: z.string().trim().min(10).max(3000),
-  budgetVnd: z.number().int().positive(),
-  targetAmountVnd: z.number().int().positive().optional(),
-  category: z.enum(["TECH", "FASHION", "FOOD", "BEAUTY", "LIFESTYLE", "EDUCATION"]),
-  campaignType: z.enum(["DONATION", "PREORDER", "SPONSORSHIP", "COMMUNITY"]),
-  setupSource: z.enum(["JOIN_EXISTING_DCREATOR_CAMP", "BRAND_REQUESTED"]).default("BRAND_REQUESTED"),
-  objective: z.string().trim().max(1000).optional().or(z.literal("")),
-  priorityChannels: z.string().trim().max(500).optional().or(z.literal("")),
-  missionTypes: z.string().trim().max(500).optional().or(z.literal("")),
-  creatorCommissionPercent: z.number().int().min(0).max(100).default(0),
-  userCommissionPercent: z.number().int().min(0).max(100).default(0),
-  bonusBudgetVnd: z.number().int().min(0).default(0),
-  startsAt: z.string().datetime().optional(),
-  endsAt: z.string().datetime().optional()
+  imageUrl: uploadPathOrHttpUrlSchema.optional().or(z.literal("")),
+  contentFileUrl: uploadPathOrHttpUrlSchema,
 });
 
 export const rewardTierSchema = z.object({

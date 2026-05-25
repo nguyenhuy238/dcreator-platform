@@ -8,10 +8,10 @@ type ApiResult<T> = { success: boolean; data?: T; error?: string };
 type TabKey = "transcript-reviews" | "applications" | "video-reviews" | "final-reviews";
 
 const tabs: Array<{ key: TabKey; label: string }> = [
-  { key: "applications", label: "Nhận nhiệm vụ" },
-  { key: "transcript-reviews", label: "Duyệt kịch bản" },
-  { key: "video-reviews", label: "Duyệt video" },
-  { key: "final-reviews", label: "Duyệt hoàn thành" }
+  { key: "applications", label: "Quản lý nhận nhiệm vụ" },
+  { key: "transcript-reviews", label: "Quản lý kịch bản" },
+  { key: "video-reviews", label: "Quản lý video" },
+  { key: "final-reviews", label: "Quản lý hoàn thành" }
 ];
 
 function fmtDate(value: string | null) {
@@ -66,7 +66,7 @@ export default function AdminMissionReviewsPage() {
 
   return (
     <>
-      <PageHeader title="Duyệt nhiệm vụ Creator" subtitle="Gộp 4 luồng duyệt: kịch bản, nhận nhiệm vụ, duyệt video và duyệt hoàn thành." />
+      <PageHeader title="Quản lý nhiệm vụ Creator" subtitle="Gộp 4 luồng xử lý: kịch bản, nhận nhiệm vụ, duyệt video và duyệt hoàn thành." />
 
       <section className="dc-card p-3">
         <div className="flex flex-wrap gap-2">
