@@ -78,49 +78,49 @@ export default async function HomePage() {
   return (
     <>
       <PublicHeader />
-      <main className="mx-auto w-full max-w-7xl overflow-x-hidden px-4 pb-16 pt-8 md:px-6">
-        <section className="rounded-[2.2rem] bg-gradient-to-b from-zinc-100 via-zinc-50/50 to-white px-4 py-14 md:py-20">
+      <main className="mx-auto w-full max-w-7xl overflow-x-hidden px-4 pb-16 pt-5 md:px-6">
+        <section className="rounded-[2.2rem] bg-gradient-to-b from-zinc-100 via-zinc-50/50 to-white px-4 py-8 md:py-10">
           <div className="mx-auto max-w-2xl text-center">
             <div className="flex flex-wrap items-center justify-center gap-2">
               <span className="rounded-full bg-zinc-200/70 px-4 py-1 text-sm font-bold uppercase tracking-[0.1em] text-zinc-700">#Dividends</span>
               <span className="rounded-full bg-zinc-200/70 px-4 py-1 text-sm font-bold uppercase tracking-[0.1em] text-zinc-700">#Domination</span>
               <span className="rounded-full bg-zinc-200/70 px-4 py-1 text-sm font-bold uppercase tracking-[0.1em] text-zinc-700">#Dedicated</span>
             </div>
-            <p className="font-display mt-6 bg-gradient-to-b from-zinc-950 to-zinc-700 bg-clip-text text-[58px] font-black leading-none tracking-[-0.05em] text-transparent md:text-[104px] lg:text-[120px]">dCREATOR</p>
-            <p className="mt-1 text-6xl font-medium italic leading-none text-zinc-400 [font-family:Georgia,'Times_New_Roman',serif] md:text-8xl">Platform</p>
-            <h1 className="mt-8 text-2xl font-semibold leading-tight text-zinc-500 md:text-4xl">
+            <p className="font-display mt-4 bg-gradient-to-b from-zinc-950 to-zinc-700 bg-clip-text text-[44px] font-black leading-none tracking-[-0.05em] text-transparent md:text-[72px] lg:text-[86px]">dCREATOR</p>
+            <p className="mt-1 text-4xl font-medium italic leading-none text-zinc-400 [font-family:Georgia,'Times_New_Roman',serif] md:text-6xl">Platform</p>
+            <h1 className="mt-5 text-xl font-semibold leading-tight text-zinc-500 md:text-3xl">
               Giao điểm của <span className="font-black text-zinc-900">Sáng tạo</span> và <span className="font-black text-zinc-900">Vốn</span>.
             </h1>
-            <p className="mx-auto mt-4 max-w-xl text-lg text-zinc-500 md:text-2xl">
+            <p className="mx-auto mt-3 max-w-xl text-base text-zinc-500 md:text-xl">
               Lan tỏa giá trị, giảm áp lực tài chính.
             </p>
-            <div className="mt-10 flex flex-wrap items-center justify-center gap-3.5 md:mt-12">
-              <Link href="/campaigns" className="dc-btn-primary h-12 min-w-[220px] rounded-full px-7 text-xl font-bold tracking-[0.04em]">
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3 md:mt-7">
+              <Link href="/campaigns" className="dc-btn-primary h-10 min-w-[190px] rounded-full px-6 text-base font-bold tracking-[0.02em]">
                 Khám phá chiến dịch
               </Link>
               {!isLoggedIn ? (
-                <Link href="/auth/register" className="dc-btn-secondary h-12 min-w-[220px] rounded-full px-7 text-xl font-semibold">
+                <Link href="/auth/register" className="dc-btn-secondary h-10 min-w-[190px] rounded-full px-6 text-base font-semibold">
                   Tạo tài khoản
                 </Link>
               ) : null}
               {canUpgradeRole ? (
-                <Link href="/dashboard/user/profile" className="dc-btn-secondary h-12 min-w-[220px] rounded-full px-7 text-xl font-semibold">
+                <Link href="/dashboard/user/profile" className="dc-btn-secondary h-10 min-w-[190px] rounded-full px-6 text-base font-semibold">
                   Nâng cấp vai trò tại hồ sơ
                 </Link>
               ) : null}
             </div>
 
-            <div className="mt-10 grid overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-50/70 md:mt-12 md:grid-cols-3">
-              <article className="px-4 py-6 text-center md:border-r md:border-zinc-200">
-                <p className="text-4xl font-black text-zinc-900 md:text-5xl">{activeCampaignCount}</p>
+            <div className="mt-6 grid overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-50/70 md:mt-7 md:grid-cols-3">
+              <article className="px-4 py-4 text-center md:border-r md:border-zinc-200">
+                <p className="text-3xl font-black text-zinc-900 md:text-4xl">{activeCampaignCount}</p>
                 <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">Dự án đang chạy</p>
               </article>
-              <article className="px-4 py-6 text-center md:border-r md:border-zinc-200">
-                <p className="text-4xl font-black text-zinc-900 md:text-5xl">{averageFundedRatioDisplay}</p>
+              <article className="px-4 py-4 text-center md:border-r md:border-zinc-200">
+                <p className="text-3xl font-black text-zinc-900 md:text-4xl">{averageFundedRatioDisplay}</p>
                 <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">Tỷ lệ tài trợ trung bình</p>
               </article>
-              <article className="px-4 py-6 text-center">
-                <p className="text-4xl font-black text-zinc-900 md:text-5xl">{totalParticipants}</p>
+              <article className="px-4 py-4 text-center">
+                <p className="text-3xl font-black text-zinc-900 md:text-4xl">{totalParticipants}</p>
                 <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">Người tham gia</p>
               </article>
             </div>
