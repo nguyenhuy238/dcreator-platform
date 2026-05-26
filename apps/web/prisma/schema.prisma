@@ -844,6 +844,8 @@ model Campaign {
   targetAmountVnd          Int                         @default(10000000)
   fundedAmountVnd          Int                         @default(0)
   backerCount              Int                         @default(0)
+  ugcVideoQuota            Int?
+  ugcVideoApprovedCount    Int                         @default(0)
   isPublic                 Boolean                     @default(true)
   budgetVnd                Int
   status                   CampaignStatus              @default(DRAFT)
