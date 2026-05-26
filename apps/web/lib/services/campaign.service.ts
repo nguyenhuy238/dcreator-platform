@@ -67,6 +67,8 @@ export async function listCampaigns(input: ListCampaignsInput) {
         fundedAmountVnd: true,
         targetAmountVnd: true,
         backerCount: true,
+        ugcVideoQuota: true,
+        ugcVideoApprovedCount: true,
         endsAt: true,
         createdAt: true,
         brand: { select: { displayName: true, avatarUrl: true } },
@@ -92,34 +94,46 @@ export async function listCampaigns(input: ListCampaignsInput) {
   const rewardByCampaignId = new Map<string, number>(
     rewardSums.map((row) => [row.campaignId, row._sum.stockRemaining ?? 0])
   );
-  const missionSubmissionByMission =
+
+  const missionApplications =
     campaignIds.length === 0
       ? []
-      : await prisma.missionSubmission.groupBy({
-          by: ["missionId"],
-          where: { mission: { campaignId: { in: campaignIds } } },
+      : await prisma.missionApplication.groupBy({
+          by: ["campaignId"],
+          where: { campaignId: { in: campaignIds } },
           _count: { _all: true }
         });
-  const missionIds = missionSubmissionByMission.map((item) => item.missionId);
-  const missions =
-    missionIds.length === 0
+
+  const approvedCreatorPairs =
+    campaignIds.length === 0
       ? []
-      : await prisma.mission.findMany({
-          where: { id: { in: missionIds } },
-          select: { id: true, campaignId: true }
+      : await prisma.missionApplication.groupBy({
+          by: ["campaignId", "accountId"],
+          where: {
+            campaignId: { in: campaignIds },
+            status: "APPROVED"
+          }
         });
-  const missionIdToCampaignId = new Map<string, string>(missions.map((mission) => [mission.id, mission.campaignId]));
+
   const creatorApplicantsByCampaignId = new Map<string, number>();
-  for (const row of missionSubmissionByMission) {
-    const campaignId = missionIdToCampaignId.get(row.missionId);
-    if (!campaignId) continue;
-    creatorApplicantsByCampaignId.set(campaignId, (creatorApplicantsByCampaignId.get(campaignId) ?? 0) + row._count._all);
+  for (const row of missionApplications) {
+    creatorApplicantsByCampaignId.set(row.campaignId, row._count._all);
+  }
+
+  const creatorJoinedByCampaignId = new Map<string, number>();
+  for (const row of approvedCreatorPairs) {
+    creatorJoinedByCampaignId.set(row.campaignId, (creatorJoinedByCampaignId.get(row.campaignId) ?? 0) + 1);
   }
 
   return {
     items: campaigns.map((campaign) => {
       const rewardsLeft = rewardByCampaignId.get(campaign.id) ?? 0;
       const creatorApplicants = creatorApplicantsByCampaignId.get(campaign.id) ?? 0;
+      const approvedVideos = Math.max(0, campaign.ugcVideoApprovedCount ?? 0);
+      const creatorJoined = creatorJoinedByCampaignId.get(campaign.id) ?? 0;
+      const videoTarget = Math.max(0, campaign.ugcVideoQuota ?? 0);
+      const videoProgressPercent = videoTarget > 0 ? Math.min(100, Math.round((approvedVideos / videoTarget) * 100)) : 0;
+      const missionSlotsRemaining = videoTarget > 0 ? Math.max(0, videoTarget - approvedVideos) : 0;
 
       return {
         id: campaign.id,
@@ -137,6 +151,12 @@ export async function listCampaigns(input: ListCampaignsInput) {
           campaign.targetAmountVnd > 0
             ? Math.min(100, Math.round((campaign.fundedAmountVnd / campaign.targetAmountVnd) * 100))
             : 0,
+        videoProgressPercent,
+        videoApproved: approvedVideos,
+        videoTarget,
+        creatorJoined,
+        missionSlotsRemaining,
+        isMissionQuotaReached: videoTarget > 0 && missionSlotsRemaining <= 0,
         backers: campaign.backerCount,
         creatorApplicants,
         rewardsLeft,

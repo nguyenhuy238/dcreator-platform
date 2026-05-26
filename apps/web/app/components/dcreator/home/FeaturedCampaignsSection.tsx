@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -14,6 +14,10 @@ type FeaturedCampaignItem = {
   coverImageUrl?: string | null;
   backers: number;
   progressPercent: number;
+  videoProgressPercent?: number;
+  videoApproved?: number;
+  videoTarget?: number;
+  creatorJoined?: number;
   creatorApplicants?: number;
 };
 
@@ -106,21 +110,25 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
                 <h3 className="line-clamp-2 text-2xl font-black leading-tight text-zinc-900">{campaign.title}</h3>
 
                 <p className="mt-3 text-sm font-semibold text-zinc-600">Brand: {campaign.brand}</p>
+                <p className="mt-1 text-xs font-semibold text-zinc-600">
+                  Video hoàn thành: {campaign.videoApproved ?? 0}/{campaign.videoTarget ?? 0}
+                </p>
 
                 <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
                   <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-                    <p className="text-zinc-500">Creator ứng tuyển</p>
-                    <p className="font-black text-zinc-900">{campaign.creatorApplicants ?? 0}</p>
+                    <p className="text-zinc-500">Creator đã tham gia</p>
+                    <p className="font-black text-zinc-900">{campaign.creatorJoined ?? 0}</p>
                   </div>
                   <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-                    <p className="text-zinc-500">Hoàn thiện camp</p>
-                    <p className="font-black text-zinc-900">{campaign.progressPercent}%</p>
+                    <p className="text-zinc-500">Video dự kiến</p>
+                    <p className="font-black text-zinc-900">{campaign.videoTarget ?? 0}</p>
                   </div>
                 </div>
 
                 <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-100">
-                  <div className="h-full bg-zinc-900 transition-all" style={{ width: `${campaign.progressPercent}%` }} />
+                  <div className="h-full bg-zinc-900 transition-all" style={{ width: `${campaign.videoProgressPercent ?? 0}%` }} />
                 </div>
+                <p className="mt-1 text-xs text-zinc-500">Tiến độ video: {campaign.videoProgressPercent ?? 0}%</p>
 
                 <div className="mt-4 flex justify-end">
                   <Link

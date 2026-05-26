@@ -27,6 +27,8 @@ export async function findPublicCampaignDetailBySlug(slug: string, viewerId?: st
       endsAt: true,
       targetAmountVnd: true,
       fundedAmountVnd: true,
+      ugcVideoQuota: true,
+      ugcVideoApprovedCount: true,
       brand: { select: { displayName: true } },
       creator: { select: { displayName: true } },
       rewards: {
@@ -63,6 +65,10 @@ export async function findPublicCampaignDetailBySlug(slug: string, viewerId?: st
           createdAt: true,
           supporter: { select: { displayName: true } }
         }
+      },
+      missionApplications: {
+        where: { status: "APPROVED" },
+        select: { accountId: true }
       }
     }
   });

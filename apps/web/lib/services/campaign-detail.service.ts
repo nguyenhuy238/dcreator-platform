@@ -45,6 +45,12 @@ export async function getCampaignDetailBySlug(slug: string, viewerId?: string): 
       : 0;
   const now = Date.now();
   const isEnded = Boolean(campaign.endsAt && campaign.endsAt.getTime() <= now);
+  const creatorJoined = new Set(campaign.missionApplications.map((item) => item.accountId)).size;
+  const approvedVideos = Math.max(0, campaign.ugcVideoApprovedCount ?? 0);
+  const targetVideos = Math.max(0, campaign.ugcVideoQuota ?? 0);
+  const completionPercent = targetVideos > 0 ? Math.min(100, Math.round((approvedVideos / targetVideos) * 100)) : 0;
+  const remainingSlots = targetVideos > 0 ? Math.max(0, targetVideos - approvedVideos) : 0;
+  const isQuotaReached = targetVideos > 0 && remainingSlots <= 0;
 
   return {
     hero: {
@@ -58,6 +64,7 @@ export async function getCampaignDetailBySlug(slug: string, viewerId?: string): 
       creator: campaign.creator?.displayName ?? null,
       campaignType: campaign.campaignType,
       category: campaign.category,
+      objective: campaign.objective,
       benefits: campaign.objective,
       participationRoadmap: parseRoadmap(campaign.priorityChannels),
       status: campaign.status,
@@ -70,6 +77,14 @@ export async function getCampaignDetailBySlug(slug: string, viewerId?: string): 
       backerCount: distinctBackers,
       remainingTimeLabel: formatRemainingTime(campaign.endsAt),
       isEnded
+    },
+    videoStats: {
+      targetVideos,
+      approvedVideos,
+      creatorJoined,
+      remainingSlots,
+      completionPercent,
+      isQuotaReached
     },
     rewards: campaign.rewards.map((reward) => ({
       id: reward.id,

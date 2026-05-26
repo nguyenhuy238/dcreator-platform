@@ -33,7 +33,7 @@ async function syncCampaignUgcVideoQuota(campaignId: string, ugcVideoQuota: numb
     `;
   } catch {
     throw new AppError(
-      "He thong chua cap nhat migration quota video UGC. Vui long chay migration truoc khi tao campaign.",
+      "Hệ thống chưa cập nhật migration quota video UGC. Vui lòng chạy migration trước khi tạo campaign.",
       500,
       "CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED"
     );
@@ -362,7 +362,7 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
   const ugcVideoQuota = BRAND_SUBSCRIPTION_PACKAGE_VIDEO_QUOTA[packageCode] ?? 0;
   if (ugcVideoQuota <= 0) {
     throw new AppError(
-      "Brand dang o goi Free nen khong the tao campaign. Vui long nang cap goi UGC de tiep tuc.",
+      "Brand đang ở gói Free nên không thể tạo campaign. Vui lòng nâng cấp gói UGC để tiếp tục.",
       409,
       "BRAND_SUBSCRIPTION_FREE_CANNOT_CREATE_CAMPAIGN"
     );

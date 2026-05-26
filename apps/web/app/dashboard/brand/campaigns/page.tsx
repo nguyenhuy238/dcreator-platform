@@ -19,8 +19,14 @@ type CampaignItem = {
   startsAt: string | null;
   endsAt: string | null;
   coverImageUrl: string | null;
+  ugcVideoQuota: number | null;
+  ugcVideoApprovedCount: number;
   _count?: { contributions?: number; missions?: number };
   applicationCount?: number;
+  creatorJoinedCount?: number;
+  videoTarget?: number;
+  videoApproved?: number;
+  videoProgressPercent?: number;
 };
 
 type ApiResponse<T> = { success: boolean; data?: T; error?: string; message?: string };
@@ -89,7 +95,7 @@ export default function BrandCampaignsPage() {
         return da - db;
       });
     } else {
-      list = list.sort((a, b) => (new Date(b.startsAt ?? 0).getTime() - new Date(a.startsAt ?? 0).getTime()));
+      list = list.sort((a, b) => new Date(b.startsAt ?? 0).getTime() - new Date(a.startsAt ?? 0).getTime());
     }
 
     return list;
@@ -119,7 +125,7 @@ export default function BrandCampaignsPage() {
             <option value="BRAND_REQUESTED">BRAND_REQUESTED</option>
             <option value="JOIN_EXISTING_DCREATOR_CAMP">JOIN_EXISTING_DCREATOR_CAMP</option>
           </select>
-          <select className="dc-input" value={sortBy} onChange={(e) => setSortBy(e.target.value as "newest" | "funded" | "ending") }>
+          <select className="dc-input" value={sortBy} onChange={(e) => setSortBy(e.target.value as "newest" | "funded" | "ending")}>
             <option value="newest">Mới nhất</option>
             <option value="funded">Nhiều funding nhất</option>
             <option value="ending">Gần kết thúc</option>
@@ -142,10 +148,25 @@ export default function BrandCampaignsPage() {
           ) : (
             <div className="grid gap-4 xl:grid-cols-2">
               {filtered.map((campaign) => {
-                const fundedProgress = progress(campaign.fundedAmountVnd, campaign.targetAmountVnd);
+                const videoTarget = campaign.videoTarget ?? Math.max(0, campaign.ugcVideoQuota ?? 0);
+                const videoApproved = campaign.videoApproved ?? Math.max(0, campaign.ugcVideoApprovedCount ?? 0);
+                const videoProgressPercent = campaign.videoProgressPercent ?? progress(videoApproved, videoTarget);
+                const creatorJoined = campaign.creatorJoinedCount ?? 0;
+
                 return (
                   <article key={campaign.id} className="dc-card overflow-hidden p-0">
-                    <div className="flex h-40 items-end bg-zinc-100" style={campaign.coverImageUrl ? { backgroundImage: `url(${campaign.coverImageUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>
+                    <div
+                      className="flex h-40 items-end bg-zinc-100"
+                      style={
+                        campaign.coverImageUrl
+                          ? {
+                              backgroundImage: `url(${campaign.coverImageUrl})`,
+                              backgroundSize: "cover",
+                              backgroundPosition: "center"
+                            }
+                          : undefined
+                      }
+                    >
                       <div className="w-full bg-black/50 px-4 py-3 text-white">
                         <p className="text-lg font-bold">{campaign.title}</p>
                         <p className="text-xs">/{campaign.slug}</p>
@@ -169,11 +190,26 @@ export default function BrandCampaignsPage() {
                         <p>Kết thúc: {formatDate(campaign.endsAt)}</p>
                       </div>
 
+                      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                        <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+                          <p className="text-xs text-zinc-500">Creator đã tham gia</p>
+                          <p className="text-lg font-black text-zinc-900">{creatorJoined}</p>
+                        </div>
+                        <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+                          <p className="text-xs text-zinc-500">Video dự kiến</p>
+                          <p className="text-lg font-black text-zinc-900">{videoTarget}</p>
+                        </div>
+                        <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+                          <p className="text-xs text-zinc-500">Video đã duyệt</p>
+                          <p className="text-lg font-black text-zinc-900">{videoApproved}</p>
+                        </div>
+                      </div>
+
                       <div className="mt-3">
                         <div className="h-2 rounded-full bg-zinc-200">
-                          <div className="h-2 rounded-full bg-zinc-900" style={{ width: `${fundedProgress}%` }} />
+                          <div className="h-2 rounded-full bg-zinc-900" style={{ width: `${videoProgressPercent}%` }} />
                         </div>
-                        <p className="mt-1 text-xs text-zinc-500">Tiến độ funding: {fundedProgress}%</p>
+                        <p className="mt-1 text-xs text-zinc-500">Tiến độ video hoàn thành: {videoProgressPercent}%</p>
                       </div>
 
                       <div className="mt-4 flex flex-wrap gap-2">

@@ -263,7 +263,7 @@ async function reserveCampaignUgcVideoQuota(tx: Prisma.TransactionClient, campai
     const quotaValue = row.ugcVideoQuota;
     if (quotaValue === null) return;
     if (quotaValue <= 0) {
-      throw new AppError("Campaign da het han muc video UGC theo goi hien tai.", 409, "CAMPAIGN_UGC_VIDEO_QUOTA_REACHED");
+      throw new AppError("Campaign đã hết hạn mức video UGC theo gói hiện tại.", 409, "CAMPAIGN_UGC_VIDEO_QUOTA_REACHED");
     }
 
     const reservedRows = await tx.$queryRaw<Array<{ id: string }>>`
@@ -275,7 +275,7 @@ async function reserveCampaignUgcVideoQuota(tx: Prisma.TransactionClient, campai
     `;
     if (!reservedRows.length) {
       throw new AppError(
-        `Campaign da dat gioi han ${quotaValue} video UGC duoc duyet.`,
+        `Campaign đã đạt giới hạn ${quotaValue} video UGC được duyệt.`,
         409,
         "CAMPAIGN_UGC_VIDEO_QUOTA_REACHED"
       );
@@ -283,7 +283,7 @@ async function reserveCampaignUgcVideoQuota(tx: Prisma.TransactionClient, campai
   } catch (error) {
     if (error instanceof AppError) throw error;
     throw new AppError(
-      "He thong chua cap nhat migration quota video UGC. Vui long chay migration truoc khi duyet mission.",
+      "Hệ thống chưa cập nhật migration quota video UGC. Vui lòng chạy migration trước khi duyệt mission.",
       500,
       "CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED"
     );

@@ -60,7 +60,7 @@ export function CampaignList({ excludeSlugs = [] }: { excludeSlugs?: string[] })
       .then(async (res) => {
         const payload = (await res.json()) as CampaignListResponse;
         if (!res.ok || !payload.success) {
-          throw new Error("Khong the tai campaigns");
+          throw new Error("Không thể tải campaigns");
         }
         if (!mounted) return;
         setItems(payload.data.items);
@@ -69,7 +69,7 @@ export function CampaignList({ excludeSlugs = [] }: { excludeSlugs?: string[] })
       .catch((err: unknown) => {
         if (err instanceof Error && err.name === "AbortError") return;
         if (!mounted) return;
-        setError(err instanceof Error ? err.message : "Loi khong xac dinh");
+        setError(err instanceof Error ? err.message : "Lỗi không xác định");
       })
       .finally(() => {
         if (!mounted) return;
@@ -100,8 +100,8 @@ export function CampaignList({ excludeSlugs = [] }: { excludeSlugs?: string[] })
         <LoadingSkeleton rows={6} />
       ) : null}
 
-      {!loading && error ? <ErrorState title="Khong the tai chien dich" description={error} /> : null}
-      {!loading && !error && visibleItems.length === 0 ? <EmptyState title="Chua co chien dich phu hop" description="Thu noi bo loc hoac doi tu khoa tim kiem." /> : null}
+      {!loading && error ? <ErrorState title="Không thể tải chiến dịch" description={error} /> : null}
+      {!loading && !error && visibleItems.length === 0 ? <EmptyState title="Chưa có chiến dịch phù hợp" description="Thử đổi bộ lọc hoặc đổi từ khóa tìm kiếm." /> : null}
 
       {!loading && !error && visibleItems.length > 0 ? (
         <>
@@ -112,7 +112,7 @@ export function CampaignList({ excludeSlugs = [] }: { excludeSlugs?: string[] })
           </div>
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-3">
             <button className="dc-btn-secondary" disabled={page <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
-              Trang truoc
+              Trang trước
             </button>
             <span className="text-sm text-zinc-600">
               Trang {page}/{totalPages}

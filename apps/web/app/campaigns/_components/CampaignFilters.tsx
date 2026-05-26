@@ -1,4 +1,4 @@
-export type CampaignFilterState = {
+﻿export type CampaignFilterState = {
   search: string;
   category: string;
   status: string;

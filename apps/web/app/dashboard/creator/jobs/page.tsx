@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -89,10 +89,7 @@ export default function CreatorJobsPage() {
 
   return (
     <>
-      <PageHeader
-        title="Campaign / Job"
-        subtitle="Danh sach campaign dang mo de Creator tham gia va nhan nhiem vu phu hop."
-      />
+      <PageHeader title="Campaign / Job" subtitle="Danh sách campaign đang mở để Creator tham gia và nhận nhiệm vụ phù hợp." />
       <section className="mb-6 rounded-2xl border border-zinc-200 bg-white p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-black text-zinc-900">{historyTitle}</h2>
