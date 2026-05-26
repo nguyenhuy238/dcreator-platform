@@ -174,7 +174,7 @@ export default function BrandSubscriptionsPage() {
                       type="button"
                       disabled={disabled}
                       onClick={() => void purchasePackage(item.code)}
-                      className="mt-5 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      className="mt-auto pt-5 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {purchaseButtonLabel(item, buying)}
                     </button>
