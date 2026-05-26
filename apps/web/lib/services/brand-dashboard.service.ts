@@ -880,10 +880,32 @@ export async function listBrandCampaigns(accountId: string) {
     campaignApplicationCountMap.set(mission.campaignId, (campaignApplicationCountMap.get(mission.campaignId) ?? 0) + item._count._all);
   }
 
-  return campaigns.map((campaign) => ({
-    ...campaign,
-    applicationCount: campaignApplicationCountMap.get(campaign.id) ?? 0
-  }));
+  const approvedCreatorPairs = await prisma.missionApplication.groupBy({
+    by: ["campaignId", "accountId"],
+    where: {
+      campaign: { brandId: ctx.brandOwnerAccountId },
+      status: "APPROVED"
+    }
+  });
+
+  const creatorJoinedByCampaignId = new Map<string, number>();
+  for (const row of approvedCreatorPairs) {
+    creatorJoinedByCampaignId.set(row.campaignId, (creatorJoinedByCampaignId.get(row.campaignId) ?? 0) + 1);
+  }
+
+  return campaigns.map((campaign) => {
+    const videoTarget = Math.max(0, campaign.ugcVideoQuota ?? 0);
+    const videoApproved = Math.max(0, campaign.ugcVideoApprovedCount ?? 0);
+    const videoProgressPercent = videoTarget > 0 ? Math.min(100, Math.round((videoApproved / videoTarget) * 100)) : 0;
+    return {
+      ...campaign,
+      applicationCount: campaignApplicationCountMap.get(campaign.id) ?? 0,
+      creatorJoinedCount: creatorJoinedByCampaignId.get(campaign.id) ?? 0,
+      videoTarget,
+      videoApproved,
+      videoProgressPercent
+    };
+  });
 }
 
 function parseCreatorMeta(value: unknown): CreatorMeta {

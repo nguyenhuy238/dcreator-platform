@@ -63,3 +63,9 @@ export const BRAND_SUBSCRIPTION_PACKAGE_MAP: Record<BrandSubscriptionPackageCode
   UGC_50_VIDEO: BRAND_SUBSCRIPTION_PACKAGES[2]!
 };
 
+export const BRAND_SUBSCRIPTION_PACKAGE_VIDEO_QUOTA: Record<BrandSubscriptionPackageCode, number> = {
+  FREE: 0,
+  UGC_15_VIDEO: 15,
+  UGC_50_VIDEO: 50
+};
+

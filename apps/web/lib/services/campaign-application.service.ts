@@ -135,6 +135,8 @@ async function getCampaignAndCreatorMission(slug: string) {
       id: true,
       status: true,
       isPublic: true,
+      ugcVideoQuota: true,
+      ugcVideoApprovedCount: true,
       missions: {
         where: {
           status: "OPEN",
@@ -161,6 +163,14 @@ export async function getCreatorCampaignApplicationStatus(
 
   const { campaign, firstMission } = campaignData;
   if (!campaign.isPublic || campaign.status !== CampaignStatus.ACTIVE) return toSnapshot("CAMPAIGN_UNAVAILABLE");
+  const videoTarget = campaign.ugcVideoQuota ?? 0;
+  const approvedVideos = campaign.ugcVideoApprovedCount ?? 0;
+  if (videoTarget > 0 && approvedVideos >= videoTarget) {
+    return toSnapshot("MISSION_UNAVAILABLE", {
+      label: "Hết lượt video",
+      message: `Campaign đã đủ ${videoTarget}/${videoTarget} video được duyệt.`
+    });
+  }
 
   if (!viewer) return toSnapshot("LOGIN_REQUIRED");
   if (!viewer.roles.includes(Role.CREATOR)) return toSnapshot("NOT_CREATOR");
@@ -200,6 +210,11 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
   const { campaign, firstMission } = campaignData;
   if (!campaign.isPublic || campaign.status !== CampaignStatus.ACTIVE) {
     throw new AppError("Campaign is not open for creator application", 409, "CAMPAIGN_NOT_OPEN");
+  }
+  const videoTarget = campaign.ugcVideoQuota ?? 0;
+  const approvedVideos = campaign.ugcVideoApprovedCount ?? 0;
+  if (videoTarget > 0 && approvedVideos >= videoTarget) {
+    throw new AppError("Campaign đã hết lượt video được phê duyệt", 409, "CAMPAIGN_UGC_VIDEO_QUOTA_REACHED");
   }
 
   if (!firstMission) {

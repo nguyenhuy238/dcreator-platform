@@ -13,6 +13,12 @@ export type CampaignCardData = {
   fundedAmount: number;
   targetAmount: number;
   progressPercent: number;
+  videoProgressPercent?: number;
+  videoApproved?: number;
+  videoTarget?: number;
+  creatorJoined?: number;
+  missionSlotsRemaining?: number;
+  isMissionQuotaReached?: boolean;
   backers: number;
   creatorApplicants?: number;
   rewardsLeft: number;
@@ -33,6 +39,11 @@ function resolveCoverImageSrc(url: string | null) {
 }
 
 export function CampaignCard({ campaign }: { campaign: CampaignCardData }) {
+  const videoTarget = campaign.videoTarget ?? 0;
+  const videoApproved = campaign.videoApproved ?? 0;
+  const creatorJoined = campaign.creatorJoined ?? 0;
+  const videoProgressPercent = campaign.videoProgressPercent ?? 0;
+
   return (
     <article className="dc-card overflow-hidden p-0">
       <div className="relative aspect-[16/9] w-full overflow-hidden bg-zinc-100">
@@ -55,18 +66,20 @@ export function CampaignCard({ campaign }: { campaign: CampaignCardData }) {
 
         <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
           <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-            <p className="text-zinc-500">{"Creator \u1ee9ng tuy\u1ec3n"}</p>
-            <p className="font-black text-zinc-900">{campaign.creatorApplicants ?? 0}</p>
+            <p className="text-zinc-500">Creator đã tham gia</p>
+            <p className="font-black text-zinc-900">{creatorJoined}</p>
           </div>
           <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-            <p className="text-zinc-500">{"Ho\u00e0n thi\u1ec7n camp"}</p>
-            <p className="font-black text-zinc-900">{campaign.progressPercent}%</p>
+            <p className="text-zinc-500">Video dự kiến</p>
+            <p className="font-black text-zinc-900">{videoTarget}</p>
           </div>
         </div>
+        <p className="mt-3 text-xs font-semibold text-zinc-600">Video hoàn thành: {videoApproved}/{videoTarget}</p>
 
         <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-100">
-          <div className="h-full bg-zinc-900 transition-all" style={{ width: `${campaign.progressPercent}%` }} />
+          <div className="h-full bg-zinc-900 transition-all" style={{ width: `${videoProgressPercent}%` }} />
         </div>
+        <p className="mt-1 text-xs text-zinc-500">Tiến độ video: {videoProgressPercent}%</p>
 
         <div className="mt-4 flex justify-end">
           <Link

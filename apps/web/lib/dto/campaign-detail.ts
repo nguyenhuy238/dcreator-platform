@@ -10,6 +10,7 @@ export type CampaignDetailDTO = {
     creator: string | null;
     campaignType: "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
     category: "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
+    objective: string | null;
     benefits: string | null;
     participationRoadmap: string[];
     status: "DRAFT" | "ACTIVE" | "PAUSED" | "COMPLETED" | "ARCHIVED";
@@ -22,6 +23,14 @@ export type CampaignDetailDTO = {
     backerCount: number;
     remainingTimeLabel: string;
     isEnded: boolean;
+  };
+  videoStats: {
+    targetVideos: number;
+    approvedVideos: number;
+    creatorJoined: number;
+    remainingSlots: number;
+    completionPercent: number;
+    isQuotaReached: boolean;
   };
   rewards: Array<{
     id: string;

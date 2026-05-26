@@ -250,6 +250,46 @@ async function notifyCreator(accountId: string, event: NotificationEvent, title:
   await createNotification({ accountId, event, title, content, metadata });
 }
 
+async function reserveCampaignUgcVideoQuota(tx: Prisma.TransactionClient, campaignId: string) {
+  try {
+    const rows = await tx.$queryRaw<Array<{ ugcVideoQuota: number | null }>>`
+      SELECT "ugcVideoQuota"
+      FROM "Campaign"
+      WHERE "id" = ${campaignId}
+      LIMIT 1
+    `;
+    const row = rows[0];
+    if (!row) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
+    const quotaValue = row.ugcVideoQuota;
+    if (quotaValue === null) return;
+    if (quotaValue <= 0) {
+      throw new AppError("Campaign đã hết hạn mức video UGC theo gói hiện tại.", 409, "CAMPAIGN_UGC_VIDEO_QUOTA_REACHED");
+    }
+
+    const reservedRows = await tx.$queryRaw<Array<{ id: string }>>`
+      UPDATE "Campaign"
+      SET "ugcVideoApprovedCount" = "ugcVideoApprovedCount" + 1
+      WHERE "id" = ${campaignId}
+        AND "ugcVideoApprovedCount" < ${quotaValue}
+      RETURNING "id"
+    `;
+    if (!reservedRows.length) {
+      throw new AppError(
+        `Campaign đã đạt giới hạn ${quotaValue} video UGC được duyệt.`,
+        409,
+        "CAMPAIGN_UGC_VIDEO_QUOTA_REACHED"
+      );
+    }
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError(
+      "Hệ thống chưa cập nhật migration quota video UGC. Vui lòng chạy migration trước khi duyệt mission.",
+      500,
+      "CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED"
+    );
+  }
+}
+
 async function creditPointsOnce(
   tx: Prisma.TransactionClient,
   accountId: string,
@@ -1063,9 +1103,17 @@ export async function approveMissionApplicationByAdmin(actorId: string, id: stri
   const current = await getMissionApplicationDetailForAdmin(id);
   if (current.status !== "PENDING_REVIEW") throw new AppError("Mission application is not pending review", 409, "MISSION_APPLICATION_INVALID_STATUS");
   const updated = await prisma.$transaction(async (tx) => {
-    const next = await tx.missionApplication.update({
-      where: { id },
+    const claimPending = await tx.missionApplication.updateMany({
+      where: { id, status: "PENDING_REVIEW" },
       data: { status: "APPROVED", reviewedById: actorId, reviewedAt: now(), rejectReason: null }
+    });
+    if (claimPending.count === 0) {
+      throw new AppError("Mission application is not pending review", 409, "MISSION_APPLICATION_INVALID_STATUS");
+    }
+
+    await reserveCampaignUgcVideoQuota(tx, current.campaignId);
+    const next = await tx.missionApplication.findUniqueOrThrow({
+      where: { id }
     });
     const submission = await ensureSubmission(tx, current.missionId, current.accountId, current.note);
     await ensureCreatorMissionFromApprovedApplication(tx, {

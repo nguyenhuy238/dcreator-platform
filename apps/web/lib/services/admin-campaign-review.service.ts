@@ -1,5 +1,9 @@
 import { CampaignStatus, NotificationEvent } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import {
+  BRAND_SUBSCRIPTION_PACKAGE_VIDEO_QUOTA,
+  type BrandSubscriptionPackageCode
+} from "@/lib/constants/brand-subscription";
 import { AppError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
 import { createNotification } from "@/lib/services/notification.service";
@@ -17,6 +21,22 @@ async function trySyncCampaignNewFields(campaignId: string, benefits: string | n
     await prisma.$executeRaw`UPDATE "Campaign" SET "benefits" = ${benefits}, "participationRoadmap" = ${participationRoadmap} WHERE "id" = ${campaignId}`;
   } catch {
     // Backward compatibility when DB has not applied migration yet.
+  }
+}
+
+async function syncCampaignUgcVideoQuota(campaignId: string, ugcVideoQuota: number) {
+  try {
+    await prisma.$executeRaw`
+      UPDATE "Campaign"
+      SET "ugcVideoQuota" = ${ugcVideoQuota}
+      WHERE "id" = ${campaignId}
+    `;
+  } catch {
+    throw new AppError(
+      "Hệ thống chưa cập nhật migration quota video UGC. Vui lòng chạy migration trước khi tạo campaign.",
+      500,
+      "CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED"
+    );
   }
 }
 
@@ -315,6 +335,39 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
   if (!brandAccount) throw new AppError("Brand account not found", 404, "BRAND_ACCOUNT_NOT_FOUND");
   if (!brandAccount.isActive) throw new AppError("Brand account is inactive", 409, "BRAND_ACCOUNT_INACTIVE");
 
+  const ownedBrand = await prisma.brand.findFirst({
+    where: { ownerAccountId: brandAccount.id },
+    select: { id: true },
+    orderBy: { createdAt: "desc" }
+  });
+
+  const memberBrand = ownedBrand
+    ? null
+    : await prisma.brandMember.findFirst({
+        where: { accountId: brandAccount.id },
+        include: { brand: { select: { id: true } } },
+        orderBy: { createdAt: "desc" }
+      });
+
+  const brandProfile = ownedBrand ?? memberBrand?.brand ?? null;
+  if (!brandProfile) {
+    throw new AppError("Brand chua hoan tat onboarding", 409, "BRAND_PROFILE_NOT_FOUND");
+  }
+
+  const subscription = await prisma.brandSubscription.findUnique({
+    where: { brandId: brandProfile.id },
+    select: { packageCode: true }
+  });
+  const packageCode = (subscription?.packageCode ?? "FREE") as BrandSubscriptionPackageCode;
+  const ugcVideoQuota = BRAND_SUBSCRIPTION_PACKAGE_VIDEO_QUOTA[packageCode] ?? 0;
+  if (ugcVideoQuota <= 0) {
+    throw new AppError(
+      "Brand đang ở gói Free nên không thể tạo campaign. Vui lòng nâng cấp gói UGC để tiếp tục.",
+      409,
+      "BRAND_SUBSCRIPTION_FREE_CANNOT_CREATE_CAMPAIGN"
+    );
+  }
+
   const campaign = await prisma.campaign.create({
     data: {
       brandId: brandAccount.id,
@@ -341,6 +394,7 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
     }
   });
   await trySyncCampaignNewFields(campaign.id, input.benefits || null, input.participationRoadmap);
+  await syncCampaignUgcVideoQuota(campaign.id, ugcVideoQuota);
 
   await writeAuditLog({
     actorId,
@@ -348,7 +402,7 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
     targetType: "Campaign",
     targetId: campaign.id,
     newStatus: campaign.status,
-    metadata: { publishNow: Boolean(input.publishNow), brandAccountId: brandAccount.id }
+    metadata: { publishNow: Boolean(input.publishNow), brandAccountId: brandAccount.id, packageCode, ugcVideoQuota }
   });
 
   await createNotification({

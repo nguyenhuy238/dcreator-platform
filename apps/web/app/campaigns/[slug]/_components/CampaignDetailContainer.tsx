@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import type { CampaignDetailDTO } from "@/lib/dto/campaign-detail";
@@ -100,7 +100,22 @@ export function CampaignDetailContainer({ slug }: Props) {
             <section id="apply" className="rounded-3xl border border-white/20 bg-black/40 p-5 backdrop-blur-sm">
               <h2 className="text-2xl font-black text-white">Đăng ký chiến dịch Creator</h2>
               <p className="mt-1 text-sm text-zinc-200">Nộp đơn để Brand/Admin duyệt trước khi nhận nhiệm vụ.</p>
-              <CreatorCampaignApplyButton slug={data.hero.slug} />
+              <p className="mt-2 text-xs font-semibold text-zinc-100">
+                Video hiện tại / mục tiêu: {data.videoStats.approvedVideos}/{data.videoStats.targetVideos}
+              </p>
+              <p className="mt-1 text-xs text-zinc-300">Creator đã tham gia: {data.videoStats.creatorJoined}</p>
+              {data.videoStats.isQuotaReached ? (
+                <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                  Campaign đã hết lượt video được duyệt.
+                </p>
+              ) : null}
+              {data.videoStats.isQuotaReached ? (
+                <button type="button" disabled className="dc-btn-primary mt-2 w-full cursor-not-allowed opacity-50">
+                  Hết lượt video
+                </button>
+              ) : (
+                <CreatorCampaignApplyButton slug={data.hero.slug} />
+              )}
             </section>
           }
         />
@@ -122,13 +137,26 @@ export function CampaignDetailContainer({ slug }: Props) {
             </button>
           </div>
         </section>
-        <div className="mx-auto w-full max-w-[960px]">
-          {activeTab === "overview" ? <OverviewTab data={data} /> : <BriefTab data={data} />}
-        </div>
+        <div className="mx-auto w-full max-w-[960px]">{activeTab === "overview" ? <OverviewTab data={data} /> : <BriefTab data={data} />}</div>
         <section id="apply-mobile" className="dc-card p-4 lg:hidden md:p-5">
           <h2 className="text-2xl font-black text-zinc-900">Đăng ký chiến dịch Creator</h2>
           <p className="mt-1 text-sm text-slate-600">Nộp đơn để Brand/Admin duyệt trước khi nhận nhiệm vụ.</p>
-          <CreatorCampaignApplyButton slug={data.hero.slug} />
+          <p className="mt-2 text-xs font-semibold text-zinc-700">
+            Video hiện tại / mục tiêu: {data.videoStats.approvedVideos}/{data.videoStats.targetVideos}
+          </p>
+          <p className="mt-1 text-xs text-zinc-600">Creator đã tham gia: {data.videoStats.creatorJoined}</p>
+          {data.videoStats.isQuotaReached ? (
+            <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+              Campaign đã hết lượt video được duyệt.
+            </p>
+          ) : null}
+          {data.videoStats.isQuotaReached ? (
+            <button type="button" disabled className="dc-btn-primary mt-2 w-full cursor-not-allowed opacity-50">
+              Hết lượt video
+            </button>
+          ) : (
+            <CreatorCampaignApplyButton slug={data.hero.slug} />
+          )}
         </section>
       </div>
     </main>
