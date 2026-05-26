@@ -1,3 +1,4 @@
+# Rules for AI Coding Agents: Codex / Claude Code / Cursor
 # dCreator — Claude Code Rules
 # Single source of truth cho Claude khi làm việc với codebase này.
 # File này được load tự động bởi Claude Code ở mọi session.
@@ -383,3 +384,14 @@ NEXT_PUBLIC_GOONG_API_KEY=
 OPENROUTER_API_KEY=
 GEMINI_API_KEY=
 ```
+
+
+# IMPORTANT RULES
+
+- NEVER change file encoding.
+- NEVER use iconv.
+- NEVER rewrite files using PowerShell Set-Content without UTF-8.
+- NEVER convert UTF-8 to ANSI/UTF16.
+- Preserve all Vietnamese characters.
+- If editing files, keep original encoding and line endings.
+- Before modifying files, read and write using UTF-8 only.
