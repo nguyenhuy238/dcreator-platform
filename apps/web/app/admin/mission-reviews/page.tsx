@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data?: T; error?: string };
@@ -141,6 +142,8 @@ function AdminMissionTranscriptReviewsTab() {
   const [selectedId, setSelectedId] = useState<string>("");
   const [detail, setDetail] = useState<TranscriptItem | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [dialogAction, setDialogAction] = useState<null | "approve" | "reject">(null);
+  const [dialogTargetId, setDialogTargetId] = useState<string>("");
 
   const [query, setQuery] = useState("");
   const [campaign, setCampaign] = useState("");
@@ -194,7 +197,6 @@ function AdminMissionTranscriptReviewsTab() {
   async function approve(id: string) {
     setNotice("");
     setError("");
-    if (!window.confirm("Xác nhận duyệt kịch bản này?")) return;
     try {
       const res = await fetch(`/api/admin/mission-transcript-reviews/${id}/approve`, { method: "POST" });
       const body = (await res.json()) as ApiResult<unknown>;
@@ -207,11 +209,9 @@ function AdminMissionTranscriptReviewsTab() {
     }
   }
 
-  async function reject(id: string) {
+  async function reject(id: string, feedback: string) {
     setNotice("");
     setError("");
-    const feedback = window.prompt("Nhập lý do từ chối kịch bản:", "Kịch bản chưa đạt yêu cầu brief")?.trim();
-    if (!feedback) return;
     try {
       const res = await fetch(`/api/admin/mission-transcript-reviews/${id}/reject`, {
         method: "POST",
@@ -279,8 +279,8 @@ function AdminMissionTranscriptReviewsTab() {
                       <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
                         {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
                       </button>
-                      {statusLabel === "PENDING" ? <button className="dc-btn-primary" onClick={() => void approve(item.id)}>Duyệt</button> : null}
-                      {statusLabel === "PENDING" ? <button className="dc-btn-secondary" onClick={() => void reject(item.id)}>Từ chối</button> : null}
+                      {statusLabel === "PENDING" ? <button className="dc-btn-primary" onClick={() => { setDialogTargetId(item.id); setDialogAction("approve"); }}>Duyệt</button> : null}
+                      {statusLabel === "PENDING" ? <button className="dc-btn-secondary" onClick={() => { setDialogTargetId(item.id); setDialogAction("reject"); }}>Từ chối</button> : null}
                     </div>
                   </article>
                 );
@@ -330,6 +330,29 @@ function AdminMissionTranscriptReviewsTab() {
           </aside>
         </section>
       ) : null}
+      <ReviewActionDialog
+        open={dialogAction === "approve"}
+        title="Duyệt kịch bản"
+        description="Kịch bản sẽ chuyển sang approved."
+        confirmLabel="Duyệt"
+        onCancel={() => setDialogAction(null)}
+        onConfirm={() => {
+          setDialogAction(null);
+          void approve(dialogTargetId);
+        }}
+      />
+      <ReviewActionDialog
+        open={dialogAction === "reject"}
+        title="Từ chối kịch bản"
+        description="Bắt buộc nhập lý do từ chối."
+        confirmLabel="Từ chối"
+        requireReason
+        onCancel={() => setDialogAction(null)}
+        onConfirm={(reason) => {
+          setDialogAction(null);
+          void reject(dialogTargetId, reason ?? "");
+        }}
+      />
     </section>
   );
 }
@@ -407,6 +430,8 @@ function AdminMissionApplicationsTab() {
   const [historyItems, setHistoryItems] = useState<CompletedMissionHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState("");
+  const [dialogAction, setDialogAction] = useState<null | "approve" | "reject">(null);
+  const [dialogTargetId, setDialogTargetId] = useState<string>("");
 
   const [query, setQuery] = useState("");
   const [campaign, setCampaign] = useState("");
@@ -460,7 +485,6 @@ function AdminMissionApplicationsTab() {
   async function approve(id: string) {
     setNotice("");
     setError("");
-    if (!window.confirm("Xác nhận duyệt đơn này?")) return;
     try {
       const res = await fetch(`/api/admin/mission-applications/${id}/approve`, { method: "POST" });
       const body = (await res.json()) as ApiResult<unknown>;
@@ -473,11 +497,9 @@ function AdminMissionApplicationsTab() {
     }
   }
 
-  async function reject(id: string) {
+  async function reject(id: string, rejectReason: string) {
     setNotice("");
     setError("");
-    const rejectReason = window.prompt("Nhập lý do từ chối:", "Chưa phù hợp yêu cầu mission")?.trim();
-    if (!rejectReason) return;
     try {
       const res = await fetch(`/api/admin/mission-applications/${id}/reject`, {
         method: "POST",
@@ -600,8 +622,8 @@ function AdminMissionApplicationsTab() {
                     <button className="dc-btn-secondary" onClick={() => void loadCompletedHistory(item.account.id, item.account.displayName)}>
                       Lịch sử Creator
                     </button>
-                    {item.status === "PENDING_REVIEW" ? <button className="dc-btn-primary" onClick={() => void approve(item.id)}>Đồng ý</button> : null}
-                    {item.status === "PENDING_REVIEW" ? <button className="dc-btn-secondary" onClick={() => void reject(item.id)}>Từ chối</button> : null}
+                    {item.status === "PENDING_REVIEW" ? <button className="dc-btn-primary" onClick={() => { setDialogTargetId(item.id); setDialogAction("approve"); }}>Đồng ý</button> : null}
+                    {item.status === "PENDING_REVIEW" ? <button className="dc-btn-secondary" onClick={() => { setDialogTargetId(item.id); setDialogAction("reject"); }}>Từ chối</button> : null}
                   </div>
                 </article>
               ))
@@ -638,6 +660,29 @@ function AdminMissionApplicationsTab() {
           </aside>
         </section>
       ) : null}
+      <ReviewActionDialog
+        open={dialogAction === "approve"}
+        title="Duyệt đơn nhận nhiệm vụ"
+        description="Đơn sẽ chuyển sang trạng thái đã duyệt."
+        confirmLabel="Duyệt"
+        onCancel={() => setDialogAction(null)}
+        onConfirm={() => {
+          setDialogAction(null);
+          void approve(dialogTargetId);
+        }}
+      />
+      <ReviewActionDialog
+        open={dialogAction === "reject"}
+        title="Từ chối đơn nhận nhiệm vụ"
+        description="Bắt buộc nhập lý do từ chối."
+        confirmLabel="Từ chối"
+        requireReason
+        onCancel={() => setDialogAction(null)}
+        onConfirm={(reason) => {
+          setDialogAction(null);
+          void reject(dialogTargetId, reason ?? "");
+        }}
+      />
     </section>
   );
 }
@@ -669,6 +714,8 @@ function AdminMissionVideoReviewsTab() {
   const [selectedId, setSelectedId] = useState<string>("");
   const [detail, setDetail] = useState<VideoItem | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [dialogAction, setDialogAction] = useState<null | "approve" | "reject">(null);
+  const [dialogTargetId, setDialogTargetId] = useState<string>("");
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [query, setQuery] = useState("");
@@ -718,7 +765,7 @@ function AdminMissionVideoReviewsTab() {
     }
   }
 
-  async function decide(id: string, action: "approve" | "reject") {
+  async function decide(id: string, action: "approve" | "reject", feedback?: string) {
     setNotice("");
     setError("");
     try {
@@ -727,8 +774,6 @@ function AdminMissionVideoReviewsTab() {
         const body = (await res.json()) as ApiResult<unknown>;
         if (!res.ok || !body.success) throw new Error(body.error ?? "Duyệt thất bại");
       } else {
-        const feedback = window.prompt("Nhập feedback từ chối:", "Video chưa đạt guideline")?.trim();
-        if (!feedback) return;
         const res = await fetch(`/api/admin/mission-video-reviews/${id}/reject`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -786,8 +831,8 @@ function AdminMissionVideoReviewsTab() {
                     <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
                       {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
                     </button>
-                    {item.videoReviewStatus === "PENDING" ? <button className="dc-btn-primary" onClick={() => void decide(item.id, "approve")}>Đồng ý video</button> : null}
-                    {item.videoReviewStatus === "PENDING" ? <button className="dc-btn-secondary" onClick={() => void decide(item.id, "reject")}>Từ chối video</button> : null}
+                    {item.videoReviewStatus === "PENDING" ? <button className="dc-btn-primary" onClick={() => { setDialogTargetId(item.id); setDialogAction("approve"); }}>Đồng ý video</button> : null}
+                    {item.videoReviewStatus === "PENDING" ? <button className="dc-btn-secondary" onClick={() => { setDialogTargetId(item.id); setDialogAction("reject"); }}>Từ chối video</button> : null}
                   </div>
                 </article>
               ))
@@ -819,6 +864,30 @@ function AdminMissionVideoReviewsTab() {
           </aside>
         </section>
       ) : null}
+      <ReviewActionDialog
+        open={dialogAction === "approve"}
+        title="Duyệt video proof"
+        description="Video sẽ chuyển sang trạng thái approved."
+        confirmLabel="Duyệt"
+        onCancel={() => setDialogAction(null)}
+        onConfirm={() => {
+          setDialogAction(null);
+          void decide(dialogTargetId, "approve");
+        }}
+      />
+      <ReviewActionDialog
+        open={dialogAction === "reject"}
+        title="Từ chối video proof"
+        description="Bắt buộc nhập feedback từ chối."
+        confirmLabel="Từ chối"
+        requireReason
+        reasonPlaceholder="Video chưa đạt guideline..."
+        onCancel={() => setDialogAction(null)}
+        onConfirm={(reason) => {
+          setDialogAction(null);
+          void decide(dialogTargetId, "reject", reason);
+        }}
+      />
     </section>
   );
 }
@@ -874,6 +943,7 @@ function AdminMissionFinalReviewsTab() {
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [query, setQuery] = useState("");
   const [campaign, setCampaign] = useState("");
+  const [dialogRejectTargetId, setDialogRejectTargetId] = useState<string>("");
 
   async function load(pageOverride?: number) {
     const targetPage = pageOverride ?? page;
@@ -948,11 +1018,9 @@ function AdminMissionFinalReviewsTab() {
     }
   }
 
-  async function reject(id: string) {
+  async function reject(id: string, feedback: string) {
     setNotice("");
     setError("");
-    const feedback = window.prompt("Nhập feedback từ chối:", "Nội dung bước cuối chưa đạt")?.trim();
-    if (!feedback) return;
     try {
       const res = await fetch(`/api/admin/mission-final-reviews/${id}/reject`, {
         method: "POST",
@@ -1012,7 +1080,7 @@ function AdminMissionFinalReviewsTab() {
                       {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
                     </button>
                     {item.publishStatus === "PENDING" ? <button className="dc-btn-primary" onClick={() => void approve(item)}>Đồng ý hoàn thành</button> : null}
-                    {item.publishStatus === "PENDING" ? <button className="dc-btn-secondary" onClick={() => void reject(item.id)}>Từ chối bước cuối</button> : null}
+                    {item.publishStatus === "PENDING" ? <button className="dc-btn-secondary" onClick={() => setDialogRejectTargetId(item.id)}>Từ chối bước cuối</button> : null}
                   </div>
                 </article>
               ))
@@ -1052,6 +1120,20 @@ function AdminMissionFinalReviewsTab() {
           </aside>
         </section>
       ) : null}
+      <ReviewActionDialog
+        open={Boolean(dialogRejectTargetId)}
+        title="Từ chối bước hoàn thành"
+        description="Bắt buộc nhập feedback từ chối."
+        confirmLabel="Từ chối"
+        requireReason
+        reasonPlaceholder="Nội dung bước cuối chưa đạt..."
+        onCancel={() => setDialogRejectTargetId("")}
+        onConfirm={(reason) => {
+          const targetId = dialogRejectTargetId;
+          setDialogRejectTargetId("");
+          void reject(targetId, reason ?? "");
+        }}
+      />
     </section>
   );
 }

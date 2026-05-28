@@ -13,7 +13,7 @@ export type CampaignDetailDTO = {
     objective: string | null;
     benefits: string | null;
     participationRoadmap: string[];
-    status: "DRAFT" | "ACTIVE" | "PAUSED" | "COMPLETED" | "ARCHIVED";
+    status: "DRAFT" | "ACTIVE" | "PAUSED" | "COMPLETED" | "CANCELLED" | "ARCHIVED";
     deadline: string | null;
   };
   funding: {
