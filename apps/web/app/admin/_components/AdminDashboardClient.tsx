@@ -47,7 +47,6 @@ const queueCards: Array<{ key: keyof AdminOverview["queues"]; title: string; hre
   { key: "campaignPendingReview", title: "Campaign cần xử lý", href: "/admin/campaigns" },
   { key: "creatorApplicationsPendingReview", title: "Creator applications", href: "/admin/creator-applications" },
   { key: "contentSubmissionsPendingReview", title: "Video cần xử lý", href: "/admin/mission-video-reviews" },
-  { key: "fulfillmentPendingIssues", title: "Fulfillment lỗi/chờ xử lý", href: "/admin/fulfillment" },
 ];
 
 export function AdminDashboardClient() {
@@ -73,7 +72,7 @@ export function AdminDashboardClient() {
 
   const totalQueue = useMemo(() => {
     if (!overview) return 0;
-    return Object.values(overview.queues).reduce((sum, value) => sum + value, 0);
+    return queueCards.reduce((sum, card) => sum + overview.queues[card.key], 0);
   }, [overview]);
 
   if (loading) {
@@ -98,7 +97,7 @@ export function AdminDashboardClient() {
       />
 
       <section className="dc-grid-dashboard">
-        <StatsCard title="Tổng queue cần xử lý" value={`${totalQueue}`} hint="Brand, Creator, Campaign, Video, Payout" />
+        <StatsCard title="Tổng queue cần xử lý" value={`${totalQueue}`} hint="Brand, Creator, Campaign, Video" />
         <StatsCard title="Campaign active" value={`${overview.totals.activeCampaigns}`} />
         <StatsCard title="Brand active" value={`${overview.totals.activeBrands}`} />
         <StatsCard title="Creator active" value={`${overview.totals.activeCreators}`} />
