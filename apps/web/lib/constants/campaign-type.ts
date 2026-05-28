@@ -1,4 +1,4 @@
-export function getCampaignTypeLabel(): string {
+ export function getCampaignTypeLabel(): string {
   return "Video seeding";
 }
 
