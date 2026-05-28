@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActionToast, ConfirmDialog, EmptyState, ErrorState, LoadingSkeleton, PageHeader, StatsCard, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
+import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, PageHeader, StatsCard, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { APPLICATION_STATUS } from "@/lib/constants/enums";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
@@ -59,7 +60,6 @@ export default function AdminBrandRequestsPage() {
   const [items, setItems] = useState<BrandRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState("");
-  const [actionError, setActionError] = useState("");
   const [toast, setToast] = useState("");
   const [status, setStatus] = useState<StatusFilter>("PENDING_REVIEW");
   const [industry, setIndustry] = useState("");
@@ -68,7 +68,6 @@ export default function AdminBrandRequestsPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<BrandDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [reason, setReason] = useState("");
   const [dialogAction, setDialogAction] = useState<"approve" | "reject" | "request-changes" | null>(null);
   const [acting, setActing] = useState(false);
 
@@ -124,20 +123,15 @@ export default function AdminBrandRequestsPage() {
     return { total, pending, approved, attention };
   }, [items]);
 
-  async function submitDecision() {
+  async function submitDecision(reason?: string) {
     if (!detail) return;
     const action = dialogAction;
     if (!action) return;
-    if (action !== "approve" && reason.trim().length < 5) {
-      setActionError("Lý do tối thiểu 5 ký tự.");
-      return;
-    }
 
     setActing(true);
-    setActionError("");
     try {
       const endpoint = action === "approve" ? "approve" : action === "reject" ? "reject" : "request-changes";
-      const payload = action === "approve" ? undefined : { reason: reason.trim() };
+      const payload = action === "approve" ? undefined : { reason: reason?.trim() };
       const res = await fetch(`/api/admin/brand-requests/${detail.id}/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -146,13 +140,11 @@ export default function AdminBrandRequestsPage() {
       const body = (await res.json()) as ApiResult<unknown>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Cập nhật thất bại");
       setDialogAction(null);
-      setReason("");
-      setActionError("");
       setToast("Cập nhật trạng thái thành công");
       setTimeout(() => setToast(""), 1800);
       await Promise.all([load(), loadDetail(detail.id)]);
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Cập nhật thất bại");
+      setListError(e instanceof Error ? e.message : "Cập nhật thất bại");
     } finally {
       setActing(false);
     }
@@ -293,20 +285,10 @@ export default function AdminBrandRequestsPage() {
                 <section className="dc-card p-4">
                   <p className="font-semibold">Thao tác duyệt</p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button className="dc-btn-primary" disabled={acting || detail.status !== "PENDING_REVIEW"} onClick={() => { setReason(""); setActionError(""); setDialogAction("approve"); }}>Approve</button>
-                    <button className="dc-btn-secondary" disabled={acting || detail.status !== "PENDING_REVIEW"} onClick={() => { setReason(""); setActionError(""); setDialogAction("reject"); }}>Reject</button>
-                    <button className="dc-btn-secondary" disabled={acting || detail.status !== "PENDING_REVIEW"} onClick={() => { setReason(""); setActionError(""); setDialogAction("request-changes"); }}>Request changes</button>
+                    <button className="dc-btn-primary" disabled={acting || detail.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("approve")}>Approve</button>
+                    <button className="dc-btn-secondary" disabled={acting || detail.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("reject")}>Reject</button>
+                    <button className="dc-btn-secondary" disabled={acting || detail.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("request-changes")}>Request changes</button>
                   </div>
-                  {dialogAction && dialogAction !== "approve" ? (
-                    <div className="mt-3 grid gap-2">
-                      <textarea className="dc-input min-h-24" placeholder="Nhập lý do bắt buộc..." value={reason} onChange={(e) => { setReason(e.target.value); if (actionError) setActionError(""); }} />
-                      {actionError ? <p className="text-sm text-red-600">{actionError}</p> : null}
-                      <div className="flex gap-2">
-                        <button className="dc-btn-secondary" disabled={acting} onClick={() => { setDialogAction(null); setReason(""); setActionError(""); }}>Hủy</button>
-                        <button className="dc-btn-primary" disabled={acting} onClick={() => void submitDecision()}>{acting ? "Đang xử lý..." : "Xác nhận"}</button>
-                      </div>
-                    </div>
-                  ) : null}
                 </section>
               </div>
             )}
@@ -314,13 +296,34 @@ export default function AdminBrandRequestsPage() {
         </div>
       ) : null}
 
-      <ConfirmDialog
+      <ReviewActionDialog
         open={dialogAction === "approve"}
         title="Xác nhận duyệt Brand"
-        message="Hồ sơ sẽ được duyệt, cập nhật Brand và cấp role BRAND_OWNER."
-        confirmLabel={acting ? "Đang xử lý..." : "Xác nhận"}
+        description="Hồ sơ sẽ được duyệt, cập nhật Brand và cấp role BRAND_OWNER."
+        confirmLabel="Xác nhận"
+        submitting={acting}
         onCancel={() => !acting && setDialogAction(null)}
         onConfirm={() => void submitDecision()}
+      />
+      <ReviewActionDialog
+        open={dialogAction === "reject"}
+        title="Từ chối hồ sơ Brand"
+        description="Bắt buộc nhập lý do từ chối."
+        confirmLabel="Từ chối"
+        requireReason
+        submitting={acting}
+        onCancel={() => !acting && setDialogAction(null)}
+        onConfirm={(reason) => void submitDecision(reason)}
+      />
+      <ReviewActionDialog
+        open={dialogAction === "request-changes"}
+        title="Yêu cầu chỉnh sửa hồ sơ Brand"
+        description="Bắt buộc nhập nội dung cần chỉnh sửa."
+        confirmLabel="Yêu cầu chỉnh sửa"
+        requireReason
+        submitting={acting}
+        onCancel={() => !acting && setDialogAction(null)}
+        onConfirm={(reason) => void submitDecision(reason)}
       />
 
       {toast ? <ActionToast message={toast} /> : null}

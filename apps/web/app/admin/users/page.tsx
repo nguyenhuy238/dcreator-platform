@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
+import { AdminDataTable } from "@/app/admin/_components/AdminDataTable";
+import { StatusBadge } from "@/app/admin/_components/StatusBadge";
 
 type UserItem = {
   id: string;
@@ -71,18 +73,7 @@ export default function AdminUsersPage() {
           {items.length === 0 ? (
             <EmptyState title="Không có dữ liệu" description="Không tìm thấy user phù hợp." />
           ) : (
-            <div className="dc-card overflow-auto">
-              <table className="w-full min-w-[760px] text-sm">
-                <thead className="bg-zinc-50 text-zinc-600">
-                  <tr>
-                    <th className="px-4 py-3 text-left">User</th>
-                    <th className="px-4 py-3 text-left">Role</th>
-                    <th className="px-4 py-3 text-left">Status</th>
-                    <th className="px-4 py-3 text-left">Wallet</th>
-                    <th className="px-4 py-3 text-left">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <AdminDataTable headers={["User", "Role", "Status", "Wallet", "Action"]}>
                   {items.map((item) => (
                     <tr key={item.id} className="border-t border-zinc-100">
                       <td className="px-4 py-3">
@@ -102,9 +93,7 @@ export default function AdminUsersPage() {
                       </td>
                     </tr>
                   ))}
-                </tbody>
-              </table>
-            </div>
+            </AdminDataTable>
           )}
         </section>
       ) : null}

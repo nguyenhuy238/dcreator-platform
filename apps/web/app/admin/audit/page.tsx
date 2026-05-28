@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
+import { AdminDataTable } from "@/app/admin/_components/AdminDataTable";
 
 type LogItem = { id: string; action: string; targetType: string; targetId: string; createdAt: string; metadata?: unknown };
 
@@ -59,17 +60,7 @@ export default function AdminAuditPage() {
           {items.length === 0 ? (
             <EmptyState title="Không có audit logs" description="Không có bản ghi phù hợp bộ lọc." />
           ) : (
-            <div className="dc-card overflow-auto">
-              <table className="w-full min-w-[900px] text-sm">
-                <thead className="bg-zinc-50 text-zinc-600">
-                  <tr>
-                    <th className="px-4 py-3 text-left">Action</th>
-                    <th className="px-4 py-3 text-left">Target</th>
-                    <th className="px-4 py-3 text-left">When</th>
-                    <th className="px-4 py-3 text-left">Metadata</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <AdminDataTable headers={["Action", "Target", "When", "Metadata"]}>
                   {items.map((item) => (
                     <tr key={item.id} className="border-t border-zinc-100 align-top">
                       <td className="px-4 py-3 font-medium">{item.action}</td>
@@ -78,9 +69,7 @@ export default function AdminAuditPage() {
                       <td className="px-4 py-3 text-xs text-zinc-500">{item.metadata ? JSON.stringify(item.metadata) : "Không có"}</td>
                     </tr>
                   ))}
-                </tbody>
-              </table>
-            </div>
+            </AdminDataTable>
           )}
         </section>
       ) : null}

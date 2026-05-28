@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
 import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, PageHeader, StatsCard, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
@@ -34,7 +35,8 @@ export function AccountRoleRequestsTab() {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"newest" | "oldest">("newest");
   const [actingId, setActingId] = useState<string | null>(null);
-  const [reasonById, setReasonById] = useState<Record<string, string>>({});
+  const [dialogAction, setDialogAction] = useState<null | "approve" | "reject">(null);
+  const [targetId, setTargetId] = useState<string>("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -82,13 +84,7 @@ export function AccountRoleRequestsTab() {
     }
   }
 
-  async function rejectRequest(requestId: string) {
-    const reason = reasonById[requestId]?.trim() ?? "";
-    if (reason.length < 5) {
-      setError("Lý do từ chối tối thiểu 5 ký tự.");
-      return;
-    }
-
+  async function rejectRequest(requestId: string, reason: string) {
     setActingId(requestId);
     setError("");
     try {
@@ -99,7 +95,6 @@ export function AccountRoleRequestsTab() {
       });
       const body = (await res.json()) as ApiResult<unknown>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Từ chối yêu cầu thất bại");
-      setReasonById((prev) => ({ ...prev, [requestId]: "" }));
       setToast("Đã từ chối yêu cầu Creator");
       setTimeout(() => setToast(""), 1800);
       await load();
@@ -188,21 +183,15 @@ export function AccountRoleRequestsTab() {
                           className="dc-btn-primary"
                           type="button"
                           disabled={actingId === item.id}
-                          onClick={() => void approveRequest(item.id)}
+                          onClick={() => { setTargetId(item.id); setDialogAction("approve"); }}
                         >
                           {actingId === item.id ? "Đang xử lý..." : "Đồng ý"}
                         </button>
-                        <textarea
-                          className="dc-input min-h-20"
-                          placeholder="Nhập lý do từ chối (bắt buộc)..."
-                          value={reasonById[item.id] ?? ""}
-                          onChange={(e) => setReasonById((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                        />
                         <button
                           className="dc-btn-secondary"
                           type="button"
                           disabled={actingId === item.id}
-                          onClick={() => void rejectRequest(item.id)}
+                          onClick={() => { setTargetId(item.id); setDialogAction("reject"); }}
                         >
                           {actingId === item.id ? "Đang xử lý..." : "Từ chối"}
                         </button>
@@ -233,21 +222,15 @@ export function AccountRoleRequestsTab() {
                     className="dc-btn-primary"
                     type="button"
                     disabled={actingId === item.id}
-                    onClick={() => void approveRequest(item.id)}
+                    onClick={() => { setTargetId(item.id); setDialogAction("approve"); }}
                   >
                     {actingId === item.id ? "Đang xử lý..." : "Đồng ý"}
                   </button>
-                  <textarea
-                    className="dc-input min-h-20"
-                    placeholder="Nhập lý do từ chối (bắt buộc)..."
-                    value={reasonById[item.id] ?? ""}
-                    onChange={(e) => setReasonById((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                  />
                   <button
                     className="dc-btn-secondary"
                     type="button"
                     disabled={actingId === item.id}
-                    onClick={() => void rejectRequest(item.id)}
+                    onClick={() => { setTargetId(item.id); setDialogAction("reject"); }}
                   >
                     {actingId === item.id ? "Đang xử lý..." : "Từ chối"}
                   </button>
@@ -259,6 +242,31 @@ export function AccountRoleRequestsTab() {
       ) : null}
 
       {toast ? <ActionToast message={toast} /> : null}
+      <ReviewActionDialog
+        open={dialogAction === "approve"}
+        title="Duyệt tài khoản Creator"
+        description="Yêu cầu sẽ chuyển sang approved và cập nhật role Creator."
+        confirmLabel="Duyệt"
+        submitting={actingId === targetId}
+        onCancel={() => setDialogAction(null)}
+        onConfirm={() => {
+          setDialogAction(null);
+          void approveRequest(targetId);
+        }}
+      />
+      <ReviewActionDialog
+        open={dialogAction === "reject"}
+        title="Từ chối tài khoản Creator"
+        description="Bắt buộc nhập lý do từ chối."
+        confirmLabel="Từ chối"
+        requireReason
+        submitting={actingId === targetId}
+        onCancel={() => setDialogAction(null)}
+        onConfirm={(reason) => {
+          setDialogAction(null);
+          void rejectRequest(targetId, reason ?? "");
+        }}
+      />
     </section>
   );
 }

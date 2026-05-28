@@ -2,18 +2,15 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatsCard } from "@/app/components/dcreator/ui/base";
+import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
+import { AdminQueueCard } from "@/app/admin/_components/AdminQueueCard";
+import { AdminStatCard } from "@/app/admin/_components/AdminStatCard";
+import { AuditTimeline } from "@/app/admin/_components/AuditTimeline";
+import { SystemAlertCard } from "@/app/admin/_components/SystemAlertCard";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
 
 type AdminOverview = {
-  totalUsers: number;
-  totalCreators: number;
-  totalBrands: number;
-  activeCampaigns: number;
-  pendingReviews: number;
-  totalContributions: number;
-  fraudAlerts: number;
   queues: {
     brandPendingReview: number;
     creatorPendingReview: number;
@@ -28,11 +25,14 @@ type AdminOverview = {
     activeCampaigns: number;
     activeBrands: number;
     activeCreators: number;
-    grossRevenueVnd: number;
-    commissionPayoutVnd: number;
   };
+  paymentFailed: number;
+  payoutPending: number;
+  fraudFlags: number;
+  campaignOverdue: number;
   systemAlerts: string[];
 };
+type AuditLog = { id: string; action: string; targetType: string; targetId: string; createdAt: string };
 
 async function getOverview() {
   const res = await fetch("/api/admin/dashboard/overview", { cache: "no-store" });
@@ -40,25 +40,34 @@ async function getOverview() {
   if (!res.ok || !body.success) throw new Error(body.error ?? "Tải dữ liệu tổng quan thất bại");
   return body.data;
 }
+async function getRecentAuditLogs() {
+  const res = await fetch("/api/admin/dashboard/audit-logs?page=1&limit=8", { cache: "no-store" });
+  const body = (await res.json()) as ApiResult<{ items: AuditLog[] }>;
+  if (!res.ok || !body.success) throw new Error(body.error ?? "Tải audit timeline thất bại");
+  return body.data.items;
+}
 
 const queueCards: Array<{ key: keyof AdminOverview["queues"]; title: string; href: string }> = [
-  { key: "brandPendingReview", title: "Brand cần xử lý", href: "/admin/brand-applications" },
-  { key: "creatorPendingReview", title: "Creator cần xử lý", href: "/admin/creator-applications" },
+  { key: "brandPendingReview", title: "Brand pending", href: "/admin/brands" },
+  { key: "creatorPendingReview", title: "Creator pending", href: "/admin/creators" },
   { key: "campaignPendingReview", title: "Campaign cần xử lý", href: "/admin/campaigns" },
-  { key: "creatorApplicationsPendingReview", title: "Creator applications", href: "/admin/creator-applications" },
-  { key: "contentSubmissionsPendingReview", title: "Video cần xử lý", href: "/admin/mission-video-reviews" },
+  { key: "contentSubmissionsPendingReview", title: "Proof/video pending", href: "/admin/proofs" },
+  { key: "payoutPendingReview", title: "Payout pending", href: "/admin/payouts" },
 ];
 
 export function AdminDashboardClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [overview, setOverview] = useState<AdminOverview | null>(null);
+  const [auditItems, setAuditItems] = useState<AuditLog[]>([]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      setOverview(await getOverview());
+      const [overviewData, auditData] = await Promise.all([getOverview(), getRecentAuditLogs()]);
+      setOverview(overviewData);
+      setAuditItems(auditData);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Tải dữ liệu tổng quan thất bại");
     } finally {
@@ -97,21 +106,21 @@ export function AdminDashboardClient() {
       />
 
       <section className="dc-grid-dashboard">
-        <StatsCard title="Tổng queue cần xử lý" value={`${totalQueue}`} hint="Brand, Creator, Campaign, Video" />
-        <StatsCard title="Campaign active" value={`${overview.totals.activeCampaigns}`} />
-        <StatsCard title="Brand active" value={`${overview.totals.activeBrands}`} />
-        <StatsCard title="Creator active" value={`${overview.totals.activeCreators}`} />
+        <AdminStatCard title="Tổng queue cần xử lý" value={totalQueue} />
+        <AdminStatCard title="Campaign active" value={overview.totals.activeCampaigns} />
+        <AdminStatCard title="Brand active" value={overview.totals.activeBrands} />
+        <AdminStatCard title="Creator active" value={overview.totals.activeCreators} />
+        <AdminStatCard title="Payment failed (24h)" value={overview.paymentFailed} />
+        <AdminStatCard title="Payout pending" value={overview.payoutPending} />
+        <AdminStatCard title="Fraud flags" value={overview.fraudFlags} />
+        <AdminStatCard title="Campaign overdue" value={overview.campaignOverdue} />
       </section>
 
       <section className="mt-8">
         <SectionHeader title="Queue xử lý" subtitle="Nhấn vào card để mở module tương ứng." />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {queueCards.map((card) => (
-            <Link key={card.key} href={card.href} className="dc-card p-4 transition hover:border-zinc-400">
-              <p className="text-sm font-semibold text-zinc-700">{card.title}</p>
-              <p className="mt-2 text-3xl font-black text-zinc-900">{overview.queues[card.key]}</p>
-              <p className="mt-2 text-xs text-zinc-500">Mở chi tiết</p>
-            </Link>
+            <AdminQueueCard key={card.key} title={card.title} value={overview.queues[card.key]} href={card.href} />
           ))}
         </div>
       </section>
@@ -121,14 +130,17 @@ export function AdminDashboardClient() {
         {overview.systemAlerts.length === 0 ? (
           <EmptyState title="Không có cảnh báo nghiêm trọng" description="Hệ thống đang ổn định theo ngưỡng cảnh báo hiện tại." />
         ) : (
-          <div className="grid gap-2">
+          <div className="grid gap-2 md:grid-cols-2">
             {overview.systemAlerts.map((alert) => (
-              <div key={alert} className="dc-card border-l-4 border-l-amber-500 p-3 text-sm text-zinc-700">
-                {alert}
-              </div>
+              <SystemAlertCard key={alert} title="System Alert" detail={alert} />
             ))}
           </div>
         )}
+      </section>
+
+      <section className="mt-8">
+        <SectionHeader title="Recent Activity / Audit Timeline" subtitle="Các thao tác Admin/Ops gần nhất." action={<Link className="dc-btn-secondary" href="/admin/audit-log">Mở đầy đủ</Link>} />
+        <AuditTimeline items={auditItems} />
       </section>
     </>
   );
