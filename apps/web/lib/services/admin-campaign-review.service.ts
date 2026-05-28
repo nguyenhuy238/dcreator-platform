@@ -15,6 +15,16 @@ import type { campaignMissionCreateSchema } from "@/lib/validators/brand-dashboa
 type AdminDecision = "APPROVE" | "REJECT" | "REQUEST_CHANGES" | "PAUSE";
 type AdminCampaignCreateInput = z.infer<typeof adminCampaignCreateSchema>;
 type CampaignMissionInput = z.infer<typeof campaignMissionCreateSchema>;
+type AdminCampaignUpdateInput = {
+  title?: string;
+  brief?: string;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  budgetVnd?: number;
+  targetAmountVnd?: number;
+  imageUrl?: string;
+  reason?: string;
+};
 
 async function trySyncCampaignNewFields(campaignId: string, benefits: string | null, participationRoadmap: string[]) {
   try {
@@ -454,6 +464,89 @@ export async function addCampaignMissionByAdmin(actorId: string, campaignId: str
   });
 
   return mission;
+}
+
+export async function updateCampaignByAdmin(actorId: string, campaignId: string, input: AdminCampaignUpdateInput) {
+  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
+  if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
+
+  const nextStartsAt = input.startsAt === undefined ? undefined : input.startsAt ? new Date(input.startsAt) : null;
+  const nextEndsAt = input.endsAt === undefined ? undefined : input.endsAt ? new Date(input.endsAt) : null;
+  const startsAtForValidate = nextStartsAt === undefined ? campaign.startsAt : nextStartsAt;
+  const endsAtForValidate = nextEndsAt === undefined ? campaign.endsAt : nextEndsAt;
+  if (startsAtForValidate && endsAtForValidate && endsAtForValidate <= startsAtForValidate) {
+    throw new AppError("Ngày kết thúc phải sau ngày bắt đầu.", 422, "CAMPAIGN_TIMELINE_INVALID");
+  }
+
+  const updated = await prisma.campaign.update({
+    where: { id: campaignId },
+    data: {
+      title: input.title?.trim(),
+      brief: input.brief?.trim(),
+      startsAt: nextStartsAt,
+      endsAt: nextEndsAt,
+      budgetVnd: input.budgetVnd,
+      targetAmountVnd: input.targetAmountVnd,
+      coverImageUrl: input.imageUrl === "" ? null : input.imageUrl
+    }
+  });
+
+  await writeAuditLog({
+    actorId,
+    action: "ADMIN_CAMPAIGN_UPDATED",
+    targetType: "Campaign",
+    targetId: campaignId,
+    oldStatus: campaign.status,
+    newStatus: updated.status,
+    reason: input.reason ?? null,
+    metadata: {
+      before: {
+        title: campaign.title,
+        brief: campaign.brief,
+        startsAt: campaign.startsAt?.toISOString() ?? null,
+        endsAt: campaign.endsAt?.toISOString() ?? null,
+        budgetVnd: campaign.budgetVnd,
+        targetAmountVnd: campaign.targetAmountVnd,
+        coverImageUrl: campaign.coverImageUrl ?? null
+      },
+      after: {
+        title: updated.title,
+        brief: updated.brief,
+        startsAt: updated.startsAt?.toISOString() ?? null,
+        endsAt: updated.endsAt?.toISOString() ?? null,
+        budgetVnd: updated.budgetVnd,
+        targetAmountVnd: updated.targetAmountVnd,
+        coverImageUrl: updated.coverImageUrl ?? null
+      }
+    }
+  });
+
+  return updated;
+}
+
+export async function archiveCampaignByAdmin(actorId: string, campaignId: string, reason: string) {
+  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
+  if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
+  if (campaign.status === "ACTIVE") {
+    throw new AppError("Campaign đang ACTIVE, hãy tạm dừng trước khi xóa.", 409, "CAMPAIGN_ACTIVE_CANNOT_ARCHIVE");
+  }
+
+  const updated = await prisma.campaign.update({
+    where: { id: campaignId },
+    data: { status: "ARCHIVED" }
+  });
+
+  await writeAuditLog({
+    actorId,
+    action: "ADMIN_CAMPAIGN_ARCHIVED",
+    targetType: "Campaign",
+    targetId: campaignId,
+    oldStatus: campaign.status,
+    newStatus: updated.status,
+    reason
+  });
+
+  return updated;
 }
 
 export async function listCampaignMissionsByAdmin(campaignId: string) {

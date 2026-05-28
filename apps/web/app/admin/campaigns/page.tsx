@@ -30,7 +30,7 @@ export default function AdminCampaignsPage() {
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState("");
   const [acting, setActing] = useState(false);
-  const [action, setAction] = useState<{ type: "pause" | "resume" | "audit" | "force-close" | "mark-completed"; id: string } | null>(null);
+  const [action, setAction] = useState<{ type: "pause" | "resume" | "audit" | "force-close" | "mark-completed" | "delete"; id: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,7 +65,16 @@ export default function AdminCampaignsPage() {
 
   return (
     <>
-      <PageHeader title="Quản lý Campaign / Job" subtitle="Theo dõi vận hành campaign, can thiệp trạng thái và đối soát." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
+      <PageHeader
+        title="Quản lý Campaign / Job"
+        subtitle="Theo dõi vận hành campaign, can thiệp trạng thái và đối soát."
+        action={(
+          <div className="flex gap-2">
+            <Link className="dc-btn-primary" href="/admin/campaigns/create">Tạo campaign</Link>
+            <button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>
+          </div>
+        )}
+      />
       <section className="dc-card p-4 grid gap-3">
         <AdminTabs items={tabs} value={status} onChange={setStatus} />
         <div className="flex gap-2">
@@ -90,13 +99,15 @@ export default function AdminCampaignsPage() {
                 <p className="mt-2 line-clamp-2 text-sm text-zinc-600">{campaign.brief}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Link className="dc-btn-primary" href={`/admin/campaigns/${campaign.id}`}>Chi tiết</Link>
+                  <Link className="dc-btn-secondary" href={`/admin/campaigns/${campaign.id}`}>Chỉnh sửa</Link>
                   <ManagementActionMenu
                     items={[
                       { key: "pause", label: "Tạm dừng campaign" },
                       { key: "resume", label: "Tiếp tục campaign" },
                       { key: "mark-completed", label: "Mark completed" },
                       { key: "audit", label: "Chuyển đối soát" },
-                      { key: "force-close", label: "Force close", danger: true }
+                      { key: "force-close", label: "Force close", danger: true },
+                      { key: "delete", label: "Xóa campaign", danger: true }
                     ]}
                     onSelect={(key) => {
                       if (key === "pause") setAction({ type: "pause", id: campaign.id });
@@ -104,6 +115,7 @@ export default function AdminCampaignsPage() {
                       if (key === "audit") setAction({ type: "audit", id: campaign.id });
                       if (key === "force-close") setAction({ type: "force-close", id: campaign.id });
                       if (key === "mark-completed") setAction({ type: "mark-completed", id: campaign.id });
+                      if (key === "delete") setAction({ type: "delete", id: campaign.id });
                     }}
                   />
                 </div>
@@ -115,8 +127,8 @@ export default function AdminCampaignsPage() {
       {toast ? <ActionToast message={toast} /> : null}
       <ReviewActionDialog
         open={Boolean(action)}
-        title="Xác nhận action campaign"
-        description="Bắt buộc nhập lý do để ghi audit log."
+        title={action?.type === "delete" ? "Xác nhận xóa campaign" : "Xác nhận action campaign"}
+        description={action?.type === "delete" ? "Campaign sẽ bị chuyển sang trạng thái archived." : "Bắt buộc nhập lý do để ghi audit log."}
         requireReason
         submitting={acting}
         onCancel={() => !acting && setAction(null)}
@@ -130,8 +142,8 @@ export default function AdminCampaignsPage() {
             if (action.type === "audit") endpoint = "move-to-audit";
             if (action.type === "force-close") endpoint = "force-close";
             if (action.type === "mark-completed") endpoint = "mark-completed";
-            const res = await fetch(`/api/admin/campaigns/${action.id}/${endpoint}`, {
-              method: "PATCH",
+            const res = await fetch(action.type === "delete" ? `/api/admin/campaigns/${action.id}` : `/api/admin/campaigns/${action.id}/${endpoint}`, {
+              method: action.type === "delete" ? "DELETE" : "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ reason })
             });
