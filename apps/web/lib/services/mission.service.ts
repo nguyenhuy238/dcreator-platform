@@ -270,7 +270,9 @@ export async function approveProof(submissionId: string, reviewerId: string, rev
       }
     });
 
-    await grantRewardOnce(tx, submission.id, submission.accountId);
+    if (!submission.rewardHold) {
+      await grantRewardOnce(tx, submission.id, submission.accountId);
+    }
 
     await tx.auditLog.create({
       data: {
@@ -278,7 +280,7 @@ export async function approveProof(submissionId: string, reviewerId: string, rev
         action: "MISSION_PROOF_APPROVED",
         targetType: "MissionSubmission",
         targetId: submission.id,
-        metadata: { reviewerRole, note: note ?? null }
+        metadata: { reviewerRole, note: note ?? null, rewardHold: submission.rewardHold }
       }
     });
 

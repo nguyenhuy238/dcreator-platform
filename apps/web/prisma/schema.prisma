@@ -47,6 +47,7 @@ enum BrandMemberRole {
 enum BrandStatus {
   ACTIVE
   SUSPENDED
+  LOCKED
   REJECTED
   PENDING_VERIFICATION
 }
@@ -85,7 +86,20 @@ enum CampaignStatus {
   ACTIVE
   PAUSED
   COMPLETED
+  CANCELLED
   ARCHIVED
+}
+
+enum RiskSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum RiskFlagStatus {
+  OPEN
+  RESOLVED
+  ESCALATED
 }
 
 enum CampaignType {
@@ -414,6 +428,8 @@ model Account {
   auditLogs                     AuditLog[]
   notifications                 Notification[]
   riskFlags                     RiskFlag[]             @relation("RiskFlagAccount")
+  resolvedRiskFlags             RiskFlag[]             @relation("RiskFlagResolver")
+  internalNotes                 InternalNote[]         @relation("InternalNoteActor")
   sessions                      AuthSession[]
   roleRequests                  RoleRequest[]          @relation("RoleRequestApplicant")
   reviewedRoleRequests          RoleRequest[]          @relation("RoleRequestReviewer")
@@ -524,6 +540,11 @@ model CreatorProfile {
   bankAccountNumber String?
   bankName          String?
   taxCode           String?
+  isSuspended       Boolean         @default(false)
+  suspendedAt       DateTime?
+  suspendedReason   String?
+  unsuspendedAt     DateTime?
+  unsuspendedReason String?
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
@@ -636,6 +657,11 @@ model Brand {
   status                      BrandStatus @default(PENDING_VERIFICATION)
   reviewedById                String?
   reviewedAt                  DateTime?
+  isLocked                    Boolean     @default(false)
+  lockedAt                    DateTime?
+  lockReason                  String?
+  unlockedAt                  DateTime?
+  unlockReason                String?
   createdAt                   DateTime    @default(now())
   updatedAt                   DateTime    @updatedAt
 
@@ -849,6 +875,12 @@ model Campaign {
   isPublic                 Boolean                     @default(true)
   budgetVnd                Int
   status                   CampaignStatus              @default(DRAFT)
+  movedToAuditAt           DateTime?
+  movedToAuditById         String?
+  pausedReason             String?
+  resumedReason            String?
+  forceClosedAt            DateTime?
+  forceCloseReason         String?
   startsAt                 DateTime?
   endsAt                   DateTime?
   createdAt                DateTime                    @default(now())
@@ -1009,6 +1041,13 @@ model MissionSubmission {
   finalSubmittedAt           DateTime?
   approvedAt                 DateTime?
   rewardGrantedAt            DateTime?
+  rewardHold                Boolean                @default(false)
+  rewardHoldReason          String?
+  rewardHeldAt              DateTime?
+  rewardHeldById            String?
+  rewardReleasedAt          DateTime?
+  rewardReleasedById        String?
+  disputeStatus             String?
   status                     MissionStatus          @default(SUBMITTED)
   reviewedById               String?
   reviewedAt                 DateTime?
@@ -1351,11 +1390,34 @@ model RiskFlag {
   targetType String
   targetId   String
   reason     String
+  flagType   String?
+  severity   RiskSeverity   @default(MEDIUM)
+  status     RiskFlagStatus @default(OPEN)
+  note       String?
+  resolvedAt DateTime?
+  resolvedById String?
   score      Int      @default(0)
   metadata   Json?
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  account Account? @relation("RiskFlagAccount", fields: [accountId], references: [id])
+  account    Account? @relation("RiskFlagAccount", fields: [accountId], references: [id])
+  resolvedBy Account? @relation("RiskFlagResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+}
+
+model InternalNote {
+  id         String   @id @default(cuid())
+  targetType String
+  targetId   String
+  content    String
+  actorId    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  actor Account @relation("InternalNoteActor", fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([targetType, targetId, createdAt])
+  @@index([actorId, createdAt])
 }
 
 model SupportTicket {
