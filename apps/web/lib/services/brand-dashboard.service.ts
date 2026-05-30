@@ -326,8 +326,6 @@ function toOnboardingStatus(
     brand?.legalName &&
       brand.industry &&
       brand.taxCode &&
-      brand.productCategories &&
-      brand.inventoryDescription &&
       brand.bccAgreementVersion &&
       bccAgreementAccepted &&
       brand.legalResponsibilityAccepted &&
@@ -356,6 +354,54 @@ function toOnboardingStatus(
     status: brand?.status ?? null,
     reviewStatus: latestApplication?.status ?? null
   };
+}
+
+async function listBrandContractDocuments(accountId: string, brand: Brand | null) {
+  const applications = await prisma.brandApplication.findMany({
+    where: {
+      accountId,
+      contractFileUrl: { not: null }
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 20,
+    select: {
+      id: true,
+      status: true,
+      contractFileUrl: true,
+      contractSignedAt: true,
+      bccAgreementVersion: true,
+      reviewNote: true,
+      createdAt: true,
+      updatedAt: true
+    }
+  });
+
+  const documents = [];
+  if (brand) {
+    documents.push({
+      id: `brand-bcc-${brand.id}`,
+      title: brand.bccAgreementVersion ?? "BCC-dCreator-v1",
+      type: "BCC hiện hành",
+      status: brand.contractSignedAt ? "SIGNED" : "DRAFT",
+      fileUrl: brand.contractFileUrl ?? "",
+      signedAt: brand.contractSignedAt?.toISOString() ?? null,
+      submittedAt: brand.updatedAt.toISOString()
+    });
+  }
+
+  for (const application of applications) {
+    documents.push({
+      id: `application-${application.id}`,
+      title: application.bccAgreementVersion ?? "Tài liệu bổ sung",
+      type: application.reviewNote === "Brand requested onboarding/BCC update and admin review." ? "Bổ sung BCC" : "Hồ sơ Brand",
+      status: application.status,
+      fileUrl: application.contractFileUrl ?? "",
+      signedAt: application.contractSignedAt?.toISOString() ?? null,
+      submittedAt: application.updatedAt.toISOString()
+    });
+  }
+
+  return documents;
 }
 
 async function ensureBrandForOwner(accountId: string) {
@@ -422,12 +468,15 @@ async function ensureBrandForOwner(accountId: string) {
 export async function getBrandOnboarding(accountId: string) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true });
   const brand = ctx.brand;
-  const latestApplication = await prisma.brandApplication.findFirst({
-    where: { accountId },
-    orderBy: { createdAt: "desc" },
-    select: { bccAgreementAccepted: true, status: true, reviewNote: true }
-  });
-  return toOnboardingStatus(brand, latestApplication);
+  const [latestApplication, contractDocuments] = await Promise.all([
+    prisma.brandApplication.findFirst({
+      where: { accountId },
+      orderBy: { createdAt: "desc" },
+      select: { bccAgreementAccepted: true, status: true, reviewNote: true }
+    }),
+    listBrandContractDocuments(accountId, brand)
+  ]);
+  return { ...toOnboardingStatus(brand, latestApplication), contractDocuments };
 }
 
 export async function updateBrandOnboarding(accountId: string, input: BrandOnboardingInput) {
@@ -548,10 +597,14 @@ export async function updateBrandOnboarding(accountId: string, input: BrandOnboa
     });
   }
 
-  return toOnboardingStatus(updated, {
-    bccAgreementAccepted: input.bccAgreementAccepted,
-    status: isRequestReview ? "PENDING_REVIEW" : "APPROVED"
-  });
+  const contractDocuments = await listBrandContractDocuments(accountId, updated);
+  return {
+    ...toOnboardingStatus(updated, {
+      bccAgreementAccepted: input.bccAgreementAccepted,
+      status: isRequestReview ? "PENDING_REVIEW" : "APPROVED"
+    }),
+    contractDocuments
+  };
 }
 
 export async function getBrandProfile(accountId: string) {

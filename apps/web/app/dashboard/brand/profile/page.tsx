@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
 
 type BrandProfile = {
@@ -154,6 +155,11 @@ export default function BrandProfilePage() {
     <>
       
       <>
+        <div className="mb-4">
+          <Link href="/dashboard/brand/settings" className="inline-flex rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100">
+            ← Quay lại
+          </Link>
+        </div>
         <PageHeader title="Hồ sơ Brand" subtitle="Quản lý thông tin hiển thị và trạng thái xác minh của Brand." />
         {error ? <ErrorState title="Không thể tải hồ sơ" description={error} onRetry={() => void loadProfile()} /> : null}
         {success ? <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p> : null}

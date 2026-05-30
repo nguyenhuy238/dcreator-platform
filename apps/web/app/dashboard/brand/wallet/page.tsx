@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatsCard } from "@/app/components/dcreator/ui/base";
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string };
@@ -265,6 +266,11 @@ export default function BrandWalletPage() {
 
   return (
     <>
+      <div className="mb-4">
+        <Link href="/dashboard/brand/settings" className="inline-flex rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100">
+          ← Quay lại
+        </Link>
+      </div>
       <PageHeader title="Ví N-Point" subtitle="Theo dõi số dư N-Point và gửi yêu cầu nạp/hoàn tiền với admin." />
 
       {error ? <ErrorState title="Không thể xử lý ví N-Point" description={error} onRetry={() => void load()} /> : null}

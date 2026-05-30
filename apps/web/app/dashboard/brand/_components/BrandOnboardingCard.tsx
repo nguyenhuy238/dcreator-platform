@@ -58,16 +58,15 @@ export function BrandOnboardingCard() {
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">Brand onboarding</p>
           <h2 className="mt-2 text-xl font-black text-zinc-900">{data.completed ? "BCC đã hoàn tất" : "Cần hoàn tất BCC"}</h2>
           <p className="mt-1 text-sm text-zinc-700">
-            Bổ sung pháp lý, danh mục sản phẩm/tồn kho và xác nhận BCC trước khi vận hành campaign chính thức.
+            Bổ sung pháp lý và xác nhận BCC trước khi vận hành campaign chính thức.
           </p>
         </div>
         <Link href="/dashboard/brand/onboarding" className={data.completed ? "dc-btn-secondary" : "dc-btn-primary"}>
           {data.completed ? "Xem BCC" : "Hoàn tất BCC"}
         </Link>
       </div>
-      <div className="mt-4 grid gap-2 text-sm text-zinc-700 md:grid-cols-4">
+      <div className="mt-4 grid gap-2 text-sm text-zinc-700 md:grid-cols-3">
         <p>Pháp lý: {data.legalName && data.taxCode ? "OK" : "Thiếu"}</p>
-        <p>Sản phẩm: {data.productCategories ? "OK" : "Thiếu"}</p>
         <p>BCC: {data.legalResponsibilityAccepted ? data.bccAgreementVersion : "Chưa xác nhận"}</p>
         <p>Commission: {data.commissionRatePercent}%</p>
       </div>

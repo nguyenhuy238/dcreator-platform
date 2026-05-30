@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useEffect, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
 
 const BCC_AGREEMENT_TERMS = `HỢP ĐỒNG BCC dCreator v1
@@ -47,6 +47,59 @@ Brand cam kết bảo mật thông tin khách hàng và chỉ sử dụng dữ l
 10. Hiệu lực và điều khoản chung
 Brand xác nhận đã đọc, hiểu và đồng ý với nội dung hợp đồng BCC khi hoàn tất BCC. URL hợp đồng BCC đã ký chỉ là tài liệu phụ được đính kèm để lưu giữ văn bản chính thức.`;
 
+const BCC_AGREEMENT_ROWS = [
+  {
+    section: "1",
+    title: "Mục đích hợp đồng",
+    content: "Xác lập quyền và nghĩa vụ giữa Brand và dCreator trong việc hợp tác triển khai chiến dịch, phát hành voucher/reward, quản lý vận hành và thanh toán doanh thu."
+  },
+  {
+    section: "2",
+    title: "Phạm vi hợp tác",
+    content: "Brand cung cấp sản phẩm, voucher, reward và thông tin liên quan cho chiến dịch. dCreator cung cấp nền tảng vận hành, hiển thị, thanh toán và hỗ trợ giao dịch."
+  },
+  {
+    section: "3",
+    title: "Nghĩa vụ của Brand",
+    content: "Brand cung cấp thông tin chính xác, đảm bảo chất lượng hàng hóa, xử lý hoàn tiền/đổi trả/khiếu nại và phối hợp giải quyết tranh chấp."
+  },
+  {
+    section: "4",
+    title: "Nghĩa vụ của dCreator",
+    content: "dCreator cung cấp nền tảng hiển thị chiến dịch, hỗ trợ thanh toán, xác thực voucher, thông báo trạng thái và hỗ trợ kỹ thuật."
+  },
+  {
+    section: "5",
+    title: "Doanh thu và phí",
+    content: "Commission nền tảng là 10% trên doanh thu hợp lệ của chiến dịch. Phần doanh thu còn lại thuộc về Brand theo tỷ lệ thỏa thuận."
+  },
+  {
+    section: "6",
+    title: "Voucher và tồn kho",
+    content: "Brand chịu trách nhiệm phát hành voucher theo khả năng đáp ứng thực tế và xử lý các trường hợp hết hàng, hủy đơn hoặc bồi thường theo quy định."
+  },
+  {
+    section: "7",
+    title: "Thông tin bổ sung",
+    content: "Các yêu cầu bổ sung về chiến dịch, voucher, điều kiện đổi quà hoặc trợ giá chỉ có hiệu lực khi được dCreator chấp thuận bằng văn bản."
+  },
+  {
+    section: "8",
+    title: "Thuế và pháp lý",
+    content: "Brand chịu toàn bộ nghĩa vụ về thuế, hóa đơn, giấy phép kinh doanh, chứng nhận chất lượng và các quy định pháp lý liên quan."
+  },
+  {
+    section: "9",
+    title: "Bảo mật dữ liệu",
+    content: "Brand cam kết bảo mật thông tin khách hàng và chỉ sử dụng dữ liệu để phục vụ đơn hàng, đổi quà và chăm sóc khách hàng."
+  },
+  {
+    section: "10",
+    title: "Hiệu lực",
+    content: "Brand xác nhận đã đọc, hiểu và đồng ý với nội dung hợp đồng BCC khi hoàn tất BCC."
+  }
+] as const;
+
 type Onboarding = {
   completed: boolean;
   legalName: string;
@@ -63,8 +116,19 @@ type Onboarding = {
   legalResponsibilityAccepted: boolean;
   contractFileUrl: string;
   contractSignedAt: string | null;
+  contractDocuments: ContractDocument[];
   supplementaryBccReviewApproved: boolean;
   reviewStatus: "DRAFT" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_REVISION" | null;
+};
+
+type ContractDocument = {
+  id: string;
+  title: string;
+  type: string;
+  status: string;
+  fileUrl: string;
+  signedAt: string | null;
+  submittedAt: string;
 };
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string };
@@ -92,9 +156,53 @@ const defaultForm: Onboarding = {
   legalResponsibilityAccepted: false,
   contractFileUrl: "",
   contractSignedAt: null,
+  contractDocuments: [],
   supplementaryBccReviewApproved: false,
   reviewStatus: null
 };
+
+function formatDateTime(value: string | null) {
+  if (!value) return "-";
+  return new Date(value).toLocaleString("vi-VN");
+}
+
+function statusLabel(status: string) {
+  switch (status) {
+    case "SIGNED":
+      return "Đã ký";
+    case "APPROVED":
+      return "Đã duyệt";
+    case "PENDING_REVIEW":
+      return "Chờ duyệt";
+    case "REJECTED":
+      return "Từ chối";
+    case "NEEDS_REVISION":
+      return "Cần sửa";
+    default:
+      return "Bản nháp";
+  }
+}
+
+function statusClassName(status: string) {
+  switch (status) {
+    case "SIGNED":
+    case "APPROVED":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "PENDING_REVIEW":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "REJECTED":
+    case "NEEDS_REVISION":
+      return "border-red-200 bg-red-50 text-red-700";
+    default:
+      return "border-zinc-200 bg-zinc-100 text-zinc-700";
+  }
+}
+
+function fileNameFromUrl(value: string) {
+  if (!value) return "-";
+  const clean = value.split("?")[0] ?? value;
+  return decodeURIComponent(clean.split("/").pop() || "Tệp hợp đồng");
+}
 
 export default function BrandOnboardingPage() {
   const [form, setForm] = useState<Onboarding>(defaultForm);
@@ -110,6 +218,21 @@ export default function BrandOnboardingPage() {
   const isWaitingReview = form.reviewStatus === "PENDING_REVIEW";
   const isSupplementaryBccApproved = form.supplementaryBccReviewApproved;
   const isSigned = form.completed && Boolean(form.contractSignedAt);
+  const contractRows = useMemo(() => {
+    const rows = [...form.contractDocuments];
+    if (form.contractFileUrl && !rows.some((item) => item.fileUrl === form.contractFileUrl)) {
+      rows.unshift({
+        id: "current-upload",
+        title: form.bccAgreementVersion || "Tài liệu vừa upload",
+        type: "Tài liệu vừa upload",
+        status: form.reviewStatus ?? "DRAFT",
+        fileUrl: form.contractFileUrl,
+        signedAt: form.contractSignedAt,
+        submittedAt: new Date().toISOString()
+      });
+    }
+    return rows;
+  }, [form.bccAgreementVersion, form.contractDocuments, form.contractFileUrl, form.contractSignedAt, form.reviewStatus]);
 
   function setField<K extends keyof Onboarding>(name: K, value: Onboarding[K]) {
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -218,14 +341,6 @@ export default function BrandOnboardingPage() {
       errors.taxCode = "Vui lòng nhập Mã số thuế.";
     } else if (form.taxCode.trim().length < 3) {
       errors.taxCode = "Mã số thuế phải ít nhất 3 ký tự.";
-    }
-    if (!form.productCategories || !form.productCategories.trim()) {
-      errors.productCategories = "Vui lòng nhập Danh mục sản phẩm.";
-    } else if (form.productCategories.trim().length < 2) {
-      errors.productCategories = "Danh mục sản phẩm phải ít nhất 2 ký tự.";
-    }
-    if (!form.inventoryDescription || form.inventoryDescription.trim().length < 10) {
-      errors.inventoryDescription = "Mô tả tồn kho phải ít nhất 10 ký tự.";
     }
     const normalizedBusinessLicenseUrl = normalizeOptionalUrl(form.businessLicenseUrl);
     if (form.businessLicenseUrl.trim() && !isValidHttpUrl(normalizedBusinessLicenseUrl)) {
@@ -413,18 +528,6 @@ export default function BrandOnboardingPage() {
             </section>
 
             <section className="dc-card grid gap-4 p-5">
-              <SectionHeader title="Sản phẩm / tồn kho" />
-              <div className="grid gap-1">
-                <input id="productCategories" className={`dc-input ${fieldErrors.productCategories ? "border-red-500 ring-1 ring-red-300" : ""}`} placeholder="Danh mục sản phẩm" value={form.productCategories} onChange={(e) => setField("productCategories", e.target.value)} />
-                {fieldErrors.productCategories ? <p className="text-sm text-red-600">{fieldErrors.productCategories}</p> : null}
-              </div>
-              <div className="grid gap-1">
-                <textarea id="inventoryDescription" className={`dc-input min-h-28 ${fieldErrors.inventoryDescription ? "border-red-500 ring-1 ring-red-300" : ""}`} placeholder="Tồn kho, voucher, điều kiện đổi quà..." value={form.inventoryDescription} onChange={(e) => setField("inventoryDescription", e.target.value)} />
-                {fieldErrors.inventoryDescription ? <p className="text-sm text-red-600">{fieldErrors.inventoryDescription}</p> : null}
-              </div>
-            </section>
-
-            <section className="dc-card grid gap-4 p-5">
               <SectionHeader title="Hợp đồng BCC" />
               <p className="text-sm text-zinc-600">Nội dung bên dưới là hợp đồng BCC hiện hành giữa Brand và dCreator. Brand không thể sửa trực tiếp các điều khoản này tại đây; nếu cần thêm nội dung hoặc đề xuất sửa đổi, vui lòng gửi kèm tài liệu cho admin xem xét.</p>
               <div className="grid gap-3 text-sm text-zinc-700 md:grid-cols-3">
@@ -434,32 +537,91 @@ export default function BrandOnboardingPage() {
               </div>
               <div className="grid gap-2">
                 <label className="text-sm text-zinc-600">Nội dung hợp đồng BCC</label>
-                <div className="dc-card bg-zinc-50 p-4 rounded-2xl text-sm whitespace-pre-wrap overflow-y-auto max-h-96">
-                  {form.bccAgreementTerms}
+                <div className="overflow-x-auto rounded-2xl border border-zinc-200">
+                  <table className="min-w-full divide-y divide-zinc-200 text-sm">
+                    <thead className="bg-zinc-50 text-left text-xs font-bold uppercase tracking-[0.12em] text-zinc-500">
+                      <tr>
+                        <th className="w-20 px-4 py-3">Mục</th>
+                        <th className="w-64 px-4 py-3">Điều khoản</th>
+                        <th className="px-4 py-3">Nội dung</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100 bg-white">
+                      {BCC_AGREEMENT_ROWS.map((item) => (
+                        <tr key={item.section} className="align-top">
+                          <td className="px-4 py-3 font-bold text-zinc-900">{item.section}</td>
+                          <td className="px-4 py-3 font-semibold text-zinc-900">{item.title}</td>
+                          <td className="px-4 py-3 leading-6 text-zinc-600">{item.content}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-              <div className="grid gap-2">
-                <label className="text-sm text-zinc-600">Tải lên hợp đồng / tài liệu bổ sung</label>
-                <input
-                  id="contractDocument"
-                  type="file"
-                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
-                  className={`dc-input bg-white ${fieldErrors.contractFileUrl ? "border-red-500 ring-1 ring-red-300" : ""}`}
-                  disabled={uploadingContractFile}
-                  onChange={handleContractFileChange}
-                />
+              <div className="grid gap-3">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-zinc-900">Danh sách hợp đồng / tài liệu</p>
+                    <p className="mt-1 text-xs text-zinc-500">Theo dõi BCC hiện hành và các tài liệu bổ sung đã gửi admin duyệt.</p>
+                  </div>
+                  <label className="inline-flex cursor-pointer rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100">
+                    Tải lên tài liệu
+                    <input
+                      id="contractDocument"
+                      type="file"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
+                      className="sr-only"
+                      disabled={uploadingContractFile}
+                      onChange={handleContractFileChange}
+                    />
+                  </label>
+                </div>
                 {uploadingContractFile ? <p className="text-sm text-zinc-500">Đang tải file lên...</p> : null}
                 {contractFile ? <p className="text-sm text-zinc-500">Tệp đã chọn: {contractFile.name}</p> : null}
-                {form.contractFileUrl ? (
-                  <p className="text-sm text-zinc-500">
-                    Tệp đã upload: <a href={form.contractFileUrl} target="_blank" rel="noreferrer" className="underline">{form.contractFileUrl}</a>
-                  </p>
-                ) : null}
                 {fieldErrors.contractFileUrl ? <p className="text-sm text-red-600">{fieldErrors.contractFileUrl}</p> : null}
                 {contractUploadError ? <p className="text-sm text-red-600">{contractUploadError}</p> : null}
-                <p className="text-xs text-zinc-500">
-                  Chọn file hợp đồng hoặc tài liệu bổ sung để gửi admin duyệt. File sẽ được upload lên hệ thống và lưu đường dẫn.
-                </p>
+
+                <div className="overflow-x-auto rounded-2xl border border-zinc-200">
+                  <table className="min-w-full divide-y divide-zinc-200 text-sm">
+                    <thead className="bg-zinc-50 text-left text-xs font-bold uppercase tracking-[0.12em] text-zinc-500">
+                      <tr>
+                        <th className="px-4 py-3">Hợp đồng</th>
+                        <th className="px-4 py-3">Loại</th>
+                        <th className="px-4 py-3">Trạng thái</th>
+                        <th className="px-4 py-3">Ngày gửi</th>
+                        <th className="px-4 py-3">Ngày ký</th>
+                        <th className="px-4 py-3 text-right">Tệp</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100 bg-white">
+                      {contractRows.map((item) => (
+                        <tr key={item.id} className="align-top">
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-zinc-900">{item.title}</p>
+                            <p className="mt-1 max-w-xs truncate text-xs text-zinc-500">{item.fileUrl ? fileNameFromUrl(item.fileUrl) : "Nội dung BCC trên hệ thống"}</p>
+                          </td>
+                          <td className="px-4 py-3 text-zinc-600">{item.type}</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassName(item.status)}`}>
+                              {statusLabel(item.status)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-zinc-600">{formatDateTime(item.submittedAt)}</td>
+                          <td className="px-4 py-3 text-zinc-600">{formatDateTime(item.signedAt)}</td>
+                          <td className="px-4 py-3 text-right">
+                            {item.fileUrl ? (
+                              <a href={item.fileUrl} target="_blank" rel="noreferrer" className="font-semibold text-zinc-900 underline">
+                                Xem file
+                              </a>
+                            ) : (
+                              <span className="text-zinc-400">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
               <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700">
                 <p className="font-semibold text-zinc-900">Điều khoản chi tiết BCC</p>

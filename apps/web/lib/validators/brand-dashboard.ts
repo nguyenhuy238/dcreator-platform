@@ -103,12 +103,6 @@ export const brandOnboardingSchema = z.object({
   if (!value.taxCode || value.taxCode.trim().length < 3) {
     ctx.addIssue({ code: "custom", path: ["taxCode"], message: "Vui lòng nhập Mã số thuế." });
   }
-  if (!value.productCategories || value.productCategories.trim().length < 2) {
-    ctx.addIssue({ code: "custom", path: ["productCategories"], message: "Vui lòng nhập Danh mục sản phẩm." });
-  }
-  if (!value.inventoryDescription || value.inventoryDescription.trim().length < 10) {
-    ctx.addIssue({ code: "custom", path: ["inventoryDescription"], message: "Mô tả tồn kho phải ít nhất 10 ký tự." });
-  }
 });
 
 export const campaignCreateSchema = z.object({
