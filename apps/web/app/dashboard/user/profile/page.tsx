@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell } from "@/app/components/dcreator/layout/shell";
 import type { Role } from "@prisma/client";
 import { getNavItemsForWorkspace } from "@/lib/navigation";
@@ -25,10 +25,7 @@ type Snapshot = {
 
 const defaultCreator = {
   displayName: "",
-  mainPlatform: "TIKTOK",
-  socialUrl: "",
-  bio: "",
-  followerCount: ""
+  bio: ""
 };
 
 const defaultBrand = {
@@ -65,11 +62,8 @@ function resolveAvatarSrc(input?: string | null) {
   }
 }
 
-function onlyDigits(raw: string) {
-  return raw.replace(/\D/g, "");
-}
-
 export default function UserProfilePage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -134,16 +128,12 @@ export default function UserProfilePage() {
     setError("");
     setSuccess("");
 
-    const currentStatus = data.creatorApplication?.status as string | undefined;
-    const isResubmit = currentStatus === "REJECTED" || currentStatus === "NEEDS_REVISION";
-    const endpoint = "/api/profile/creator-application";
     const body = {
-      ...creatorForm,
-      followerCount: creatorForm.followerCount ? Number(creatorForm.followerCount) : undefined,
-      applicationId: isResubmit ? data.creatorApplication?.id : undefined
+      displayName: creatorForm.displayName || data.account.displayName,
+      bio: creatorForm.bio
     };
-    const response = await fetch(endpoint, {
-      method: isResubmit ? "PATCH" : "POST",
+    const response = await fetch("/api/creator/create", {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
     });
@@ -153,8 +143,9 @@ export default function UserProfilePage() {
       setError(payload.error ?? "Gửi đơn Creator thất bại");
       return;
     }
-    setSuccess("Hồ sơ Creator đã được tạo. Bạn có thể bắt đầu thiết lập dashboard.");
-    await load();
+    setSuccess("Creator Profile đã được tạo. Hãy thêm kênh social đầu tiên của bạn.");
+    router.push("/dashboard/creator?created=1");
+    router.refresh();
   }
 
   async function submitBrand(event: FormEvent) {
@@ -244,6 +235,7 @@ export default function UserProfilePage() {
 
   const creatorStatus = data.creatorApplication?.status as string | undefined;
   const brandStatus = data.brandApplication?.status as string | undefined;
+  const isCreator = data.account.roles.includes("CREATOR");
 
   return (
     <>
@@ -299,24 +291,20 @@ export default function UserProfilePage() {
         <section className="mt-6 grid gap-4 md:grid-cols-2">
           <div className="dc-card p-5">
             <h2 className="text-xl font-bold">Nâng cấp Creator</h2>
-            <p className="mt-2 text-sm">Trạng thái: <span className="font-semibold">{statusText(creatorStatus)}</span></p>
+            <p className="mt-2 text-sm">Trạng thái: <span className="font-semibold">{isCreator ? "Creator Profile đã được tạo" : statusText(creatorStatus)}</span></p>
+            {isCreator || creatorStatus === "APPROVED" || creatorStatus === "PENDING_REVIEW" ? (
+              <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+                Xác minh danh tính giúp mở khóa payout.
+              </p>
+            ) : null}
             {data.creatorApplication?.rejectReason ? <p className="mt-2 text-sm text-red-700">Lý do: {String(data.creatorApplication.rejectReason)}</p> : null}
-            {creatorStatus === "APPROVED" || creatorStatus === "PENDING_REVIEW" ? <Link className="dc-btn-primary mt-4 inline-flex" href="/dashboard/creator">Vào Bảng điều khiển Nhà sáng tạo</Link> : null}
-            {creatorStatus !== "APPROVED" && creatorStatus !== "PENDING_REVIEW" ? (
+            {isCreator || creatorStatus === "APPROVED" || creatorStatus === "PENDING_REVIEW" ? <Link className="dc-btn-primary mt-4 inline-flex" href="/dashboard/creator">Vào Bảng điều khiển Nhà sáng tạo</Link> : null}
+            {!isCreator && creatorStatus !== "APPROVED" && creatorStatus !== "PENDING_REVIEW" ? (
               <form className="mt-4 grid gap-3" onSubmit={submitCreator}>
                 <input className="dc-input" placeholder="Tên hiển thị" value={creatorForm.displayName} onChange={(e) => setCreatorForm((x) => ({ ...x, displayName: e.target.value }))} required />
-                <select className="dc-input" value={creatorForm.mainPlatform} onChange={(e) => setCreatorForm((x) => ({ ...x, mainPlatform: e.target.value }))}>
-                  <option value="TIKTOK">TIKTOK</option>
-                  <option value="INSTAGRAM">INSTAGRAM</option>
-                  <option value="YOUTUBE">YOUTUBE</option>
-                  <option value="FACEBOOK">FACEBOOK</option>
-                  <option value="OTHER">OTHER</option>
-                </select>
-                <input className="dc-input" placeholder="Liên kết mạng xã hội" type="url" value={creatorForm.socialUrl} onChange={(e) => setCreatorForm((x) => ({ ...x, socialUrl: e.target.value }))} required />
-                <input className="dc-input" placeholder="Số lượng người theo dõi" type="text" inputMode="numeric" value={creatorForm.followerCount} onChange={(e) => setCreatorForm((x) => ({ ...x, followerCount: onlyDigits(e.target.value) }))} />
-                <p className="text-xs font-medium text-zinc-500">Đơn vị: follower, chỉ nhập số.</p>
                 <textarea className="dc-input min-h-24" placeholder="Giới thiệu bản thân" value={creatorForm.bio} onChange={(e) => setCreatorForm((x) => ({ ...x, bio: e.target.value }))} />
-                <button className="dc-btn-primary" disabled={submittingCreator} type="submit">{submittingCreator ? "Đang gửi..." : creatorStatus ? "Gửi lại hồ sơ Creator" : "Đăng ký Creator"}</button>
+                <p className="text-xs font-medium text-zinc-500">Sau khi tạo profile, hãy thêm kênh social đầu tiên trong Creator Dashboard.</p>
+                <button className="dc-btn-primary" disabled={submittingCreator} type="submit">{submittingCreator ? "Đang tạo..." : "Trở thành Creator"}</button>
               </form>
             ) : null}
           </div>

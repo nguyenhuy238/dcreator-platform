@@ -97,7 +97,7 @@ function LoginPageContent() {
           <p className="text-xs font-bold uppercase tracking-[0.15em] text-zinc-500">dCreator</p>
           <h1 className="mt-3 text-4xl font-black tracking-tight">Kết nối ảnh hưởng, mở rộng doanh thu.</h1>
           <p className="mt-3 text-zinc-600">
-            Đăng nhập tài khoản cơ bản, sau đó nâng cấp Creator/Brand tại User profile để gửi hồ sơ duyệt.
+            Đăng nhập tài khoản cơ bản, sau đó tạo Creator Profile hoặc Brand và dùng dashboard ngay.
           </p>
         </section>
         <form className="mx-auto w-full max-w-md space-y-4 rounded-[28px] border border-zinc-200 bg-white p-6 shadow-[0_40px_120px_-60px_rgba(24,24,27,0.55)]" onSubmit={onSubmit}>

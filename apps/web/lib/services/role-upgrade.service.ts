@@ -125,6 +125,7 @@ async function syncCreatorAccessFromApplication(tx: Prisma.TransactionClient, ap
       platform: app.mainPlatform,
       socialUrl: app.socialUrl,
       followers: app.followerCount ?? 0,
+      isPrimary: true,
       status: "APPROVED",
       reviewedAt: new Date()
     },
