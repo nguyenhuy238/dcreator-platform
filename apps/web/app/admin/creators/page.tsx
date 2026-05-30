@@ -7,16 +7,28 @@ import { ManagementActionMenu } from "@/app/admin/_components/ManagementActionMe
 import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
 
-type Item = { id: string; status: string; displayName: string; mainPlatform: string; socialUrl: string; contentCategory: string | null; account: { email: string }; createdAt: string };
+type Item = {
+  id: string;
+  status: string;
+  verificationStatus: string;
+  riskFlag: boolean;
+  displayName: string;
+  mainPlatform: string;
+  socialUrl: string;
+  contentCategory: string | null;
+  campaignCount: number;
+  payoutCount: number;
+  transactionTotal: number;
+  channelCount: number;
+  account: { email: string; displayName: string };
+  createdAt: string;
+};
 type ApiResult<T> = { success: boolean; data: T; error?: string };
 
 const tabs = [
   { key: "", label: "Tất cả" },
-  { key: "PENDING_REVIEW", label: "Chờ duyệt" },
-  { key: "NEEDS_REVISION", label: "Cần bổ sung" },
-  { key: "APPROVED", label: "Đã duyệt" },
-  { key: "REJECTED", label: "Bị từ chối" },
-  { key: "SUSPENDED", label: "Bị khóa" },
+  { key: "ACTIVE", label: "Active" },
+  { key: "SUSPENDED", label: "Suspended" },
   { key: "RISK", label: "Có rủi ro" }
 ];
 
@@ -24,7 +36,7 @@ export default function AdminCreatorsPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [status, setStatus] = useState("PENDING_REVIEW");
+  const [status, setStatus] = useState("");
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState("");
   const [acting, setActing] = useState(false);
@@ -35,7 +47,7 @@ export default function AdminCreatorsPage() {
     setError("");
     try {
       const params = new URLSearchParams();
-      if (status && status !== "SUSPENDED" && status !== "RISK") params.set("status", status);
+      if (status && status !== "RISK") params.set("status", status);
       if (query.trim()) params.set("query", query.trim());
       const res = await fetch(`/api/admin/creators?${params.toString()}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<Item[]>;
@@ -51,14 +63,13 @@ export default function AdminCreatorsPage() {
   useEffect(() => { void load(); }, [load]);
 
   const filtered = useMemo(() => {
-    if (status === "RISK") return items.filter((x) => x.mainPlatform === "OTHER");
-    if (status === "SUSPENDED") return [];
+    if (status === "RISK") return items.filter((x) => x.riskFlag);
     return items;
   }, [items, status]);
 
   return (
     <>
-      <PageHeader title="Quản lý Creator" subtitle="Theo dõi, can thiệp và quản lý toàn vòng đời Creator." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
+      <PageHeader title="Quản lý Creator" subtitle="Giám sát rủi ro, moderation và trạng thái vận hành Creator (không dùng để duyệt onboarding ban đầu)." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
       <section className="dc-card p-4 grid gap-3">
         <AdminTabs items={tabs} value={status} onChange={setStatus} />
         <div className="flex gap-2">
@@ -77,8 +88,15 @@ export default function AdminCreatorsPage() {
                   <div>
                     <p className="font-semibold">{item.displayName}</p>
                     <p className="text-xs text-zinc-500">{item.mainPlatform} • {item.contentCategory ?? "-"} • {item.account.email}</p>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      Campaign/jobs: {item.campaignCount} • Payouts: {item.payoutCount} • Channels: {item.channelCount}
+                    </p>
                   </div>
-                  <StatusBadge status={item.status.toLowerCase()} />
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <StatusBadge status={item.status} />
+                    <StatusBadge status={item.verificationStatus} />
+                    {item.riskFlag ? <StatusBadge status="risk" /> : null}
+                  </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Link className="dc-btn-primary" href={`/admin/creators/${item.id}`}>Chi tiết</Link>

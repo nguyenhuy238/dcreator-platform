@@ -48,8 +48,8 @@ async function getRecentAuditLogs() {
 }
 
 const queueCards: Array<{ key: keyof AdminOverview["queues"]; title: string; href: string }> = [
-  { key: "brandPendingReview", title: "Brand pending", href: "/admin/brands" },
-  { key: "creatorPendingReview", title: "Creator pending", href: "/admin/creators" },
+  { key: "brandPendingReview", title: "Brand cần giám sát", href: "/admin/brands" },
+  { key: "creatorPendingReview", title: "Creator cần giám sát", href: "/admin/creators" },
   { key: "campaignPendingReview", title: "Campaign cần xử lý", href: "/admin/campaigns" },
   { key: "contentSubmissionsPendingReview", title: "Proof/video pending", href: "/admin/proofs" },
   { key: "payoutPendingReview", title: "Payout pending", href: "/admin/payouts" },
@@ -101,7 +101,7 @@ export function AdminDashboardClient() {
     <>
       <PageHeader
         title="Admin Command Center"
-        subtitle="Ưu tiên xử lý các queue pending trước khi theo dõi KPI tổng."
+        subtitle="Ưu tiên rủi ro vận hành, verification, payout và campaign review trước khi theo dõi KPI tổng."
         action={<button className="dc-btn-secondary" onClick={() => void refresh()}>Làm mới</button>}
       />
 

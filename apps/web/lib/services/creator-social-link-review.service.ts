@@ -7,7 +7,7 @@ type ReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
 type ListCreatorSocialLinkRequestOptions = {
   status?: ReviewStatus;
   query?: string;
-  platform?: "TIKTOK" | "INSTAGRAM" | "YOUTUBE" | "FACEBOOK" | "OTHER";
+  platform?: "TIKTOK" | "INSTAGRAM" | "YOUTUBE" | "FACEBOOK" | "SHOPEE" | "OTHER";
   sort?: "newest" | "oldest";
 };
 
@@ -127,6 +127,7 @@ export async function reviewCreatorSocialLinkRequest(
       where: { id: linkId },
       data: {
         status,
+        verificationStatus: status === "APPROVED" ? "VERIFIED" : status === "REJECTED" ? "REJECTED" : "PENDING",
         rejectReason: status === "APPROVED" ? null : rejectReason ?? null,
         reviewNote: reviewNote ?? null,
         reviewedById: actorId,

@@ -11,7 +11,13 @@ function deny(request: NextRequest) {
   return NextResponse.redirect(url);
 }
 
-async function resolveCurrentRoles(request: NextRequest, fallbackRole: Role): Promise<Role[]> {
+type ResolvedAccessContext = {
+  roles: Role[];
+  creatorProfile?: { id: string } | null;
+  brandMemberships?: Array<{ id: string; role: "OWNER" | "STAFF" }>;
+};
+
+async function resolveCurrentAccessContext(request: NextRequest, fallbackRole: Role): Promise<ResolvedAccessContext> {
   try {
     const response = await fetch(new URL("/api/auth/me", request.url), {
       cache: "no-store",
@@ -19,16 +25,27 @@ async function resolveCurrentRoles(request: NextRequest, fallbackRole: Role): Pr
         cookie: request.headers.get("cookie") ?? ""
       }
     });
-    if (!response.ok) return [fallbackRole];
-    const payload = (await response.json()) as { success?: boolean; data?: { user?: { roles?: Role[] } } };
+    if (!response.ok) return { roles: [fallbackRole] };
+    const payload = (await response.json()) as {
+      success?: boolean;
+      data?: {
+        user?: {
+          roles?: Role[];
+          creatorProfile?: { id: string } | null;
+          brandMemberships?: Array<{ id: string; role: "OWNER" | "STAFF" }>;
+        };
+      };
+    };
     const roles = payload?.data?.user?.roles;
+    const creatorProfile = payload?.data?.user?.creatorProfile;
+    const brandMemberships = payload?.data?.user?.brandMemberships;
     if (payload?.success && Array.isArray(roles) && roles.length > 0) {
-      return roles;
+      return { roles, creatorProfile, brandMemberships };
     }
   } catch {
     // fallback below
   }
-  return [fallbackRole];
+  return { roles: [fallbackRole] };
 }
 
 export async function proxy(request: NextRequest) {
@@ -41,9 +58,9 @@ export async function proxy(request: NextRequest) {
 
   try {
     const session = decodeSession(token);
-    const roles = await resolveCurrentRoles(request, session.role);
+    const { roles, creatorProfile, brandMemberships } = await resolveCurrentAccessContext(request, session.role);
     const workspace = getWorkspaceForPath(request.nextUrl.pathname);
-    if (!canAccessWorkspaceByRoles(workspace, roles)) {
+    if (!canAccessWorkspaceByRoles(workspace, roles, { creatorProfile, brandMemberships })) {
       const url = new URL("/dashboard/user", request.url);
       url.searchParams.set("denied", deniedWorkspaceMessage(workspace));
       return NextResponse.redirect(url);

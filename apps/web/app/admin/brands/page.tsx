@@ -7,15 +7,26 @@ import { ManagementActionMenu } from "@/app/admin/_components/ManagementActionMe
 import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
 
-type Item = { id: string; status: string; brandName: string; industry: string | null; contactEmail: string; account: { email: string; displayName: string }; createdAt: string };
+type Item = {
+  id: string;
+  status: string;
+  verificationStatus: string;
+  riskFlag: boolean;
+  brandName: string;
+  industry: string | null;
+  contactEmail: string;
+  campaignCount: number;
+  memberCount: number;
+  productCount: number;
+  transactionTotal: number;
+  account: { email: string; displayName: string };
+  createdAt: string;
+};
 type ApiResult<T> = { success: boolean; data: T; error?: string };
 
 const tabs = [
   { key: "", label: "Tất cả" },
-  { key: "PENDING_REVIEW", label: "Chờ duyệt" },
-  { key: "NEEDS_REVISION", label: "Cần bổ sung" },
-  { key: "APPROVED", label: "Đã xác minh" },
-  { key: "REJECTED", label: "Bị từ chối" },
+  { key: "ACTIVE", label: "Active" },
   { key: "LOCKED", label: "Bị khóa" },
   { key: "RISK", label: "Có rủi ro" }
 ];
@@ -24,7 +35,7 @@ export default function AdminBrandsPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [status, setStatus] = useState("PENDING_REVIEW");
+  const [status, setStatus] = useState("");
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState("");
   const [acting, setActing] = useState(false);
@@ -35,7 +46,7 @@ export default function AdminBrandsPage() {
     setError("");
     try {
       const params = new URLSearchParams();
-      if (status && status !== "LOCKED" && status !== "RISK") params.set("status", status);
+      if (status && status !== "RISK") params.set("status", status);
       if (query.trim()) params.set("query", query.trim());
       const res = await fetch(`/api/admin/brands?${params.toString()}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<Item[]>;
@@ -51,14 +62,13 @@ export default function AdminBrandsPage() {
   useEffect(() => { void load(); }, [load]);
 
   const filtered = useMemo(() => {
-    if (status === "RISK") return items.filter((x) => !x.industry);
-    if (status === "LOCKED") return [];
+    if (status === "RISK") return items.filter((x) => x.riskFlag);
     return items;
   }, [items, status]);
 
   return (
     <>
-      <PageHeader title="Quản lý Brand" subtitle="Quản lý KYB, credit balance, trạng thái vận hành và rủi ro Brand." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
+      <PageHeader title="Quản lý Brand" subtitle="Giám sát KYB/rủi ro, credit balance và trạng thái vận hành Brand (không dùng để duyệt onboarding ban đầu)." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
       <section className="dc-card p-4 grid gap-3">
         <AdminTabs items={tabs} value={status} onChange={setStatus} />
         <div className="flex gap-2">
@@ -77,8 +87,15 @@ export default function AdminBrandsPage() {
                   <div>
                     <p className="font-semibold">{item.brandName}</p>
                     <p className="text-xs text-zinc-500">{item.industry ?? "-"} • {item.contactEmail}</p>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      Campaigns: {item.campaignCount} • Members: {item.memberCount} • Products: {item.productCount} • Transactions: {item.transactionTotal.toLocaleString("vi-VN")} VND
+                    </p>
                   </div>
-                  <StatusBadge status={item.status.toLowerCase()} />
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <StatusBadge status={item.status} />
+                    <StatusBadge status={item.verificationStatus} />
+                    {item.riskFlag ? <StatusBadge status="risk" /> : null}
+                  </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Link className="dc-btn-primary" href={`/admin/brands/${item.id}`}>Chi tiết</Link>

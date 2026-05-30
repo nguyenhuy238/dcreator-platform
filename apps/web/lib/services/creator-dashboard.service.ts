@@ -61,15 +61,43 @@ function toSocialPlatform(platform: string): SocialPlatform {
   if (normalized === "instagram") return "INSTAGRAM";
   if (normalized === "youtube") return "YOUTUBE";
   if (normalized === "facebook") return "FACEBOOK";
+  if (normalized === "shopee") return "SHOPEE";
   return "OTHER";
 }
 
-function fromSocialPlatform(platform: SocialPlatform): "TikTok" | "Instagram" | "YouTube" | "Facebook" | "Other" {
+function fromSocialPlatform(platform: SocialPlatform): "TikTok" | "Instagram" | "YouTube" | "Facebook" | "Shopee" | "Other" {
   if (platform === "TIKTOK") return "TikTok";
   if (platform === "INSTAGRAM") return "Instagram";
   if (platform === "YOUTUBE") return "YouTube";
   if (platform === "FACEBOOK") return "Facebook";
+  if (platform === "SHOPEE") return "Shopee";
   return "Other";
+}
+
+function normalizeHandle(handle: string) {
+  return handle.trim().replace(/^@+/, "").toLowerCase();
+}
+
+function validatePlatformUrl(platform: SocialPlatform, url: string) {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new AppError("URL kênh không hợp lệ", 422, "CHANNEL_URL_INVALID");
+  }
+  const host = parsed.hostname.toLowerCase();
+  const checks: Record<SocialPlatform, string[]> = {
+    TIKTOK: ["tiktok.com"],
+    INSTAGRAM: ["instagram.com"],
+    YOUTUBE: ["youtube.com", "youtu.be"],
+    FACEBOOK: ["facebook.com", "fb.com"],
+    SHOPEE: ["shopee.vn", "shopee.com"],
+    OTHER: []
+  };
+  const expectedHosts = checks[platform];
+  if (expectedHosts.length > 0 && !expectedHosts.some((allowed) => host.includes(allowed))) {
+    throw new AppError(`URL không đúng nền tảng ${platform}`, 422, "CHANNEL_URL_PLATFORM_MISMATCH");
+  }
 }
 
 async function ensureCreatorProfileForSocialLink(accountId: string) {
@@ -168,7 +196,7 @@ export async function listCreatorMarketplaceJobs(
 }
 
 export async function acceptCreatorMarketplaceJob(missionId: string, accountId: string) {
-  return acceptMission(missionId, accountId, "CREATOR");
+  return acceptMission(missionId, accountId, ["CREATOR"]);
 }
 
 export async function listCreatorMyJobs(accountId: string) {
@@ -302,7 +330,7 @@ export async function getCreatorChannels(accountId: string) {
     where: { accountId },
     include: {
       socialLinks: {
-        orderBy: [{ createdAt: "desc" }]
+        orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }]
       }
     }
   });
@@ -321,8 +349,12 @@ export async function getCreatorChannels(accountId: string) {
       ? creatorProfile.socialLinks.map((item) => ({
           id: item.id,
           platform: fromSocialPlatform(item.platform),
+          handle: item.handle ?? "",
           url: item.socialUrl,
           followerCount: item.followers,
+          engagementRate: item.engagementRate ?? null,
+          isPrimary: item.isPrimary,
+          verificationStatus: item.verificationStatus,
           status: item.status,
           rejectReason: item.rejectReason,
           createdAt: item.createdAt
@@ -331,16 +363,37 @@ export async function getCreatorChannels(accountId: string) {
   };
 }
 
-export async function updateCreatorChannels(accountId: string, input: CreatorChannelsUpdateInput) {
+export async function createCreatorChannel(accountId: string, input: CreatorChannelsUpdateInput) {
   const creatorProfile = await ensureCreatorProfileForSocialLink(accountId);
+  const platform = toSocialPlatform(input.platform);
+  const handle = normalizeHandle(input.handle);
+  validatePlatformUrl(platform, input.url);
+
+  const duplicate = await prisma.creatorSocialLink.findFirst({
+    where: {
+      creatorProfileId: creatorProfile.id,
+      platform,
+      handle
+    },
+    select: { id: true }
+  });
+  if (duplicate) {
+    throw new AppError("Kênh trùng platform + handle", 409, "CHANNEL_DUPLICATE_HANDLE");
+  }
+
+  const hasAny = await prisma.creatorSocialLink.count({ where: { creatorProfileId: creatorProfile.id } });
 
   try {
     await prisma.creatorSocialLink.create({
       data: {
         creatorProfileId: creatorProfile.id,
-        platform: toSocialPlatform(input.platform),
+        platform,
+        handle,
         socialUrl: input.url,
         followers: input.followerCount,
+        engagementRate: input.engagementRate ?? null,
+        isPrimary: hasAny === 0,
+        verificationStatus: "PENDING",
         status: "PENDING",
         rejectReason: null,
         reviewNote: null,
@@ -358,6 +411,52 @@ export async function updateCreatorChannels(accountId: string, input: CreatorCha
   return getCreatorChannels(accountId);
 }
 
+export async function updateCreatorChannel(accountId: string, linkId: string, input: CreatorChannelsUpdateInput) {
+  const link = await prisma.creatorSocialLink.findUnique({
+    where: { id: linkId },
+    include: { creatorProfile: { select: { accountId: true, id: true } } }
+  });
+  if (!link || link.creatorProfile.accountId !== accountId) {
+    throw new AppError("Channel not found", 404, "CHANNEL_NOT_FOUND");
+  }
+
+  const platform = toSocialPlatform(input.platform);
+  const handle = normalizeHandle(input.handle);
+  validatePlatformUrl(platform, input.url);
+
+  const duplicate = await prisma.creatorSocialLink.findFirst({
+    where: {
+      creatorProfileId: link.creatorProfileId,
+      platform,
+      handle,
+      id: { not: link.id }
+    },
+    select: { id: true }
+  });
+  if (duplicate) {
+    throw new AppError("Kênh trùng platform + handle", 409, "CHANNEL_DUPLICATE_HANDLE");
+  }
+
+  await prisma.creatorSocialLink.update({
+    where: { id: link.id },
+    data: {
+      platform,
+      handle,
+      socialUrl: input.url,
+      followers: input.followerCount,
+      engagementRate: input.engagementRate ?? null,
+      status: "PENDING",
+      verificationStatus: "PENDING",
+      rejectReason: null,
+      reviewNote: null,
+      reviewedAt: null,
+      reviewedById: null
+    }
+  });
+
+  return getCreatorChannels(accountId);
+}
+
 export async function removeCreatorChannel(accountId: string, linkId: string) {
   const link = await prisma.creatorSocialLink.findUnique({
     where: { id: linkId },
@@ -366,7 +465,27 @@ export async function removeCreatorChannel(accountId: string, linkId: string) {
   if (!link || link.creatorProfile.accountId !== accountId) {
     throw new AppError("Channel not found", 404, "CHANNEL_NOT_FOUND");
   }
-  await prisma.creatorSocialLink.delete({ where: { id: linkId } });
+  await prisma.$transaction(async (tx) => {
+    await tx.creatorSocialLink.delete({ where: { id: linkId } });
+    if (link.isPrimary) {
+      const next = await tx.creatorSocialLink.findFirst({
+        where: { creatorProfileId: link.creatorProfileId },
+        orderBy: { createdAt: "asc" }
+      });
+      if (next) {
+        await tx.creatorSocialLink.update({ where: { id: next.id }, data: { isPrimary: true } });
+        await tx.creatorProfile.update({
+          where: { id: next.creatorProfileId },
+          data: { mainPlatform: next.platform, socialUrl: next.socialUrl, followerCount: next.followers }
+        });
+      } else {
+        await tx.creatorProfile.update({
+          where: { id: link.creatorProfileId },
+          data: { mainPlatform: null, socialUrl: null, followerCount: null }
+        });
+      }
+    }
+  });
   return getCreatorChannels(accountId);
 }
 
@@ -378,17 +497,27 @@ export async function setCreatorMainChannel(accountId: string, linkId: string) {
   if (!link || link.creatorProfile.accountId !== accountId) {
     throw new AppError("Channel not found", 404, "CHANNEL_NOT_FOUND");
   }
-  if (link.status !== CreatorSocialLinkStatus.APPROVED) {
+  if (link.verificationStatus !== "VERIFIED" && link.status !== CreatorSocialLinkStatus.APPROVED) {
     throw new AppError("Channel must be approved before selecting as main", 409, "CHANNEL_NOT_APPROVED");
   }
 
-  await prisma.creatorProfile.update({
-    where: { id: link.creatorProfileId },
-    data: {
-      mainPlatform: link.platform,
-      socialUrl: link.socialUrl,
-      followerCount: link.followers
-    }
+  await prisma.$transaction(async (tx) => {
+    await tx.creatorSocialLink.updateMany({
+      where: { creatorProfileId: link.creatorProfileId },
+      data: { isPrimary: false }
+    });
+    await tx.creatorSocialLink.update({
+      where: { id: link.id },
+      data: { isPrimary: true }
+    });
+    await tx.creatorProfile.update({
+      where: { id: link.creatorProfileId },
+      data: {
+        mainPlatform: link.platform,
+        socialUrl: link.socialUrl,
+        followerCount: link.followers
+      }
+    });
   });
 
   return getCreatorChannels(accountId);

@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const items = await prisma.account.findMany({
       where: {
         isActive: true,
-        role: { in: ["BRAND_OWNER", "BRAND_STAFF"] },
+        ownedBrandMemberships: { some: { status: "ACTIVE" } },
         OR: [
           { displayName: { contains: query, mode: "insensitive" } },
           { email: { contains: query, mode: "insensitive" } }
@@ -33,4 +33,3 @@ export async function GET(request: NextRequest) {
     return toErrorResponse(error);
   }
 }
-

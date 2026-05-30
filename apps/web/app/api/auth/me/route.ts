@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
         creatorProfile: user.creatorProfile,
         brandMemberships: user.brandMemberships,
         activeBrandId: user.activeBrandId,
+        capabilities: user.capabilities,
         permissions: user.permissions,
         creatorRequestStatus: user.creatorRequestStatus,
         brandRequestStatus: user.brandRequestStatus

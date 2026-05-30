@@ -200,13 +200,13 @@ export const productSubmissionSchema = z.object({
 
 export const brandMemberInviteSchema = z.object({
   email: z.email().trim().toLowerCase(),
-  role: z.enum(["OWNER", "STAFF"]).default("STAFF"),
+  role: z.enum(["OWNER", "MANAGER", "STAFF"]).default("STAFF"),
   note: z.string().trim().max(500).optional().or(z.literal(""))
 });
 
 export const brandMemberRoleUpdateSchema = z.object({
   memberId: z.string().trim().min(3),
-  role: z.enum(["OWNER", "STAFF"])
+  role: z.enum(["OWNER", "MANAGER", "STAFF"])
 });
 
 export const brandMemberRemoveSchema = z.object({

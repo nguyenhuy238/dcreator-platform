@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const applicationStatuses = ["DRAFT", "PENDING_REVIEW", "APPROVED", "REJECTED", "NEEDS_REVISION"] as const;
 const creatorSocialLinkStatuses = ["PENDING", "APPROVED", "REJECTED"] as const;
-const socialPlatforms = ["TIKTOK", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "OTHER"] as const;
+const socialPlatforms = ["TIKTOK", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "SHOPEE", "OTHER"] as const;
 
 export const adminCreatorListQuerySchema = z.object({
   status: z.enum(applicationStatuses).optional(),

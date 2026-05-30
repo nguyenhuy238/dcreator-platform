@@ -1,20 +1,9 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { fail } from "@/lib/api-response";
+import { AppError } from "@/lib/errors-core";
 
-export class AppError extends Error {
-  statusCode: number;
-  code?: string;
-  details?: unknown;
-
-  constructor(message: string, statusCode = 400, code?: string, details?: unknown) {
-    super(message);
-    this.name = "AppError";
-    this.statusCode = statusCode;
-    this.code = code;
-    this.details = details;
-  }
-}
+export { AppError } from "@/lib/errors-core";
 
 export function toErrorResponse(error: unknown): NextResponse {
   if (error instanceof AppError) {

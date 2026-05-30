@@ -6,7 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import type { Role } from "@prisma/client";
 import { DashboardSwitcher } from "@/app/components/dcreator/layout/dashboard-switcher";
 import { DashboardShell } from "@/app/components/dcreator/layout/dashboard-shell";
-import { ROLE } from "@/lib/auth/role-constants";
+import { deriveCapabilities, type UserCapabilities } from "@/lib/auth/capabilities";
 import { canAccessWorkspace, getNavItemsForWorkspace, getWorkspaceConfig, getWorkspaceForPath } from "@/lib/navigation";
 
 type NavItem = { href: string; label: string };
@@ -17,6 +17,9 @@ type AuthUser = {
   displayName: string;
   avatarUrl: string | null;
   roles: Role[];
+  creatorProfile?: { id: string } | null;
+  brandMemberships?: Array<{ id: string; role: "OWNER" | "MANAGER" | "STAFF" }>;
+  capabilities?: UserCapabilities;
 };
 
 export function PublicHeader() {
@@ -69,16 +72,19 @@ export function PublicHeader() {
     }
   }
 
-  const canAccessAdmin = currentUser ? currentUser.roles.includes("ADMIN") || currentUser.roles.includes("OPS") : false;
-  const isBrandLandingPage = pathname === "/brand";
-  const roleSwitchHref = isBrandLandingPage ? "/" : "/brand";
-  const roleSwitchLabel = isBrandLandingPage ? "Dành cho Creator" : "Dành cho Brand";
+  const capabilities = currentUser
+    ? (currentUser.capabilities ?? deriveCapabilities({ roles: currentUser.roles, creatorProfile: currentUser.creatorProfile, brandMemberships: currentUser.brandMemberships }))
+    : null;
+  const canAccessAdmin = Boolean(capabilities?.admin);
+  const isCreator = Boolean(capabilities?.creator);
+  const isBrand = Boolean(capabilities?.brand);
+  const brandHref = isBrand ? "/dashboard/brand" : "/brand/register";
   const profileHref = currentUser
     ? currentUser.roles.includes("ADMIN")
       ? "/admin"
-      : currentUser.roles.includes(ROLE.BRAND_OWNER) || currentUser.roles.includes(ROLE.BRAND_STAFF)
+      : isBrand
         ? "/dashboard/brand"
-        : currentUser.roles.includes("CREATOR")
+        : isCreator
           ? "/dashboard/creator"
           : "/dashboard/user/profile"
     : "/dashboard/user/profile";
@@ -290,6 +296,7 @@ export function AppShell({ children, sidebarItems }: { children: React.ReactNode
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [roles, setRoles] = useState<Role[]>([]);
+  const [capabilities, setCapabilities] = useState<UserCapabilities>({ user: true, creator: false, brand: false, admin: false });
   const [user, setUser] = useState<AuthUser | null>(null);
   const [rolesLoading, setRolesLoading] = useState(true);
   const [rolesError, setRolesError] = useState("");
@@ -310,17 +317,21 @@ export function AppShell({ children, sidebarItems }: { children: React.ReactNode
         const payload = await response.json();
         if (!active) return;
         if (response.ok && payload?.success && Array.isArray(payload?.data?.user?.roles)) {
-          setRoles(payload.data.user.roles as Role[]);
-          setUser(payload.data.user as AuthUser);
+          const nextUser = payload.data.user as AuthUser;
+          setRoles(nextUser.roles);
+          setUser(nextUser);
+          setCapabilities(nextUser.capabilities ?? deriveCapabilities({ roles: nextUser.roles, creatorProfile: nextUser.creatorProfile, brandMemberships: nextUser.brandMemberships }));
         } else {
           setRoles([]);
           setUser(null);
+          setCapabilities({ user: true, creator: false, brand: false, admin: false });
           setRolesError("Không thể tải quyền truy cập hiện tại.");
         }
       } catch {
         if (active) {
           setRoles([]);
           setUser(null);
+          setCapabilities({ user: true, creator: false, brand: false, admin: false });
           setRolesError("Không thể tải quyền truy cập hiện tại.");
         }
       } finally {
@@ -337,8 +348,9 @@ export function AppShell({ children, sidebarItems }: { children: React.ReactNode
 
   const workspace = getWorkspaceForPath(pathname);
   const workspaceConfig = getWorkspaceConfig(workspace);
-  const canAccess = canAccessWorkspace(workspace, roles);
-  const workspaceNav = canAccess ? getNavItemsForWorkspace(workspace, roles) : [];
+  const accessSubject = { roles, capabilities };
+  const canAccess = canAccessWorkspace(workspace, accessSubject);
+  const workspaceNav = canAccess ? getNavItemsForWorkspace(workspace, accessSubject) : [];
   const effectiveSidebarItems = workspaceNav.length > 0 ? workspaceNav : (sidebarItems ?? []);
 
   return (
@@ -369,7 +381,7 @@ export function AppShell({ children, sidebarItems }: { children: React.ReactNode
           </button>
         </div>
       ) : null}
-      <DashboardSwitcher roles={roles} />
+      <DashboardSwitcher roles={roles} capabilities={capabilities} />
       {children}
     </DashboardShell>
   );

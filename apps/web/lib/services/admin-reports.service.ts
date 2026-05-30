@@ -1,4 +1,4 @@
-import { CampaignStatus, Role } from "@prisma/client";
+import { BrandStatus, CampaignStatus, CreatorChannelVerificationStatus, CreatorSocialLinkStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
 function startByPeriod(period: "7d" | "30d" | "month") {
@@ -40,10 +40,33 @@ export async function getAdminReportsSummary(period: "7d" | "30d" | "month") {
     prisma.campaign.count({ where: { status: { in: [CampaignStatus.DRAFT, CampaignStatus.PAUSED] } } }),
     prisma.brand.count(),
     prisma.brand.count({ where: { status: "ACTIVE" } }),
-    prisma.account.count({ where: { role: Role.CREATOR } }),
-    prisma.account.count({ where: { role: Role.CREATOR, isActive: true } }),
-    prisma.brandApplication.count({ where: { status: "PENDING_REVIEW" } }),
-    prisma.creatorApplication.count({ where: { status: "PENDING_REVIEW" } }),
+    prisma.creatorProfile.count(),
+    prisma.creatorProfile.count({ where: { isSuspended: false, account: { isActive: true } } }),
+    prisma.brand.count({
+      where: {
+        OR: [
+          { isLocked: true },
+          { status: { in: [BrandStatus.PENDING_VERIFICATION, BrandStatus.REJECTED, BrandStatus.SUSPENDED, BrandStatus.LOCKED] } }
+        ]
+      }
+    }),
+    prisma.creatorProfile.count({
+      where: {
+        OR: [
+          { isSuspended: true },
+          {
+            socialLinks: {
+              some: {
+                OR: [
+                  { verificationStatus: { in: [CreatorChannelVerificationStatus.PENDING, CreatorChannelVerificationStatus.REJECTED] } },
+                  { status: CreatorSocialLinkStatus.REJECTED }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }),
     prisma.missionSubmission.count({ where: { mission: { audience: "CREATOR" }, lifecycleStatus: "PENDING_REVIEW" } }),
     prismaAny.productSubmission.count({ where: { reviewStatus: { in: ["PENDING_REVIEW", "CHANGES_REQUESTED"] } } }),
     prisma.missionSubmission.count({ where: { mission: { audience: "CREATOR" }, lifecycleStatus: { in: ["ACCEPTED", "DOING"] } } }),

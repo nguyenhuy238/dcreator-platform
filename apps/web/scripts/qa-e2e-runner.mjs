@@ -112,32 +112,22 @@ async function run() {
     add("/api/auth/me admin role", hasAdmin ? "PASS" : "FAIL", JSON.stringify(me.body?.data?.user?.roles ?? []));
   }
 
-  // Admin approve creator + brand role requests
+  // Creator/Brand onboarding is immediate; Admin/Ops now verifies or flags risk only.
   {
-    const creatorReqs = await admin.request("/api/admin/dashboard/creator-verifications");
-    if (!creatorReqs.res.ok) {
-      add("Admin list creator verifications", "FAIL", JSON.stringify(creatorReqs.body));
+    const creators = await admin.request("/api/admin/creators");
+    if (!creators.res.ok) {
+      add("Admin list creators for risk ops", "FAIL", JSON.stringify(creators.body));
     } else {
-      const target = creatorReqs.body?.data?.find?.((item) => item?.account?.email === QA_CREATOR_EMAIL);
-      if (!target) {
-        add("Admin approve creator", "SKIP", "creator request not found");
-      } else {
-        const approve = await admin.request(`/api/admin/dashboard/creator-verifications/${target.id}/approve`, { method: "POST" });
-        add("Admin approve creator", approve.res.ok ? "PASS" : "FAIL", approve.res.ok ? target.id : JSON.stringify(approve.body));
-      }
+      const target = creators.body?.data?.find?.((item) => item?.account?.email === QA_CREATOR_EMAIL);
+      add("Admin creator risk ops list", target ? "PASS" : "SKIP", target ? target.id : "creator profile not found");
     }
 
-    const brandReqs = await admin.request("/api/admin/dashboard/brand-verifications");
-    if (!brandReqs.res.ok) {
-      add("Admin list brand verifications", "FAIL", JSON.stringify(brandReqs.body));
+    const brands = await admin.request("/api/admin/brands");
+    if (!brands.res.ok) {
+      add("Admin list brands for risk ops", "FAIL", JSON.stringify(brands.body));
     } else {
-      const target = brandReqs.body?.data?.find?.((item) => item?.account?.email === QA_BRAND_EMAIL);
-      if (!target) {
-        add("Admin approve brand", "SKIP", "brand request not found");
-      } else {
-        const approve = await admin.request(`/api/admin/dashboard/brand-verifications/${target.id}/approve`, { method: "POST" });
-        add("Admin approve brand", approve.res.ok ? "PASS" : "FAIL", approve.res.ok ? target.id : JSON.stringify(approve.body));
-      }
+      const target = brands.body?.data?.find?.((item) => item?.account?.email === QA_BRAND_EMAIL);
+      add("Admin brand risk ops list", target ? "PASS" : "SKIP", target ? target.id : "brand not found");
     }
   }
 
@@ -180,7 +170,7 @@ async function run() {
 
     const me = await creator.request("/api/auth/me");
     const hasCreator = Boolean(me.body?.data?.user?.roles?.includes?.("CREATOR"));
-    add("Creator role after admin approval", hasCreator ? "PASS" : "FAIL", JSON.stringify(me.body?.data?.user?.roles ?? []));
+    add("Creator capability after onboarding", hasCreator ? "PASS" : "FAIL", JSON.stringify(me.body?.data?.user?.roles ?? []));
 
     const apply = await creator.request(`/api/campaigns/${QA_SCENARIO_SLUG}/creator-application`, { method: "POST" });
     add("Creator apply campaign", apply.res.ok ? "PASS" : "FAIL", apply.res.ok ? "submitted" : JSON.stringify(apply.body));

@@ -27,6 +27,22 @@ type CreatorMissionItem = {
   };
 };
 
+type CreatorProfile = {
+  displayName: string;
+  bio: string;
+  categories: string[];
+};
+
+type CreatorChannel = {
+  id: string;
+  isPrimary: boolean;
+};
+
+type CreatorChannelsPayload = {
+  creatorProfile: { id: string } | null;
+  channels: CreatorChannel[];
+};
+
 const statusLabel: Record<string, string> = {
   PRODUCT_PENDING: "Xử lý sản phẩm",
   DRAFT_PENDING: "Chờ duyệt kịch bản",
@@ -62,6 +78,9 @@ export function CreatorDashboardClient() {
   const [error, setError] = useState("");
   const [overview, setOverview] = useState<Overview | null>(null);
   const [missions, setMissions] = useState<CreatorMissionItem[]>([]);
+  const [profile, setProfile] = useState<CreatorProfile | null>(null);
+  const [channels, setChannels] = useState<CreatorChannel[]>([]);
+  const [createdNotice, setCreatedNotice] = useState(false);
 
   async function loadDashboard() {
     setLoading(true);
@@ -71,8 +90,14 @@ export function CreatorDashboardClient() {
         fetcher<Overview>("/api/creator/dashboard/overview"),
         fetcher<CreatorMissionItem[]>("/api/me/mission")
       ]);
+      const [profileData, channelsData] = await Promise.all([
+        fetcher<CreatorProfile>("/api/creator/dashboard/profile"),
+        fetcher<CreatorChannelsPayload>("/api/creator/dashboard/channels")
+      ]);
       setOverview(overviewData);
       setMissions(missionData);
+      setProfile(profileData);
+      setChannels(channelsData.channels ?? []);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Không thể tải dữ liệu dashboard");
     } finally {
@@ -81,6 +106,7 @@ export function CreatorDashboardClient() {
   }
 
   useEffect(() => {
+    setCreatedNotice(new URLSearchParams(window.location.search).get("created") === "1");
     void loadDashboard();
   }, []);
 
@@ -100,6 +126,35 @@ export function CreatorDashboardClient() {
     if (submittedMissions === 0) return 0;
     return Math.round((approvedMissions / submittedMissions) * 100);
   }, [approvedMissions, submittedMissions]);
+  const checklist = useMemo(
+    () => [
+      {
+        label: "Hoàn thiện hồ sơ",
+        done: Boolean(profile?.displayName?.trim()) && Boolean(profile?.bio?.trim() || profile?.categories?.length)
+      },
+      {
+        label: "Thêm kênh social",
+        done: channels.length > 0,
+        href: "/dashboard/creator/profile?tab=channels"
+      },
+      {
+        label: "Chọn kênh chính",
+        done: channels.some((channel) => channel.isPrimary),
+        href: "/dashboard/creator/profile?tab=channels"
+      },
+      {
+        label: "Khám phá campaign",
+        done: missions.length > 0,
+        href: "/campaigns"
+      },
+      {
+        label: "Bổ sung xác minh để nhận payout",
+        done: false,
+        href: "/dashboard/creator/wallet"
+      }
+    ],
+    [channels, missions.length, profile?.bio, profile?.categories?.length, profile?.displayName]
+  );
 
   return (
     <div className="space-y-8">
@@ -108,6 +163,15 @@ export function CreatorDashboardClient() {
         subtitle="Theo dõi nhiệm vụ, tiến độ duyệt minh chứng và hoa hồng của bạn."
         action={<Link href="/campaigns" className="dc-btn-primary">Nhận nhiệm vụ</Link>}
       />
+      {createdNotice ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <p className="font-semibold">Creator Profile đã được tạo</p>
+          <p>Hãy thêm kênh social đầu tiên của bạn.</p>
+        </div>
+      ) : null}
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+        Xác minh danh tính giúp mở khóa payout.
+      </div>
 
       {error ? <ErrorState title="Không thể tải bảng điều khiển" description={error} onRetry={() => void loadDashboard()} /> : null}
 
@@ -130,6 +194,31 @@ export function CreatorDashboardClient() {
               value={`${approvalRate}%`}
               hint={`${approvedMissions.toLocaleString("vi-VN")}/${submittedMissions.toLocaleString("vi-VN")} mission`}
             />
+          </section>
+
+          <section>
+            <SectionHeader title="Checklist khởi tạo Creator" subtitle="Hoàn tất các bước cơ bản để hồ sơ sẵn sàng cho campaign." />
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              {checklist.map((item) => {
+                const content = (
+                  <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-zinc-900">{item.label}</p>
+                      <span className={item.done ? "rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700" : "rounded-full bg-zinc-100 px-2 py-1 text-xs font-bold text-zinc-600"}>
+                        {item.done ? "Xong" : "Cần làm"}
+                      </span>
+                    </div>
+                  </div>
+                );
+                return item.href ? (
+                  <Link key={item.label} href={item.href} className="block">
+                    {content}
+                  </Link>
+                ) : (
+                  <div key={item.label}>{content}</div>
+                );
+              })}
+            </div>
           </section>
 
           <section>
