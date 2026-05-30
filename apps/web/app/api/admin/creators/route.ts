@@ -6,7 +6,7 @@ import { listCreatorApplications } from "@/lib/services/role-upgrade.service";
 import { adminCreatorListQuerySchema } from "@/lib/validators/admin-creator";
 
 const APPLICATION_STATUSES = ["DRAFT", "PENDING_REVIEW", "APPROVED", "REJECTED", "NEEDS_REVISION"] as const;
-const SOCIAL_PLATFORMS = ["TIKTOK", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "OTHER"] as const;
+const SOCIAL_PLATFORMS = ["TIKTOK", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "SHOPEE", "OTHER"] as const;
 
 export async function GET(request: NextRequest) {
   try {

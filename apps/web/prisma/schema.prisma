@@ -31,11 +31,19 @@ enum CreatorSocialLinkStatus {
   REJECTED
 }
 
+enum CreatorChannelVerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
 enum SocialPlatform {
   TIKTOK
   INSTAGRAM
   YOUTUBE
   FACEBOOK
+  SHOPEE
   OTHER
 }
 
@@ -562,8 +570,12 @@ model CreatorSocialLink {
   id               String                  @id @default(cuid())
   creatorProfileId String
   platform         SocialPlatform
+  handle           String?
   socialUrl        String
   followers        Int                     @default(0)
+  engagementRate   Float?
+  isPrimary        Boolean                 @default(false)
+  verificationStatus CreatorChannelVerificationStatus @default(UNVERIFIED)
   status           CreatorSocialLinkStatus @default(PENDING)
   rejectReason     String?
   reviewNote       String?
@@ -576,8 +588,10 @@ model CreatorSocialLink {
   reviewedBy     Account?       @relation("CreatorSocialLinkReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
 
   @@unique([creatorProfileId, platform, socialUrl])
+  @@unique([creatorProfileId, platform, handle])
   @@index([creatorProfileId, createdAt])
   @@index([status, createdAt])
+  @@index([creatorProfileId, isPrimary])
 }
 
 model BrandApplication {

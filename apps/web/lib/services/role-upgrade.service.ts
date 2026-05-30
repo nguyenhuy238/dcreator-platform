@@ -294,7 +294,7 @@ export async function updateBrandApplication(accountId: string, applicationId: s
 type ListCreatorApplicationsOptions = {
   status?: ApplicationStatusValue;
   query?: string;
-  platform?: "TIKTOK" | "INSTAGRAM" | "YOUTUBE" | "FACEBOOK" | "OTHER";
+  platform?: "TIKTOK" | "INSTAGRAM" | "YOUTUBE" | "FACEBOOK" | "SHOPEE" | "OTHER";
   contentCategory?: string;
   sort?: "newest" | "oldest";
 };

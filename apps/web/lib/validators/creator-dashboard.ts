@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const supportedPlatforms = ["TikTok", "Instagram", "YouTube", "Facebook"] as const;
+const supportedPlatforms = ["TikTok", "Instagram", "YouTube", "Facebook", "Shopee", "Other"] as const;
 const isAbsoluteUrl = (value: string) => {
   try {
     const parsed = new URL(value);
@@ -29,7 +29,7 @@ export const creatorJobStatusSchema = z.enum(["accepted", "in_progress", "submit
 export const creatorProofSubmissionSchema = z.object({
   videoUrl: z.url().max(400),
   screenshotUrl: z.url().max(400).optional(),
-  platform: z.enum(supportedPlatforms).optional(),
+  platform: z.enum(["TikTok", "Instagram", "YouTube", "Facebook"]).optional(),
   adCode: z.string().trim().max(120).optional(),
   note: z.string().trim().max(500).optional()
 });
@@ -59,14 +59,18 @@ export const creatorProfileUpdateSchema = z.object({
 
 export const creatorChannelSchema = z.object({
   platform: z.enum(supportedPlatforms),
+  handle: z.string().trim().min(1).max(80),
   url: z.url().max(400),
-  followerCount: z.number().int().min(0)
+  followerCount: z.number().int().min(0),
+  engagementRate: z.number().min(0).max(100).optional()
 });
 
 export const creatorChannelsUpdateSchema = z.object({
   platform: z.enum(supportedPlatforms),
+  handle: z.string().trim().min(1).max(80),
   url: z.url().max(400),
-  followerCount: z.number().int().min(0)
+  followerCount: z.number().int().min(0),
+  engagementRate: z.number().min(0).max(100).optional()
 });
 
 export const creatorChannelSetMainSchema = z.object({
