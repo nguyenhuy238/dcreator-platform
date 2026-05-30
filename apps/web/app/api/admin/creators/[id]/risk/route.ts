@@ -2,8 +2,9 @@ import { NextRequest } from "next/server";
 import { ok } from "@/lib/api-response";
 import { requireAdminOps } from "@/lib/auth/admin-guard";
 import { assertSameOrigin } from "@/lib/auth/csrf";
-import { toErrorResponse } from "@/lib/errors";
-import { reviewCreatorApplication } from "@/lib/services/role-upgrade.service";
+import { prisma } from "@/lib/db";
+import { AppError, toErrorResponse } from "@/lib/errors";
+import { createRiskFlagByAdmin } from "@/lib/services/admin-lifecycle.service";
 import { adminCreatorDecisionSchema } from "@/lib/validators/admin-creator";
 
 type Props = { params: Promise<{ id: string }> };
@@ -17,9 +18,18 @@ export async function PATCH(request: NextRequest, { params }: Props) {
     if (!payload.reason) {
       return Response.json({ success: false, error: "reason is required" }, { status: 422 });
     }
-    return ok(await reviewCreatorApplication(actor.id, id, "REJECTED", payload.reason, payload.note));
+    const creator = await prisma.creatorProfile.findUnique({ where: { id }, select: { id: true, accountId: true } });
+    if (!creator) throw new AppError("Creator profile not found", 404, "CREATOR_NOT_FOUND");
+    return ok(await createRiskFlagByAdmin(actor.id, actor.role, {
+      targetType: "CreatorProfile",
+      targetId: creator.id,
+      accountId: creator.accountId,
+      reason: payload.reason,
+      flagType: "VERIFICATION_REJECTED",
+      severity: "MEDIUM",
+      note: payload.note
+    }));
   } catch (error) {
     return toErrorResponse(error);
   }
 }
-

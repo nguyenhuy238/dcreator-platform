@@ -1,4 +1,4 @@
-import { BrandMemberRole, BrandStatus, CampaignStatus, MissionAudience, MissionLifecycleStatus, Prisma, Role, RoleRequestStatus, RoleRequestType } from "@prisma/client";
+import { BrandMemberRole, BrandStatus, CampaignStatus, CreatorChannelVerificationStatus, CreatorSocialLinkStatus, MissionAudience, MissionLifecycleStatus, Prisma, Role, RoleRequestStatus, RoleRequestType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { approveProof, rejectProof } from "@/lib/services/mission.service";
@@ -110,8 +110,31 @@ export async function getAdminOverview() {
     prisma.roleRequest.count({ where: { status: RoleRequestStatus.PENDING } }),
     prisma.contribution.aggregate({ _sum: { amountVnd: true }, where: { status: "SUCCESS" } }),
     prisma.riskFlag.count(),
-    prisma.brandApplication.count({ where: { status: "PENDING_REVIEW" } }),
-    prisma.creatorApplication.count({ where: { status: "PENDING_REVIEW" } }),
+    prisma.brand.count({
+      where: {
+        OR: [
+          { isLocked: true },
+          { status: { in: [BrandStatus.PENDING_VERIFICATION, BrandStatus.REJECTED, BrandStatus.SUSPENDED, BrandStatus.LOCKED] } }
+        ]
+      }
+    }),
+    prisma.creatorProfile.count({
+      where: {
+        OR: [
+          { isSuspended: true },
+          {
+            socialLinks: {
+              some: {
+                OR: [
+                  { verificationStatus: { in: [CreatorChannelVerificationStatus.PENDING, CreatorChannelVerificationStatus.REJECTED] } },
+                  { status: CreatorSocialLinkStatus.REJECTED }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }),
     prisma.brandCampaignRequest.count({ where: { status: { in: ["PENDING_REVIEW", "NEEDS_REVISION"] } } }),
     prisma.missionSubmission.count({
       where: {
@@ -122,7 +145,7 @@ export async function getAdminOverview() {
     prisma.missionSubmission.count({ where: { lifecycleStatus: "PENDING_REVIEW" } }),
     prisma.payoutRequest.count({ where: { status: "PENDING" } }),
     prisma.brand.count({ where: { status: "ACTIVE" } }),
-    prisma.account.count({ where: { role: Role.CREATOR, isActive: true } }),
+    prisma.creatorProfile.count({ where: { isSuspended: false, account: { isActive: true } } }),
     prismaAny.productSubmission.count({
       where: { reviewStatus: { in: ["PENDING_REVIEW", "CHANGES_REQUESTED"] } }
     }),

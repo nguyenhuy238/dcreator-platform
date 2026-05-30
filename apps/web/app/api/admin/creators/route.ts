@@ -1,37 +1,77 @@
 import { NextRequest } from "next/server";
 import { ok } from "@/lib/api-response";
 import { requireAdminOps } from "@/lib/auth/admin-guard";
+import { prisma } from "@/lib/db";
 import { toErrorResponse } from "@/lib/errors";
-import { listCreatorApplications } from "@/lib/services/role-upgrade.service";
-import { adminCreatorListQuerySchema } from "@/lib/validators/admin-creator";
-
-const APPLICATION_STATUSES = ["DRAFT", "PENDING_REVIEW", "APPROVED", "REJECTED", "NEEDS_REVISION"] as const;
-const SOCIAL_PLATFORMS = ["TIKTOK", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "SHOPEE", "OTHER"] as const;
 
 export async function GET(request: NextRequest) {
   try {
     await requireAdminOps(request);
-    const statusRaw = request.nextUrl.searchParams.get("status") ?? undefined;
-    const query = request.nextUrl.searchParams.get("query") ?? undefined;
-    const platformRaw = request.nextUrl.searchParams.get("platform") ?? undefined;
-    const contentCategory = request.nextUrl.searchParams.get("contentCategory") ?? undefined;
-    const sort = request.nextUrl.searchParams.get("sort") ?? undefined;
+    const query = request.nextUrl.searchParams.get("query")?.trim() ?? "";
+    const status = request.nextUrl.searchParams.get("status")?.trim() ?? "";
 
-    const parsed = adminCreatorListQuerySchema.parse({
-      status: statusRaw && APPLICATION_STATUSES.includes(statusRaw as (typeof APPLICATION_STATUSES)[number]) ? statusRaw : undefined,
-      query,
-      platform: platformRaw && SOCIAL_PLATFORMS.includes(platformRaw as (typeof SOCIAL_PLATFORMS)[number]) ? platformRaw : undefined,
-      contentCategory,
-      sort
+    const profiles = await prisma.creatorProfile.findMany({
+      where: {
+        ...(status === "SUSPENDED" ? { isSuspended: true } : status === "ACTIVE" ? { isSuspended: false } : {}),
+        ...(query
+          ? {
+              OR: [
+                { displayName: { contains: query, mode: "insensitive" } },
+                { handle: { contains: query, mode: "insensitive" } },
+                { socialUrl: { contains: query, mode: "insensitive" } },
+                { account: { email: { contains: query, mode: "insensitive" } } },
+                { account: { displayName: { contains: query, mode: "insensitive" } } }
+              ]
+            }
+          : {})
+      },
+      include: {
+        account: {
+          select: {
+            id: true,
+            email: true,
+            displayName: true,
+            isActive: true,
+            profile: { select: { socialLinks: true } },
+            _count: { select: { campaignsAsCreator: true, submissions: true, payoutRequests: true } }
+          }
+        },
+        socialLinks: { select: { verificationStatus: true, status: true, isPrimary: true } },
+        _count: { select: { socialLinks: true } }
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100
     });
 
     return ok(
-      await listCreatorApplications({
-        status: parsed.status,
-        query: parsed.query,
-        platform: parsed.platform,
-        contentCategory: parsed.contentCategory,
-        sort: parsed.sort
+      profiles.map((profile) => {
+        const socialMeta = profile.account.profile?.socialLinks;
+        const kycVerified = typeof socialMeta === "object" && socialMeta !== null && !Array.isArray(socialMeta) && "kycVerified" in socialMeta && socialMeta.kycVerified === true;
+        const verificationStatus = kycVerified
+          ? "verified"
+          : profile.socialLinks.some((item) => item.verificationStatus === "PENDING")
+            ? "pending"
+            : profile.socialLinks.some((item) => item.verificationStatus === "REJECTED")
+              ? "rejected"
+              : "unverified";
+        const riskFlag = profile.isSuspended || profile.socialLinks.some((item) => item.status === "REJECTED");
+        return {
+          id: profile.id,
+          accountId: profile.accountId,
+          displayName: profile.displayName,
+          mainPlatform: profile.mainPlatform ?? "OTHER",
+          socialUrl: profile.socialUrl ?? "",
+          contentCategory: profile.contentCategory,
+          status: profile.isSuspended ? "suspended" : profile.account.isActive ? "active" : "restricted",
+          verificationStatus,
+          riskFlag,
+          campaignCount: profile.account._count.campaignsAsCreator + profile.account._count.submissions,
+          payoutCount: profile.account._count.payoutRequests,
+          transactionTotal: 0,
+          channelCount: profile._count.socialLinks,
+          account: { email: profile.account.email, displayName: profile.account.displayName },
+          createdAt: profile.createdAt.toISOString()
+        };
       })
     );
   } catch (error) {
