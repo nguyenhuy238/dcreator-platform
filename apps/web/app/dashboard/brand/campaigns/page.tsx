@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { BrandSubscriptionPanel } from "@/app/dashboard/brand/_components/BrandSubscriptionPanel";
 
 type CampaignItem = {
   id: string;
@@ -46,11 +47,10 @@ function progress(current: number, target: number) {
 }
 
 export default function BrandCampaignsPage() {
+  const [activeTab, setActiveTab] = useState<"campaigns" | "packages">("campaigns");
   const [items, setItems] = useState<CampaignItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [toast, setToast] = useState("");
-
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
@@ -75,6 +75,7 @@ export default function BrandCampaignsPage() {
   useEffect(() => {
     void load();
   }, []);
+
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -108,6 +109,32 @@ export default function BrandCampaignsPage() {
         subtitle="Theo dõi campaign hiện có và gửi yêu cầu để Admin tạo campaign mới."
         action={<Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Gửi yêu cầu tạo campaign</Link>}
       />
+
+      <div className="mb-5 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab("campaigns")}
+          className={`rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 ${
+            activeTab === "campaigns" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:bg-zinc-100"
+          }`}
+        >
+          Campaign / Job
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("packages")}
+          className={`rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 ${
+            activeTab === "packages" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:bg-zinc-100"
+          }`}
+        >
+          Mục tiêu gói
+        </button>
+      </div>
+
+      {activeTab === "packages" ? <BrandSubscriptionPanel showHeader={false} /> : null}
+
+      {activeTab === "campaigns" ? (
+        <>
 
       <section className="dc-card p-4">
         <div className="grid gap-2 md:grid-cols-5">
@@ -152,7 +179,6 @@ export default function BrandCampaignsPage() {
                 const videoApproved = campaign.videoApproved ?? Math.max(0, campaign.ugcVideoApprovedCount ?? 0);
                 const videoProgressPercent = campaign.videoProgressPercent ?? progress(videoApproved, videoTarget);
                 const creatorJoined = campaign.creatorJoinedCount ?? 0;
-
                 return (
                   <article key={campaign.id} className="dc-card overflow-hidden p-0">
                     <div
@@ -212,6 +238,7 @@ export default function BrandCampaignsPage() {
                         <p className="mt-1 text-xs text-zinc-500">Tiến độ video hoàn thành: {videoProgressPercent}%</p>
                       </div>
 
+
                       <div className="mt-4 flex flex-wrap gap-2">
                         <Link href={`/campaigns/${campaign.slug}`} className="dc-btn-secondary">Xem chi tiết</Link>
                         <Link href={`/dashboard/brand/campaigns/${campaign.id}/missions`} className="dc-btn-secondary">Quản lý mission/job</Link>
@@ -224,8 +251,10 @@ export default function BrandCampaignsPage() {
           )}
         </section>
       ) : null}
+        </>
+      ) : null}
 
-      {toast ? <ActionToast message={toast} /> : null}
+
     </>
   );
 }

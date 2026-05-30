@@ -1,9 +1,5 @@
 import { CampaignStatus, NotificationEvent } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import {
-  BRAND_SUBSCRIPTION_PACKAGE_VIDEO_QUOTA,
-  type BrandSubscriptionPackageCode
-} from "@/lib/constants/brand-subscription";
 import { AppError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
 import { createNotification } from "@/lib/services/notification.service";
@@ -31,22 +27,6 @@ async function trySyncCampaignNewFields(campaignId: string, benefits: string | n
     await prisma.$executeRaw`UPDATE "Campaign" SET "benefits" = ${benefits}, "participationRoadmap" = ${participationRoadmap} WHERE "id" = ${campaignId}`;
   } catch {
     // Backward compatibility when DB has not applied migration yet.
-  }
-}
-
-async function syncCampaignUgcVideoQuota(campaignId: string, ugcVideoQuota: number) {
-  try {
-    await prisma.$executeRaw`
-      UPDATE "Campaign"
-      SET "ugcVideoQuota" = ${ugcVideoQuota}
-      WHERE "id" = ${campaignId}
-    `;
-  } catch {
-    throw new AppError(
-      "Hệ thống chưa cập nhật migration quota video UGC. Vui lòng chạy migration trước khi tạo campaign.",
-      500,
-      "CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED"
-    );
   }
 }
 
@@ -253,6 +233,12 @@ function validateCampaignReadiness(detail: Awaited<ReturnType<typeof getCampaign
   return errors;
 }
 
+function isCampaignVideoQuotaReached(campaign: { ugcVideoQuota: number | null; ugcVideoApprovedCount: number }) {
+  const quota = Math.max(0, campaign.ugcVideoQuota ?? 0);
+  if (quota <= 0) return false;
+  return Math.max(0, campaign.ugcVideoApprovedCount) >= quota;
+}
+
 export async function decideCampaignByAdmin(input: {
   actorId: string;
   campaignId: string;
@@ -364,20 +350,6 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
     throw new AppError("Brand chua hoan tat onboarding", 409, "BRAND_PROFILE_NOT_FOUND");
   }
 
-  const subscription = await prisma.brandSubscription.findUnique({
-    where: { brandId: brandProfile.id },
-    select: { packageCode: true }
-  });
-  const packageCode = (subscription?.packageCode ?? "FREE") as BrandSubscriptionPackageCode;
-  const ugcVideoQuota = BRAND_SUBSCRIPTION_PACKAGE_VIDEO_QUOTA[packageCode] ?? 0;
-  if (ugcVideoQuota <= 0) {
-    throw new AppError(
-      "Brand đang ở gói Free nên không thể tạo campaign. Vui lòng nâng cấp gói UGC để tiếp tục.",
-      409,
-      "BRAND_SUBSCRIPTION_FREE_CANNOT_CREATE_CAMPAIGN"
-    );
-  }
-
   const campaign = await prisma.campaign.create({
     data: {
       brandId: brandAccount.id,
@@ -404,15 +376,13 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
     }
   });
   await trySyncCampaignNewFields(campaign.id, input.benefits || null, input.participationRoadmap);
-  await syncCampaignUgcVideoQuota(campaign.id, ugcVideoQuota);
-
   await writeAuditLog({
     actorId,
     action: "ADMIN_CAMPAIGN_CREATED",
     targetType: "Campaign",
     targetId: campaign.id,
     newStatus: campaign.status,
-    metadata: { publishNow: Boolean(input.publishNow), brandAccountId: brandAccount.id, packageCode, ugcVideoQuota }
+    metadata: { publishNow: Boolean(input.publishNow), brandAccountId: brandAccount.id }
   });
 
   await createNotification({
@@ -432,6 +402,10 @@ export async function addCampaignMissionByAdmin(actorId: string, campaignId: str
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
   if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
 
+  if (input.audience === "CREATOR" && isCampaignVideoQuotaReached(campaign)) {
+    throw new AppError("Campaign da du so video du kien", 409, "CAMPAIGN_VIDEO_QUOTA_REACHED");
+  }
+
   const deadlineAt = input.deadlineAt ? new Date(input.deadlineAt) : null;
   if (deadlineAt && campaign.startsAt && deadlineAt < campaign.startsAt) {
     throw new AppError("Mission deadline cannot be earlier than campaign start", 422, "MISSION_DEADLINE_INVALID");
@@ -440,30 +414,34 @@ export async function addCampaignMissionByAdmin(actorId: string, campaignId: str
     throw new AppError("Mission deadline cannot be later than campaign end", 422, "MISSION_DEADLINE_INVALID");
   }
 
-  const mission = await prisma.mission.create({
-    data: {
-      campaignId: campaign.id,
-      title: input.title,
-      description: input.description,
-      productLink: input.productLink || null,
-      rewardPoints: input.rewardPoints,
-      rewardCommissionVnd: input.rewardCommissionVnd,
-      audience: input.audience,
-      productReceiveOption: input.productReceiveOption,
-      allowRepeat: input.allowRepeat,
-      deadlineAt
-    }
-  });
+  return prisma.$transaction(async (tx) => {
+    const mission = await tx.mission.create({
+      data: {
+        campaignId: campaign.id,
+        title: input.title,
+        description: input.description,
+        productLink: input.productReceiveOption === "NO_PRODUCT_REQUIRED" ? null : input.productLink || null,
+        rewardPoints: input.rewardPoints,
+        rewardCommissionVnd: input.rewardCommissionVnd,
+        audience: input.audience,
+        productReceiveOption: input.productReceiveOption,
+        allowRepeat: input.allowRepeat,
+        deadlineAt
+      }
+    });
 
-  await writeAuditLog({
-    actorId,
-    action: "ADMIN_CAMPAIGN_MISSION_CREATED",
-    targetType: "Mission",
-    targetId: mission.id,
-    metadata: { campaignId: campaign.id, audience: mission.audience }
-  });
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: "ADMIN_CAMPAIGN_MISSION_CREATED",
+        targetType: "Mission",
+        targetId: mission.id,
+        metadata: { campaignId: campaign.id, audience: mission.audience }
+      }
+    });
 
-  return mission;
+    return mission;
+  });
 }
 
 export async function updateCampaignByAdmin(actorId: string, campaignId: string, input: AdminCampaignUpdateInput) {

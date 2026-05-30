@@ -2,10 +2,17 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { FormEvent, ReactNode, useEffect, useState } from "react";
+import { FormEvent, ReactNode, useCallback, useEffect, useState } from "react";
 import { ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data?: T; error?: string };
+type CampaignSummary = {
+  id: string;
+  videoTarget?: number;
+  videoApproved?: number;
+  ugcVideoQuota: number | null;
+  ugcVideoApprovedCount: number;
+};
 type MissionItem = {
   id: string;
   title: string;
@@ -14,6 +21,7 @@ type MissionItem = {
   rewardCommissionVnd: number;
   rewardPoints: number;
   productReceiveOption: "DEPOSIT_PRODUCT" | "CREATOR_BUY_FIRST" | "NO_PRODUCT_REQUIRED";
+  productLink: string | null;
   allowRepeat: boolean;
   deadlineAt: string | null;
   status: string;
@@ -26,6 +34,7 @@ type MissionForm = {
   rewardCommissionVnd: number;
   rewardPoints: number;
   productReceiveOption: "DEPOSIT_PRODUCT" | "CREATOR_BUY_FIRST" | "NO_PRODUCT_REQUIRED";
+  productLink: string;
   allowRepeat: boolean;
   deadlineAt: string;
 };
@@ -37,9 +46,12 @@ const defaultForm: MissionForm = {
   rewardCommissionVnd: 0,
   rewardPoints: 0,
   productReceiveOption: "NO_PRODUCT_REQUIRED",
+  productLink: "",
   allowRepeat: false,
   deadlineAt: ""
 };
+
+const POSTGRES_INT_MAX = 2_147_483_647;
 
 function Field({
   label,
@@ -67,30 +79,45 @@ export default function BrandCampaignMissionsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [videoQuotaReached, setVideoQuotaReached] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!campaignId) return;
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/brand/dashboard/campaigns/${campaignId}/missions`, { cache: "no-store" });
+      const [res, campaignsRes] = await Promise.all([
+        fetch(`/api/brand/dashboard/campaigns/${campaignId}/missions`, { cache: "no-store" }),
+        fetch("/api/brand/dashboard/campaigns", { cache: "no-store" })
+      ]);
       const body = (await res.json()) as ApiResult<MissionItem[]>;
       if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? "Không thể tải mission");
       setItems(body.data);
+      if (campaignsRes.ok) {
+        const campaignsBody = (await campaignsRes.json()) as ApiResult<CampaignSummary[]>;
+        const campaign = campaignsBody.data?.find((item) => item.id === campaignId);
+        const videoTarget = campaign?.videoTarget ?? Math.max(0, campaign?.ugcVideoQuota ?? 0);
+        const videoApproved = campaign?.videoApproved ?? Math.max(0, campaign?.ugcVideoApprovedCount ?? 0);
+        setVideoQuotaReached(videoTarget > 0 && videoApproved >= videoTarget);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không thể tải mission");
     } finally {
       setLoading(false);
     }
-  }
+  }, [campaignId]);
 
   useEffect(() => {
     void load();
-  }, [campaignId]);
+  }, [load]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!campaignId) return;
+    if (form.audience === "CREATOR" && videoQuotaReached) {
+      setError("Campaign đã đủ số video dự kiến, không tạo thêm mission/job Creator.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -122,6 +149,12 @@ export default function BrandCampaignMissionsPage() {
       />
       {error ? <ErrorState title="Có lỗi" description={error} onRetry={() => void load()} /> : null}
 
+      {videoQuotaReached ? (
+        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
+          Đã đủ video. Bạn vẫn có thể xem lịch sử mission/job bên dưới, nhưng không tạo thêm job Creator cho campaign này.
+        </p>
+      ) : null}
+
       <form className="dc-card mt-4 grid gap-4 p-4" onSubmit={submit}>
         <SectionHeader title="Tạo mission mới" subtitle="Khai báo đầy đủ thông tin nhiệm vụ để creator/user dễ thực hiện và brand dễ theo dõi." />
         <Field label="Tên mission / job" hint="Tên ngắn gọn, mô tả rõ hành động chính. Ví dụ: Review sản phẩm 30s.">
@@ -144,14 +177,23 @@ export default function BrandCampaignMissionsPage() {
               <option value="CREATOR_BUY_FIRST">CREATOR_BUY_FIRST</option>
             </select>
           </Field>
+          <Field label="Link sản phẩm" hint="Bắt buộc khi chọn CREATOR_BUY_FIRST để creator mua sản phẩm trước.">
+            <input
+              className="dc-input"
+              placeholder="https://..."
+              value={form.productLink}
+              onChange={(e) => setForm((s) => ({ ...s, productLink: e.target.value }))}
+              required={form.productReceiveOption === "CREATOR_BUY_FIRST"}
+            />
+          </Field>
           <Field label="Hạn nộp nhiệm vụ (Deadline)" hint="Để trống nếu không giới hạn thời gian. Nếu có, phải nằm trong timeline campaign.">
             <input className="dc-input" type="datetime-local" value={form.deadlineAt} onChange={(e) => setForm((s) => ({ ...s, deadlineAt: e.target.value }))} />
           </Field>
           <Field label="Thưởng hoa hồng (VND)" hint="Số tiền thưởng cho mỗi nhiệm vụ hoàn thành (đơn vị VND).">
-            <input className="dc-input" type="number" min={0} placeholder="0" value={form.rewardCommissionVnd} onChange={(e) => setForm((s) => ({ ...s, rewardCommissionVnd: Number(e.target.value || 0) }))} />
+            <input className="dc-input" type="number" min={0} max={POSTGRES_INT_MAX} placeholder="0" value={form.rewardCommissionVnd} onChange={(e) => setForm((s) => ({ ...s, rewardCommissionVnd: Number(e.target.value || 0) }))} />
           </Field>
           <Field label="Thưởng điểm (Points)" hint="Điểm thưởng cộng thêm cho người hoàn thành nhiệm vụ.">
-            <input className="dc-input" type="number" min={0} placeholder="0" value={form.rewardPoints} onChange={(e) => setForm((s) => ({ ...s, rewardPoints: Number(e.target.value || 0) }))} />
+            <input className="dc-input" type="number" min={0} max={POSTGRES_INT_MAX} placeholder="0" value={form.rewardPoints} onChange={(e) => setForm((s) => ({ ...s, rewardPoints: Number(e.target.value || 0) }))} />
           </Field>
           <Field label="Cho phép làm lại" hint="Bật nếu một người được phép nhận/làm nhiệm vụ nhiều lần.">
             <label className="flex min-h-11 items-center gap-2 rounded-xl border border-zinc-200 px-3">
@@ -160,7 +202,9 @@ export default function BrandCampaignMissionsPage() {
             </label>
           </Field>
         </div>
-        <button className="dc-btn-primary w-fit" type="submit" disabled={saving}>{saving ? "Đang tạo..." : "Tạo mission/job"}</button>
+        <button className="dc-btn-primary w-fit" type="submit" disabled={saving || (form.audience === "CREATOR" && videoQuotaReached)}>
+          {form.audience === "CREATOR" && videoQuotaReached ? "Đã đủ video" : saving ? "Đang tạo..." : "Tạo mission/job"}
+        </button>
       </form>
 
       <section className="mt-4">
@@ -174,6 +218,7 @@ export default function BrandCampaignMissionsPage() {
                 <div className="mt-2 grid gap-1 md:grid-cols-2">
                   <p><span className="font-semibold">Đối tượng:</span> {item.audience}</p>
                   <p><span className="font-semibold">Nhận sản phẩm:</span> {item.productReceiveOption}</p>
+                  <p><span className="font-semibold">Link sản phẩm:</span> {item.productLink ?? "Không có"}</p>
                   <p><span className="font-semibold">Thưởng hoa hồng:</span> {item.rewardCommissionVnd.toLocaleString("vi-VN")} VND</p>
                   <p><span className="font-semibold">Thưởng điểm:</span> {item.rewardPoints.toLocaleString("vi-VN")}</p>
                   <p><span className="font-semibold">Cho phép lặp:</span> {item.allowRepeat ? "Có" : "Không"}</p>

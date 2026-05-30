@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const POSTGRES_INT_MAX = 2_147_483_647;
+
 const campaignSlugSchema = z
   .string()
   .trim()
@@ -146,17 +148,27 @@ export const rewardTierSchema = z.object({
   pricePoints: z.number().int().min(0).default(0)
 });
 
-export const campaignMissionCreateSchema = z.object({
-  title: z.string().trim().min(3).max(160),
-  description: z.string().trim().min(10).max(3000),
-  productLink: z.string().trim().max(400).optional().or(z.literal("")),
-  rewardPoints: z.number().int().min(0).default(0),
-  rewardCommissionVnd: z.number().int().min(0).default(0),
-  audience: z.enum(["USER", "CREATOR"]).default("CREATOR"),
-  productReceiveOption: z.enum(["DEPOSIT_PRODUCT", "CREATOR_BUY_FIRST", "NO_PRODUCT_REQUIRED"]).default("NO_PRODUCT_REQUIRED"),
-  allowRepeat: z.boolean().default(false),
-  deadlineAt: z.string().datetime().optional()
-});
+export const campaignMissionCreateSchema = z
+  .object({
+    title: z.string().trim().min(3).max(160),
+    description: z.string().trim().min(10).max(3000),
+    productLink: z.string().trim().max(400).optional().or(z.literal("")),
+    rewardPoints: z.number().int().min(0).max(POSTGRES_INT_MAX).default(0),
+    rewardCommissionVnd: z.number().int().min(0).max(POSTGRES_INT_MAX).default(0),
+    audience: z.enum(["USER", "CREATOR"]).default("CREATOR"),
+    productReceiveOption: z.enum(["DEPOSIT_PRODUCT", "CREATOR_BUY_FIRST", "NO_PRODUCT_REQUIRED"]).default("NO_PRODUCT_REQUIRED"),
+    allowRepeat: z.boolean().default(false),
+    deadlineAt: z.string().datetime().optional()
+  })
+  .superRefine((value, ctx) => {
+    if (value.productReceiveOption === "CREATOR_BUY_FIRST" && !value.productLink?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["productLink"],
+        message: "productLink is required when creator buys product first"
+      });
+    }
+  });
 
 export const creatorApplicationDecisionSchema = z.object({
   submissionId: z.string().trim().min(3),

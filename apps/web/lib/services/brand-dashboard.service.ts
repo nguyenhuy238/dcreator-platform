@@ -204,6 +204,12 @@ async function getBrandScopedCampaign(campaignId: string, brandId: string) {
   return campaign;
 }
 
+function isCampaignVideoQuotaReached(campaign: { ugcVideoQuota: number | null; ugcVideoApprovedCount: number }) {
+  const quota = Math.max(0, campaign.ugcVideoQuota ?? 0);
+  if (quota <= 0) return false;
+  return Math.max(0, campaign.ugcVideoApprovedCount) >= quota;
+}
+
 type BrandActorContext = {
   brand: Brand;
   brandOwnerAccountId: string;
@@ -1155,6 +1161,10 @@ export async function addCampaignMissionForBrand(accountId: string, campaignId: 
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true });
   const campaign = await getBrandScopedCampaign(campaignId, ctx.brandOwnerAccountId);
 
+  if (input.audience === "CREATOR" && isCampaignVideoQuotaReached(campaign)) {
+    throw new AppError("Campaign da du so video du kien", 409, "CAMPAIGN_VIDEO_QUOTA_REACHED");
+  }
+
   const deadlineAt = input.deadlineAt ? new Date(input.deadlineAt) : null;
   if (deadlineAt && campaign.startsAt && deadlineAt < campaign.startsAt) {
     throw new AppError("Mission deadline cannot be earlier than campaign start", 422, "MISSION_DEADLINE_INVALID");
@@ -1168,7 +1178,7 @@ export async function addCampaignMissionForBrand(accountId: string, campaignId: 
       campaignId: campaign.id,
       title: input.title,
       description: input.description,
-      productLink: input.productLink || null,
+      productLink: input.productReceiveOption === "NO_PRODUCT_REQUIRED" ? null : input.productLink || null,
       rewardPoints: input.rewardPoints,
       rewardCommissionVnd: input.rewardCommissionVnd,
       audience: input.audience,
@@ -1568,4 +1578,3 @@ export async function listProductSubmissionsForBrand(accountId: string) {
     include: { inventoryBatches: true }
   });
 }
-

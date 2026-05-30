@@ -61,7 +61,12 @@ async function main() {
     ["streetwear-drop", "Streetwear Limited Drop - 10 video seeding", CampaignCategory.FASHION, 90000000, 74000000, 25, "Ra mắt BST mới và tăng doanh thu", "TikTok, Instagram, Facebook", "Video review, Livestream, Post ảnh"]
   ];
 
+  const ugcVideoQuotaBySlug = {
+    "foodie-preorder-box": 20
+  };
+
   for (const [slug, title, category, targetAmountVnd, fundedAmountVnd, daysLeft, objective, priorityChannels, missionTypes] of campaignSeeds) {
+    const ugcVideoQuota = ugcVideoQuotaBySlug[slug] ?? null;
     const campaign = await prisma.campaign.upsert({
       where: { slug },
       update: {
@@ -80,6 +85,7 @@ async function main() {
         bonusBudgetVnd: 5000000,
         targetAmountVnd,
         fundedAmountVnd,
+        ugcVideoQuota,
         budgetVnd: targetAmountVnd,
         status: CampaignStatus.ACTIVE,
         isPublic: true,
@@ -102,6 +108,7 @@ async function main() {
         bonusBudgetVnd: 5000000,
         targetAmountVnd,
         fundedAmountVnd,
+        ugcVideoQuota,
         budgetVnd: targetAmountVnd,
         status: CampaignStatus.ACTIVE,
         isPublic: true,

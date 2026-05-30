@@ -40,7 +40,6 @@ const creatorNavItems: readonly NavItem[] = [
 
 const brandNavItems: readonly NavItem[] = [
   { href: "/dashboard/brand", label: "T\u1ed5ng quan Brand", description: "To\u00e0n c\u1ea3nh v\u1eadn h\u00e0nh Brand" },
-  { href: "/dashboard/brand/subscriptions", label: "M\u1ee5c ti\u00eau g\u00f3i", description: "Ch\u1ecdn g\u00f3i \u0111\u0103ng k\u00fd d\u00e0nh cho Brand" },
   { href: "/dashboard/brand/wallet", label: "V\u00ed N-Point", description: "S\u1ed1 d\u01b0 N-Point v\u00e0 y\u00eau c\u1ea7u n\u1ea1p/ho\u00e0n ti\u1ec1n" },
   { href: "/dashboard/brand/onboarding", label: "Onboarding / BCC", description: "H\u1ed3 s\u01a1 ph\u00e1p l\u00fd v\u00e0 BCC" },
   { href: "/dashboard/brand/profile", label: "H\u1ed3 s\u01a1 nh\u00e3n h\u00e0ng", description: "Th\u00f4ng tin nh\u00e3n h\u00e0ng" },
@@ -206,5 +205,4 @@ export function getBreadcrumbsForPath(pathname: string, workspace: Workspace): B
   }
   return crumbs;
 }
-
 

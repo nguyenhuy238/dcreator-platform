@@ -3,6 +3,7 @@ import { AppError } from "@/lib/errors";
 import {
   BRAND_SUBSCRIPTION_PACKAGE_MAP,
   BRAND_SUBSCRIPTION_PACKAGE_RANK,
+  BRAND_SUBSCRIPTION_PACKAGE_VIDEO_QUOTA,
   BRAND_SUBSCRIPTION_PACKAGES,
   type BrandSubscriptionPackageCode
 } from "@/lib/constants/brand-subscription";
@@ -38,28 +39,50 @@ function toPackageStatus(currentPackageCode: BrandSubscriptionPackageCode, packa
   return "LOCKED";
 }
 
+function canPurchasePackage(input: {
+  currentPackageCode: BrandSubscriptionPackageCode;
+  packageCode: BrandSubscriptionPackageCode;
+  pricePoints: number;
+}) {
+  return (
+    input.pricePoints > 0 &&
+    toPackageStatus(input.currentPackageCode, input.packageCode) === "AVAILABLE"
+  );
+}
+
 export async function getBrandSubscriptionState(accountId: string) {
   const brand = await resolveBrandContext(prisma, accountId);
-  const [wallet, subscription] = await Promise.all([
+  const [wallet, subscription, videoUsage] = await Promise.all([
     ensureWalletByAccountId(brand.ownerAccountId),
     prisma.brandSubscription.upsert({
       where: { brandId: brand.id },
       create: { brandId: brand.id, packageCode: "FREE", activatedAt: new Date() },
       update: {}
+    }),
+    prisma.campaign.aggregate({
+      where: { brandId: brand.ownerAccountId },
+      _sum: { ugcVideoApprovedCount: true }
     })
   ]);
 
   const currentPackageCode = subscription.packageCode as BrandSubscriptionPackageCode;
+  const videoQuota = BRAND_SUBSCRIPTION_PACKAGE_VIDEO_QUOTA[currentPackageCode] ?? 0;
+  const videoUsed = Math.max(0, videoUsage._sum.ugcVideoApprovedCount ?? 0);
 
   return {
     brand,
     walletPoints: wallet.pointsBalance,
     currentPackageCode,
+    videoQuota,
+    videoUsed,
+    videoRemaining: Math.max(0, videoQuota - videoUsed),
+    isVideoQuotaReached: videoQuota > 0 && videoUsed >= videoQuota,
     updatedAt: subscription.updatedAt,
     packages: BRAND_SUBSCRIPTION_PACKAGES.map((pkg) => ({
       ...pkg,
+      videoQuota: BRAND_SUBSCRIPTION_PACKAGE_VIDEO_QUOTA[pkg.code] ?? 0,
       status: toPackageStatus(currentPackageCode, pkg.code),
-      canPurchase: pkg.pricePoints > 0 && toPackageStatus(currentPackageCode, pkg.code) === "AVAILABLE"
+      canPurchase: canPurchasePackage({ currentPackageCode, packageCode: pkg.code, pricePoints: pkg.pricePoints })
     }))
   };
 }
@@ -91,6 +114,7 @@ export async function purchaseBrandSubscription(accountId: string, packageCode: 
     if (targetRank <= currentRank) {
       throw new AppError("Không thể mua lại gói thấp hơn gói hiện tại", 409, "BRAND_SUBSCRIPTION_DOWNGRADE_NOT_ALLOWED");
     }
+
 
     const wallet = await tx.wallet.upsert({
       where: { userId: brand.ownerAccountId },
@@ -155,13 +179,24 @@ export async function purchaseBrandSubscription(accountId: string, packageCode: 
     };
   });
 
+  const videoUsage = await prisma.campaign.aggregate({
+    where: { brandId: result.brand.ownerAccountId },
+    _sum: { ugcVideoApprovedCount: true }
+  });
+  const videoQuota = BRAND_SUBSCRIPTION_PACKAGE_VIDEO_QUOTA[result.currentPackageCode] ?? 0;
+  const videoUsed = Math.max(0, videoUsage._sum.ugcVideoApprovedCount ?? 0);
+
   return {
     ...result,
+    videoQuota,
+    videoUsed,
+    videoRemaining: Math.max(0, videoQuota - videoUsed),
+    isVideoQuotaReached: videoQuota > 0 && videoUsed >= videoQuota,
     packages: BRAND_SUBSCRIPTION_PACKAGES.map((pkg) => ({
       ...pkg,
+      videoQuota: BRAND_SUBSCRIPTION_PACKAGE_VIDEO_QUOTA[pkg.code] ?? 0,
       status: toPackageStatus(result.currentPackageCode, pkg.code),
-      canPurchase: pkg.pricePoints > 0 && toPackageStatus(result.currentPackageCode, pkg.code) === "AVAILABLE"
+      canPurchase: canPurchasePackage({ currentPackageCode: result.currentPackageCode, packageCode: pkg.code, pricePoints: pkg.pricePoints })
     }))
   };
 }
-

@@ -70,8 +70,7 @@ export const BRAND_SUBSCRIPTION_PACKAGE_MAP: Record<BrandSubscriptionPackageCode
 };
 
 export const BRAND_SUBSCRIPTION_PACKAGE_VIDEO_QUOTA: Record<BrandSubscriptionPackageCode, number> = {
-  FREE: 0,
+  FREE: 20,
   UGC_15_VIDEO: 15,
   UGC_50_VIDEO: 50
 };
-

@@ -9,6 +9,7 @@ export type CreatorCampaignApplicationState =
   | "PROFILE_REQUIRED"
   | "CAMPAIGN_UNAVAILABLE"
   | "MISSION_UNAVAILABLE"
+  | "VIDEO_QUOTA_REACHED"
   | "CAN_APPLY"
   | "PENDING_REVIEW"
   | "ASSIGNED"
@@ -80,6 +81,15 @@ function toSnapshot(
       missionId: null,
       lifecycleStatus: null
     },
+    VIDEO_QUOTA_REACHED: {
+      label: "Đã đủ video",
+      disabled: true,
+      message: "Campaign đã đủ số video dự kiến, không nhận thêm Creator mới.",
+      rejectReason: null,
+      submissionId: null,
+      missionId: null,
+      lifecycleStatus: null
+    },
     CAN_APPLY: {
       label: "Nộp đơn đăng ký",
       disabled: false,
@@ -128,11 +138,18 @@ function toStateFromApplicationStatus(status: ApplicationStatus): CreatorCampaig
   return "CAN_APPLY";
 }
 
+function isCampaignVideoQuotaReached(campaign: { ugcVideoQuota: number | null; ugcVideoApprovedCount: number }) {
+  const quota = Math.max(0, campaign.ugcVideoQuota ?? 0);
+  if (quota <= 0) return false;
+  return Math.max(0, campaign.ugcVideoApprovedCount) >= quota;
+}
+
 async function getCampaignAndCreatorMission(slug: string) {
   const campaign = await prisma.campaign.findUnique({
     where: { slug },
     select: {
       id: true,
+      brandId: true,
       status: true,
       isPublic: true,
       ugcVideoQuota: true,
@@ -163,14 +180,6 @@ export async function getCreatorCampaignApplicationStatus(
 
   const { campaign, firstMission } = campaignData;
   if (!campaign.isPublic || campaign.status !== CampaignStatus.ACTIVE) return toSnapshot("CAMPAIGN_UNAVAILABLE");
-  const videoTarget = campaign.ugcVideoQuota ?? 0;
-  const approvedVideos = campaign.ugcVideoApprovedCount ?? 0;
-  if (videoTarget > 0 && approvedVideos >= videoTarget) {
-    return toSnapshot("MISSION_UNAVAILABLE", {
-      label: "Hết lượt video",
-      message: `Campaign đã đủ ${videoTarget}/${videoTarget} video được duyệt.`
-    });
-  }
 
   if (!viewer) return toSnapshot("LOGIN_REQUIRED");
   if (!viewer.roles.includes(Role.CREATOR)) return toSnapshot("NOT_CREATOR");
@@ -189,6 +198,9 @@ export async function getCreatorCampaignApplicationStatus(
 
   if (existing) {
     const state = toStateFromApplicationStatus(existing.status);
+    if (state === "REJECTED" && isCampaignVideoQuotaReached(campaign)) {
+      return toSnapshot("VIDEO_QUOTA_REACHED");
+    }
     return toSnapshot(state, {
       submissionId: existing.id,
       missionId: existing.missionId,
@@ -197,6 +209,7 @@ export async function getCreatorCampaignApplicationStatus(
     });
   }
 
+  if (isCampaignVideoQuotaReached(campaign)) return toSnapshot("VIDEO_QUOTA_REACHED");
   if (!firstMission) return toSnapshot("MISSION_UNAVAILABLE");
   return toSnapshot("CAN_APPLY", { missionId: firstMission.id });
 }
@@ -210,11 +223,6 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
   const { campaign, firstMission } = campaignData;
   if (!campaign.isPublic || campaign.status !== CampaignStatus.ACTIVE) {
     throw new AppError("Campaign is not open for creator application", 409, "CAMPAIGN_NOT_OPEN");
-  }
-  const videoTarget = campaign.ugcVideoQuota ?? 0;
-  const approvedVideos = campaign.ugcVideoApprovedCount ?? 0;
-  if (videoTarget > 0 && approvedVideos >= videoTarget) {
-    throw new AppError("Campaign đã hết lượt video được phê duyệt", 409, "CAMPAIGN_UGC_VIDEO_QUOTA_REACHED");
   }
 
   if (!firstMission) {
@@ -245,6 +253,10 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
   if (existing) {
     if (existing.status !== "REJECTED") {
       throw new AppError("Creator has already applied to this campaign", 409, "CREATOR_CAMPAIGN_ALREADY_APPLIED");
+    }
+
+    if (isCampaignVideoQuotaReached(campaign)) {
+      throw new AppError("Campaign da du so video du kien", 409, "CAMPAIGN_VIDEO_QUOTA_REACHED");
     }
 
     const reapplied = await prisma.missionApplication.update({
@@ -281,6 +293,10 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
         lifecycleStatus: "ACCEPTED"
       })
     };
+  }
+
+  if (isCampaignVideoQuotaReached(campaign)) {
+    throw new AppError("Campaign da du so video du kien", 409, "CAMPAIGN_VIDEO_QUOTA_REACHED");
   }
 
   const application = await prisma.missionApplication.create({

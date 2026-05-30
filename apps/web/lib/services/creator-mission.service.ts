@@ -250,43 +250,15 @@ async function notifyCreator(accountId: string, event: NotificationEvent, title:
   await createNotification({ accountId, event, title, content, metadata });
 }
 
-async function reserveCampaignUgcVideoQuota(tx: Prisma.TransactionClient, campaignId: string) {
+async function recordCampaignUgcVideoApproved(tx: Prisma.TransactionClient, campaignId: string) {
   try {
-    const rows = await tx.$queryRaw<Array<{ ugcVideoQuota: number | null }>>`
-      SELECT "ugcVideoQuota"
-      FROM "Campaign"
-      WHERE "id" = ${campaignId}
-      LIMIT 1
-    `;
-    const row = rows[0];
-    if (!row) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
-    const quotaValue = row.ugcVideoQuota;
-    if (quotaValue === null) return;
-    if (quotaValue <= 0) {
-      throw new AppError("Campaign đã hết hạn mức video UGC theo gói hiện tại.", 409, "CAMPAIGN_UGC_VIDEO_QUOTA_REACHED");
-    }
-
-    const reservedRows = await tx.$queryRaw<Array<{ id: string }>>`
+    await tx.$executeRaw`
       UPDATE "Campaign"
       SET "ugcVideoApprovedCount" = "ugcVideoApprovedCount" + 1
       WHERE "id" = ${campaignId}
-        AND "ugcVideoApprovedCount" < ${quotaValue}
-      RETURNING "id"
     `;
-    if (!reservedRows.length) {
-      throw new AppError(
-        `Campaign đã đạt giới hạn ${quotaValue} video UGC được duyệt.`,
-        409,
-        "CAMPAIGN_UGC_VIDEO_QUOTA_REACHED"
-      );
-    }
-  } catch (error) {
-    if (error instanceof AppError) throw error;
-    throw new AppError(
-      "Hệ thống chưa cập nhật migration quota video UGC. Vui lòng chạy migration trước khi duyệt mission.",
-      500,
-      "CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED"
-    );
+  } catch {
+    // Backward compatibility when the UGC video counter migration has not been applied yet.
   }
 }
 
@@ -1111,7 +1083,7 @@ export async function approveMissionApplicationByAdmin(actorId: string, id: stri
       throw new AppError("Mission application is not pending review", 409, "MISSION_APPLICATION_INVALID_STATUS");
     }
 
-    await reserveCampaignUgcVideoQuota(tx, current.campaignId);
+    await recordCampaignUgcVideoApproved(tx, current.campaignId);
     const next = await tx.missionApplication.findUniqueOrThrow({
       where: { id }
     });
@@ -1125,7 +1097,7 @@ export async function approveMissionApplicationByAdmin(actorId: string, id: stri
     });
     return next;
   });
-  await notifyCreator(current.accountId, "MISSION_APPLICATION_APPROVED", "Don xin nhiem vu duoc duyet", `Ban da duoc duyet nhiem vu \"${current.mission.title}\".`, { missionApplicationId: id });
+  await notifyCreator(current.accountId, "MISSION_APPLICATION_APPROVED", "Don xin nhiem vu duoc duyet", `Ban da duoc duyet nhiem vu "${current.mission.title}".`, { missionApplicationId: id });
   return updated;
 }
 
