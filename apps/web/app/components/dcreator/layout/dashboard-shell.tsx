@@ -2,9 +2,32 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { Role } from "@prisma/client";
+import {
+  Bank,
+  List,
+  Bell,
+  Briefcase,
+  CheckCircle,
+  ClipboardText,
+  Coins,
+  Gauge,
+  GearSix,
+  Gift,
+  House,
+  IdentificationCard,
+  Megaphone,
+  X,
+  Package,
+  Scroll,
+  ShieldWarning,
+  SlidersHorizontal,
+  Storefront,
+  UserCircle,
+  UsersThree
+} from "@phosphor-icons/react";
 import { getBreadcrumbsForPath, getWorkspaceForPath } from "@/lib/navigation";
 import { ROLE } from "@/lib/auth/role-constants";
 
@@ -13,6 +36,8 @@ export type DashboardNavItem = {
   label: string;
   description?: string;
   isComingSoon?: boolean;
+  icon?: string;
+  activePrefixes?: readonly string[];
 };
 
 type DashboardShellUser = {
@@ -39,10 +64,35 @@ function isCurrent(pathname: string, href: string) {
 
 function getActiveHref(pathname: string, nav: readonly DashboardNavItem[]) {
   const candidates = nav
-    .filter((item) => isCurrent(pathname, item.href))
+    .filter((item) => {
+      const matchedByPrefix = item.activePrefixes?.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+      return isCurrent(pathname, item.href) || Boolean(matchedByPrefix);
+    })
     .sort((a, b) => b.href.length - a.href.length);
   return candidates[0]?.href ?? null;
 }
+
+const iconMap = {
+  Bank,
+  Bell,
+  Briefcase,
+  CheckCircle,
+  ClipboardText,
+  Coins,
+  Gauge,
+  GearSix,
+  Gift,
+  House,
+  IdentificationCard,
+  Megaphone,
+  Package,
+  Scroll,
+  ShieldWarning,
+  SlidersHorizontal,
+  Storefront,
+  UserCircle,
+  UsersThree
+} as const;
 
 export function DashboardShell({
   children,
@@ -62,6 +112,7 @@ export function DashboardShell({
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [desktopNavOpen, setDesktopNavOpen] = useState(false);
   const workspace = useMemo(() => getWorkspaceForPath(pathname), [pathname]);
   const crumbs = useMemo(() => getBreadcrumbsForPath(pathname, workspace), [pathname, workspace]);
   const activeHref = useMemo(() => getActiveHref(pathname, navItems), [pathname, navItems]);
@@ -74,6 +125,15 @@ export function DashboardShell({
     return "/dashboard/user/profile";
   }, [user.roles]);
 
+  useEffect(() => {
+    const saved = window.localStorage.getItem("dc:desktop-nav-open");
+    if (saved === "1") setDesktopNavOpen(true);
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("dc:desktop-nav-open", desktopNavOpen ? "1" : "0");
+  }, [desktopNavOpen]);
+
   async function onLogout() {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -85,38 +145,59 @@ export function DashboardShell({
   return (
     <div className="min-h-screen bg-zinc-50">
       <div className="mx-auto flex w-full max-w-7xl">
-        <aside className="sticky top-0 hidden h-screen w-80 shrink-0 border-r border-zinc-200 bg-white lg:block">
-          <div className="border-b border-zinc-200 px-5 py-4">
-            <div className="flex items-center gap-3">
-              <Link href="/" className="inline-flex items-center" aria-label="Về trang chủ dCreator">
-                <Image src="/uploads/dCreator-logo-new.png" alt="dCreator logo" width={120} height={32} className="h-8 w-auto" priority />
-              </Link>
-              <div>
-                <p className="text-sm font-black text-zinc-900">{workspaceTitle}</p>
-                <p className="mt-1 text-xs text-zinc-500">{workspaceDescription}</p>
+        <aside className={`sticky top-0 hidden h-screen shrink-0 border-r border-zinc-200 bg-white transition-all duration-200 lg:block ${desktopNavOpen ? "w-80" : "w-20"}`}>
+          {desktopNavOpen ? (
+            <div className="border-b border-zinc-200 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <Link href="/" className="inline-flex items-center" aria-label="Về trang chủ dCreator">
+                  <Image src="/uploads/dCreator-logo-new.png" alt="dCreator logo" width={120} height={32} className="h-8 w-auto" priority />
+                </Link>
+                <div>
+                  <p className="text-sm font-black text-zinc-900">{workspaceTitle}</p>
+                  <p className="mt-1 text-xs text-zinc-500">{workspaceDescription}</p>
+                </div>
               </div>
             </div>
-          </div>
-          <nav className="h-[calc(100vh-73px)] overflow-y-auto p-3">
+          ) : (
+            <div className="flex h-[73px] items-center justify-center border-b border-zinc-200 px-2">
+              <Link href="/" className="inline-flex items-center" aria-label="Về trang chủ dCreator">
+                <Image src="/uploads/dCreator-logo-new.png" alt="dCreator logo" width={32} height={32} className="h-8 w-8 rounded-lg object-cover" priority />
+              </Link>
+            </div>
+          )}
+          <nav className={`overflow-y-auto p-2 ${desktopNavOpen ? "h-[calc(100vh-73px)]" : "h-[calc(100vh-73px)]"}`}>
             {navItems.map((item) => {
               const active = item.href === activeHref;
               const label = item.label?.trim() || "Đi tới trang";
+              const Icon = iconMap[item.icon as keyof typeof iconMap] ?? House;
               return (
                 <Link
                   key={`${item.href}-${item.label}`}
                   href={item.href}
                   aria-current={active ? "page" : undefined}
-                  className={`dc-focus relative mb-1 block min-h-11 rounded-xl border px-3 py-2.5 transition ${active ? "border-zinc-900 bg-zinc-900 shadow-sm hover:bg-zinc-900" : "border-transparent bg-transparent hover:border-zinc-200 hover:bg-zinc-100"}`}
+                  title={!desktopNavOpen ? label : undefined}
+                  className={`dc-focus relative mb-1 block min-h-11 rounded-2xl border transition ${desktopNavOpen ? "px-3 py-2.5" : "px-0 py-2"} ${active ? "border-zinc-900 bg-zinc-900 shadow-sm hover:bg-zinc-900" : "border-transparent bg-transparent hover:border-zinc-200 hover:bg-zinc-100"}`}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className={`relative z-10 text-sm font-semibold leading-5 ${active ? "text-white" : "text-zinc-900"}`}>{label}</p>
-                    {item.isComingSoon ? (
-                      <span className={`relative z-10 rounded-full border px-2 py-0.5 text-[10px] font-bold ${active ? "border-white/20 bg-white/10 text-white" : "border-zinc-200 bg-zinc-200 text-zinc-700"}`}>
-                        SOON
-                      </span>
-                    ) : null}
-                  </div>
-                  {item.description ? <p className={`relative z-10 mt-0.5 text-xs leading-4 ${active ? "text-zinc-300" : "text-zinc-500"}`}>{item.description}</p> : null}
+                  {desktopNavOpen ? (
+                    <>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Icon size={18} weight={active ? "fill" : "regular"} className={active ? "text-white" : "text-zinc-700"} />
+                          <p className={`relative z-10 text-sm font-semibold leading-5 ${active ? "text-white" : "text-zinc-900"}`}>{label}</p>
+                        </div>
+                        {item.isComingSoon ? (
+                          <span className={`relative z-10 rounded-full border px-2 py-0.5 text-[10px] font-bold ${active ? "border-white/20 bg-white/10 text-white" : "border-zinc-200 bg-zinc-200 text-zinc-700"}`}>
+                            SOON
+                          </span>
+                        ) : null}
+                      </div>
+                      {item.description ? <p className={`relative z-10 mt-0.5 text-xs leading-4 ${active ? "text-zinc-300" : "text-zinc-500"}`}>{item.description}</p> : null}
+                    </>
+                  ) : (
+                    <span className="inline-flex w-full items-center justify-center">
+                      <Icon size={20} weight={active ? "fill" : "regular"} className={active ? "text-white" : "text-zinc-700"} />
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -135,6 +216,14 @@ export function DashboardShell({
                     aria-label="Mở thanh điều hướng"
                   >
                     ☰
+                  </button>
+                  <button
+                    type="button"
+                    className="hidden h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-zinc-700 transition hover:bg-zinc-100 lg:inline-flex"
+                    onClick={() => setDesktopNavOpen((prev) => !prev)}
+                    aria-label={desktopNavOpen ? "Đóng thanh điều hướng" : "Mở thanh điều hướng"}
+                  >
+                    {desktopNavOpen ? <X size={18} weight="bold" /> : <List size={18} weight="bold" />}
                   </button>
                   <div>
                     <p className="text-sm font-bold text-zinc-900">{activeTitle}</p>
@@ -208,4 +297,3 @@ export function DashboardShell({
     </div>
   );
 }
-

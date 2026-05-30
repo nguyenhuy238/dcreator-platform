@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { CreatorCampaignApplyButton } from "./CreatorCampaignApplyButton";
 
 const FALLBACK_COVER_IMAGE = "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200";
 
@@ -60,36 +61,42 @@ export function CampaignCard({ campaign }: { campaign: CampaignCardData }) {
         </div>
       </div>
 
-      <div className="flex h-full flex-col p-5">
+      <div className="grid h-full grid-rows-[4rem_1.5rem_92px_5.5rem_1fr] gap-y-3 p-5">
         <h3 className="line-clamp-2 text-2xl font-black leading-tight text-zinc-900">{campaign.title}</h3>
-        <p className="mt-3 text-sm font-semibold text-zinc-600">Brand: {campaign.brand}</p>
+        <p className="text-sm font-semibold text-zinc-600">Brand: {campaign.brand}</p>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-          <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="min-h-[92px] rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
             <p className="text-zinc-500">Creator đã tham gia</p>
             <p className="font-black text-zinc-900">{creatorJoined}</p>
           </div>
-          <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+          <div className="min-h-[92px] rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
             <p className="text-zinc-500">Video dự kiến</p>
             <p className="font-black text-zinc-900">{videoTarget}</p>
           </div>
         </div>
-        <p className="mt-3 text-xs font-semibold text-zinc-600">Video hoàn thành: {videoApproved}/{videoTarget}</p>
-
-        <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-100">
-          <div className="h-full bg-zinc-900 transition-all" style={{ width: `${videoProgressPercent}%` }} />
+        <div>
+          <p className="text-xs font-semibold text-zinc-600">Video hoàn thành: {videoApproved}/{videoTarget}</p>
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-100">
+            <div className="h-full bg-zinc-900 transition-all" style={{ width: `${videoProgressPercent}%` }} />
+          </div>
+          <p className="mt-1 text-xs text-zinc-500">Tiến độ video: {videoProgressPercent}%</p>
         </div>
-        <p className="mt-1 text-xs text-zinc-500">Tiến độ video: {videoProgressPercent}%</p>
 
-        <div className="mt-auto pt-4 flex justify-end">
-          <Link
-            href={`/campaigns/${campaign.slug}`}
-            className="inline-flex items-center gap-2 rounded-full border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
-            aria-label={`Xem chi ti\u1ebft ${campaign.title}`}
-          >
-            {"Xem chi ti\u1ebft"}
-            <span className="text-base font-bold">→</span>
-          </Link>
+        <div className="flex items-end pt-1">
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <CreatorCampaignApplyButton slug={campaign.slug} compact inline hideStatusMessage />
+            </div>
+            <Link
+              href={`/campaigns/${campaign.slug}`}
+              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
+              aria-label={`Xem chi ti\u1ebft ${campaign.title}`}
+            >
+              {"Xem chi ti\u1ebft"}
+              <span className="text-base font-bold">→</span>
+            </Link>
+          </div>
         </div>
       </div>
     </article>
