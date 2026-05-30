@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import type { Role } from "@prisma/client";
 import { AppShell } from "@/app/components/dcreator/layout/shell";
 import {
   EmptyState,
@@ -14,7 +13,6 @@ import {
   StatsCard
 } from "@/app/components/dcreator/ui/base";
 import { MissionCard, VoucherCard } from "@/app/components/dcreator/cards/campaign";
-import { getDefaultDashboardPathByContext } from "@/lib/auth/dashboard-access";
 import { getNavItemsForWorkspace } from "@/lib/navigation";
 
 const nav = getNavItemsForWorkspace("user", ["USER", "CREATOR", "BRAND_OWNER", "BRAND_STAFF", "ADMIN", "OPS"]);
@@ -72,7 +70,6 @@ function contributionStatusLabel(status: MyContribution["status"]) {
 }
 
 export default function UserDashboardPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,21 +82,6 @@ export default function UserDashboardPage() {
     let active = true;
     const denied = searchParams.get("denied");
     if (denied) setError(denied);
-    fetch("/api/auth/me", { cache: "no-store" })
-      .then(async (response) => {
-        const payload = await response.json();
-        if (!active || !response.ok || !payload?.success) return;
-        const roles = payload.data?.user?.roles as Role[] | undefined;
-        if (!Array.isArray(roles)) return;
-        const defaultDashboard = getDefaultDashboardPathByContext({
-          roles,
-          creatorProfile: payload.data?.user?.creatorProfile ?? null,
-          brandMemberships: payload.data?.user?.brandMemberships ?? []
-        });
-        if (defaultDashboard !== "/dashboard/user") router.replace(defaultDashboard);
-      })
-      .catch(() => {});
-
     Promise.all([
       fetch("/api/wallet/me", { cache: "no-store" }),
       fetch("/api/me/vouchers", { cache: "no-store" }),
@@ -136,7 +118,7 @@ export default function UserDashboardPage() {
     return () => {
       active = false;
     };
-  }, [router, searchParams]);
+  }, [searchParams]);
 
   const weeklyPoints = useMemo(() => {
     if (!wallet) return 0;

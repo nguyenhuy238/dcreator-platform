@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { FormField } from "@/app/components/dcreator/ui/base";
 import { PasswordInput } from "@/app/components/dcreator/ui/PasswordInput";
-import { getDefaultDashboardPath } from "@/lib/auth/dashboard-access";
+import { resolveWorkspaceLanding } from "@/lib/auth/workspace-choice";
 import type { Role } from "@prisma/client";
 
 export default function RegisterPage() {
@@ -21,7 +21,12 @@ export default function RegisterPage() {
       const payload = await response.json();
       if (!alive) return;
       if (response.ok && payload?.success && payload?.data?.user?.roles) {
-        router.replace(getDefaultDashboardPath(payload.data.user.roles as Role[]));
+        const decision = resolveWorkspaceLanding({
+          roles: payload.data.user.roles as Role[],
+          creatorProfile: payload.data.user.creatorProfile ?? null,
+          brandMemberships: payload.data.user.brandMemberships ?? []
+        });
+        router.replace(decision.href);
       }
     }
     void checkAuth();
@@ -52,8 +57,15 @@ export default function RegisterPage() {
     const payload = await response.json();
     setLoading(false);
     if (!response.ok || !payload.success) return setError(payload.error ?? "Đăng ký thất bại");
-    const roles = (payload?.data?.roles ?? [payload?.data?.role].filter(Boolean)) as Role[];
-    router.push(getDefaultDashboardPath(roles));
+    const meResponse = await fetch("/api/auth/me", { cache: "no-store" });
+    const mePayload = await meResponse.json();
+    const roles = (mePayload?.data?.user?.roles ?? payload?.data?.roles ?? [payload?.data?.role].filter(Boolean)) as Role[];
+    const decision = resolveWorkspaceLanding({
+      roles,
+      creatorProfile: mePayload?.data?.user?.creatorProfile ?? null,
+      brandMemberships: mePayload?.data?.user?.brandMemberships ?? []
+    });
+    router.push(decision.href);
     router.refresh();
   }
 

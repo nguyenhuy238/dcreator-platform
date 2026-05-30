@@ -7,13 +7,12 @@ import type { Role } from "@prisma/client";
 import { PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { FormField } from "@/app/components/dcreator/ui/base";
 import { PasswordInput } from "@/app/components/dcreator/ui/PasswordInput";
-import { getDefaultDashboardPathByContext } from "@/lib/auth/dashboard-access";
+import { canAccessPath, resolveWorkspaceLanding } from "@/lib/auth/workspace-choice";
 import { ROLE } from "@/lib/auth/role-constants";
 
-async function resolvePostLoginPath(
-  roles: Role[],
-  context?: { creatorProfile?: { id: string } | null; brandMemberships?: Array<{ id: string; role: "OWNER" | "MANAGER" | "STAFF" }> }
-) {
+type LoginContext = { creatorProfile?: { id: string } | null; brandMemberships?: Array<{ id: string; name: string; role: "OWNER" | "MANAGER" | "STAFF" }> };
+
+async function resolvePostLoginPath(roles: Role[], context?: LoginContext) {
   const brandRoles: Role[] = [ROLE.BRAND_OWNER, ROLE.BRAND_STAFF];
   if (roles.some((role) => brandRoles.includes(role))) {
     const response = await fetch("/api/brand/dashboard/onboarding", { cache: "no-store" });
@@ -22,28 +21,18 @@ async function resolvePostLoginPath(
       return "/dashboard/brand/onboarding";
     }
   }
-  return getDefaultDashboardPathByContext({
+  const decision = resolveWorkspaceLanding({
     roles,
     creatorProfile: context?.creatorProfile ?? null,
     brandMemberships: context?.brandMemberships ?? []
   });
+  return decision.href;
 }
 
-async function resolveTargetPath(
-  roles: Role[],
-  nextPath: string | null,
-  context?: { creatorProfile?: { id: string } | null; brandMemberships?: Array<{ id: string; role: "OWNER" | "MANAGER" | "STAFF" }> }
-) {
+async function resolveTargetPath(roles: Role[], nextPath: string | null, context?: LoginContext) {
   const defaultPath = await resolvePostLoginPath(roles, context);
   if (!nextPath) return defaultPath;
-  if (
-    nextPath === "/dashboard/brand" ||
-    nextPath.startsWith("/dashboard/brand/") ||
-    nextPath === "/brand" ||
-    nextPath.startsWith("/brand/")
-  ) {
-    return defaultPath;
-  }
+  if (!canAccessPath(nextPath, { roles, creatorProfile: context?.creatorProfile ?? null, brandMemberships: context?.brandMemberships ?? [] })) return defaultPath;
   return nextPath;
 }
 
@@ -98,10 +87,12 @@ function LoginPageContent() {
     const payload = await response.json();
     setLoading(false);
     if (!response.ok || !payload.success) return setError(payload.error ?? "Đăng nhập thất bại");
-    const roles = (payload?.data?.roles ?? [payload?.data?.role].filter(Boolean)) as Role[];
+    const meResponse = await fetch("/api/auth/me", { cache: "no-store" });
+    const mePayload = await meResponse.json();
+    const roles = (mePayload?.data?.user?.roles ?? payload?.data?.roles ?? [payload?.data?.role].filter(Boolean)) as Role[];
     const target = await resolveTargetPath(roles, searchParams.get("next"), {
-      creatorProfile: payload?.data?.user?.creatorProfile ?? null,
-      brandMemberships: payload?.data?.user?.brandMemberships ?? []
+      creatorProfile: mePayload?.data?.user?.creatorProfile ?? null,
+      brandMemberships: mePayload?.data?.user?.brandMemberships ?? []
     });
     router.push(target);
     router.refresh();
