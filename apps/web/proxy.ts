@@ -32,7 +32,7 @@ async function resolveCurrentRoles(request: NextRequest, fallbackRole: Role): Pr
 }
 
 export async function proxy(request: NextRequest) {
-  if (request.nextUrl.pathname === "/brand/register") {
+  if (request.nextUrl.pathname === "/brand" || request.nextUrl.pathname === "/brand/register") {
     return NextResponse.next();
   }
 

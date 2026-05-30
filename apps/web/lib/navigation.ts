@@ -93,7 +93,7 @@ const WORKSPACES: readonly WorkspaceConfig[] = [
     title: "B\u1ea3ng \u0111i\u1ec1u khi\u1ec3n Nh\u00e3n h\u00e0ng",
     description: "Qu\u1ea3n l\u00fd onboarding, campaign, creator v\u00e0 qu\u1ef9 Brand",
     defaultHref: "/dashboard/brand",
-    routePrefixes: ["/dashboard/brand", "/brand"],
+    routePrefixes: ["/dashboard/brand"],
     allowedRoles: ["BRAND_OWNER", "BRAND_STAFF"],
     navItems: brandNavItems
   },
@@ -206,5 +206,4 @@ export function getBreadcrumbsForPath(pathname: string, workspace: Workspace): B
   }
   return crumbs;
 }
-
 

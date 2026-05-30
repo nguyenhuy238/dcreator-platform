@@ -20,6 +20,7 @@ type AuthUser = {
 };
 
 export function PublicHeader() {
+  const pathname = usePathname();
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -69,9 +70,9 @@ export function PublicHeader() {
   }
 
   const canAccessAdmin = currentUser ? currentUser.roles.includes("ADMIN") || currentUser.roles.includes("OPS") : false;
-  const isCreator = currentUser ? currentUser.roles.includes(ROLE.CREATOR) : false;
-  const isBrand = currentUser ? currentUser.roles.includes(ROLE.BRAND_OWNER) || currentUser.roles.includes(ROLE.BRAND_STAFF) : false;
-  const brandHref = isBrand ? "/dashboard/brand" : "/brand/register";
+  const isBrandLandingPage = pathname === "/brand";
+  const roleSwitchHref = isBrandLandingPage ? "/" : "/brand";
+  const roleSwitchLabel = isBrandLandingPage ? "Dành cho Creator" : "Dành cho Brand";
   const profileHref = currentUser
     ? currentUser.roles.includes("ADMIN")
       ? "/admin"
@@ -97,8 +98,7 @@ export function PublicHeader() {
             <div className="h-10 w-44 animate-pulse rounded-full bg-zinc-200" />
           ) : currentUser ? (
             <>
-              <Link href={brandHref} className="dc-btn-secondary hidden md:inline-flex">Brand</Link>
-              {isCreator ? <Link href="/dashboard/creator/wallet" className="dc-btn-secondary hidden md:inline-flex">Ví / N-Points</Link> : null}
+              <Link href={roleSwitchHref} className="dc-btn-secondary">{roleSwitchLabel}</Link>
               {canAccessAdmin ? (
                 <>
                   <Link href="/admin" className="dc-btn-secondary hidden xl:inline-flex">Admin</Link>
@@ -135,6 +135,7 @@ export function PublicHeader() {
             </>
           ) : (
             <>
+              <Link href={roleSwitchHref} className="dc-btn-secondary">{roleSwitchLabel}</Link>
               <Link href="/auth/login" className="dc-btn-secondary">Đăng nhập</Link>
               <Link href="/auth/register" className="dc-btn-primary hidden px-7 py-3 text-base sm:inline-flex">Đăng ký tài khoản</Link>
             </>
