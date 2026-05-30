@@ -34,9 +34,11 @@ type ApiResponse<T> = {
 type Props = {
   slug: string;
   compact?: boolean;
+  inline?: boolean;
+  hideStatusMessage?: boolean;
 };
 
-export function CreatorCampaignApplyButton({ slug, compact = false }: Props) {
+export function CreatorCampaignApplyButton({ slug, compact = false, inline = false, hideStatusMessage = false }: Props) {
   const [status, setStatus] = useState<StatusPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -151,11 +153,16 @@ export function CreatorCampaignApplyButton({ slug, compact = false }: Props) {
   }
 
   return (
-    <div className={`grid gap-2 ${compact ? "" : "mt-2"}`}>
-      <button type="button" className="dc-btn-primary" disabled={buttonDisabled} onClick={() => void applyCampaign()}>
+    <div className={`${inline ? "" : "grid gap-2"} ${compact ? "" : "mt-2"}`}>
+      <button
+        type="button"
+        className={`dc-btn-primary ${inline ? "w-full min-w-0 px-3 py-2 text-sm leading-tight text-center" : ""}`}
+        disabled={buttonDisabled}
+        onClick={() => void applyCampaign()}
+      >
         {buttonLabel}
       </button>
-      {notice ? (
+      {!inline && notice ? (
         <p
           className={`rounded-xl border px-3 py-2 text-sm ${
             notice.type === "success"
@@ -166,7 +173,7 @@ export function CreatorCampaignApplyButton({ slug, compact = false }: Props) {
           {notice.text}
         </p>
       ) : null}
-      {!notice && status?.message ? (
+      {!inline && !hideStatusMessage && !notice && status?.message ? (
         <p className="text-xs text-zinc-500">
           {status.message}
           {status.state === "REJECTED" && status.rejectReason ? ` Lý do: ${status.rejectReason}` : ""}
@@ -175,7 +182,7 @@ export function CreatorCampaignApplyButton({ slug, compact = false }: Props) {
       {portalReady && actionNotice
         ? createPortal(
             <div className="fixed bottom-4 right-4 z-[9999] w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-xl">
-              <p className="font-semibold">Bạn đang chưa điền tài khoản mạng xã hội của mình hãy vào đây <a href={actionNotice.href} className="font-semibold underline">"Hồ Sơ Cá Nhân"</a> để hoàn thiện hồ sơ của mình nhé.</p>
+              <p className="font-semibold">Bạn đang chưa điền tài khoản mạng xã hội của mình hãy vào đây <a href={actionNotice.href} className="font-semibold underline">Hồ Sơ Cá Nhân</a> để hoàn thiện hồ sơ của mình nhé.</p>
 
               <button type="button" className="mt-3 text-xs font-semibold underline" onClick={() => setActionNotice(null)}>
                 Đóng
