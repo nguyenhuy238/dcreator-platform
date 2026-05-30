@@ -1,11 +1,21 @@
 import type { Role } from "@prisma/client";
 import { redirect } from "next/navigation";
 import type { CurrentUser } from "@/lib/auth/current-user";
+import { deriveCapabilities } from "@/lib/auth/capabilities";
 import type { Workspace } from "@/lib/navigation";
 import { canAccessWorkspace } from "@/lib/navigation";
 
-export function canAccessWorkspaceByRoles(workspace: Workspace, roles: Role[]) {
-  return canAccessWorkspace(workspace, roles);
+export function canAccessWorkspaceByRoles(
+  workspace: Workspace,
+  roles: Role[],
+  context?: { creatorProfile?: { id: string } | null; brandMemberships?: Array<{ id: string; role: "OWNER" | "STAFF" }> }
+) {
+  const capabilities = deriveCapabilities({
+    roles,
+    creatorProfile: context?.creatorProfile,
+    brandMemberships: context?.brandMemberships
+  });
+  return canAccessWorkspace(workspace, { roles, capabilities });
 }
 
 export function deniedWorkspaceMessage(workspace: Workspace) {
@@ -19,7 +29,7 @@ export function enforceWorkspaceAccess(workspace: Workspace, user: CurrentUser |
   if (!user) {
     redirect(`/auth/login?next=${encodeURIComponent(loginNext)}`);
   }
-  if (!canAccessWorkspaceByRoles(workspace, user.roles)) {
+  if (!canAccessWorkspaceByRoles(workspace, user.roles, { creatorProfile: user.creatorProfile, brandMemberships: user.brandMemberships })) {
     const denied = encodeURIComponent(deniedWorkspaceMessage(workspace));
     redirect(`/dashboard/user?denied=${denied}`);
   }

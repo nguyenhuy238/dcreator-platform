@@ -7,10 +7,13 @@ import type { Role } from "@prisma/client";
 import { PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { FormField } from "@/app/components/dcreator/ui/base";
 import { PasswordInput } from "@/app/components/dcreator/ui/PasswordInput";
-import { getDefaultDashboardPath } from "@/lib/auth/dashboard-access";
+import { getDefaultDashboardPathByContext } from "@/lib/auth/dashboard-access";
 import { ROLE } from "@/lib/auth/role-constants";
 
-async function resolvePostLoginPath(roles: Role[]) {
+async function resolvePostLoginPath(
+  roles: Role[],
+  context?: { creatorProfile?: { id: string } | null; brandMemberships?: Array<{ id: string; role: "OWNER" | "STAFF" }> }
+) {
   const brandRoles: Role[] = [ROLE.BRAND_OWNER, ROLE.BRAND_STAFF];
   if (roles.some((role) => brandRoles.includes(role))) {
     const response = await fetch("/api/brand/dashboard/onboarding", { cache: "no-store" });
@@ -19,11 +22,19 @@ async function resolvePostLoginPath(roles: Role[]) {
       return "/dashboard/brand/onboarding";
     }
   }
-  return getDefaultDashboardPath(roles);
+  return getDefaultDashboardPathByContext({
+    roles,
+    creatorProfile: context?.creatorProfile ?? null,
+    brandMemberships: context?.brandMemberships ?? []
+  });
 }
 
-async function resolveTargetPath(roles: Role[], nextPath: string | null) {
-  const defaultPath = await resolvePostLoginPath(roles);
+async function resolveTargetPath(
+  roles: Role[],
+  nextPath: string | null,
+  context?: { creatorProfile?: { id: string } | null; brandMemberships?: Array<{ id: string; role: "OWNER" | "STAFF" }> }
+) {
+  const defaultPath = await resolvePostLoginPath(roles, context);
   if (!nextPath) return defaultPath;
   if (
     nextPath === "/dashboard/brand" ||
@@ -51,7 +62,10 @@ function LoginPageContent() {
       if (!alive) return;
       if (response.ok && payload?.success && payload?.data?.user?.roles) {
         const roles = payload.data.user.roles as Role[];
-        router.replace(await resolveTargetPath(roles, null));
+        router.replace(await resolveTargetPath(roles, null, {
+          creatorProfile: payload.data.user.creatorProfile ?? null,
+          brandMemberships: payload.data.user.brandMemberships ?? []
+        }));
       }
     }
     void checkAuth();
@@ -85,7 +99,10 @@ function LoginPageContent() {
     setLoading(false);
     if (!response.ok || !payload.success) return setError(payload.error ?? "Đăng nhập thất bại");
     const roles = (payload?.data?.roles ?? [payload?.data?.role].filter(Boolean)) as Role[];
-    const target = await resolveTargetPath(roles, searchParams.get("next"));
+    const target = await resolveTargetPath(roles, searchParams.get("next"), {
+      creatorProfile: payload?.data?.user?.creatorProfile ?? null,
+      brandMemberships: payload?.data?.user?.brandMemberships ?? []
+    });
     router.push(target);
     router.refresh();
   }

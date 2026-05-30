@@ -6,6 +6,7 @@ import { AppError } from "@/lib/errors";
 import { getCurrentSessionFromRequest } from "@/lib/auth/session";
 import { decodeSession, SESSION_COOKIE } from "@/lib/auth/session-token";
 import { resolvePrimaryRole } from "@/lib/auth/role-constants";
+import { deriveCapabilities, type UserCapabilities } from "@/lib/auth/capabilities";
 import { RuntimeTtlCache } from "@/lib/perf/runtime-cache";
 
 export type CurrentUser = {
@@ -20,6 +21,7 @@ export type CurrentUser = {
   creatorProfile: { id: string } | null;
   brandMemberships: Array<{ id: string; name: string; role: "OWNER" | "STAFF" }>;
   activeBrandId: string | null;
+  capabilities: UserCapabilities;
   permissions: string[];
   creatorRequestStatus: string | null;
   brandRequestStatus: string | null;
@@ -45,6 +47,12 @@ function mapAccountToCurrentUser(
   const assignmentRoles = account.roleAssignments.map((item) => item.role);
   const roles = Array.from(new Set<Role>(assignmentRoles.length > 0 ? assignmentRoles : [fallbackRole]));
   const primaryRole = resolvePrimaryRole(roles);
+  const brandMemberships = account.ownedBrandMemberships.map((item) => ({ id: item.brand.id, name: item.brand.name, role: item.role }));
+  const capabilities = deriveCapabilities({
+    roles,
+    creatorProfile: account.creatorProfile,
+    brandMemberships
+  });
 
   return {
     id: account.id,
@@ -56,9 +64,10 @@ function mapAccountToCurrentUser(
     roles,
     isActive: account.isActive,
     creatorProfile: account.creatorProfile,
-    brandMemberships: account.ownedBrandMemberships.map((item) => ({ id: item.brand.id, name: item.brand.name, role: item.role })),
-    activeBrandId: account.ownedBrandMemberships[0]?.brand.id ?? null,
-    permissions: roles.map((role) => `role:${role.toLowerCase()}`),
+    brandMemberships,
+    activeBrandId: brandMemberships[0]?.id ?? null,
+    capabilities,
+    permissions: [...roles.map((role) => `role:${role.toLowerCase()}`), ...Object.entries(capabilities).filter(([, enabled]) => enabled).map(([key]) => `cap:${key}`)],
     creatorRequestStatus: account.creatorApplications[0]?.status ?? null,
     brandRequestStatus: account.brandApplications[0]?.status ?? null
   };

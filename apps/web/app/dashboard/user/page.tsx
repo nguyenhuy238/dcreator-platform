@@ -14,7 +14,7 @@ import {
   StatsCard
 } from "@/app/components/dcreator/ui/base";
 import { MissionCard, VoucherCard } from "@/app/components/dcreator/cards/campaign";
-import { getDefaultDashboardPath } from "@/lib/auth/dashboard-access";
+import { getDefaultDashboardPathByContext } from "@/lib/auth/dashboard-access";
 import { getNavItemsForWorkspace } from "@/lib/navigation";
 
 const nav = getNavItemsForWorkspace("user", ["USER", "CREATOR", "BRAND_OWNER", "BRAND_STAFF", "ADMIN", "OPS"]);
@@ -91,7 +91,11 @@ export default function UserDashboardPage() {
         if (!active || !response.ok || !payload?.success) return;
         const roles = payload.data?.user?.roles as Role[] | undefined;
         if (!Array.isArray(roles)) return;
-        const defaultDashboard = getDefaultDashboardPath(roles);
+        const defaultDashboard = getDefaultDashboardPathByContext({
+          roles,
+          creatorProfile: payload.data?.user?.creatorProfile ?? null,
+          brandMemberships: payload.data?.user?.brandMemberships ?? []
+        });
         if (defaultDashboard !== "/dashboard/user") router.replace(defaultDashboard);
       })
       .catch(() => {});
