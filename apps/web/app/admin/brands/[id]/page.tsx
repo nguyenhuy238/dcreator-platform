@@ -3,6 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AdminAvatar } from "@/app/admin/_components/AdminAvatar";
+import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
 import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
@@ -42,6 +43,7 @@ export default function AdminBrandDetailPage() {
   const [toast, setToast] = useState("");
   const [item, setItem] = useState<BrandApplicationDetail | null>(null);
   const [acting, setActing] = useState(false);
+  const [dialogAction, setDialogAction] = useState<null | "approve" | "reject" | "request-changes">(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -129,35 +131,59 @@ export default function AdminBrandDetailPage() {
       <section className="mt-4 dc-card p-4">
         <p className="font-semibold">Decision</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button className="dc-btn-primary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => void patch(`/api/admin/brands/${item.id}/approve`, {}, "Brand approved")}>
+          <button className="dc-btn-primary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("approve")}>
             Approve
           </button>
-          <button
-            className="dc-btn-secondary"
-            disabled={acting || item.status !== "PENDING_REVIEW"}
-            onClick={() => {
-              const reason = window.prompt("Reject reason:", "Thông tin pháp lý chưa hợp lệ")?.trim();
-              if (!reason) return;
-              void patch(`/api/admin/brands/${item.id}/reject`, { reason }, "Brand rejected");
-            }}
-          >
+          <button className="dc-btn-secondary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("reject")}>
             Reject
           </button>
-          <button
-            className="dc-btn-secondary"
-            disabled={acting || item.status !== "PENDING_REVIEW"}
-            onClick={() => {
-              const reason = window.prompt("Lý do yêu cầu chỉnh sửa:", "Thiếu hồ sơ bổ sung ngành hàng")?.trim();
-              if (!reason) return;
-              void patch(`/api/admin/brands/${item.id}/request-changes`, { reason }, "Requested changes");
-            }}
-          >
+          <button className="dc-btn-secondary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("request-changes")}>
             Request changes
           </button>
         </div>
       </section>
 
       {toast ? <ActionToast message={toast} /> : null}
+      <ReviewActionDialog
+        open={dialogAction === "approve"}
+        title="Xác nhận duyệt Brand"
+        description="Hồ sơ sẽ được duyệt và kích hoạt theo quy trình."
+        confirmLabel="Duyệt"
+        submitting={acting}
+        onCancel={() => !acting && setDialogAction(null)}
+        onConfirm={() => {
+          setDialogAction(null);
+          void patch(`/api/admin/brands/${item.id}/approve`, {}, "Brand approved");
+        }}
+      />
+      <ReviewActionDialog
+        open={dialogAction === "reject"}
+        title="Từ chối hồ sơ Brand"
+        description="Bắt buộc nhập lý do từ chối."
+        confirmLabel="Từ chối"
+        requireReason
+        reasonPlaceholder="Thông tin pháp lý chưa hợp lệ..."
+        submitting={acting}
+        onCancel={() => !acting && setDialogAction(null)}
+        onConfirm={(reason) => {
+          setDialogAction(null);
+          void patch(`/api/admin/brands/${item.id}/reject`, { reason }, "Brand rejected");
+        }}
+      />
+      <ReviewActionDialog
+        open={dialogAction === "request-changes"}
+        title="Yêu cầu chỉnh sửa hồ sơ Brand"
+        description="Bắt buộc nhập nội dung cần chỉnh sửa."
+        confirmLabel="Yêu cầu chỉnh sửa"
+        requireReason
+        reasonPlaceholder="Thiếu hồ sơ bổ sung ngành hàng..."
+        submitting={acting}
+        onCancel={() => !acting && setDialogAction(null)}
+        onConfirm={(reason) => {
+          setDialogAction(null);
+          void patch(`/api/admin/brands/${item.id}/request-changes`, { reason }, "Requested changes");
+        }}
+      />
     </>
   );
 }

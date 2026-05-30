@@ -44,7 +44,6 @@ const brandNavItems: readonly NavItem[] = [
   { href: "/dashboard/brand/wallet", label: "V\u00ed N-Point", description: "S\u1ed1 d\u01b0 N-Point v\u00e0 y\u00eau c\u1ea7u n\u1ea1p/ho\u00e0n ti\u1ec1n" },
   { href: "/dashboard/brand/onboarding", label: "Onboarding / BCC", description: "H\u1ed3 s\u01a1 ph\u00e1p l\u00fd v\u00e0 BCC" },
   { href: "/dashboard/brand/profile", label: "H\u1ed3 s\u01a1 nh\u00e3n h\u00e0ng", description: "Th\u00f4ng tin nh\u00e3n h\u00e0ng" },
-  { href: "/dashboard/brand/products", label: "S\u1ea3n ph\u1ea9m & l\u00f4 h\u00e0ng", description: "Qu\u1ea3n l\u00fd s\u1ea3n ph\u1ea9m v\u00e0 t\u1ed3n kho" },
   { href: "/dashboard/brand/campaigns", label: "Campaign / Job", description: "T\u1ea1o v\u00e0 qu\u1ea3n l\u00fd campaign" },
   { href: "/dashboard/brand/mission-reviews", label: "Duy\u1ec7t nhi\u1ec7m v\u1ee5 Creator", description: "Duy\u1ec7t k\u1ecbch b\u1ea3n, video v\u00e0 ho\u00e0n th\u00e0nh" },
   { href: "/dashboard/brand/mission-history", label: "L\u1ecbch s\u1eed nhi\u1ec7m v\u1ee5", description: "To\u00e0n b\u1ed9 Creator Mission theo campaign" },
@@ -52,19 +51,19 @@ const brandNavItems: readonly NavItem[] = [
 ];
 
 const adminNavItems: readonly NavItem[] = [
-  { href: "/admin", label: "T\u1ed5ng quan Admin", description: "To\u00e0n c\u1ea3nh h\u1ec7 th\u1ed1ng" },
-  { href: "/admin/users", label: "Ng\u01b0\u1eddi d\u00f9ng", description: "Qu\u1ea3n l\u00fd t\u00e0i kho\u1ea3n ng\u01b0\u1eddi d\u00f9ng" },
-  { href: "/admin/creator-requests", label: "Duy\u1ec7t Creator", description: "Duy\u1ec7t h\u1ed3 s\u01a1 Creator" },
-  { href: "/admin/brand-requests", label: "Duy\u1ec7t Brand", description: "Duy\u1ec7t h\u1ed3 s\u01a1 Brand" },
-  { href: "/admin/products", label: "Duy\u1ec7t s\u1ea3n ph\u1ea9m", description: "Ki\u1ec3m duy\u1ec7t s\u1ea3n ph\u1ea9m/l\u00f4 h\u00e0ng" },
-  { href: "/admin/campaigns", label: "Duy\u1ec7t campaign", description: "Ki\u1ec3m duy\u1ec7t campaign/job" },
-  { href: "/admin/mission-reviews", label: "Duy\u1ec7t nhi\u1ec7m v\u1ee5 Creator", description: "G\u1ed9p duy\u1ec7t k\u1ecbch b\u1ea3n, video v\u00e0 ho\u00e0n th\u00e0nh" },
-  { href: "/admin/mission-history", label: "L\u1ecbch s\u1eed nhi\u1ec7m v\u1ee5", description: "To\u00e0n b\u1ed9 l\u1ecbch s\u1eed Creator Mission" },
-  { href: "/admin/finance", label: "Finance / payout", description: "T\u00e0i ch\u00ednh v\u00e0 chi tr\u1ea3" },
-  { href: "/admin/n-point-requests", label: "X\u1eed l\u00fd n\u1ea1p N-Point", description: "Duy\u1ec7t n\u1ea1p \u0111i\u1ec3m v\u00e0 x\u1eed l\u00fd ho\u00e0n ti\u1ec1n" },
-  { href: "/admin/audit", label: "Audit log", description: "Nh\u1eadt k\u00fd v\u1eadn h\u00e0nh h\u1ec7 th\u1ed1ng" },
-  { href: "/admin/notifications", label: "Notification", description: "Th\u00f4ng b\u00e1o h\u1ec7 th\u1ed1ng" },
-  { href: "/admin/settings", label: "System settings", description: "Thi\u1ebft l\u1eadp h\u1ec7 th\u1ed1ng" }
+  { href: "/admin", label: "Tổng quan Admin", description: "Toàn cảnh hệ thống" },
+  { href: "/admin/users", label: "Quản lý người dùng", description: "Quản lý tài khoản người dùng" },
+  { href: "/admin/creators", label: "Quản lý Creator", description: "Quản lý toàn vòng đời Creator" },
+  { href: "/admin/brands", label: "Quản lý Brand", description: "Quản lý toàn vòng đời Brand" },
+  { href: "/admin/campaigns", label: "Quản lý Campaign / Job", description: "Vận hành campaign/job toàn hệ thống" },
+  { href: "/admin/proofs", label: "Quản lý Mission & Proof", description: "Quản lý workflow nhiệm vụ và proof" },
+  { href: "/admin/vouchers", label: "Quản lý Voucher / Reward", description: "Theo dõi và can thiệp voucher/reward" },
+  { href: "/admin/finance", label: "Finance & Payout", description: "Tài chính và chi trả" },
+  { href: "/admin/n-point-requests", label: "N-Point Transactions", description: "Nạp điểm, refund, đối soát giao dịch điểm" },
+  { href: "/admin/risk", label: "Risk & Fraud", description: "Phát hiện rủi ro và gian lận" },
+  { href: "/admin/audit", label: "Audit Log", description: "Nhật ký vận hành hệ thống" },
+  { href: "/admin/notifications", label: "Notifications", description: "Thông báo hệ thống" },
+  { href: "/admin/settings", label: "System Settings", description: "Thiết lập hệ thống" }
 ];
 
 const WORKSPACES: readonly WorkspaceConfig[] = [
@@ -173,19 +172,22 @@ const breadcrumbLabelMap: Record<string, string> = {
   "/admin": "Admin",
   "/admin/users": "Người dùng",
   "/admin/creator-requests": "Quản lý Creator",
+  "/admin/creators": "Quản lý Creator",
   "/admin/brand-requests": "Quản lý Brand",
-  "/admin/campaigns": "Quản lý campaign",
+  "/admin/brands": "Quản lý Brand",
+  "/admin/campaigns": "Quản lý Campaign / Job",
   "/admin/mission-reviews": "Quản lý nhiệm vụ Creator",
   "/admin/mission-history": "Lịch sử nhiệm vụ",
-  "/admin/proofs": "Duyệt video",
+  "/admin/proofs": "Quản lý Mission & Proof",
   "/admin/mission-applications": "Duyệt nhận nhiệm vụ",
   "/admin/mission-video-reviews": "Duyệt video",
   "/admin/mission-final-reviews": "Duyệt hoàn thành",
   "/admin/finance": "Finance / payout",
   "/admin/n-point-requests": "X\u1eed l\u00fd n\u1ea1p N-Point",
   "/admin/audit": "Audit log",
-  "/admin/notifications": "Notification",
-  "/admin/settings": "System settings"
+  "/admin/audit-log": "Audit log",
+  "/admin/notifications": "Notifications",
+  "/admin/settings": "System Settings"
 };
 
 function prettifySegment(segment: string) {
@@ -204,3 +206,5 @@ export function getBreadcrumbsForPath(pathname: string, workspace: Workspace): B
   }
   return crumbs;
 }
+
+

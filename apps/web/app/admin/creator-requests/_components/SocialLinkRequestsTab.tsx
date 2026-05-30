@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActionToast, ConfirmDialog, EmptyState, ErrorState, LoadingSkeleton, PageHeader, StatsCard, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
+import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, PageHeader, StatsCard, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type SocialLinkStatus = "PENDING" | "APPROVED" | "REJECTED";
 
@@ -64,9 +65,7 @@ export default function AdminCreatorRequestsPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<CreatorDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [reason, setReason] = useState("");
   const [dialogAction, setDialogAction] = useState<"approve" | "reject" | null>(null);
-  const [rejecting, setRejecting] = useState(false);
   const [acting, setActing] = useState(false);
 
   const load = useCallback(async () => {
@@ -121,21 +120,16 @@ export default function AdminCreatorRequestsPage() {
     return { total, pending, approved, rejected };
   }, [items]);
 
-  async function submitDecision() {
+  async function submitDecision(reason?: string) {
     if (!detail) return;
     const action = dialogAction;
     if (!action) return;
-
-    if (action === "reject" && reason.trim().length < 5) {
-      setError("Lý do từ chối tối thiểu 5 ký tự.");
-      return;
-    }
 
     setActing(true);
     setError("");
     try {
       const endpoint = action === "approve" ? "approve" : "reject";
-      const payload = action === "approve" ? undefined : { reason: reason.trim() };
+      const payload = action === "approve" ? undefined : { reason: reason?.trim() };
       const res = await fetch(`/api/admin/creator-requests/${detail.id}/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -144,8 +138,6 @@ export default function AdminCreatorRequestsPage() {
       const body = (await res.json()) as ApiResult<unknown>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Cập nhật thất bại");
       setDialogAction(null);
-      setRejecting(false);
-      setReason("");
       setToast("Cập nhật trạng thái thành công");
       setTimeout(() => setToast(""), 1800);
       await Promise.all([load(), loadDetail(detail.id)]);
@@ -260,8 +252,6 @@ export default function AdminCreatorRequestsPage() {
           onClick={() => {
             setDetailId(null);
             setDialogAction(null);
-            setRejecting(false);
-            setReason("");
           }}
         >
           <div className="mx-auto h-full w-full max-w-4xl overflow-auto rounded-2xl bg-white p-4 sm:p-6" onClick={(e) => e.stopPropagation()}>
@@ -272,8 +262,6 @@ export default function AdminCreatorRequestsPage() {
                 onClick={() => {
                   setDetailId(null);
                   setDialogAction(null);
-                  setRejecting(false);
-                  setReason("");
                 }}
               >
                 Đóng
@@ -317,8 +305,6 @@ export default function AdminCreatorRequestsPage() {
                       className="dc-btn-primary"
                       disabled={acting || detail.status !== "PENDING"}
                       onClick={() => {
-                        setRejecting(false);
-                        setReason("");
                         setDialogAction("approve");
                       }}
                     >
@@ -328,44 +314,12 @@ export default function AdminCreatorRequestsPage() {
                       className="dc-btn-secondary"
                       disabled={acting || detail.status !== "PENDING"}
                       onClick={() => {
-                        setReason("");
-                        setDialogAction(null);
-                        setRejecting(true);
+                        setDialogAction("reject");
                       }}
                     >
                       Từ chối
                     </button>
                   </div>
-                  {rejecting ? (
-                    <>
-                      <textarea
-                        className="dc-input mt-3 min-h-24"
-                        placeholder="Nhập lý do từ chối (bắt buộc)..."
-                        value={reason}
-                        onChange={(e) => setReason(e.target.value)}
-                      />
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          className="dc-btn-secondary"
-                          type="button"
-                          onClick={() => {
-                            setReason("");
-                            setRejecting(false);
-                          }}
-                        >
-                          Hủy từ chối
-                        </button>
-                        <button
-                          className="dc-btn-primary"
-                          type="button"
-                          disabled={acting || reason.trim().length < 5}
-                          onClick={() => setDialogAction("reject")}
-                        >
-                          Xác nhận từ chối
-                        </button>
-                      </div>
-                    </>
-                  ) : null}
                 </section>
               </div>
             )}
@@ -373,13 +327,25 @@ export default function AdminCreatorRequestsPage() {
         </div>
       ) : null}
 
-      <ConfirmDialog
-        open={Boolean(dialogAction)}
-        title={dialogAction === "approve" ? "Xác nhận đồng ý yêu cầu" : "Xác nhận từ chối yêu cầu"}
-        message={dialogAction === "approve" ? "Yêu cầu kênh sẽ được duyệt và chuyển sang APPROVED." : "Yêu cầu kênh sẽ bị từ chối và Creator sẽ thấy lý do."}
-        confirmLabel={acting ? "Đang xử lý..." : "Xác nhận"}
+      <ReviewActionDialog
+        open={dialogAction === "approve"}
+        title="Xác nhận đồng ý yêu cầu"
+        description="Yêu cầu kênh sẽ được duyệt và chuyển sang APPROVED."
+        confirmLabel="Xác nhận"
+        submitting={acting}
         onCancel={() => !acting && setDialogAction(null)}
         onConfirm={() => void submitDecision()}
+      />
+      <ReviewActionDialog
+        open={dialogAction === "reject"}
+        title="Xác nhận từ chối yêu cầu"
+        description="Yêu cầu kênh sẽ bị từ chối và Creator sẽ thấy lý do."
+        confirmLabel="Từ chối"
+        requireReason
+        reasonPlaceholder="Nhập lý do từ chối (bắt buộc)..."
+        submitting={acting}
+        onCancel={() => !acting && setDialogAction(null)}
+        onConfirm={(reason) => void submitDecision(reason)}
       />
 
       {toast ? <ActionToast message={toast} /> : null}

@@ -2,7 +2,8 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ActionToast, ConfirmDialog, ErrorState, LoadingSkeleton, PageHeader, SectionCard, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
+import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, SectionCard, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
 type Detail = {
@@ -34,7 +35,6 @@ export default function AdminPayoutDetailPage() {
   const [acting, setActing] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
-  const [reason, setReason] = useState("");
   const [confirmAction, setConfirmAction] = useState<null | "approve" | "mark-paid" | "reject">(null);
   const [item, setItem] = useState<Detail | null>(null);
 
@@ -58,19 +58,15 @@ export default function AdminPayoutDetailPage() {
     void load();
   }, [load]);
 
-  async function act(action: "approve" | "reject" | "mark-paid") {
+  async function act(action: "approve" | "reject" | "mark-paid", reason?: string) {
     if (!item) return;
-    if (action === "reject" && !reason.trim()) {
-      setError("Reject reason is required.");
-      return;
-    }
     setActing(true);
     setError("");
     try {
       const res = await fetch(`/api/admin/payouts/${item.id}/${action}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: action === "reject" ? JSON.stringify({ reason: reason.trim() }) : JSON.stringify({})
+        body: action === "reject" ? JSON.stringify({ reason: reason?.trim() }) : JSON.stringify({})
       });
       const body = (await res.json()) as ApiResult<unknown>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Thao tác thất bại");
@@ -129,7 +125,6 @@ export default function AdminPayoutDetailPage() {
       </section>
       <section className="mt-4">
         <SectionCard title="Quyết định">
-        <textarea className="dc-input mt-3 min-h-24" placeholder="Reject reason..." value={reason} onChange={(e) => setReason(e.target.value)} />
         <div className="mt-3 flex flex-wrap gap-2">
           <button className="dc-btn-primary" disabled={acting} onClick={() => setConfirmAction("approve")}>Approve</button>
           <button className="dc-btn-secondary" disabled={acting} onClick={() => setConfirmAction("reject")}>Reject</button>
@@ -138,40 +133,42 @@ export default function AdminPayoutDetailPage() {
         </SectionCard>
       </section>
       {toast ? <ActionToast message={toast} /> : null}
-      <ConfirmDialog
+      <ReviewActionDialog
         open={confirmAction === "approve"}
         title="Duyệt yêu cầu rút thưởng?"
-        message="Hành động này xác nhận payout đã qua bước review."
+        description="Hành động này xác nhận payout đã qua bước review."
         confirmLabel="Duyệt rút thưởng"
-        tone="primary"
+        submitting={acting}
         onCancel={() => setConfirmAction(null)}
         onConfirm={() => {
           setConfirmAction(null);
           void act("approve");
         }}
       />
-      <ConfirmDialog
+      <ReviewActionDialog
         open={confirmAction === "mark-paid"}
         title="Đánh dấu đã thanh toán rút thưởng?"
-        message="Xác nhận rằng khoản payout đã được chuyển tiền thực tế."
+        description="Xác nhận rằng khoản payout đã được chuyển tiền thực tế."
         confirmLabel="Đánh dấu đã thanh toán"
-        tone="danger"
+        submitting={acting}
         onCancel={() => setConfirmAction(null)}
         onConfirm={() => {
           setConfirmAction(null);
           void act("mark-paid");
         }}
       />
-      <ConfirmDialog
+      <ReviewActionDialog
         open={confirmAction === "reject"}
         title="Từ chối yêu cầu rút thưởng?"
-        message="Yêu cầu này sẽ bị từ chối và hoàn tiền về ví commission của creator."
+        description="Yêu cầu này sẽ bị từ chối và hoàn tiền về ví commission của creator."
         confirmLabel="Từ chối rút thưởng"
-        tone="danger"
+        requireReason
+        reasonPlaceholder="Nhập lý do từ chối..."
+        submitting={acting}
         onCancel={() => setConfirmAction(null)}
-        onConfirm={() => {
+        onConfirm={(reason) => {
           setConfirmAction(null);
-          void act("reject");
+          void act("reject", reason);
         }}
       />
     </>

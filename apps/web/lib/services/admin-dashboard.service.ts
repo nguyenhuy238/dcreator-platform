@@ -100,7 +100,8 @@ export async function getAdminOverview() {
     pendingProductInventoryReviews,
     pendingFulfillmentIssues,
     totalCommissionPaid,
-    failedPayments24h
+    failedPayments24h,
+    overdueActiveCampaigns
   ] = await Promise.all([
     prisma.account.count(),
     prisma.account.count({ where: { role: Role.CREATOR } }),
@@ -111,7 +112,7 @@ export async function getAdminOverview() {
     prisma.riskFlag.count(),
     prisma.brandApplication.count({ where: { status: "PENDING_REVIEW" } }),
     prisma.creatorApplication.count({ where: { status: "PENDING_REVIEW" } }),
-    prisma.campaign.count({ where: { status: CampaignStatus.PAUSED } }),
+    prisma.brandCampaignRequest.count({ where: { status: { in: ["PENDING_REVIEW", "NEEDS_REVISION"] } } }),
     prisma.missionSubmission.count({
       where: {
         mission: { audience: "CREATOR" },
@@ -137,6 +138,12 @@ export async function getAdminOverview() {
         status: "FAILED",
         updatedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
       }
+    }),
+    prisma.campaign.count({
+      where: {
+        status: CampaignStatus.ACTIVE,
+        endsAt: { lt: new Date() }
+      }
     })
   ]);
 
@@ -149,6 +156,9 @@ export async function getAdminOverview() {
   }
   if (pendingPayouts >= 20) {
     systemAlerts.push(`Large payout queue: ${pendingPayouts}`);
+  }
+  if (overdueActiveCampaigns > 0) {
+    systemAlerts.push(`Campaign overdue: ${overdueActiveCampaigns}`);
   }
 
   return {
@@ -169,6 +179,10 @@ export async function getAdminOverview() {
       fulfillmentPendingIssues: pendingFulfillmentIssues,
       payoutPendingReview: pendingPayouts
     },
+    paymentFailed: failedPayments24h,
+    payoutPending: pendingPayouts,
+    fraudFlags: fraudAlerts,
+    campaignOverdue: overdueActiveCampaigns,
     totals: {
       activeCampaigns,
       activeBrands,

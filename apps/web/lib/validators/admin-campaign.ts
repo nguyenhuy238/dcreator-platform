@@ -40,3 +40,24 @@ export const adminCampaignCreateSchema = z.object({
     ctx.addIssue({ code: "custom", path: ["endsAt"], message: "Ngày kết thúc phải sau ngày bắt đầu." });
   }
 });
+
+export const adminCampaignUpdateSchema = z.object({
+  title: z.string().trim().min(3).max(200).optional(),
+  brief: z.string().trim().min(10).max(3000).optional(),
+  startsAt: z.string().datetime().nullable().optional(),
+  endsAt: z.string().datetime().nullable().optional(),
+  budgetVnd: z.number().int().positive().optional(),
+  targetAmountVnd: z.number().int().positive().optional(),
+  imageUrl: z
+    .string()
+    .trim()
+    .max(400)
+    .refine((value) => value.startsWith("/uploads/") || /^https?:\/\//.test(value), "File URL không hợp lệ.")
+    .optional()
+    .or(z.literal("")),
+  reason: z.string().trim().min(5).max(1000).optional()
+}).superRefine((value, ctx) => {
+  if (value.startsAt && value.endsAt && new Date(value.endsAt) <= new Date(value.startsAt)) {
+    ctx.addIssue({ code: "custom", path: ["endsAt"], message: "Ngày kết thúc phải sau ngày bắt đầu." });
+  }
+});

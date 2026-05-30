@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
 import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatsCard } from "@/app/components/dcreator/ui/base";
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string };
@@ -75,7 +76,8 @@ export default function AdminNPointRequestsPage() {
   const [toast, setToast] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
   const [actingId, setActingId] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState<Record<string, string>>({});
+  const [dialogAction, setDialogAction] = useState<null | "approve" | "reject">(null);
+  const [dialogTarget, setDialogTarget] = useState<TopupRequest | null>(null);
   const [refundNote, setRefundNote] = useState<Record<string, string>>({});
   const [refundProofUrl, setRefundProofUrl] = useState<Record<string, string>>({});
   const [uploadingRefundFor, setUploadingRefundFor] = useState<string | null>(null);
@@ -134,13 +136,7 @@ export default function AdminNPointRequestsPage() {
     }
   }
 
-  async function reject(item: TopupRequest) {
-    const reason = (rejectReason[item.id] ?? "").trim();
-    if (reason.length < 3) {
-      setError("Lý do từ chối cần ít nhất 3 ký tự.");
-      return;
-    }
-
+  async function reject(item: TopupRequest, reason: string) {
     setActingId(item.id);
     setError("");
     try {
@@ -286,12 +282,11 @@ export default function AdminNPointRequestsPage() {
                 <div className="mt-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
                   <SectionHeader title="Xử lý duyệt/từ chối" />
                   <div className="grid gap-2">
-                    <textarea className="dc-input min-h-24" placeholder="Nhập lý do nếu từ chối" value={rejectReason[item.id] ?? ""} onChange={(event) => setRejectReason((prev) => ({ ...prev, [item.id]: event.target.value }))} />
                     <div className="flex gap-2">
-                      <button className="dc-btn-primary" disabled={actingId === item.id} onClick={() => void approve(item)}>
+                      <button className="dc-btn-primary" disabled={actingId === item.id} onClick={() => { setDialogTarget(item); setDialogAction("approve"); }}>
                         {actingId === item.id ? "Đang xử lý..." : "Duyệt nạp điểm"}
                       </button>
-                      <button className="dc-btn-secondary" disabled={actingId === item.id} onClick={() => void reject(item)}>
+                      <button className="dc-btn-secondary" disabled={actingId === item.id} onClick={() => { setDialogTarget(item); setDialogAction("reject"); }}>
                         {actingId === item.id ? "Đang xử lý..." : "Từ chối"}
                       </button>
                     </div>
@@ -353,6 +348,34 @@ export default function AdminNPointRequestsPage() {
       ) : null}
 
       {toast ? <ActionToast message={toast} /> : null}
+      <ReviewActionDialog
+        open={dialogAction === "approve"}
+        title="Duyệt yêu cầu nạp N-Point"
+        description="Xác nhận cộng điểm cho yêu cầu này."
+        confirmLabel="Duyệt"
+        submitting={Boolean(dialogTarget && actingId === dialogTarget.id)}
+        onCancel={() => setDialogAction(null)}
+        onConfirm={() => {
+          const target = dialogTarget;
+          setDialogAction(null);
+          if (target) void approve(target);
+        }}
+      />
+      <ReviewActionDialog
+        open={dialogAction === "reject"}
+        title="Từ chối yêu cầu nạp N-Point"
+        description="Bắt buộc nhập lý do từ chối."
+        confirmLabel="Từ chối"
+        requireReason
+        reasonPlaceholder="Nhập lý do từ chối..."
+        submitting={Boolean(dialogTarget && actingId === dialogTarget.id)}
+        onCancel={() => setDialogAction(null)}
+        onConfirm={(reason) => {
+          const target = dialogTarget;
+          setDialogAction(null);
+          if (target) void reject(target, reason ?? "");
+        }}
+      />
     </>
   );
 }

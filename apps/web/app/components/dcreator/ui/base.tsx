@@ -10,6 +10,7 @@ export function StatusBadge({ status }: { status: string }) {
     NEEDS_REVISION: "Cần bổ sung",
     ACTIVE: "Đang hoạt động",
     INACTIVE: "Không hoạt động",
+    LOCKED: "Đã khóa",
     COMPLETED: "Đã hoàn thành",
     CANCELLED: "Đã hủy",
     FAILED: "Thất bại",

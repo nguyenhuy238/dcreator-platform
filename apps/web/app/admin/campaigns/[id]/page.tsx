@@ -2,7 +2,8 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ActionToast, ConfirmDialog, ErrorState, LoadingSkeleton, PageHeader, SectionCard, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
+import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, SectionCard, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
 type CampaignDetail = {
@@ -38,8 +39,16 @@ export default function AdminCampaignDetailPage() {
   const [toast, setToast] = useState("");
   const [item, setItem] = useState<CampaignDetail | null>(null);
   const [acting, setActing] = useState(false);
-  const [reason, setReason] = useState("");
   const [confirmAction, setConfirmAction] = useState<null | "pause" | "reject" | "request-changes">(null);
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: "",
+    brief: "",
+    startsAt: "",
+    endsAt: "",
+    budgetVnd: 0,
+    targetAmountVnd: 0
+  });
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -50,6 +59,14 @@ export default function AdminCampaignDetailPage() {
       const body = (await res.json()) as ApiResult<CampaignDetail>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Tải chi tiết chiến dịch thất bại");
       setItem(body.data);
+      setEditForm({
+        title: body.data.title,
+        brief: body.data.brief,
+        startsAt: body.data.startsAt ? new Date(body.data.startsAt).toISOString().slice(0, 16) : "",
+        endsAt: body.data.endsAt ? new Date(body.data.endsAt).toISOString().slice(0, 16) : "",
+        budgetVnd: body.data.budgetVnd,
+        targetAmountVnd: body.data.kpiSnapshot.targetAmountVnd
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Tải chi tiết chiến dịch thất bại");
     } finally {
@@ -61,10 +78,10 @@ export default function AdminCampaignDetailPage() {
     void load();
   }, [load]);
 
-  async function act(action: "approve" | "reject" | "request-changes" | "pause") {
+  async function act(action: "approve" | "reject" | "request-changes" | "pause", reason?: string) {
     if (!item) return;
-    if (action !== "approve" && !reason.trim()) {
-      setError("Reason is required.");
+    if (action !== "approve" && !reason?.trim()) {
+      setError("Reason is required");
       return;
     }
     setActing(true);
@@ -73,7 +90,7 @@ export default function AdminCampaignDetailPage() {
       const res = await fetch(`/api/admin/campaigns/${item.id}/${action}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: action === "approve" ? JSON.stringify({}) : JSON.stringify({ reason: reason.trim() })
+        body: action === "approve" ? JSON.stringify({}) : JSON.stringify({ reason: reason?.trim() })
       });
       const body = (await res.json()) as ApiResult<unknown>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Thao tác thất bại");
@@ -82,6 +99,37 @@ export default function AdminCampaignDetailPage() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Thao tác thất bại");
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function saveEdit() {
+    if (!item) return;
+    setActing(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/campaigns/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editForm.title,
+          brief: editForm.brief,
+          startsAt: editForm.startsAt ? new Date(editForm.startsAt).toISOString() : null,
+          endsAt: editForm.endsAt ? new Date(editForm.endsAt).toISOString() : null,
+          budgetVnd: Number(editForm.budgetVnd),
+          targetAmountVnd: Number(editForm.targetAmountVnd),
+          reason: "Cập nhật thông tin campaign từ admin"
+        })
+      });
+      const body = (await res.json()) as ApiResult<unknown>;
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Cập nhật campaign thất bại");
+      setToast("Đã cập nhật campaign");
+      setTimeout(() => setToast(""), 1800);
+      setEditing(false);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Cập nhật campaign thất bại");
     } finally {
       setActing(false);
     }
@@ -131,6 +179,50 @@ export default function AdminCampaignDetailPage() {
       </SectionCard>
 
       <section className="mt-4 dc-card p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="font-semibold">Thông tin campaign</p>
+          {!editing ? (
+            <button className="dc-btn-secondary" onClick={() => setEditing(true)}>Chỉnh sửa</button>
+          ) : (
+            <div className="flex gap-2">
+              <button className="dc-btn-secondary" onClick={() => setEditing(false)} disabled={acting}>Hủy</button>
+              <button className="dc-btn-primary" onClick={() => void saveEdit()} disabled={acting}>Lưu</button>
+            </div>
+          )}
+        </div>
+        {editing ? (
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="grid gap-1 text-sm">
+              <span className="font-semibold">Tên campaign</span>
+              <input className="dc-input" value={editForm.title} onChange={(e) => setEditForm((s) => ({ ...s, title: e.target.value }))} />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="font-semibold">Budget (VND)</span>
+              <input className="dc-input" type="number" min={1} value={editForm.budgetVnd} onChange={(e) => setEditForm((s) => ({ ...s, budgetVnd: Number(e.target.value || 0) }))} />
+            </label>
+            <label className="grid gap-1 text-sm md:col-span-2">
+              <span className="font-semibold">Brief</span>
+              <textarea className="dc-input min-h-24" value={editForm.brief} onChange={(e) => setEditForm((s) => ({ ...s, brief: e.target.value }))} />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="font-semibold">Starts at</span>
+              <input className="dc-input" type="datetime-local" value={editForm.startsAt} onChange={(e) => setEditForm((s) => ({ ...s, startsAt: e.target.value }))} />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="font-semibold">Ends at</span>
+              <input className="dc-input" type="datetime-local" value={editForm.endsAt} onChange={(e) => setEditForm((s) => ({ ...s, endsAt: e.target.value }))} />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="font-semibold">Target amount (VND)</span>
+              <input className="dc-input" type="number" min={1} value={editForm.targetAmountVnd} onChange={(e) => setEditForm((s) => ({ ...s, targetAmountVnd: Number(e.target.value || 0) }))} />
+            </label>
+          </div>
+        ) : (
+          <p className="text-sm text-zinc-600">Dùng nút Chỉnh sửa để cập nhật title, brief, timeline, budget và target.</p>
+        )}
+      </section>
+
+      <section className="mt-4 dc-card p-4">
         <p className="font-semibold">Product / Inventory</p>
         <div className="mt-3 grid gap-2">
           {item.productSubmissions.length === 0 ? (
@@ -175,7 +267,6 @@ export default function AdminCampaignDetailPage() {
 
       <section className="mt-4">
         <SectionCard title="Quyết định">
-        <textarea className="dc-input mt-3 min-h-24" placeholder="Reason for reject/request changes/pause" value={reason} onChange={(e) => setReason(e.target.value)} />
         <div className="mt-3 flex flex-wrap gap-2">
           <button className="dc-btn-primary" disabled={acting} onClick={() => void act("approve")}>Approve & Publish</button>
           <button className="dc-btn-secondary" disabled={acting} onClick={() => setConfirmAction("request-changes")}>Request changes</button>
@@ -186,40 +277,46 @@ export default function AdminCampaignDetailPage() {
       </section>
 
       {toast ? <ActionToast message={toast} /> : null}
-      <ConfirmDialog
+      <ReviewActionDialog
         open={confirmAction === "pause"}
         title="Pause campaign?"
-        message="Campaign sẽ tạm dừng hiển thị và vận hành."
+        description="Campaign sẽ tạm dừng hiển thị và vận hành."
         confirmLabel="Pause campaign"
-        tone="danger"
-        onCancel={() => setConfirmAction(null)}
-        onConfirm={() => {
+        requireReason
+        reasonPlaceholder="Nêu rõ lý do tạm dừng campaign..."
+        submitting={acting}
+        onCancel={() => !acting && setConfirmAction(null)}
+        onConfirm={(reason) => {
           setConfirmAction(null);
-          void act("pause");
+          void act("pause", reason);
         }}
       />
-      <ConfirmDialog
+      <ReviewActionDialog
         open={confirmAction === "reject"}
         title="Reject campaign?"
-        message="Campaign sẽ bị từ chối và cần tạo/chỉnh lại theo policy."
+        description="Campaign sẽ bị từ chối và cần tạo/chỉnh lại theo policy."
         confirmLabel="Reject campaign"
-        tone="danger"
-        onCancel={() => setConfirmAction(null)}
-        onConfirm={() => {
+        requireReason
+        reasonPlaceholder="Nêu rõ lý do từ chối campaign..."
+        submitting={acting}
+        onCancel={() => !acting && setConfirmAction(null)}
+        onConfirm={(reason) => {
           setConfirmAction(null);
-          void act("reject");
+          void act("reject", reason);
         }}
       />
-      <ConfirmDialog
+      <ReviewActionDialog
         open={confirmAction === "request-changes"}
         title="Request campaign changes?"
-        message="Campaign sẽ được trả về trạng thái cần chỉnh sửa."
+        description="Campaign sẽ được trả về trạng thái cần chỉnh sửa."
         confirmLabel="Yêu cầu chỉnh sửa"
-        tone="danger"
-        onCancel={() => setConfirmAction(null)}
-        onConfirm={() => {
+        requireReason
+        reasonPlaceholder="Nêu rõ nội dung cần Brand chỉnh sửa..."
+        submitting={acting}
+        onCancel={() => !acting && setConfirmAction(null)}
+        onConfirm={(reason) => {
           setConfirmAction(null);
-          void act("request-changes");
+          void act("request-changes", reason);
         }}
       />
     </>
