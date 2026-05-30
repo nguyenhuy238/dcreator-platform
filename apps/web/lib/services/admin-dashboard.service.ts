@@ -104,8 +104,8 @@ export async function getAdminOverview() {
     overdueActiveCampaigns
   ] = await Promise.all([
     prisma.account.count(),
-    prisma.account.count({ where: { role: Role.CREATOR } }),
-    prisma.account.count({ where: { role: { in: [Role.BRAND_OWNER, Role.BRAND_STAFF] } } }),
+    prisma.creatorProfile.count(),
+    prisma.brand.count(),
     prisma.campaign.count({ where: { status: CampaignStatus.ACTIVE } }),
     prisma.roleRequest.count({ where: { status: RoleRequestStatus.PENDING } }),
     prisma.contribution.aggregate({ _sum: { amountVnd: true }, where: { status: "SUCCESS" } }),
@@ -633,7 +633,10 @@ export async function getFinanceSnapshot() {
     prisma.paymentTransaction.findMany({ orderBy: { createdAt: "desc" }, take: 100, select: { id: true, provider: true, requestedAmountVnd: true, status: true, createdAt: true, accountId: true } }),
     prisma.walletTransaction.findMany({ orderBy: { createdAt: "desc" }, take: 100, select: { id: true, accountId: true, type: true, pointsDelta: true, cashDeltaVnd: true, createdAt: true } }),
     prisma.payoutRequest.findMany({ orderBy: { createdAt: "desc" }, take: 100, select: { id: true, accountId: true, amountVnd: true, status: true, createdAt: true } }),
-    prisma.wallet.findMany({ where: { user: { role: { in: [Role.BRAND_OWNER, Role.BRAND_STAFF] } } }, select: { userId: true, pointsBalance: true, cashBalanceVnd: true, updatedAt: true } })
+    prisma.wallet.findMany({
+      where: { user: { ownedBrandMemberships: { some: { status: "ACTIVE" } } } },
+      select: { userId: true, pointsBalance: true, cashBalanceVnd: true, updatedAt: true }
+    })
   ]);
 
   return { paymentTransactions, walletTransactions, payoutRequests, brandPrepaidFunds };

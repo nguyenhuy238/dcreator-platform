@@ -17,6 +17,8 @@ type Snapshot = {
     avatarUrl: string | null;
     role: string;
     roles: Role[];
+    brandMemberships?: Array<{ id: string; name: string; role: string }>;
+    hasCreatorProfile?: boolean;
     profile: { phone: string | null } | null;
   };
   creatorApplication: null | Record<string, unknown>;
@@ -30,6 +32,8 @@ const defaultCreator = {
 
 const defaultBrand = {
   brandName: "",
+  industry: "",
+  description: "",
   contactName: "",
   contactPhone: "",
   contactEmail: "",
@@ -155,32 +159,25 @@ export default function UserProfilePage() {
     setError("");
     setSuccess("");
 
-    const currentStatus = data.brandApplication?.status as string | undefined;
-    const isResubmit = currentStatus === "REJECTED" || currentStatus === "NEEDS_REVISION";
-    const endpoint = "/api/profile/brand-application";
     const body = {
-      ...brandForm,
-      legalName: brandForm.brandName,
-      revenueSharePercent: 70,
-      commissionRatePercent: 10,
-      bccAgreementAccepted: true,
-      bccAgreementVersion: BRAND_BCC_VERSION,
-      legalResponsibilityAccepted: true,
-      applicationId: isResubmit ? data.brandApplication?.id : undefined
+      brandName: brandForm.brandName,
+      industry: brandForm.industry,
+      description: brandForm.description
     };
-    const response = await fetch(endpoint, {
-      method: isResubmit ? "PATCH" : "POST",
+    const response = await fetch("/api/brand/create", {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
     });
     const payload = await response.json();
     setSubmittingBrand(false);
     if (!response.ok || !payload.success) {
-      setError(payload.error ?? "Gửi đơn Brand thất bại");
+      setError(payload.error ?? "Tạo Brand thất bại");
       return;
     }
-    setSuccess("Hồ sơ Brand đã được tạo. Bạn có thể bắt đầu thiết lập dashboard.");
-    await load();
+    setSuccess("Brand đã được tạo. Bạn có thể bắt đầu thiết lập sản phẩm/campaign.");
+    router.push("/dashboard/brand?created=1");
+    router.refresh();
   }
 
   if (loading) {
@@ -235,7 +232,8 @@ export default function UserProfilePage() {
 
   const creatorStatus = data.creatorApplication?.status as string | undefined;
   const brandStatus = data.brandApplication?.status as string | undefined;
-  const isCreator = data.account.roles.includes("CREATOR");
+  const isCreator = Boolean(data.account.hasCreatorProfile) || data.account.roles.includes("CREATOR");
+  const hasBrand = (data.account.brandMemberships?.length ?? 0) > 0;
 
   return (
     <>
@@ -311,18 +309,20 @@ export default function UserProfilePage() {
 
           <div className="dc-card p-5">
             <h2 className="text-xl font-bold">Nâng cấp Brand</h2>
-            <p className="mt-2 text-sm">Trạng thái: <span className="font-semibold">{statusText(brandStatus)}</span></p>
+            <p className="mt-2 text-sm">Trạng thái: <span className="font-semibold">{hasBrand ? "Brand đã được tạo" : statusText(brandStatus)}</span></p>
             {data.brandApplication?.rejectReason ? <p className="mt-2 text-sm text-red-700">Lý do: {String(data.brandApplication.rejectReason)}</p> : null}
-            {brandStatus === "APPROVED" || brandStatus === "PENDING_REVIEW" ? <Link className="dc-btn-primary mt-4 inline-flex" href="/dashboard/brand">Vào Bảng điều khiển Nhãn hàng</Link> : null}
-            {brandStatus !== "APPROVED" && brandStatus !== "PENDING_REVIEW" ? (
+            {hasBrand ? <Link className="dc-btn-primary mt-4 inline-flex" href="/dashboard/brand">Vào Bảng điều khiển Nhãn hàng</Link> : null}
+            {!hasBrand ? (
               <form className="mt-4 grid gap-3" onSubmit={submitBrand}>
                 <input className="dc-input" placeholder="Tên nhãn hàng" value={brandForm.brandName} onChange={(e) => setBrandForm((x) => ({ ...x, brandName: e.target.value }))} required />
+                <input className="dc-input" placeholder="Ngành hàng" value={brandForm.industry} onChange={(e) => setBrandForm((x) => ({ ...x, industry: e.target.value }))} required />
+                <textarea className="dc-input min-h-20" placeholder="Mô tả ngắn" value={brandForm.description} onChange={(e) => setBrandForm((x) => ({ ...x, description: e.target.value }))} />
                 <input className="dc-input" placeholder="Tên người liên hệ" value={brandForm.contactName} onChange={(e) => setBrandForm((x) => ({ ...x, contactName: e.target.value }))} required />
                 <input className="dc-input" placeholder="Số điện thoại liên hệ" value={brandForm.contactPhone} onChange={(e) => setBrandForm((x) => ({ ...x, contactPhone: e.target.value }))} required />
                 <input className="dc-input" placeholder="Email liên hệ" type="email" value={brandForm.contactEmail} onChange={(e) => setBrandForm((x) => ({ ...x, contactEmail: e.target.value }))} required />
                 <input className="dc-input" placeholder="Website" type="url" value={brandForm.website} onChange={(e) => setBrandForm((x) => ({ ...x, website: e.target.value }))} />
-                <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">Khi gửi hồ sơ Brand, bạn xác nhận BCC {BRAND_BCC_VERSION}: Brand chịu trách nhiệm pháp lý về sản phẩm/tồn kho/voucher, chia doanh thu Brand 70% và commission nền tảng 10%.</p>
-                <button className="dc-btn-primary" disabled={submittingBrand} type="submit">{submittingBrand ? "Đang gửi..." : brandStatus ? "Gửi lại hồ sơ Brand" : "Đăng ký Brand"}</button>
+                <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">Brand được tạo và dùng ngay. Các thông tin BCC {BRAND_BCC_VERSION}, pháp lý, thanh toán và kho hàng có thể bổ sung sau.</p>
+                <button className="dc-btn-primary" disabled={submittingBrand} type="submit">{submittingBrand ? "Đang tạo..." : "Tạo Brand mới"}</button>
               </form>
             ) : null}
           </div>

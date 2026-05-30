@@ -24,6 +24,16 @@ type CreatorApplicationDetail = {
   maxJobsPerMonth: number | null;
   rejectReason: string | null;
   reviewNote: string | null;
+  socialLinks?: Array<{
+    id: string;
+    platform: string;
+    socialUrl: string;
+    followers: number;
+    engagementRate: number | null;
+    isPrimary: boolean;
+    verificationStatus: string;
+    status: string;
+  }>;
   account: {
     id: string;
     email: string;
@@ -104,14 +114,22 @@ export default function AdminCreatorDetailPage() {
     return <ErrorState title="Không tải được hồ sơ Creator" description={error || "Lỗi không xác định"} onRetry={() => void load()} />;
   }
 
-  const channels = [
-    { platform: item.mainPlatform, url: item.socialUrl, followers: item.followerCount },
-    ...(item.portfolioUrl ? [{ platform: "PORTFOLIO", url: item.portfolioUrl, followers: null as number | null }] : [])
-  ];
+  const channels = item.socialLinks?.length
+    ? item.socialLinks.map((channel) => ({
+        platform: channel.platform,
+        url: channel.socialUrl,
+        followers: channel.followers,
+        isPrimary: channel.isPrimary,
+        verificationStatus: channel.verificationStatus
+      }))
+    : [
+        { platform: item.mainPlatform, url: item.socialUrl, followers: item.followerCount, isPrimary: false, verificationStatus: "UNVERIFIED" },
+        ...(item.portfolioUrl ? [{ platform: "PORTFOLIO", url: item.portfolioUrl, followers: null as number | null, isPrimary: false, verificationStatus: "UNVERIFIED" }] : [])
+      ].filter((channel) => channel.url);
 
   return (
     <>
-      <PageHeader title={item.displayName} subtitle={`Applicant: ${item.account.displayName} (${item.account.email})`} action={<button className="dc-btn-secondary" onClick={() => router.push("/admin/creators")}>Back</button>} />
+      <PageHeader title={item.displayName} subtitle={`Account: ${item.account.displayName} (${item.account.email})`} action={<button className="dc-btn-secondary" onClick={() => router.push("/admin/creators")}>Back</button>} />
       {error ? <div className="mb-4"><ErrorState title="Có lỗi thao tác" description={error} onRetry={() => void load()} /></div> : null}
       <section className="dc-card p-4">
         <div className="flex items-center justify-between">
@@ -146,6 +164,7 @@ export default function AdminCreatorDetailPage() {
               <p className="font-semibold">{channel.platform}</p>
               <p className="break-all text-zinc-700">{channel.url}</p>
               <p className="text-zinc-500">Followers: {(channel.followers ?? 0).toLocaleString("vi-VN")}</p>
+              <p className="text-zinc-500">{channel.isPrimary ? "Kênh chính" : "Kênh phụ"} • {channel.verificationStatus}</p>
             </div>
           ))}
           {item.account.creatorProfile ? (
@@ -159,13 +178,13 @@ export default function AdminCreatorDetailPage() {
       <section className="mt-4 dc-card p-4">
         <p className="font-semibold">Risk Decision</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button className="dc-btn-primary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("verify")}>
+          <button className="dc-btn-primary" disabled={acting} onClick={() => setDialogAction("verify")}>
             Xác nhận an toàn cơ bản
           </button>
-          <button className="dc-btn-secondary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("risk")}>
+          <button className="dc-btn-secondary" disabled={acting} onClick={() => setDialogAction("risk")}>
             Gắn cờ rủi ro
           </button>
-          <button className="dc-btn-secondary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("restrict")}>
+          <button className="dc-btn-secondary" disabled={acting} onClick={() => setDialogAction("restrict")}>
             Yêu cầu bổ sung
           </button>
         </div>

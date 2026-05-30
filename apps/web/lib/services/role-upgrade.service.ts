@@ -143,10 +143,10 @@ async function syncCreatorAccessFromApplication(tx: Prisma.TransactionClient, ap
 
 async function syncBrandAccessFromApplication(
   tx: Prisma.TransactionClient,
-  app: Prisma.BrandApplicationGetPayload<{}>
+  app: Prisma.BrandApplicationGetPayload<Prisma.BrandApplicationDefaultArgs>
 ) {
   const existingBrand = await tx.brand.findFirst({
-    where: { ownerAccountId: app.accountId },
+    where: { ownerAccountId: app.accountId, name: { equals: app.brandName, mode: "insensitive" } },
     orderBy: { createdAt: "desc" }
   });
   const reviewedAt = new Date();
@@ -222,7 +222,7 @@ async function syncBrandAccessFromApplication(
   await tx.brandMember.upsert({
     where: { brandId_accountId: { brandId: brand.id, accountId: app.accountId } },
     create: { brandId: brand.id, accountId: app.accountId, role: BrandMemberRole.OWNER },
-    update: { role: BrandMemberRole.OWNER }
+    update: { role: BrandMemberRole.OWNER, status: "ACTIVE" }
   });
   await assignRole(tx, app.accountId, Role.BRAND_OWNER);
   await tx.account.update({ where: { id: app.accountId }, data: { role: Role.BRAND_OWNER } });
@@ -240,7 +240,12 @@ export async function getRoleUpgradeSnapshot(accountId: string) {
         avatarUrl: true,
         role: true,
         profile: { select: { phone: true } },
-        roleAssignments: { select: { role: true } }
+        roleAssignments: { select: { role: true } },
+        creatorProfile: { select: { id: true } },
+        ownedBrandMemberships: {
+          where: { status: "ACTIVE" },
+          select: { brand: { select: { id: true, name: true } }, role: true }
+        }
       }
     }),
     prisma.creatorApplication.findFirst({ where: { accountId }, orderBy: { createdAt: "desc" } }),
@@ -249,13 +254,14 @@ export async function getRoleUpgradeSnapshot(accountId: string) {
 
   const roles = Array.from(new Set(account.roleAssignments.map((x) => x.role)));
   const primaryRole = resolvePrimaryRole(roles);
-  return { account: { ...account, role: primaryRole, roles }, creatorApplication: creatorLatest, brandApplication: brandLatest };
+  const brandMemberships = account.ownedBrandMemberships.map((item) => ({ id: item.brand.id, name: item.brand.name, role: item.role }));
+  return { account: { ...account, role: primaryRole, roles, brandMemberships, hasCreatorProfile: Boolean(account.creatorProfile) }, creatorApplication: creatorLatest, brandApplication: brandLatest };
 }
 
 export async function applyCreator(accountId: string, input: CreatorApplicationInput) {
   const account = await prisma.account.findUniqueOrThrow({ where: { id: accountId }, select: { roleAssignments: { select: { role: true } } } });
   const roles = account.roleAssignments.map((item) => item.role);
-  if (hasSomeRole(Role.CREATOR, roles) || hasSomeRole(Role.ADMIN, roles) || hasSomeRole(Role.OPS, roles)) {
+  if (hasSomeRole(Role.CREATOR, roles)) {
     throw new AppError("Account already has creator access", 409, "CREATOR_ALREADY_GRANTED");
   }
 
@@ -401,12 +407,6 @@ export async function updateCreatorApplication(accountId: string, applicationId:
 }
 
 export async function applyBrand(accountId: string, input: BrandApplicationInput) {
-  const pending = await prisma.brandApplication.findFirst({
-    where: { accountId, status: { in: ["PENDING_REVIEW", "APPROVED"] } },
-    select: { id: true }
-  });
-  if (pending) throw new AppError("Brand profile is already active", 409, "BRAND_ALREADY_GRANTED");
-
   return prisma.$transaction(async (tx) => {
     const app = await tx.brandApplication.create({
       data: {

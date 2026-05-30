@@ -28,17 +28,18 @@ export default function BrandRegisterPage() {
     const representativeIdBackImage = formData.get("representativeIdBackImage");
     const businessLicenseFile = formData.get("businessLicenseFile");
 
-    if (!(representativeIdFrontImage instanceof File) || representativeIdFrontImage.size === 0) {
-      throw new Error("Vui lòng tải lên CCCD người đại diện mặt trước.");
+    if (representativeIdFrontImage instanceof File && representativeIdFrontImage.size > 0) {
+      uploadData.append("representativeIdFrontImage", representativeIdFrontImage);
     }
-    if (!(representativeIdBackImage instanceof File) || representativeIdBackImage.size === 0) {
-      throw new Error("Vui lòng tải lên CCCD người đại diện mặt sau.");
+    if (representativeIdBackImage instanceof File && representativeIdBackImage.size > 0) {
+      uploadData.append("representativeIdBackImage", representativeIdBackImage);
     }
-
-    uploadData.append("representativeIdFrontImage", representativeIdFrontImage);
-    uploadData.append("representativeIdBackImage", representativeIdBackImage);
     if (businessLicenseFile instanceof File && businessLicenseFile.size > 0) {
       uploadData.append("businessLicense", businessLicenseFile);
+    }
+
+    if (Array.from(uploadData.keys()).length === 0) {
+      return { idCardFrontImageUrl: "", idCardBackImageUrl: "", businessLicenseUrl: null };
     }
 
     const uploadResponse = await fetch("/api/uploads/brand-kyc", {
@@ -99,36 +100,33 @@ export default function BrandRegisterPage() {
       setIdCardFrontImageUrl(uploadState.idCardFrontImageUrl);
       setIdCardBackImageUrl(uploadState.idCardBackImageUrl);
 
-      const applicationResponse = await fetch("/api/profile/brand-application", {
+      const applicationResponse = await fetch("/api/brand/create", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           brandName,
-          logoUrl,
-          legalName,
           industry,
-          website,
-          fanpage,
-          address,
-          contactName: representativeName,
-          contactPhone: phone,
-          contactEmail: representativeEmail || email,
-          description: brandNote,
-          businessGoal: campaignGoal,
-          taxCode,
-          businessLicenseUrl: uploadState.businessLicenseUrl ?? undefined,
-          representativeName,
-          representativePhone: phone,
-          representativeEmail: representativeEmail || email,
-          representativeIdentityNumber,
-          productCategories,
-          inventoryDescription: [
+          logoUrl,
+          description: [
+            brandNote,
+            legalName ? `Pháp nhân: ${legalName}` : "",
+            taxCode ? `MST: ${taxCode}` : "",
+            website ? `Website: ${website}` : "",
+            fanpage ? `Fanpage: ${fanpage}` : "",
+            address ? `Địa chỉ: ${address}` : "",
+            representativeName ? `Đại diện: ${representativeName}` : "",
+            phone ? `SĐT: ${phone}` : "",
+            representativeEmail || email ? `Email đại diện: ${representativeEmail || email}` : "",
+            representativeIdentityNumber ? `Định danh đại diện: ${representativeIdentityNumber}` : "",
+            productCategories ? `Danh mục: ${productCategories}` : "",
+            campaignGoal ? `Mục tiêu campaign: ${campaignGoal}` : "",
+            estimatedBudget ? `Ngân sách dự kiến: ${estimatedBudget}` : "",
+            expectedCreatorCount ? `Số creator dự kiến: ${expectedCreatorCount}` : "",
+            uploadState.businessLicenseUrl ? `GPKD: ${uploadState.businessLicenseUrl}` : "",
             inventoryDescription,
             `CCCD mặt trước: ${uploadState.idCardFrontImageUrl}`,
             `CCCD mặt sau: ${uploadState.idCardBackImageUrl}`
-          ].filter(Boolean).join("\n"),
-          expectedCampaignBudget: estimatedBudget ? Number(estimatedBudget) : undefined,
-          expectedCreatorCount: expectedCreatorCount ? Number(expectedCreatorCount) : undefined
+          ].filter(Boolean).join("\n").slice(0, 300)
         })
       });
       const applicationPayload = await applicationResponse.json();
@@ -137,8 +135,8 @@ export default function BrandRegisterPage() {
       }
 
       upsertCurrentBrandInContext({
-        id: applicationPayload.data.brand.id,
-        name: applicationPayload.data.brand.name,
+        id: applicationPayload.data.id,
+        name: applicationPayload.data.name,
         role: "OWNER"
       });
       setSuccess("Brand đã được tạo. Bạn có thể bắt đầu thiết lập sản phẩm/campaign.");
@@ -189,30 +187,30 @@ export default function BrandRegisterPage() {
             <FormField label={<span>Tên thương hiệu <span className="text-red-500">*</span></span>}>
               <input name="brandName" className="dc-input" placeholder="FreshSkin" required minLength={2} />
             </FormField>
-            <FormField label={<span>Pháp nhân / tên công ty <span className="text-red-500">*</span></span>}>
-              <input name="legalName" className="dc-input" placeholder="Công ty TNHH FreshSkin" required />
+            <FormField label={<span>Pháp nhân / tên công ty <span className="text-xs text-zinc-500">(bổ sung sau)</span></span>}>
+              <input name="legalName" className="dc-input" placeholder="Công ty TNHH FreshSkin" />
             </FormField>
-            <FormField label={<span>Mã số thuế <span className="text-red-500">*</span></span>}>
-              <input name="taxCode" className="dc-input" placeholder="0101234567" required />
+            <FormField label={<span>Mã số thuế <span className="text-xs text-zinc-500">(bổ sung sau)</span></span>}>
+              <input name="taxCode" className="dc-input" placeholder="0101234567" />
               <p className="text-xs font-medium text-zinc-500">Nhập mã số thuế doanh nghiệp, chỉ gồm ký tự số.</p>
             </FormField>
             <FormField label={<span>Ngành hàng <span className="text-red-500">*</span></span>}>
               <input name="industry" className="dc-input" placeholder="Beauty, Food, Fashion..." required />
             </FormField>
-            <FormField label={<span>Danh mục sản phẩm <span className="text-red-500">*</span></span>}>
-              <input name="productCategories" className="dc-input" placeholder="Skincare, voucher spa, combo quà..." required />
+            <FormField label={<span>Danh mục sản phẩm</span>}>
+              <input name="productCategories" className="dc-input" placeholder="Skincare, voucher spa, combo quà..." />
             </FormField>
-            <FormField label={<span>Website <span className="text-red-500">*</span></span>}>
+            <FormField label={<span>Website</span>}>
               <>
-                <input name="website" type="url" className="dc-input" placeholder="https://example.com" required />
+                <input name="website" type="url" className="dc-input" placeholder="https://example.com" />
                 <p className="text-xs font-medium text-zinc-500">Nhập URL đầy đủ, bao gồm `https://`.</p>
               </>
             </FormField>
             <FormField label={<span>Fanpage</span>}>
               <input name="fanpage" type="url" className="dc-input" placeholder="https://facebook.com/..." />
             </FormField>
-            <FormField label={<span>Logo thương hiệu <span className="text-red-500">*</span></span>}>
-              <input name="logoUrl" type="url" className="dc-input" placeholder="https://example.com/logo.png" required />
+            <FormField label={<span>Logo thương hiệu</span>}>
+              <input name="logoUrl" type="url" className="dc-input" placeholder="https://example.com/logo.png" />
             </FormField>
             <FormField label={<span>Giấy phép kinh doanh <span className="text-xs text-zinc-500">(PDF, DOC, DOCX, JPG, PNG – tối đa 10MB)</span></span>}>
               <input name="businessLicenseFile" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" className="dc-input bg-white" />
@@ -230,11 +228,11 @@ export default function BrandRegisterPage() {
           </section>
 
           <section className="grid gap-4 border-t border-zinc-200 pt-5 md:grid-cols-2">
-            <FormField label={<span>Người đại diện <span className="text-red-500">*</span></span>}>
-              <input name="representativeName" className="dc-input" placeholder="Nguyễn An" required />
+            <FormField label={<span>Người đại diện</span>}>
+              <input name="representativeName" className="dc-input" placeholder="Nguyễn An" />
             </FormField>
-            <FormField label={<span>Số điện thoại <span className="text-red-500">*</span></span>}>
-              <input name="phone" className="dc-input" placeholder="09xx xxx xxx" required />
+            <FormField label={<span>Số điện thoại</span>}>
+              <input name="phone" className="dc-input" placeholder="09xx xxx xxx" />
             </FormField>
             <FormField label={<span>Email người đại diện</span>}>
               <input name="representativeEmail" type="email" className="dc-input" placeholder="owner@example.com" />
@@ -243,11 +241,11 @@ export default function BrandRegisterPage() {
               <input name="representativeIdentityNumber" className="dc-input" placeholder="012345678901" />
             </FormField>
             <div className="grid gap-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:col-span-2 md:grid-cols-2">
-              <FormField label={<span>CCCD mặt trước <span className="text-red-500">*</span></span>}>
-                <input name="representativeIdFrontImage" type="file" accept="image/*" className="dc-input bg-white" required />
+              <FormField label={<span>CCCD mặt trước <span className="text-xs text-zinc-500">(bổ sung sau nếu cần)</span></span>}>
+                <input name="representativeIdFrontImage" type="file" accept="image/*" className="dc-input bg-white" />
               </FormField>
-              <FormField label={<span>CCCD mặt sau <span className="text-red-500">*</span></span>}>
-                <input name="representativeIdBackImage" type="file" accept="image/*" className="dc-input bg-white" required />
+              <FormField label={<span>CCCD mặt sau <span className="text-xs text-zinc-500">(bổ sung sau nếu cần)</span></span>}>
+                <input name="representativeIdBackImage" type="file" accept="image/*" className="dc-input bg-white" />
               </FormField>
               {idCardFrontImageUrl ? <p className="text-xs text-zinc-500 md:col-span-2">CCCD mặt trước: {idCardFrontImageUrl}</p> : null}
               {idCardBackImageUrl ? <p className="text-xs text-zinc-500 md:col-span-2">CCCD mặt sau: {idCardBackImageUrl}</p> : null}

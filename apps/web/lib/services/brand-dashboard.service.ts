@@ -535,7 +535,7 @@ export async function updateBrandOnboarding(accountId: string, input: BrandOnboa
       contractFileUrl: input.contractFileUrl ?? brand.contractFileUrl ?? "",
       contractSignedAt: null,
       rejectReason: null,
-      reviewNote: "Brand requested onboarding/BCC update and admin review.",
+      reviewNote: "Brand requested KYB/BCC verification update.",
       reviewedById: null,
       reviewedAt: null
     };
@@ -559,7 +559,7 @@ export async function updateBrandOnboarding(accountId: string, input: BrandOnboa
     }
     await writeAuditLog({
       actorId: accountId,
-      action: "BRAND_ONBOARDING_SUBMITTED",
+      action: "BRAND_KYB_UPDATE_SUBMITTED",
       targetType: "Brand",
       targetId: brand.id,
       oldStatus: brand.status,
@@ -567,8 +567,8 @@ export async function updateBrandOnboarding(accountId: string, input: BrandOnboa
     });
     await createNotificationForAdminOps({
       event: "CAMPAIGN_APPROVED",
-      title: "Brand gửi onboarding chờ duyệt",
-      content: `${brand.name} đã gửi onboarding/BCC để admin duyệt.`,
+      title: "Brand gửi cập nhật KYB/BCC",
+      content: `${brand.name} đã gửi cập nhật KYB/BCC để Ops kiểm tra.`,
       metadata: { brandId: brand.id, ownerAccountId: brand.ownerAccountId },
       excludeAccountId: accountId
     });

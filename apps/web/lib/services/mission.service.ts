@@ -78,18 +78,15 @@ export async function getMissionDetail(missionId: string) {
   return mission;
 }
 
-export async function acceptMission(missionId: string, accountId: string, role: Role) {
+export async function acceptMission(missionId: string, accountId: string, roles: Role[]) {
   const mission = await prisma.mission.findUnique({ where: { id: missionId }, include: { campaign: true } });
   if (!mission) throw new AppError("Mission not found", 404, "MISSION_NOT_FOUND");
   if (mission.status !== "OPEN") throw new AppError("Mission not open", 409, "MISSION_NOT_OPEN");
   if (isPast(mission.deadlineAt)) throw new AppError("Mission expired", 409, "MISSION_EXPIRED");
 
-  if (mission.audience === "CREATOR" && role === "USER") {
+  const hasCreatorCapability = roles.includes("CREATOR") || roles.includes("ADMIN") || roles.includes("OPS");
+  if (mission.audience === "CREATOR" && !hasCreatorCapability) {
     throw new AppError("Creator mission requires creator role", 403, "MISSION_CREATOR_ONLY");
-  }
-
-  if (mission.audience === "USER" && role !== "USER" && role !== "ADMIN" && role !== "OPS") {
-    throw new AppError("Mission is for user audience", 403, "MISSION_USER_ONLY");
   }
 
   const existing = await prisma.missionSubmission.findUnique({

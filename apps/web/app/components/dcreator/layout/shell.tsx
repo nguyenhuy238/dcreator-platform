@@ -7,7 +7,6 @@ import type { Role } from "@prisma/client";
 import { DashboardSwitcher } from "@/app/components/dcreator/layout/dashboard-switcher";
 import { DashboardShell } from "@/app/components/dcreator/layout/dashboard-shell";
 import { deriveCapabilities, type UserCapabilities } from "@/lib/auth/capabilities";
-import { ROLE } from "@/lib/auth/role-constants";
 import { canAccessWorkspace, getNavItemsForWorkspace, getWorkspaceConfig, getWorkspaceForPath } from "@/lib/navigation";
 
 type NavItem = { href: string; label: string };

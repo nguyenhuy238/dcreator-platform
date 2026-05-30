@@ -7,7 +7,7 @@ import { EmptyState, ErrorState, PageHeader, SectionHeader } from "@/app/compone
 import type { Role } from "@prisma/client";
 
 type Snapshot = {
-  account: { roles: Role[] };
+  account: { roles: Role[]; brandMemberships?: Array<{ id: string; name: string; role: string }>; hasCreatorProfile?: boolean };
   creatorApplication: null | { status?: string; rejectReason?: string | null };
   brandApplication: null | { status?: string; rejectReason?: string | null };
 };
@@ -37,8 +37,8 @@ export default function UserRoleRequestsPage() {
   }, []);
 
   const roles = data?.account.roles ?? [];
-  const isCreator = roles.includes("CREATOR");
-  const isBrand = roles.includes("BRAND_OWNER") || roles.includes("BRAND_STAFF");
+  const isCreator = Boolean(data?.account.hasCreatorProfile) || roles.includes("CREATOR");
+  const isBrand = (data?.account.brandMemberships?.length ?? 0) > 0;
 
   return (
     <>

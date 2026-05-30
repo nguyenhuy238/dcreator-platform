@@ -196,7 +196,7 @@ export async function listCreatorMarketplaceJobs(
 }
 
 export async function acceptCreatorMarketplaceJob(missionId: string, accountId: string) {
-  return acceptMission(missionId, accountId, "CREATOR");
+  return acceptMission(missionId, accountId, ["CREATOR"]);
 }
 
 export async function listCreatorMyJobs(accountId: string) {

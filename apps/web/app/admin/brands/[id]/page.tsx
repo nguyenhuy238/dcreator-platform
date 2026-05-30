@@ -101,7 +101,7 @@ export default function AdminBrandDetailPage() {
 
   return (
     <>
-      <PageHeader title={item.brandName} subtitle={`Applicant: ${item.account.displayName} (${item.account.email})`} action={<button className="dc-btn-secondary" onClick={() => router.push("/admin/brands")}>Back</button>} />
+      <PageHeader title={item.brandName} subtitle={`Account: ${item.account.displayName} (${item.account.email})`} action={<button className="dc-btn-secondary" onClick={() => router.push("/admin/brands")}>Back</button>} />
       {error ? <div className="mb-4"><ErrorState title="Có lỗi thao tác" description={error} onRetry={() => void load()} /></div> : null}
       <section className="dc-card p-4">
         <div className="flex items-center justify-between">
@@ -131,13 +131,13 @@ export default function AdminBrandDetailPage() {
       <section className="mt-4 dc-card p-4">
         <p className="font-semibold">Risk Decision</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button className="dc-btn-primary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("verify")}>
+          <button className="dc-btn-primary" disabled={acting} onClick={() => setDialogAction("verify")}>
             Xác nhận an toàn cơ bản
           </button>
-          <button className="dc-btn-secondary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("risk")}>
+          <button className="dc-btn-secondary" disabled={acting} onClick={() => setDialogAction("risk")}>
             Gắn cờ rủi ro
           </button>
-          <button className="dc-btn-secondary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("restrict")}>
+          <button className="dc-btn-secondary" disabled={acting} onClick={() => setDialogAction("restrict")}>
             Yêu cầu bổ sung
           </button>
         </div>

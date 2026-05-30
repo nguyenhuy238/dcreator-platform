@@ -48,6 +48,16 @@ export default function CreatorRegisterPage() {
     return files.every((file) => file instanceof File && file.size > 0);
   }
 
+  function deriveHandle(url: string, fallback: string) {
+    try {
+      const parsed = new URL(url);
+      const last = parsed.pathname.split("/").filter(Boolean).pop();
+      return (last || fallback).replace(/^@/, "").slice(0, 80);
+    } catch {
+      return fallback;
+    }
+  }
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
@@ -95,44 +105,46 @@ export default function CreatorRegisterPage() {
         setPortraitImageUrl(uploaded.portraitImageUrl);
       }
 
-      const creatorBio = [
-        `TikTok: ${tiktokUrl || "N/A"}`,
-        `Instagram: ${instagramUrl || "N/A"}`,
-        `Facebook: ${facebookUrl || "N/A"}`,
-        `Ghi chú: ${creatorNote || "Không có"}`
-      ].join(" | ");
-
-      const creatorApplicationResponse = await fetch("/api/profile/creator-application", {
+      const creatorProfileResponse = await fetch("/api/creator/create", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           displayName,
-          avatarUrl: "",
-          bio: creatorBio,
-          mainPlatform: "TIKTOK",
-          socialUrl: tiktokUrl,
-          handle: "",
-          followerCount: Number(followerCount),
-          contentCategory: preferredCategory,
-          portfolioUrl: instagramUrl,
-          location: "",
-          expectedRate: 0,
-          maxJobsPerMonth: 0,
-          realName: "",
-          phone: "",
-          identityNumber: "",
-          identityFrontUrl: uploaded.idCardFrontImageUrl,
-          identityBackUrl: uploaded.idCardBackImageUrl,
-          selfieUrl: uploaded.portraitImageUrl,
-          bankAccountName: "",
-          bankAccountNumber: "",
-          bankName: "",
-          taxCode: ""
+          bio: [
+            creatorNote,
+            preferredCategory ? `Ngành hàng: ${preferredCategory}` : "",
+            uploaded.idCardFrontImageUrl ? `KYC mặt trước: ${uploaded.idCardFrontImageUrl}` : "",
+            uploaded.idCardBackImageUrl ? `KYC mặt sau: ${uploaded.idCardBackImageUrl}` : "",
+            uploaded.portraitImageUrl ? `KYC chân dung: ${uploaded.portraitImageUrl}` : ""
+          ].filter(Boolean).join(" | ")
         })
       });
-      const creatorApplicationPayload = await creatorApplicationResponse.json();
-      if (!creatorApplicationResponse.ok || !creatorApplicationPayload.success) {
-        throw new Error(creatorApplicationPayload.error ?? "Không thể gửi hồ sơ Creator.");
+      const creatorProfilePayload = await creatorProfileResponse.json();
+      if (!creatorProfileResponse.ok || !creatorProfilePayload.success) {
+        throw new Error(creatorProfilePayload.error ?? "Không thể tạo Creator Profile.");
+      }
+
+      const channelInputs = [
+        { platform: "TikTok", url: tiktokUrl, handle: deriveHandle(tiktokUrl, "tiktok") },
+        { platform: "Instagram", url: instagramUrl, handle: deriveHandle(instagramUrl, "instagram") },
+        { platform: "Facebook", url: facebookUrl, handle: deriveHandle(facebookUrl, "facebook") }
+      ].filter((item) => item.url);
+
+      for (const channel of channelInputs) {
+        const channelResponse = await fetch("/api/creator/dashboard/channels", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            platform: channel.platform,
+            handle: channel.handle,
+            url: channel.url,
+            followerCount: Number(followerCount) || 0
+          })
+        });
+        const channelPayload = await channelResponse.json();
+        if (!channelResponse.ok || !channelPayload.success) {
+          throw new Error(channelPayload.error ?? `Không thể thêm kênh ${channel.platform}.`);
+        }
       }
 
       setSuccess("Hồ sơ Creator đã được tạo. Bạn có thể bắt đầu thiết lập dashboard ngay.");

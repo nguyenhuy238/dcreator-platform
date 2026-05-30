@@ -1,5 +1,5 @@
 import type { Role } from "@prisma/client";
-import { deriveCapabilities } from "@/lib/auth/capabilities";
+import { deriveCapabilities } from "./capabilities.ts";
 
 export type WorkspaceId = "user" | "creator" | "brand" | "admin";
 
