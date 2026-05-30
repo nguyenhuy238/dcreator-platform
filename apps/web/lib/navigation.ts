@@ -5,6 +5,9 @@ export type NavItem = {
   href: string;
   label: string;
   description?: string;
+  icon?: string;
+  activePrefixes?: readonly string[];
+  hidden?: boolean;
 };
 export type BreadcrumbItem = { href: string; label: string };
 
@@ -31,39 +34,42 @@ const userNavItems: readonly NavItem[] = [
 ];
 
 const creatorNavItems: readonly NavItem[] = [
-  { href: "/dashboard/creator", label: "T\u1ed5ng quan Creator", description: "Ti\u1ebfn \u0111\u1ed9 nhi\u1ec7m v\u1ee5 v\u00e0 hoa h\u1ed3ng" },
-  { href: "/dashboard/creator/jobs", label: "Campaign / Job", description: "Chi\u1ebfn d\u1ecbch c\u00f3 th\u1ec3 tham gia" },
-  { href: "/dashboard/creator/missions", label: "Nhi\u1ec7m v\u1ee5 c\u1ee7a t\u00f4i", description: "Danh s\u00e1ch nhi\u1ec7m v\u1ee5 Creator" },
-  { href: "/dashboard/creator/profile", label: "H\u1ed3 s\u01a1 Creator", description: "Portfolio v\u00e0 th\u00f4ng tin Creator" },
-  { href: "/dashboard/creator/wallet", label: "V\u00ed Creator", description: "Hoa h\u1ed3ng v\u00e0 payout" }
+  { href: "/dashboard/creator", label: "T\u1ed5ng quan Creator", description: "Ti\u1ebfn \u0111\u1ed9 nhi\u1ec7m v\u1ee5 v\u00e0 hoa h\u1ed3ng", icon: "Gauge" },
+  { href: "/dashboard/creator/jobs", label: "Campaign / Job", description: "Chi\u1ebfn d\u1ecbch c\u00f3 th\u1ec3 tham gia", icon: "Briefcase" },
+  { href: "/dashboard/creator/missions", label: "Nhi\u1ec7m v\u1ee5 c\u1ee7a t\u00f4i", description: "Danh s\u00e1ch nhi\u1ec7m v\u1ee5 Creator", icon: "ClipboardText" },
+  { href: "/dashboard/creator/proofs", label: "Proof / Ho\u00e0n th\u00e0nh", description: "N\u1ed9p minh ch\u1ee9ng v\u00e0 theo d\u00f5i duy\u1ec7t", icon: "CheckCircle" },
+  { href: "/dashboard/creator/channels", label: "K\u00eanh social", description: "K\u1ebft n\u1ed1i k\u00eanh m\u1ea1ng x\u00e3 h\u1ed9i", icon: "UsersThree" },
+  { href: "/dashboard/creator/profile", label: "H\u1ed3 s\u01a1 Creator", description: "Portfolio v\u00e0 th\u00f4ng tin Creator", icon: "UserCircle" },
+  { href: "/dashboard/creator/wallet", label: "V\u00ed Creator", description: "Hoa h\u1ed3ng v\u00e0 payout", icon: "Wallet" }
 ];
 
 const brandNavItems: readonly NavItem[] = [
-  { href: "/dashboard/brand", label: "T\u1ed5ng quan Brand", description: "To\u00e0n c\u1ea3nh v\u1eadn h\u00e0nh Brand" },
-  { href: "/dashboard/brand/subscriptions", label: "M\u1ee5c ti\u00eau g\u00f3i", description: "Ch\u1ecdn g\u00f3i \u0111\u0103ng k\u00fd d\u00e0nh cho Brand" },
-  { href: "/dashboard/brand/wallet", label: "V\u00ed N-Point", description: "S\u1ed1 d\u01b0 N-Point v\u00e0 y\u00eau c\u1ea7u n\u1ea1p/ho\u00e0n ti\u1ec1n" },
-  { href: "/dashboard/brand/onboarding", label: "Onboarding / BCC", description: "H\u1ed3 s\u01a1 ph\u00e1p l\u00fd v\u00e0 BCC" },
-  { href: "/dashboard/brand/profile", label: "H\u1ed3 s\u01a1 nh\u00e3n h\u00e0ng", description: "Th\u00f4ng tin nh\u00e3n h\u00e0ng" },
-  { href: "/dashboard/brand/campaigns", label: "Campaign / Job", description: "T\u1ea1o v\u00e0 qu\u1ea3n l\u00fd campaign" },
-  { href: "/dashboard/brand/mission-reviews", label: "Duy\u1ec7t nhi\u1ec7m v\u1ee5 Creator", description: "Duy\u1ec7t k\u1ecbch b\u1ea3n, video v\u00e0 ho\u00e0n th\u00e0nh" },
-  { href: "/dashboard/brand/mission-history", label: "L\u1ecbch s\u1eed nhi\u1ec7m v\u1ee5", description: "To\u00e0n b\u1ed9 Creator Mission theo campaign" },
-  { href: "/dashboard/brand/settings", label: "C\u00e0i \u0111\u1eb7t Brand", description: "Thi\u1ebft l\u1eadp v\u1eadn h\u00e0nh Brand" }
+  { href: "/dashboard/brand", label: "T\u1ed5ng quan Brand", description: "To\u00e0n c\u1ea3nh v\u1eadn h\u00e0nh Brand", icon: "Gauge" },
+  { href: "/dashboard/brand/subscriptions", label: "M\u1ee5c ti\u00eau g\u00f3i", description: "Ch\u1ecdn g\u00f3i \u0111\u0103ng k\u00fd d\u00e0nh cho Brand", icon: "SlidersHorizontal" },
+  { href: "/dashboard/brand/wallet", label: "V\u00ed N-Point", description: "S\u1ed1 d\u01b0 N-Point v\u00e0 y\u00eau c\u1ea7u n\u1ea1p/ho\u00e0n ti\u1ec1n", icon: "Coins" },
+  { href: "/dashboard/brand/onboarding", label: "Onboarding / BCC", description: "H\u1ed3 s\u01a1 ph\u00e1p l\u00fd v\u00e0 BCC", icon: "IdentificationCard" },
+  { href: "/dashboard/brand/profile", label: "H\u1ed3 s\u01a1 nh\u00e3n h\u00e0ng", description: "Th\u00f4ng tin nh\u00e3n h\u00e0ng", icon: "Storefront" },
+  { href: "/dashboard/brand/campaigns", label: "Campaign / Job", description: "T\u1ea1o v\u00e0 qu\u1ea3n l\u00fd campaign", icon: "Megaphone" },
+  { href: "/dashboard/brand/mission-reviews", label: "Duy\u1ec7t nhi\u1ec7m v\u1ee5 Creator", description: "Duy\u1ec7t k\u1ecbch b\u1ea3n, video v\u00e0 ho\u00e0n th\u00e0nh", icon: "ClipboardText" },
+  { href: "/dashboard/brand/mission-history", label: "L\u1ecbch s\u1eed nhi\u1ec7m v\u1ee5", description: "To\u00e0n b\u1ed9 Creator Mission theo campaign", icon: "Scroll" },
+  { href: "/dashboard/brand/products", label: "S\u1ea3n ph\u1ea9m / SKU / Variant", description: "Qu\u1ea3n l\u00fd danh m\u1ee5c s\u1ea3n ph\u1ea9m", icon: "Package" },
+  { href: "/dashboard/brand/settings", label: "C\u00e0i \u0111\u1eb7t Brand", description: "Thi\u1ebft l\u1eadp v\u1eadn h\u00e0nh Brand", icon: "GearSix" }
 ];
 
 const adminNavItems: readonly NavItem[] = [
-  { href: "/admin", label: "Tổng quan Admin", description: "Toàn cảnh hệ thống" },
-  { href: "/admin/users", label: "Quản lý người dùng", description: "Quản lý tài khoản người dùng" },
-  { href: "/admin/creators", label: "Quản lý Creator", description: "Quản lý toàn vòng đời Creator" },
-  { href: "/admin/brands", label: "Quản lý Brand", description: "Quản lý toàn vòng đời Brand" },
-  { href: "/admin/campaigns", label: "Quản lý Campaign / Job", description: "Vận hành campaign/job toàn hệ thống" },
-  { href: "/admin/proofs", label: "Quản lý Mission & Proof", description: "Quản lý workflow nhiệm vụ và proof" },
-  { href: "/admin/vouchers", label: "Quản lý Voucher / Reward", description: "Theo dõi và can thiệp voucher/reward" },
-  { href: "/admin/finance", label: "Finance & Payout", description: "Tài chính và chi trả" },
-  { href: "/admin/n-point-requests", label: "N-Point Transactions", description: "Nạp điểm, refund, đối soát giao dịch điểm" },
-  { href: "/admin/risk", label: "Risk & Fraud", description: "Phát hiện rủi ro và gian lận" },
-  { href: "/admin/audit", label: "Audit Log", description: "Nhật ký vận hành hệ thống" },
-  { href: "/admin/notifications", label: "Notifications", description: "Thông báo hệ thống" },
-  { href: "/admin/settings", label: "System Settings", description: "Thiết lập hệ thống" }
+  { href: "/admin", label: "Tổng quan Admin", description: "Toàn cảnh hệ thống", icon: "Gauge" },
+  { href: "/admin/users", label: "Quản lý người dùng", description: "Quản lý tài khoản người dùng", icon: "UsersThree" },
+  { href: "/admin/creators", label: "Quản lý Creator", description: "Quản lý toàn vòng đời Creator", icon: "UsersThree", activePrefixes: ["/admin/creator-requests", "/admin/creator-applications"] },
+  { href: "/admin/brands", label: "Quản lý Brand", description: "Quản lý toàn vòng đời Brand", icon: "Storefront", activePrefixes: ["/admin/brand-requests", "/admin/brand-applications"] },
+  { href: "/admin/campaigns", label: "Quản lý Campaign / Job", description: "Vận hành campaign/job toàn hệ thống", icon: "Megaphone", activePrefixes: ["/admin/campaign-applications"] },
+  { href: "/admin/proofs", label: "Quản lý Mission & Proof", description: "Quản lý workflow nhiệm vụ và proof", icon: "ClipboardText", activePrefixes: ["/admin/mission-reviews", "/admin/mission-history", "/admin/mission-applications", "/admin/mission-video-reviews", "/admin/mission-final-reviews", "/admin/content-review", "/admin/creator-missions"] },
+  { href: "/admin/vouchers", label: "Quản lý Voucher / Reward", description: "Theo dõi và can thiệp voucher/reward", icon: "Gift" },
+  { href: "/admin/finance", label: "Finance & Payout", description: "Tài chính và chi trả", icon: "Bank", activePrefixes: ["/admin/payouts"] },
+  { href: "/admin/n-point-requests", label: "N-Point Transactions", description: "Nạp điểm, refund, đối soát giao dịch điểm", icon: "Coins" },
+  { href: "/admin/risk", label: "Risk & Fraud", description: "Phát hiện rủi ro và gian lận", icon: "ShieldWarning" },
+  { href: "/admin/audit", label: "Audit Log", description: "Nhật ký vận hành hệ thống", icon: "Scroll", activePrefixes: ["/admin/audit-log"] },
+  { href: "/admin/notifications", label: "Notifications", description: "Thông báo hệ thống", icon: "Bell" },
+  { href: "/admin/settings", label: "System Settings", description: "Thiết lập hệ thống", icon: "SlidersHorizontal" }
 ];
 
 const WORKSPACES: readonly WorkspaceConfig[] = [
@@ -138,7 +144,7 @@ export function getWorkspaceConfig(workspace: Workspace): WorkspaceConfig {
 
 export function getNavItemsForWorkspace(workspace: Workspace, roles: RoleCode[]) {
   if (!canAccessWorkspace(workspace, roles)) return [] as NavItem[];
-  return [...getWorkspaceConfig(workspace).navItems];
+  return [...getWorkspaceConfig(workspace).navItems].filter((item) => !item.hidden);
 }
 
 const breadcrumbLabelMap: Record<string, string> = {
