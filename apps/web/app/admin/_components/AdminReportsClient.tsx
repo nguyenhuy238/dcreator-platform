@@ -87,12 +87,12 @@ export function AdminReportsClient({ source = "reports" }: { source?: "reports" 
           </section>
 
           <section className="mt-8">
-            <SectionHeader title="Pending Reviews" subtitle="Theo loại nghiệp vụ." />
+            <SectionHeader title="Risk / Verification Operations" subtitle="Theo loại nghiệp vụ cần giám sát." />
             <div className="grid gap-3 md:grid-cols-3">
-              <StatsCard title="Brand" value={`${data.pendingReviewsByType.brand}`} />
-              <StatsCard title="Creator" value={`${data.pendingReviewsByType.creator}`} />
+              <StatsCard title="Brand cần giám sát" value={`${data.pendingReviewsByType.brand}`} />
+              <StatsCard title="Creator cần giám sát" value={`${data.pendingReviewsByType.creator}`} />
               <StatsCard title="Chiến dịch" value={`${data.pendingReviewsByType.campaign}`} />
-              <StatsCard title="Creator applications" value={`${data.pendingReviewsByType.creatorApplications}`} />
+              <StatsCard title="Creator missions đang chạy" value={`${data.pendingReviewsByType.creatorApplications}`} />
               <StatsCard title="Content" value={`${data.pendingReviewsByType.content}`} />
               <StatsCard title="Product/Inventory" value={`${data.pendingReviewsByType.productInventory}`} />
             </div>
@@ -155,4 +155,3 @@ export function AdminReportsClient({ source = "reports" }: { source?: "reports" 
     </>
   );
 }
-

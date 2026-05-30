@@ -24,6 +24,16 @@ type CreatorApplicationDetail = {
   maxJobsPerMonth: number | null;
   rejectReason: string | null;
   reviewNote: string | null;
+  socialLinks?: Array<{
+    id: string;
+    platform: string;
+    socialUrl: string;
+    followers: number;
+    engagementRate: number | null;
+    isPrimary: boolean;
+    verificationStatus: string;
+    status: string;
+  }>;
   account: {
     id: string;
     email: string;
@@ -48,7 +58,7 @@ export default function AdminCreatorDetailPage() {
   const [toast, setToast] = useState("");
   const [item, setItem] = useState<CreatorApplicationDetail | null>(null);
   const [acting, setActing] = useState(false);
-  const [dialogAction, setDialogAction] = useState<null | "approve" | "reject" | "request-changes">(null);
+  const [dialogAction, setDialogAction] = useState<null | "verify" | "risk" | "restrict">(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -94,7 +104,7 @@ export default function AdminCreatorDetailPage() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Creator Request Detail" subtitle="Kiểm tra hồ sơ trước khi quyết định duyệt." />
+        <PageHeader title="Creator Verification Detail" subtitle="Kiểm tra hồ sơ phục vụ risk/moderation operations." />
         <LoadingSkeleton rows={5} />
       </>
     );
@@ -104,14 +114,22 @@ export default function AdminCreatorDetailPage() {
     return <ErrorState title="Không tải được hồ sơ Creator" description={error || "Lỗi không xác định"} onRetry={() => void load()} />;
   }
 
-  const channels = [
-    { platform: item.mainPlatform, url: item.socialUrl, followers: item.followerCount },
-    ...(item.portfolioUrl ? [{ platform: "PORTFOLIO", url: item.portfolioUrl, followers: null as number | null }] : [])
-  ];
+  const channels = item.socialLinks?.length
+    ? item.socialLinks.map((channel) => ({
+        platform: channel.platform,
+        url: channel.socialUrl,
+        followers: channel.followers,
+        isPrimary: channel.isPrimary,
+        verificationStatus: channel.verificationStatus
+      }))
+    : [
+        { platform: item.mainPlatform, url: item.socialUrl, followers: item.followerCount, isPrimary: false, verificationStatus: "UNVERIFIED" },
+        ...(item.portfolioUrl ? [{ platform: "PORTFOLIO", url: item.portfolioUrl, followers: null as number | null, isPrimary: false, verificationStatus: "UNVERIFIED" }] : [])
+      ].filter((channel) => channel.url);
 
   return (
     <>
-      <PageHeader title={item.displayName} subtitle={`Applicant: ${item.account.displayName} (${item.account.email})`} action={<button className="dc-btn-secondary" onClick={() => router.push("/admin/creators")}>Back</button>} />
+      <PageHeader title={item.displayName} subtitle={`Account: ${item.account.displayName} (${item.account.email})`} action={<button className="dc-btn-secondary" onClick={() => router.push("/admin/creators")}>Back</button>} />
       {error ? <div className="mb-4"><ErrorState title="Có lỗi thao tác" description={error} onRetry={() => void load()} /></div> : null}
       <section className="dc-card p-4">
         <div className="flex items-center justify-between">
@@ -146,6 +164,7 @@ export default function AdminCreatorDetailPage() {
               <p className="font-semibold">{channel.platform}</p>
               <p className="break-all text-zinc-700">{channel.url}</p>
               <p className="text-zinc-500">Followers: {(channel.followers ?? 0).toLocaleString("vi-VN")}</p>
+              <p className="text-zinc-500">{channel.isPrimary ? "Kênh chính" : "Kênh phụ"} • {channel.verificationStatus}</p>
             </div>
           ))}
           {item.account.creatorProfile ? (
@@ -157,59 +176,59 @@ export default function AdminCreatorDetailPage() {
       </section>
 
       <section className="mt-4 dc-card p-4">
-        <p className="font-semibold">Decision</p>
+        <p className="font-semibold">Risk Decision</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button className="dc-btn-primary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("approve")}>
-            Approve
+          <button className="dc-btn-primary" disabled={acting} onClick={() => setDialogAction("verify")}>
+            Xác nhận an toàn cơ bản
           </button>
-          <button className="dc-btn-secondary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("reject")}>
-            Reject
+          <button className="dc-btn-secondary" disabled={acting} onClick={() => setDialogAction("risk")}>
+            Gắn cờ rủi ro
           </button>
-          <button className="dc-btn-secondary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("request-changes")}>
-            Request changes
+          <button className="dc-btn-secondary" disabled={acting} onClick={() => setDialogAction("restrict")}>
+            Yêu cầu bổ sung
           </button>
         </div>
       </section>
 
       {toast ? <ActionToast message={toast} /> : null}
       <ReviewActionDialog
-        open={dialogAction === "approve"}
-        title="Xác nhận duyệt Creator"
-        description="Hồ sơ sẽ được duyệt và chuyển sang approved."
-        confirmLabel="Duyệt"
+        open={dialogAction === "verify"}
+        title="Xác nhận hồ sơ an toàn cơ bản"
+        description="Đánh dấu hồ sơ qua kiểm tra cơ bản. Không phải bước mở quyền onboarding."
+        confirmLabel="Xác nhận"
         submitting={acting}
         onCancel={() => !acting && setDialogAction(null)}
         onConfirm={() => {
           setDialogAction(null);
-          void patch(`/api/admin/creators/${item.id}/approve`, {}, "Creator approved");
+          void patch(`/api/admin/creators/${item.id}/verify`, {}, "Creator verification confirmed");
         }}
       />
       <ReviewActionDialog
-        open={dialogAction === "reject"}
-        title="Từ chối hồ sơ Creator"
-        description="Bắt buộc nhập lý do từ chối."
-        confirmLabel="Từ chối"
+        open={dialogAction === "risk"}
+        title="Gắn cờ rủi ro Creator"
+        description="Bắt buộc nhập lý do rủi ro."
+        confirmLabel="Gắn cờ"
         requireReason
         reasonPlaceholder="Nội dung kênh chưa phù hợp guideline..."
         submitting={acting}
         onCancel={() => !acting && setDialogAction(null)}
         onConfirm={(reason) => {
           setDialogAction(null);
-          void patch(`/api/admin/creators/${item.id}/reject`, { reason }, "Creator rejected");
+          void patch(`/api/admin/creators/${item.id}/risk`, { reason }, "Creator risk flagged");
         }}
       />
       <ReviewActionDialog
-        open={dialogAction === "request-changes"}
-        title="Yêu cầu chỉnh sửa hồ sơ Creator"
-        description="Bắt buộc nhập nội dung cần chỉnh sửa."
-        confirmLabel="Yêu cầu chỉnh sửa"
+        open={dialogAction === "restrict"}
+        title="Yêu cầu bổ sung hồ sơ Creator"
+        description="Bắt buộc nhập nội dung cần bổ sung."
+        confirmLabel="Yêu cầu bổ sung"
         requireReason
         reasonPlaceholder="Bổ sung hồ sơ social/profile..."
         submitting={acting}
         onCancel={() => !acting && setDialogAction(null)}
         onConfirm={(reason) => {
           setDialogAction(null);
-          void patch(`/api/admin/creators/${item.id}/request-changes`, { reason }, "Requested changes");
+          void patch(`/api/admin/creators/${item.id}/restrict`, { reason }, "Creator restrictions requested");
         }}
       />
     </>

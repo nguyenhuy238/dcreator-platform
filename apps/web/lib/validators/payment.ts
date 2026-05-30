@@ -7,6 +7,7 @@ export const payosCreatePaymentSchema = z.object({
   idempotencyKey: z.string().min(8).max(120),
   campaignId: z.string().cuid().optional(),
   rewardId: z.string().cuid().optional(),
+  currentBrandId: z.string().cuid().optional(),
   note: z.string().trim().max(300).optional()
 });
 

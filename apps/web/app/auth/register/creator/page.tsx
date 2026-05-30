@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { FormField } from "@/app/components/dcreator/ui/base";
 
@@ -12,6 +13,7 @@ type UploadResponse = {
 };
 
 export default function CreatorRegisterPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -41,6 +43,21 @@ export default function CreatorRegisterPage() {
     return payload.data as UploadResponse;
   }
 
+  function hasKycFiles(formData: FormData) {
+    const files = ["idCardFrontImage", "idCardBackImage", "portraitImage"].map((name) => formData.get(name));
+    return files.every((file) => file instanceof File && file.size > 0);
+  }
+
+  function deriveHandle(url: string, fallback: string) {
+    try {
+      const parsed = new URL(url);
+      const last = parsed.pathname.split("/").filter(Boolean).pop();
+      return (last || fallback).replace(/^@/, "").slice(0, 80);
+    } catch {
+      return fallback;
+    }
+  }
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
@@ -58,7 +75,6 @@ export default function CreatorRegisterPage() {
     const followerCount = String(formData.get("followerCount") ?? "").trim();
     const preferredCategory = String(formData.get("preferredCategory") ?? "").trim();
     const creatorNote = String(formData.get("creatorNote") ?? "").trim();
-    const kycConfirmed = formData.get("kycConfirmed") === "on";
 
     if (password !== confirmPassword) {
       setLoading(false);
@@ -66,21 +82,7 @@ export default function CreatorRegisterPage() {
       return;
     }
 
-    if (!kycConfirmed) {
-      setLoading(false);
-      setError("Bạn cần xác nhận KYC trước khi gửi.");
-      return;
-    }
-
-    if (
-      !(formData.get("idCardFrontImage") instanceof File) ||
-      !(formData.get("idCardBackImage") instanceof File) ||
-      !(formData.get("portraitImage") instanceof File)
-    ) {
-      setLoading(false);
-      setError("Vui lòng tải lên ảnh CCCD mặt trước, mặt sau và ảnh chân dung.");
-      return;
-    }
+    const shouldUploadKyc = hasKycFiles(formData);
 
     try {
       const registerResponse = await fetch("/api/auth/register", {
@@ -93,54 +95,62 @@ export default function CreatorRegisterPage() {
         throw new Error(registerPayload.error ?? "Không thể tạo tài khoản.");
       }
 
-      setUploading(true);
-      const uploaded = await uploadKycImages(formData);
-      setIdCardFrontImageUrl(uploaded.idCardFrontImageUrl);
-      setIdCardBackImageUrl(uploaded.idCardBackImageUrl);
-      setPortraitImageUrl(uploaded.portraitImageUrl);
+      setUploading(shouldUploadKyc);
+      const uploaded = shouldUploadKyc
+        ? await uploadKycImages(formData)
+        : { idCardFrontImageUrl: "", idCardBackImageUrl: "", portraitImageUrl: "" };
+      if (shouldUploadKyc) {
+        setIdCardFrontImageUrl(uploaded.idCardFrontImageUrl);
+        setIdCardBackImageUrl(uploaded.idCardBackImageUrl);
+        setPortraitImageUrl(uploaded.portraitImageUrl);
+      }
 
-      const creatorBio = [
-        `TikTok: ${tiktokUrl || "N/A"}`,
-        `Instagram: ${instagramUrl || "N/A"}`,
-        `Facebook: ${facebookUrl || "N/A"}`,
-        `Ghi chú: ${creatorNote || "Không có"}`
-      ].join(" | ");
-
-      const creatorApplicationResponse = await fetch("/api/profile/creator-application", {
+      const creatorProfileResponse = await fetch("/api/creator/create", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           displayName,
-          avatarUrl: "",
-          bio: creatorBio,
-          mainPlatform: "TIKTOK",
-          socialUrl: tiktokUrl,
-          handle: "",
-          followerCount: Number(followerCount),
-          contentCategory: preferredCategory,
-          portfolioUrl: instagramUrl,
-          location: "",
-          expectedRate: 0,
-          maxJobsPerMonth: 0,
-          realName: "",
-          phone: "",
-          identityNumber: "",
-          identityFrontUrl: uploaded.idCardFrontImageUrl,
-          identityBackUrl: uploaded.idCardBackImageUrl,
-          selfieUrl: uploaded.portraitImageUrl,
-          bankAccountName: "",
-          bankAccountNumber: "",
-          bankName: "",
-          taxCode: ""
+          bio: [
+            creatorNote,
+            preferredCategory ? `Ngành hàng: ${preferredCategory}` : "",
+            uploaded.idCardFrontImageUrl ? `KYC mặt trước: ${uploaded.idCardFrontImageUrl}` : "",
+            uploaded.idCardBackImageUrl ? `KYC mặt sau: ${uploaded.idCardBackImageUrl}` : "",
+            uploaded.portraitImageUrl ? `KYC chân dung: ${uploaded.portraitImageUrl}` : ""
+          ].filter(Boolean).join(" | ")
         })
       });
-      const creatorApplicationPayload = await creatorApplicationResponse.json();
-      if (!creatorApplicationResponse.ok || !creatorApplicationPayload.success) {
-        throw new Error(creatorApplicationPayload.error ?? "Không thể gửi hồ sơ Creator.");
+      const creatorProfilePayload = await creatorProfileResponse.json();
+      if (!creatorProfileResponse.ok || !creatorProfilePayload.success) {
+        throw new Error(creatorProfilePayload.error ?? "Không thể tạo Creator Profile.");
       }
 
-      setSuccess("Đã tạo tài khoản Creator. Hồ sơ đang chờ duyệt.");
+      const channelInputs = [
+        { platform: "TikTok", url: tiktokUrl, handle: deriveHandle(tiktokUrl, "tiktok") },
+        { platform: "Instagram", url: instagramUrl, handle: deriveHandle(instagramUrl, "instagram") },
+        { platform: "Facebook", url: facebookUrl, handle: deriveHandle(facebookUrl, "facebook") }
+      ].filter((item) => item.url);
+
+      for (const channel of channelInputs) {
+        const channelResponse = await fetch("/api/creator/dashboard/channels", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            platform: channel.platform,
+            handle: channel.handle,
+            url: channel.url,
+            followerCount: Number(followerCount) || 0
+          })
+        });
+        const channelPayload = await channelResponse.json();
+        if (!channelResponse.ok || !channelPayload.success) {
+          throw new Error(channelPayload.error ?? `Không thể thêm kênh ${channel.platform}.`);
+        }
+      }
+
+      setSuccess("Hồ sơ Creator đã được tạo. Bạn có thể bắt đầu thiết lập dashboard ngay.");
       event.currentTarget.reset();
+      router.push("/dashboard/creator?created=1");
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra. Vui lòng thử lại.");
     } finally {
@@ -157,7 +167,7 @@ export default function CreatorRegisterPage() {
           <p className="text-xs font-bold uppercase tracking-[0.15em] text-zinc-500">Creator Registration</p>
           <h1 className="mt-3 text-4xl font-black tracking-tight">Đăng ký Creator</h1>
           <p className="mt-3 text-zinc-600">
-            Tạo tài khoản bằng email và mật khẩu, sau đó gửi hồ sơ để được duyệt Creator.
+            Tạo tài khoản bằng email và mật khẩu, sau đó hoàn tất hồ sơ để sử dụng Creator Dashboard ngay.
           </p>
         </section>
 
@@ -189,7 +199,7 @@ export default function CreatorRegisterPage() {
             <FormField
               label={
                 <span className="flex items-center gap-2">
-                  Ảnh CCCD mặt trước <span className="text-red-500">*</span>
+                  Ảnh CCCD mặt trước <span className="text-xs text-zinc-500">(bổ sung sau nếu cần payout)</span>
                 </span>
               }
             >
@@ -202,13 +212,13 @@ export default function CreatorRegisterPage() {
                     <path d="M5 19h14" />
                   </svg>
                 </span>
-                <input name="idCardFrontImage" type="file" accept="image/*" className="hidden" required />
+                <input name="idCardFrontImage" type="file" accept="image/*" className="hidden" />
               </label>
             </FormField>
             <FormField
               label={
                 <span className="flex items-center gap-2">
-                  Ảnh CCCD mặt sau <span className="text-red-500">*</span>
+                  Ảnh CCCD mặt sau <span className="text-xs text-zinc-500">(tùy chọn)</span>
                 </span>
               }
             >
@@ -221,13 +231,13 @@ export default function CreatorRegisterPage() {
                     <path d="M5 19h14" />
                   </svg>
                 </span>
-                <input name="idCardBackImage" type="file" accept="image/*" className="hidden" required />
+                <input name="idCardBackImage" type="file" accept="image/*" className="hidden" />
               </label>
             </FormField>
             <FormField
               label={
                 <span className="flex items-center gap-2">
-                  Ảnh chân dung <span className="text-red-500">*</span>
+                  Ảnh chân dung <span className="text-xs text-zinc-500">(tùy chọn)</span>
                 </span>
               }
             >
@@ -240,7 +250,7 @@ export default function CreatorRegisterPage() {
                     <path d="M5 19h14" />
                   </svg>
                 </span>
-                <input name="portraitImage" type="file" accept="image/*" className="hidden" required />
+                <input name="portraitImage" type="file" accept="image/*" className="hidden" />
               </label>
             </FormField>
             {idCardFrontImageUrl ? <p className="text-xs text-zinc-500 md:col-span-2">CCCD mặt trước: {idCardFrontImageUrl}</p> : null}
@@ -276,8 +286,8 @@ export default function CreatorRegisterPage() {
             </div>
 
             <label className="flex items-start gap-2 text-sm text-zinc-700 md:col-span-2">
-              <input name="kycConfirmed" type="checkbox" className="mt-1" required />
-              <span>Tôi cam kết thông tin trên là đúng và đồng ý KYC khi được yêu cầu.</span>
+              <input name="kycConfirmed" type="checkbox" className="mt-1" />
+              <span>Tôi cam kết thông tin trên là đúng. Xác minh danh tính giúp mở khóa payout.</span>
             </label>
           </div>
 
@@ -285,7 +295,7 @@ export default function CreatorRegisterPage() {
           {error ? <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
 
           <button className="dc-btn-primary w-full" disabled={loading || uploading}>
-            {loading || uploading ? "Đang gửi..." : "Gửi đăng ký"}
+            {loading || uploading ? "Đang tạo..." : "Tạo Creator Profile"}
           </button>
 
           <p className="text-sm text-zinc-600">

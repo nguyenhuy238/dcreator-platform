@@ -29,7 +29,6 @@ import {
   UsersThree
 } from "@phosphor-icons/react";
 import { getBreadcrumbsForPath, getWorkspaceForPath } from "@/lib/navigation";
-import { ROLE } from "@/lib/auth/role-constants";
 
 export type DashboardNavItem = {
   href: string;
@@ -119,11 +118,11 @@ export function DashboardShell({
   const activeTitle = navItems.find((item) => item.href === activeHref)?.label ?? workspaceTitle;
   const userInitials = initials(user.displayName || user.email || "U");
   const profileHref = useMemo(() => {
-    if (user.roles.includes("ADMIN")) return "/admin";
-    if (user.roles.includes(ROLE.BRAND_OWNER) || user.roles.includes(ROLE.BRAND_STAFF)) return "/dashboard/brand";
-    if (user.roles.includes("CREATOR")) return "/dashboard/creator";
+    if (workspace === "admin") return "/admin";
+    if (workspace === "brand") return "/dashboard/brand";
+    if (workspace === "creator") return "/dashboard/creator";
     return "/dashboard/user/profile";
-  }, [user.roles]);
+  }, [workspace]);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("dc:desktop-nav-open");
@@ -150,7 +149,7 @@ export function DashboardShell({
             <div className="border-b border-zinc-200 px-5 py-4">
               <div className="flex items-center gap-3">
                 <Link href="/" className="inline-flex items-center" aria-label="Về trang chủ dCreator">
-                  <Image src="/uploads/dCreator-logo-new.png" alt="dCreator logo" width={120} height={32} className="h-8 w-auto" priority />
+                  <Image src="/uploads/dCreator-logo-new.png" alt="dCreator logo" width={120} height={32} className="h-8 w-auto" style={{ width: "auto" }} priority />
                 </Link>
                 <div>
                   <p className="text-sm font-black text-zinc-900">{workspaceTitle}</p>
@@ -269,7 +268,7 @@ export function DashboardShell({
             <div className="mb-3 flex items-center justify-between border-b border-zinc-200 pb-3">
               <div className="flex items-center gap-3">
                 <Link href="/" className="inline-flex items-center" aria-label="Về trang chủ dCreator" onClick={() => setMobileOpen(false)}>
-                  <Image src="/uploads/dCreator-logo-new.png" alt="dCreator logo" width={120} height={32} className="h-8 w-auto" />
+                  <Image src="/uploads/dCreator-logo-new.png" alt="dCreator logo" width={120} height={32} className="h-8 w-auto" style={{ width: "auto" }} />
                 </Link>
                 <p className="font-black text-zinc-900">{workspaceTitle}</p>
               </div>

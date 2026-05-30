@@ -3,11 +3,12 @@
 import { useMemo } from "react";
 import { usePathname } from "next/navigation";
 import type { Role } from "@prisma/client";
+import type { UserCapabilities } from "@/lib/auth/capabilities";
 import { getAvailableWorkspaces, getWorkspaceForPath } from "@/lib/navigation";
 
-export function DashboardSwitcher({ roles }: { roles: Role[] }) {
+export function DashboardSwitcher({ roles, capabilities }: { roles: Role[]; capabilities: UserCapabilities }) {
   const pathname = usePathname();
-  const workspaces = getAvailableWorkspaces(roles);
+  const workspaces = getAvailableWorkspaces({ roles, capabilities });
   const currentWorkspace = useMemo(() => getWorkspaceForPath(pathname), [pathname]);
   const current = workspaces.find((workspace) => workspace.id === currentWorkspace) ?? workspaces[0];
   if (workspaces.length <= 1 || !current) return null;

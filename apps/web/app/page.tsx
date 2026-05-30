@@ -4,6 +4,7 @@ import { FeaturedCampaignsSection } from "@/app/components/dcreator/home/Feature
 import { PartnerLogo } from "@/app/components/dcreator/home/PartnerLogo";
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { getCurrentUserFromServer } from "@/lib/auth/current-user";
+import { deriveCapabilities } from "@/lib/auth/capabilities";
 import { listCampaigns } from "@/lib/services/campaign.service";
 
 const faqs = [
@@ -39,8 +40,15 @@ export default async function HomePage() {
   ]);
   const roles = currentUser?.roles ?? [];
   const isLoggedIn = Boolean(currentUser);
-  const hasCreatorRole = roles.includes("CREATOR");
-  const hasBrandRole = roles.includes("BRAND_OWNER") || roles.includes("BRAND_STAFF");
+  const capabilities = currentUser
+    ? deriveCapabilities({
+        roles,
+        creatorProfile: currentUser.creatorProfile,
+        brandMemberships: currentUser.brandMemberships
+      })
+    : null;
+  const hasCreatorRole = Boolean(capabilities?.creator);
+  const hasBrandRole = Boolean(capabilities?.brand);
   const canUpgradeRole = isLoggedIn && (!hasCreatorRole || !hasBrandRole);
 
   const activeCampaignCount = campaignStatsSource.pagination.total;
@@ -352,7 +360,6 @@ export default async function HomePage() {
       <PublicFooter />`r`n</>
   );
 }
-
 
 
 

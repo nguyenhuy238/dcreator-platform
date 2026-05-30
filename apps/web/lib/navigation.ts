@@ -1,5 +1,10 @@
 export type Workspace = "user" | "creator" | "brand" | "admin";
 export type RoleCode = "USER" | "CREATOR" | "BRAND_OWNER" | "BRAND_STAFF" | "ADMIN" | "OPS";
+export type CapabilityCode = "user" | "creator" | "brand" | "admin";
+export type WorkspaceAccessSubject = {
+  roles: RoleCode[];
+  capabilities: Record<CapabilityCode, boolean>;
+};
 
 export type NavItem = {
   href: string;
@@ -18,7 +23,7 @@ type WorkspaceConfig = {
   description: string;
   defaultHref: string;
   routePrefixes: readonly string[];
-  allowedRoles: readonly RoleCode[];
+  requiredCapability: CapabilityCode;
   navItems: readonly NavItem[];
 };
 
@@ -80,7 +85,7 @@ const WORKSPACES: readonly WorkspaceConfig[] = [
     description: "Qu\u1ea3n l\u00fd h\u1ed3 s\u01a1 c\u00e1 nh\u00e2n, v\u00ed, voucher v\u00e0 nhi\u1ec7m v\u1ee5 c\u1ee7a b\u1ea1n",
     defaultHref: "/dashboard/user",
     routePrefixes: ["/dashboard/user"],
-    allowedRoles: ["USER", "CREATOR", "BRAND_OWNER", "BRAND_STAFF", "ADMIN", "OPS"],
+    requiredCapability: "user",
     navItems: userNavItems
   },
   {
@@ -90,7 +95,7 @@ const WORKSPACES: readonly WorkspaceConfig[] = [
     description: "Qu\u1ea3n l\u00fd job, nhi\u1ec7m v\u1ee5 v\u00e0 hoa h\u1ed3ng",
     defaultHref: "/dashboard/creator",
     routePrefixes: ["/dashboard/creator"],
-    allowedRoles: ["CREATOR"],
+    requiredCapability: "creator",
     navItems: creatorNavItems
   },
   {
@@ -100,7 +105,7 @@ const WORKSPACES: readonly WorkspaceConfig[] = [
     description: "Qu\u1ea3n l\u00fd onboarding, campaign, creator v\u00e0 qu\u1ef9 Brand",
     defaultHref: "/dashboard/brand",
     routePrefixes: ["/dashboard/brand", "/brand"],
-    allowedRoles: ["BRAND_OWNER", "BRAND_STAFF"],
+    requiredCapability: "brand",
     navItems: brandNavItems
   },
   {
@@ -110,7 +115,7 @@ const WORKSPACES: readonly WorkspaceConfig[] = [
     description: "Vận hành, quản lý và quản trị hệ thống",
     defaultHref: "/admin",
     routePrefixes: ["/admin", "/dashboard/admin", "/ops"],
-    allowedRoles: ["ADMIN", "OPS"],
+    requiredCapability: "admin",
     navItems: adminNavItems
   }
 ] as const;
@@ -124,14 +129,31 @@ export function getWorkspaceForPath(pathname: string): Workspace {
   return "user";
 }
 
-export function canAccessWorkspace(workspace: Workspace, roles: RoleCode[]): boolean {
-  const config = WORKSPACES.find((item) => item.id === workspace);
-  if (!config) return false;
-  return roles.some((role) => config.allowedRoles.includes(role));
+function toAccessSubject(input: WorkspaceAccessSubject | RoleCode[]): WorkspaceAccessSubject {
+  if (Array.isArray(input)) {
+    const roles = input;
+    return {
+      roles,
+      capabilities: {
+        user: true,
+        creator: roles.includes("CREATOR"),
+        brand: roles.includes("BRAND_OWNER") || roles.includes("BRAND_STAFF"),
+        admin: roles.includes("ADMIN") || roles.includes("OPS")
+      }
+    };
+  }
+  return input;
 }
 
-export function getAvailableWorkspaces(roles: RoleCode[]) {
-  return WORKSPACES.filter((workspace) => canAccessWorkspace(workspace.id, roles)).map((workspace) => ({
+export function canAccessWorkspace(workspace: Workspace, subjectOrRoles: WorkspaceAccessSubject | RoleCode[]): boolean {
+  const config = WORKSPACES.find((item) => item.id === workspace);
+  if (!config) return false;
+  const subject = toAccessSubject(subjectOrRoles);
+  return Boolean(subject.capabilities[config.requiredCapability]);
+}
+
+export function getAvailableWorkspaces(subjectOrRoles: WorkspaceAccessSubject | RoleCode[]) {
+  return WORKSPACES.filter((workspace) => canAccessWorkspace(workspace.id, subjectOrRoles)).map((workspace) => ({
     id: workspace.id,
     label: workspace.label,
     href: workspace.defaultHref
@@ -142,8 +164,8 @@ export function getWorkspaceConfig(workspace: Workspace): WorkspaceConfig {
   return WORKSPACES.find((item) => item.id === workspace) ?? WORKSPACES[0]!;
 }
 
-export function getNavItemsForWorkspace(workspace: Workspace, roles: RoleCode[]) {
-  if (!canAccessWorkspace(workspace, roles)) return [] as NavItem[];
+export function getNavItemsForWorkspace(workspace: Workspace, subjectOrRoles: WorkspaceAccessSubject | RoleCode[]) {
+  if (!canAccessWorkspace(workspace, subjectOrRoles)) return [] as NavItem[];
   return [...getWorkspaceConfig(workspace).navItems].filter((item) => !item.hidden);
 }
 

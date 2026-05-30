@@ -5,7 +5,7 @@ const applicationStatus = {
   REJECTED: "REJECTED",
   NEEDS_REVISION: "NEEDS_REVISION"
 } as const;
-const socialPlatforms = ["TIKTOK", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "OTHER"] as const;
+const socialPlatforms = ["TIKTOK", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "SHOPEE", "OTHER"] as const;
 
 const optionalUrl = z.url().trim().max(400).optional().or(z.literal(""));
 

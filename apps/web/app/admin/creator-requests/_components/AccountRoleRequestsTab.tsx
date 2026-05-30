@@ -43,7 +43,6 @@ export function AccountRoleRequestsTab() {
     setError("");
     try {
       const params = new URLSearchParams();
-      params.set("status", "PENDING_REVIEW");
       params.set("sort", sort);
       if (query.trim()) params.set("query", query.trim());
 
@@ -64,14 +63,15 @@ export function AccountRoleRequestsTab() {
 
   const stats = useMemo(() => {
     const total = items.length;
-    return { total, pending: total };
+    const pending = items.filter((item) => item.status === "PENDING_REVIEW").length;
+    return { total, pending };
   }, [items]);
 
   async function approveRequest(requestId: string) {
     setActingId(requestId);
     setError("");
     try {
-      const res = await fetch(`/api/admin/creators/${requestId}/approve`, { method: "PATCH" });
+      const res = await fetch(`/api/admin/creators/${requestId}/verify`, { method: "PATCH" });
       const body = (await res.json()) as ApiResult<unknown>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Duyệt yêu cầu thất bại");
       setToast("Đã duyệt tài khoản Creator thành công");
@@ -88,7 +88,7 @@ export function AccountRoleRequestsTab() {
     setActingId(requestId);
     setError("");
     try {
-      const res = await fetch(`/api/admin/creators/${requestId}/reject`, {
+      const res = await fetch(`/api/admin/creators/${requestId}/risk`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason })
@@ -108,8 +108,8 @@ export function AccountRoleRequestsTab() {
   return (
     <section>
       <PageHeader
-        title="Quản lý yêu cầu tài khoản Creator"
-        subtitle="Quản lý các hồ sơ Creator từ bảng CreatorApplication. Khi duyệt sẽ nâng quyền Account và tạo CreatorProfile/CreatorSocialLink."
+        title="Creator Verification & Risk Ops"
+        subtitle="Rà soát hồ sơ Creator cho mục tiêu xác minh/rủi ro. Onboarding cơ bản đã active ngay, không phụ thuộc bước duyệt này."
         action={
           <button className="dc-btn-secondary" type="button" onClick={() => void load()}>
             Làm mới
@@ -119,7 +119,7 @@ export function AccountRoleRequestsTab() {
 
       <section className="grid gap-3 sm:grid-cols-2">
         <StatsCard title="Tổng yêu cầu" value={String(stats.total)} />
-        <StatsCard title="Đang chờ duyệt" value={String(stats.pending)} />
+        <StatsCard title="Chờ kiểm tra" value={String(stats.pending)} />
       </section>
 
       <section className="dc-card mt-4 p-4">
@@ -141,7 +141,7 @@ export function AccountRoleRequestsTab() {
       {error ? <div className="mt-4"><ErrorState title="Không tải được yêu cầu tài khoản" description={error} onRetry={() => void load()} /></div> : null}
       {!loading && !error && items.length === 0 ? (
         <div className="mt-4">
-          <EmptyState title="Không có yêu cầu" description="Không có hồ sơ Creator đang chờ duyệt." />
+          <EmptyState title="Không có hồ sơ cần xử lý" description="Không có hồ sơ Creator phù hợp bộ lọc hiện tại." />
         </div>
       ) : null}
 
@@ -185,7 +185,7 @@ export function AccountRoleRequestsTab() {
                           disabled={actingId === item.id}
                           onClick={() => { setTargetId(item.id); setDialogAction("approve"); }}
                         >
-                          {actingId === item.id ? "Đang xử lý..." : "Đồng ý"}
+                          {actingId === item.id ? "Đang xử lý..." : "Xác nhận an toàn cơ bản"}
                         </button>
                         <button
                           className="dc-btn-secondary"
@@ -193,7 +193,7 @@ export function AccountRoleRequestsTab() {
                           disabled={actingId === item.id}
                           onClick={() => { setTargetId(item.id); setDialogAction("reject"); }}
                         >
-                          {actingId === item.id ? "Đang xử lý..." : "Từ chối"}
+                          {actingId === item.id ? "Đang xử lý..." : "Gắn cờ rủi ro"}
                         </button>
                       </div>
                     </td>
@@ -224,7 +224,7 @@ export function AccountRoleRequestsTab() {
                     disabled={actingId === item.id}
                     onClick={() => { setTargetId(item.id); setDialogAction("approve"); }}
                   >
-                    {actingId === item.id ? "Đang xử lý..." : "Đồng ý"}
+                    {actingId === item.id ? "Đang xử lý..." : "Xác nhận an toàn cơ bản"}
                   </button>
                   <button
                     className="dc-btn-secondary"
@@ -232,7 +232,7 @@ export function AccountRoleRequestsTab() {
                     disabled={actingId === item.id}
                     onClick={() => { setTargetId(item.id); setDialogAction("reject"); }}
                   >
-                    {actingId === item.id ? "Đang xử lý..." : "Từ chối"}
+                    {actingId === item.id ? "Đang xử lý..." : "Gắn cờ rủi ro"}
                   </button>
                 </div>
               </article>
@@ -244,9 +244,9 @@ export function AccountRoleRequestsTab() {
       {toast ? <ActionToast message={toast} /> : null}
       <ReviewActionDialog
         open={dialogAction === "approve"}
-        title="Duyệt tài khoản Creator"
-        description="Yêu cầu sẽ chuyển sang approved và cập nhật role Creator."
-        confirmLabel="Duyệt"
+        title="Xác nhận hồ sơ an toàn cơ bản"
+        description="Đánh dấu hồ sơ qua kiểm tra cơ bản; không phải bước mở quyền onboarding."
+        confirmLabel="Xác nhận"
         submitting={actingId === targetId}
         onCancel={() => setDialogAction(null)}
         onConfirm={() => {
@@ -256,9 +256,9 @@ export function AccountRoleRequestsTab() {
       />
       <ReviewActionDialog
         open={dialogAction === "reject"}
-        title="Từ chối tài khoản Creator"
-        description="Bắt buộc nhập lý do từ chối."
-        confirmLabel="Từ chối"
+        title="Gắn cờ rủi ro Creator"
+        description="Bắt buộc nhập lý do rủi ro để phục vụ moderation và audit."
+        confirmLabel="Gắn cờ"
         requireReason
         submitting={actingId === targetId}
         onCancel={() => setDialogAction(null)}
