@@ -1,4 +1,4 @@
-import { ApplicationStatus, CampaignStatus, MissionAudience, MissionLifecycleStatus, Role } from "@prisma/client";
+import { ApplicationStatus, CampaignStatus, MissionAudience, MissionLifecycleStatus, ProductReceiveOption, Role } from "@prisma/client";
 import { appendCreatorCampaignApplicationTag } from "@/lib/constants/campaign-application";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
@@ -128,6 +128,34 @@ function toStateFromApplicationStatus(status: ApplicationStatus): CreatorCampaig
   return "CAN_APPLY";
 }
 
+function toInitialMissionState(option: ProductReceiveOption) {
+  if (option === "NO_PRODUCT_REQUIRED") {
+    return {
+      status: "IN_PROGRESS" as const,
+      productStatus: "NOT_REQUIRED" as const,
+      depositStatus: "NOT_REQUIRED" as const,
+      reimbursementStatus: "NOT_REQUIRED" as const,
+      startedAt: new Date()
+    };
+  }
+  if (option === "CREATOR_BUY_FIRST") {
+    return {
+      status: "PRODUCT_PENDING" as const,
+      productStatus: "WAITING_PURCHASE" as const,
+      depositStatus: "NOT_REQUIRED" as const,
+      reimbursementStatus: "PENDING" as const,
+      startedAt: null
+    };
+  }
+  return {
+    status: "PRODUCT_PENDING" as const,
+    productStatus: "WAITING_DEPOSIT" as const,
+    depositStatus: "PENDING" as const,
+    reimbursementStatus: "NOT_REQUIRED" as const,
+    startedAt: null
+  };
+}
+
 async function getCampaignAndCreatorMission(slug: string) {
   const campaign = await prisma.campaign.findUnique({
     where: { slug },
@@ -143,7 +171,7 @@ async function getCampaignAndCreatorMission(slug: string) {
           audience: { in: [MissionAudience.CREATOR, MissionAudience.USER] }
         },
         orderBy: { createdAt: "asc" },
-        select: { id: true, audience: true }
+        select: { id: true, audience: true, productReceiveOption: true }
       }
     }
   });
@@ -181,19 +209,19 @@ export async function getCreatorCampaignApplicationStatus(
   });
   if (!creatorProfile || !creatorProfile.mainPlatform) return toSnapshot("PROFILE_REQUIRED");
 
-  const existing = await prisma.missionApplication.findFirst({
+  const existing = await prisma.creatorMission.findFirst({
     where: { accountId: viewer.id, campaignId: campaign.id },
-    orderBy: { createdAt: "desc" },
-    select: { id: true, missionId: true, status: true, rejectReason: true }
+    orderBy: { appliedAt: "desc" },
+    select: { id: true, missionId: true, applicationStatus: true, applicationRejectReason: true }
   });
 
   if (existing) {
-    const state = toStateFromApplicationStatus(existing.status);
+    const state = toStateFromApplicationStatus(existing.applicationStatus);
     return toSnapshot(state, {
       submissionId: existing.id,
       missionId: existing.missionId,
       lifecycleStatus: state === "ASSIGNED" ? "DOING" : state === "REJECTED" ? "REJECTED" : "ACCEPTED",
-      rejectReason: existing.rejectReason
+      rejectReason: existing.applicationRejectReason
     });
   }
 
@@ -233,28 +261,29 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
     );
   }
 
-  const existing = await prisma.missionApplication.findUnique({
+  const existing = await prisma.creatorMission.findUnique({
     where: {
       missionId_accountId: {
         missionId: firstMission.id,
         accountId
       }
     },
-    select: { id: true, status: true }
+    select: { id: true, applicationStatus: true }
   });
   if (existing) {
-    if (existing.status !== "REJECTED") {
+    if (existing.applicationStatus !== "REJECTED") {
       throw new AppError("Creator has already applied to this campaign", 409, "CREATOR_CAMPAIGN_ALREADY_APPLIED");
     }
 
-    const reapplied = await prisma.missionApplication.update({
+    const reapplied = await prisma.creatorMission.update({
       where: { id: existing.id },
       data: {
-        status: "PENDING_REVIEW",
-        rejectReason: null,
-        reviewedById: null,
-        reviewedAt: null,
-        note: appendCreatorCampaignApplicationTag(null, slug)
+        applicationStatus: "PENDING_REVIEW",
+        applicationRejectReason: null,
+        applicationReviewedById: null,
+        applicationReviewedAt: null,
+        applicationNote: appendCreatorCampaignApplicationTag(null, slug),
+        appliedAt: new Date()
       }
     });
 
@@ -262,7 +291,7 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
       data: {
         actorId: accountId,
         action: "CREATOR_CAMPAIGN_APPLICATION_RESUBMITTED",
-        targetType: "MissionApplication",
+        targetType: "CreatorMission",
         targetId: reapplied.id,
         metadata: {
           campaignId: campaign.id,
@@ -283,24 +312,34 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
     };
   }
 
-  const application = await prisma.missionApplication.create({
+  const initial = toInitialMissionState(firstMission.productReceiveOption);
+  const application = await prisma.creatorMission.create({
     data: {
       missionId: firstMission.id,
       campaignId: campaign.id,
       accountId,
-      status: "PENDING_REVIEW",
-      note: appendCreatorCampaignApplicationTag(null, slug)
+      status: initial.status,
+      productReceiveOption: firstMission.productReceiveOption,
+      productStatus: initial.productStatus,
+      depositStatus: initial.depositStatus,
+      reimbursementStatus: initial.reimbursementStatus,
+      startedAt: initial.startedAt,
+      applicationStatus: "PENDING_REVIEW",
+      applicationNote: appendCreatorCampaignApplicationTag(null, slug),
+      appliedAt: new Date(),
+      submissionStatus: "OPEN",
+      submissionLifecycleStatus: "ACCEPTED"
     }
   });
 
   await prisma.auditLog.create({
-    data: {
-      actorId: accountId,
-      action: "CREATOR_CAMPAIGN_APPLICATION_SUBMITTED",
-      targetType: "MissionApplication",
-      targetId: application.id,
-      metadata: {
-        campaignId: campaign.id,
+      data: {
+        actorId: accountId,
+        action: "CREATOR_CAMPAIGN_APPLICATION_SUBMITTED",
+        targetType: "CreatorMission",
+        targetId: application.id,
+        metadata: {
+          campaignId: campaign.id,
         missionId: firstMission.id,
         creatorProfile: {
           mainPlatform: creatorProfile.mainPlatform,

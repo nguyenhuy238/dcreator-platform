@@ -38,36 +38,6 @@ const creatorMissionInclude = {
       email: true,
       creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true } }
     }
-  },
-  submission: {
-    select: {
-      id: true,
-      createdAt: true,
-      updatedAt: true,
-      lifecycleStatus: true,
-      status: true,
-      videoUrl: true,
-      socialPostUrl: true,
-      screenshotUrl: true,
-      fileUploadUrl: true,
-      proofTextNote: true,
-      note: true,
-      rejectReason: true,
-      purchaseBillImageUrl: true,
-      productReviewScreenshotUrl: true,
-      purchaseProofNote: true,
-      purchaseConfirmedAt: true,
-      publicVideoUrl: true,
-      adCode: true,
-      finalProofNote: true,
-      finalSubmittedAt: true,
-      reviewedAt: true,
-      approvedAt: true,
-      rewardGrantedAt: true
-    }
-  },
-  missionApplication: {
-    select: { id: true, status: true, note: true, rejectReason: true, reviewedAt: true, createdAt: true }
   }
 } satisfies Prisma.CreatorMissionInclude;
 
@@ -165,6 +135,41 @@ function toCreatorMissionState(option: ProductReceiveOption) {
 }
 
 function mapMission(item: CreatorMissionEntity) {
+  const submission = {
+    id: item.id,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+    lifecycleStatus: item.submissionLifecycleStatus,
+    status: item.submissionStatus,
+    videoUrl: item.submissionVideoUrl,
+    socialPostUrl: item.submissionSocialPostUrl,
+    screenshotUrl: item.submissionScreenshotUrl,
+    fileUploadUrl: item.submissionFileUploadUrl,
+    proofTextNote: item.submissionProofTextNote,
+    note: item.submissionNote,
+    rejectReason: item.submissionRejectReason,
+    purchaseBillImageUrl: item.submissionPurchaseBillImageUrl,
+    productReviewScreenshotUrl: item.submissionProductReviewScreenshotUrl,
+    purchaseProofNote: item.submissionPurchaseProofNote,
+    purchaseConfirmedAt: item.submissionPurchaseConfirmedAt,
+    publicVideoUrl: item.submissionPublicVideoUrl,
+    adCode: item.submissionAdCode,
+    finalProofNote: item.submissionFinalProofNote,
+    finalSubmittedAt: item.submissionFinalSubmittedAt,
+    reviewedAt: item.submissionReviewedAt,
+    approvedAt: item.submissionApprovedAt,
+    rewardGrantedAt: item.submissionRewardGrantedAt
+  };
+
+  const missionApplication = {
+    id: item.id,
+    status: item.applicationStatus,
+    note: item.applicationNote,
+    rejectReason: item.applicationRejectReason,
+    reviewedAt: item.applicationReviewedAt,
+    createdAt: item.appliedAt
+  };
+
   return {
     id: item.id,
     missionId: item.missionId,
@@ -203,19 +208,21 @@ function mapMission(item: CreatorMissionEntity) {
     mission: { ...item.mission, deadlineAt: dt(item.mission.deadlineAt) },
     campaign: item.campaign,
     account: item.account,
-    submission: item.submission
-      ? {
-          ...item.submission,
-          purchaseConfirmedAt: dt(item.submission.purchaseConfirmedAt),
-          finalSubmittedAt: dt(item.submission.finalSubmittedAt),
-          reviewedAt: dt(item.submission.reviewedAt),
-          approvedAt: dt(item.submission.approvedAt),
-          rewardGrantedAt: dt(item.submission.rewardGrantedAt)
-        }
-      : null,
-    missionApplication: item.missionApplication
-      ? { ...item.missionApplication, reviewedAt: dt(item.missionApplication.reviewedAt), createdAt: item.missionApplication.createdAt.toISOString() }
-      : null
+    submission: {
+      ...submission,
+      createdAt: submission.createdAt.toISOString(),
+      updatedAt: submission.updatedAt.toISOString(),
+      purchaseConfirmedAt: dt(submission.purchaseConfirmedAt),
+      finalSubmittedAt: dt(submission.finalSubmittedAt),
+      reviewedAt: dt(submission.reviewedAt),
+      approvedAt: dt(submission.approvedAt),
+      rewardGrantedAt: dt(submission.rewardGrantedAt)
+    },
+    missionApplication: {
+      ...missionApplication,
+      reviewedAt: dt(missionApplication.reviewedAt),
+      createdAt: missionApplication.createdAt.toISOString()
+    }
   };
 }
 
@@ -230,19 +237,24 @@ async function getMissionByIdForAccount(id: string, accountId: string) {
   return mission;
 }
 
-async function ensureSubmission(tx: Prisma.TransactionClient, missionId: string, accountId: string, note?: string | null) {
-  const existing = await tx.missionSubmission.findUnique({
-    where: { missionId_accountId: { missionId, accountId } }
-  });
-  if (existing) return existing;
-  return tx.missionSubmission.create({
-    data: {
-      missionId,
-      accountId,
-      lifecycleStatus: "ACCEPTED",
-      status: "OPEN",
-      note: note ?? null
-    }
+async function syncLegacySubmission(
+  tx: Prisma.TransactionClient,
+  missionId: string,
+  accountId: string,
+  submissionId: string | null | undefined,
+  data: Prisma.MissionSubmissionUpdateManyMutationInput
+) {
+  if (submissionId) {
+    await tx.missionSubmission.updateMany({
+      where: { id: submissionId },
+      data
+    });
+    return;
+  }
+
+  await tx.missionSubmission.updateMany({
+    where: { missionId, accountId },
+    data
   });
 }
 
@@ -330,23 +342,7 @@ async function creditPointsOnce(
 }
 
 async function syncCreatorMissions(accountId: string) {
-  const approvedApps = await prisma.missionApplication.findMany({
-    where: { accountId, status: "APPROVED" },
-    select: { id: true, missionId: true, campaignId: true, note: true }
-  });
-
-  for (const app of approvedApps) {
-    await prisma.$transaction(async (tx) => {
-      const submission = await ensureSubmission(tx, app.missionId, accountId, app.note);
-      await ensureCreatorMissionFromApprovedApplication(tx, {
-        missionId: app.missionId,
-        campaignId: app.campaignId,
-        accountId,
-        missionApplicationId: app.id,
-        submissionId: submission.id
-      });
-    });
-  }
+  void accountId;
 }
 
 export function getCreatorMissionGuidanceByOption(option: ProductReceiveOption) {
@@ -381,7 +377,10 @@ export async function ensureCreatorMissionFromApprovedApplication(
       where: { id: existing.id },
       data: {
         submissionId: existing.submissionId ?? input.submissionId ?? input.applicationId ?? null,
-        missionApplicationId: existing.missionApplicationId ?? input.missionApplicationId ?? null
+        missionApplicationId: existing.missionApplicationId ?? input.missionApplicationId ?? null,
+        applicationStatus: existing.applicationStatus ?? "PENDING_REVIEW",
+        submissionLifecycleStatus: existing.submissionLifecycleStatus ?? "ACCEPTED",
+        submissionStatus: existing.submissionStatus ?? "OPEN"
       }
     });
   }
@@ -394,6 +393,14 @@ export async function ensureCreatorMissionFromApprovedApplication(
       accountId: input.accountId,
       submissionId: input.submissionId ?? input.applicationId ?? null,
       missionApplicationId: input.missionApplicationId ?? null,
+      applicationStatus: "PENDING_REVIEW",
+      applicationNote: null,
+      applicationRejectReason: null,
+      applicationReviewedById: null,
+      applicationReviewedAt: null,
+      appliedAt: now(),
+      submissionLifecycleStatus: "ACCEPTED",
+      submissionStatus: "OPEN",
       status: initial.status,
       productReceiveOption: mission.productReceiveOption,
       productStatus: initial.productStatus,
@@ -510,16 +517,12 @@ export async function confirmDepositPaid(creatorMissionId: string, accountId: st
 export async function submitPurchaseProof(creatorMissionId: string, accountId: string, payload: { proofTextNote: string; screenshotUrl?: string; note?: string }) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
   if (current.productReceiveOption !== "CREATOR_BUY_FIRST") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
-  if (!current.submissionId) throw new AppError("Mission submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
   await prisma.$transaction(async (tx) => {
-    await tx.missionSubmission.update({
-      where: { id: current.submissionId! },
-      data: {
-        purchaseBillImageUrl: payload.screenshotUrl ?? null,
-        purchaseProofNote: payload.proofTextNote,
-        note: payload.note ?? null,
-        purchaseConfirmedAt: now()
-      }
+    await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
+      purchaseBillImageUrl: payload.screenshotUrl ?? null,
+      purchaseProofNote: payload.proofTextNote,
+      note: payload.note ?? null,
+      purchaseConfirmedAt: now()
     });
     await tx.creatorMission.update({
       where: { id: creatorMissionId },
@@ -528,6 +531,10 @@ export async function submitPurchaseProof(creatorMissionId: string, accountId: s
         purchaseProofScreenshotUrl: payload.screenshotUrl ?? null,
         purchaseProofNote: payload.note ?? null,
         purchaseProofSubmittedAt: now(),
+        submissionPurchaseBillImageUrl: payload.screenshotUrl ?? null,
+        submissionPurchaseProofNote: payload.proofTextNote,
+        submissionNote: payload.note ?? null,
+        submissionPurchaseConfirmedAt: now(),
         productStatus: "RECEIVED",
         reimbursementStatus: "PENDING",
         status: "IN_PROGRESS",
@@ -542,7 +549,6 @@ export async function submitPurchaseProof(creatorMissionId: string, accountId: s
 
 export async function submitDraft(creatorMissionId: string, accountId: string, payload: { videoUrl: string; note?: string }) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
-  if (!current.submissionId) throw new AppError("Mission submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
   if (current.status === "DRAFT_PENDING") {
     throw new AppError("Transcript must be approved first", 409, "CREATOR_MISSION_TRANSCRIPT_NOT_APPROVED");
   }
@@ -550,23 +556,28 @@ export async function submitDraft(creatorMissionId: string, accountId: string, p
     throw new AppError("Purchase proof is required before video submission", 409, "PURCHASE_PROOF_REQUIRED");
   }
   await prisma.$transaction(async (tx) => {
-    await tx.missionSubmission.update({
-      where: { id: current.submissionId! },
-      data: {
-        videoUrl: payload.videoUrl,
-        note: payload.note ?? null,
-        status: "SUBMITTED",
-        lifecycleStatus: "SUBMITTED",
-        rejectReason: null,
-        reviewedById: null,
-        reviewedAt: null,
-        approvedAt: null
-      }
+    await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
+      videoUrl: payload.videoUrl,
+      note: payload.note ?? null,
+      status: "SUBMITTED",
+      lifecycleStatus: "SUBMITTED",
+      rejectReason: null,
+      reviewedById: null,
+      reviewedAt: null,
+      approvedAt: null
     });
     await tx.creatorMission.update({
       where: { id: creatorMissionId },
       data: {
         status: "IN_PROGRESS",
+        submissionVideoUrl: payload.videoUrl,
+        submissionNote: payload.note ?? null,
+        submissionStatus: "SUBMITTED",
+        submissionLifecycleStatus: "SUBMITTED",
+        submissionRejectReason: null,
+        submissionReviewedById: null,
+        submissionReviewedAt: null,
+        submissionApprovedAt: null,
         videoReviewStatus: "PENDING",
         videoReviewFeedback: null,
         videoSubmittedAt: now(),
@@ -577,7 +588,7 @@ export async function submitDraft(creatorMissionId: string, accountId: string, p
   });
   const updated = await getMissionById(creatorMissionId);
   if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  return { creatorMission: mapMission(updated), submissionId: updated.submissionId, submissionLifecycleStatus: updated.submission?.lifecycleStatus ?? null };
+  return { creatorMission: mapMission(updated), submissionId: updated.submissionId, submissionLifecycleStatus: updated.submissionLifecycleStatus };
 }
 
 export async function confirmDepositAndProductReceivedByAdmin(actorId: string, creatorMissionId: string) {
@@ -664,29 +675,43 @@ export async function submitPublishReport(
 ) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
   if (current.videoReviewStatus !== "APPROVED") throw new AppError("Video must be approved first", 409, "CREATOR_MISSION_VIDEO_NOT_APPROVED");
-  if (!current.submissionId) throw new AppError("Mission submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
   await prisma.$transaction(async (tx) => {
-    await tx.missionSubmission.update({
-      where: { id: current.submissionId! },
-      data: {
-        socialPostUrl: payload.socialPostUrl,
-        publicVideoUrl: payload.socialPostUrl,
-        adCode: payload.adCode ?? null,
-        proofTextNote: payload.adCode ?? null,
-        screenshotUrl: payload.purchaseInvoiceUrl ?? null,
-        productReviewScreenshotUrl: payload.ratingImageUrl ?? null,
-        finalProofNote: payload.note ?? null,
-        finalSubmittedAt: now(),
-        status: "SUBMITTED",
-        lifecycleStatus: "SUBMITTED",
-        rejectReason: null,
-        reviewedById: null,
-        reviewedAt: null
-      }
+    await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
+      socialPostUrl: payload.socialPostUrl,
+      publicVideoUrl: payload.socialPostUrl,
+      adCode: payload.adCode ?? null,
+      proofTextNote: payload.adCode ?? null,
+      screenshotUrl: payload.purchaseInvoiceUrl ?? null,
+      productReviewScreenshotUrl: payload.ratingImageUrl ?? null,
+      finalProofNote: payload.note ?? null,
+      finalSubmittedAt: now(),
+      status: "SUBMITTED",
+      lifecycleStatus: "SUBMITTED",
+      rejectReason: null,
+      reviewedById: null,
+      reviewedAt: null
     });
     await tx.creatorMission.update({
       where: { id: creatorMissionId },
-      data: { publishStatus: "PENDING", publishFeedback: null, publishSubmittedAt: now(), publishReviewedAt: null }
+      data: {
+        submissionSocialPostUrl: payload.socialPostUrl,
+        submissionPublicVideoUrl: payload.socialPostUrl,
+        submissionAdCode: payload.adCode ?? null,
+        submissionProofTextNote: payload.adCode ?? null,
+        submissionScreenshotUrl: payload.purchaseInvoiceUrl ?? null,
+        submissionProductReviewScreenshotUrl: payload.ratingImageUrl ?? null,
+        submissionFinalProofNote: payload.note ?? null,
+        submissionFinalSubmittedAt: now(),
+        submissionStatus: "SUBMITTED",
+        submissionLifecycleStatus: "SUBMITTED",
+        submissionRejectReason: null,
+        submissionReviewedById: null,
+        submissionReviewedAt: null,
+        publishStatus: "PENDING",
+        publishFeedback: null,
+        publishSubmittedAt: now(),
+        publishReviewedAt: null
+      }
     });
   });
   const updated = await getMissionById(creatorMissionId);
@@ -696,16 +721,33 @@ export async function submitPublishReport(
 
 export async function approveVideoReviewByAdmin(actorId: string, creatorMissionId: string) {
   const current = await getMissionById(creatorMissionId);
-  if (!current || !current.submissionId) throw new AppError("Creator mission/submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
+  if (!current) throw new AppError("Creator mission/submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
   if (current.videoReviewStatus !== "PENDING") throw new AppError("Invalid status", 409, "CREATOR_MISSION_INVALID_STATUS");
   const updated = await prisma.$transaction(async (tx) => {
-    await tx.missionSubmission.update({
-      where: { id: current.submissionId! },
-      data: { status: "APPROVED", lifecycleStatus: "APPROVED", rejectReason: null, reviewedById: actorId, reviewedAt: now(), approvedAt: now() }
+    await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
+      status: "APPROVED",
+      lifecycleStatus: "APPROVED",
+      rejectReason: null,
+      reviewedById: actorId,
+      reviewedAt: now(),
+      approvedAt: now()
     });
     return tx.creatorMission.update({
       where: { id: creatorMissionId },
-      data: { status: "IN_PROGRESS", videoReviewStatus: "APPROVED", videoReviewFeedback: null, videoReviewedAt: now(), publishStatus: "NOT_SUBMITTED", publishFeedback: null },
+      data: {
+        status: "IN_PROGRESS",
+        submissionStatus: "APPROVED",
+        submissionLifecycleStatus: "APPROVED",
+        submissionRejectReason: null,
+        submissionReviewedById: actorId,
+        submissionReviewedAt: now(),
+        submissionApprovedAt: now(),
+        videoReviewStatus: "APPROVED",
+        videoReviewFeedback: null,
+        videoReviewedAt: now(),
+        publishStatus: "NOT_SUBMITTED",
+        publishFeedback: null
+      },
       include: creatorMissionInclude
     });
   });
@@ -715,19 +757,29 @@ export async function approveVideoReviewByAdmin(actorId: string, creatorMissionI
 
 export async function rejectVideoReviewByAdmin(actorId: string, creatorMissionId: string, reason: string) {
   const current = await getMissionById(creatorMissionId);
-  if (!current || !current.submissionId) throw new AppError("Creator mission/submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
+  if (!current) throw new AppError("Creator mission/submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
   if (current.videoReviewStatus !== "PENDING") throw new AppError("Invalid status", 409, "CREATOR_MISSION_INVALID_STATUS");
   const feedback = reason.trim();
   if (!feedback) throw new AppError("reason is required", 422, "REJECT_REASON_REQUIRED");
   const updated = await prisma.$transaction(async (tx) => {
-    await tx.missionSubmission.update({
-      where: { id: current.submissionId! },
-      data: { status: "REJECTED", lifecycleStatus: "REJECTED", rejectReason: feedback, reviewedById: actorId, reviewedAt: now(), approvedAt: null }
+    await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
+      status: "REJECTED",
+      lifecycleStatus: "REJECTED",
+      rejectReason: feedback,
+      reviewedById: actorId,
+      reviewedAt: now(),
+      approvedAt: null
     });
     return tx.creatorMission.update({
       where: { id: creatorMissionId },
       data: {
         status: "IN_PROGRESS",
+        submissionStatus: "REJECTED",
+        submissionLifecycleStatus: "REJECTED",
+        submissionRejectReason: feedback,
+        submissionReviewedById: actorId,
+        submissionReviewedAt: now(),
+        submissionApprovedAt: null,
         videoReviewStatus: "REJECTED",
         videoReviewFeedback: feedback,
         videoReviewedAt: now(),
@@ -745,7 +797,7 @@ export async function rejectVideoReviewByAdmin(actorId: string, creatorMissionId
 
 export async function approvePublishReportByAdmin(actorId: string, creatorMissionId: string, purchaseAmountVnd: number) {
   const current = await getMissionById(creatorMissionId);
-  if (!current || !current.submissionId) throw new AppError("Creator mission/submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
+  if (!current) throw new AppError("Creator mission/submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
   if (current.publishStatus === "APPROVED" && current.status === "COMPLETED") return mapMission(current);
   if (current.publishStatus !== "PENDING") throw new AppError("Invalid status", 409, "CREATOR_MISSION_INVALID_STATUS");
   if (current.videoReviewStatus !== "APPROVED") throw new AppError("Video must be approved first", 409, "CREATOR_MISSION_VIDEO_NOT_APPROVED");
@@ -755,9 +807,14 @@ export async function approvePublishReportByAdmin(actorId: string, creatorMissio
   const reimbursementVnd = current.productReceiveOption === "CREATOR_BUY_FIRST" ? Math.floor(purchaseAmountVnd) : 0;
   const reimbursementPoints = reimbursementVnd > 0 ? Math.floor(reimbursementVnd / 100) : 0;
   const updated = await prisma.$transaction(async (tx) => {
-    await tx.missionSubmission.update({
-      where: { id: current.submissionId! },
-      data: { status: "APPROVED", lifecycleStatus: "DONE", rejectReason: null, reviewedById: actorId, reviewedAt: now(), approvedAt: now(), rewardGrantedAt: now() }
+    await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
+      status: "APPROVED",
+      lifecycleStatus: "DONE",
+      rejectReason: null,
+      reviewedById: actorId,
+      reviewedAt: now(),
+      approvedAt: now(),
+      rewardGrantedAt: now()
     });
 
     await creditPointsOnce(tx, current.accountId, current.mission.rewardPoints, "CREATOR_MISSION_REWARD", creatorMissionId, `creator_mission_reward_${creatorMissionId}`);
@@ -769,6 +826,13 @@ export async function approvePublishReportByAdmin(actorId: string, creatorMissio
       where: { id: creatorMissionId },
       data: {
         status: "COMPLETED",
+        submissionStatus: "APPROVED",
+        submissionLifecycleStatus: "DONE",
+        submissionRejectReason: null,
+        submissionReviewedById: actorId,
+        submissionReviewedAt: now(),
+        submissionApprovedAt: now(),
+        submissionRewardGrantedAt: now(),
         publishStatus: "APPROVED",
         publishFeedback: null,
         publishReviewedAt: now(),
@@ -787,15 +851,27 @@ export async function approvePublishReportByAdmin(actorId: string, creatorMissio
 
 export async function rejectPublishReportByAdmin(actorId: string, creatorMissionId: string, reason: string) {
   const current = await getMissionById(creatorMissionId);
-  if (!current || !current.submissionId) throw new AppError("Creator mission/submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
+  if (!current) throw new AppError("Creator mission/submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
   if (current.publishStatus !== "PENDING") throw new AppError("Invalid status", 409, "CREATOR_MISSION_INVALID_STATUS");
   const feedback = reason.trim();
   if (!feedback) throw new AppError("reason is required", 422, "REJECT_REASON_REQUIRED");
   const updated = await prisma.$transaction(async (tx) => {
-    await tx.missionSubmission.update({ where: { id: current.submissionId! }, data: { rejectReason: feedback, reviewedById: actorId, reviewedAt: now() } });
+    await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
+      rejectReason: feedback,
+      reviewedById: actorId,
+      reviewedAt: now()
+    });
     return tx.creatorMission.update({
       where: { id: creatorMissionId },
-      data: { status: "IN_PROGRESS", publishStatus: "REJECTED", publishFeedback: feedback, publishReviewedAt: now() },
+      data: {
+        status: "IN_PROGRESS",
+        submissionRejectReason: feedback,
+        submissionReviewedById: actorId,
+        submissionReviewedAt: now(),
+        publishStatus: "REJECTED",
+        publishFeedback: feedback,
+        publishReviewedAt: now()
+      },
       include: creatorMissionInclude
     });
   });
@@ -804,14 +880,35 @@ export async function rejectPublishReportByAdmin(actorId: string, creatorMission
 }
 
 export async function listCreatorMissionApplicationsByAccount(accountId: string) {
-  return prisma.missionApplication.findMany({
+  return prisma.creatorMission.findMany({
     where: { accountId },
-    include: {
+    select: {
+      id: true,
+      missionId: true,
+      campaignId: true,
+      applicationStatus: true,
+      applicationNote: true,
+      applicationRejectReason: true,
+      applicationReviewedAt: true,
+      appliedAt: true,
       mission: { select: { id: true, title: true, rewardPoints: true, productReceiveOption: true, productLink: true } },
       campaign: { select: { id: true, title: true, slug: true } }
     },
-    orderBy: { createdAt: "desc" }
-  });
+    orderBy: { appliedAt: "desc" }
+  }).then((rows) =>
+    rows.map((row) => ({
+      id: row.id,
+      missionId: row.missionId,
+      campaignId: row.campaignId,
+      status: row.applicationStatus,
+      note: row.applicationNote,
+      rejectReason: row.applicationRejectReason,
+      reviewedAt: row.applicationReviewedAt,
+      createdAt: row.appliedAt,
+      mission: row.mission,
+      campaign: row.campaign
+    }))
+  );
 }
 
 export async function getCreatorMissionDetail(accountId: string, creatorMissionId: string) {
@@ -824,21 +921,21 @@ export async function submitCreatorMissionPurchaseProof(
   payload: { purchaseBillImageUrl: string; productReviewScreenshotUrl: string; purchaseProofNote?: string }
 ) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
-  if (!current.submissionId) throw new AppError("Mission submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
   if (current.productReceiveOption !== "CREATOR_BUY_FIRST") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
   const updated = await prisma.$transaction(async (tx) => {
-    await tx.missionSubmission.update({
-      where: { id: current.submissionId! },
-      data: {
-        purchaseBillImageUrl: payload.purchaseBillImageUrl,
-        productReviewScreenshotUrl: payload.productReviewScreenshotUrl,
-        purchaseProofNote: payload.purchaseProofNote ?? null,
-        purchaseConfirmedAt: now()
-      }
+    await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
+      purchaseBillImageUrl: payload.purchaseBillImageUrl,
+      productReviewScreenshotUrl: payload.productReviewScreenshotUrl,
+      purchaseProofNote: payload.purchaseProofNote ?? null,
+      purchaseConfirmedAt: now()
     });
     return tx.creatorMission.update({
       where: { id: creatorMissionId },
       data: {
+        submissionPurchaseBillImageUrl: payload.purchaseBillImageUrl,
+        submissionProductReviewScreenshotUrl: payload.productReviewScreenshotUrl,
+        submissionPurchaseProofNote: payload.purchaseProofNote ?? null,
+        submissionPurchaseConfirmedAt: now(),
         purchaseProofSubmittedAt: now(),
         productStatus: "RECEIVED",
         status: "IN_PROGRESS",
@@ -857,7 +954,6 @@ export async function submitCreatorMissionVideo(accountId: string, creatorMissio
 
 export async function submitCreatorMissionTranscript(accountId: string, creatorMissionId: string, transcript: string) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
-  if (!current.submissionId) throw new AppError("Mission submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
   if (current.status === "COMPLETED") throw new AppError("Mission already completed", 409, "CREATOR_MISSION_ALREADY_COMPLETED");
   if (current.videoReviewStatus === "PENDING" || current.videoReviewStatus === "APPROVED") {
     throw new AppError("Video review already started", 409, "CREATOR_MISSION_VIDEO_ALREADY_STARTED");
@@ -877,22 +973,27 @@ export async function submitCreatorMissionTranscript(accountId: string, creatorM
   });
 
   const updated = await prisma.$transaction(async (tx) => {
-    await tx.missionSubmission.update({
-      where: { id: current.submissionId! },
-      data: {
-        proofTextNote: sanitizedHtml,
-        fileUploadUrl: transcriptFileUrl,
-        status: "SUBMITTED",
-        lifecycleStatus: "SUBMITTED",
-        rejectReason: null,
-        reviewedById: null,
-        reviewedAt: null,
-        approvedAt: null
-      }
+    await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
+      proofTextNote: sanitizedHtml,
+      fileUploadUrl: transcriptFileUrl,
+      status: "SUBMITTED",
+      lifecycleStatus: "SUBMITTED",
+      rejectReason: null,
+      reviewedById: null,
+      reviewedAt: null,
+      approvedAt: null
     });
     return tx.creatorMission.update({
       where: { id: creatorMissionId },
       data: {
+        submissionProofTextNote: sanitizedHtml,
+        submissionFileUploadUrl: transcriptFileUrl,
+        submissionStatus: "SUBMITTED",
+        submissionLifecycleStatus: "SUBMITTED",
+        submissionRejectReason: null,
+        submissionReviewedById: null,
+        submissionReviewedAt: null,
+        submissionApprovedAt: null,
         status: "DRAFT_PENDING",
         videoReviewStatus: "NOT_SUBMITTED",
         videoReviewFeedback: null,
@@ -939,20 +1040,58 @@ export async function createMissionApplicationForCreator(accountId: string, payl
   if (mission.status !== "OPEN") throw new AppError("Mission is not open", 409, "MISSION_NOT_OPEN");
   if (!mission.campaign.isPublic || mission.campaign.status !== "ACTIVE") throw new AppError("Campaign is not open", 409, "CAMPAIGN_NOT_OPEN");
 
-  const existing = await prisma.missionApplication.findUnique({
-    where: { missionId_accountId: { missionId: mission.id, accountId } }
+  const existing = await prisma.creatorMission.findUnique({
+    where: { missionId_accountId: { missionId: mission.id, accountId } },
+    select: { id: true, applicationStatus: true }
   });
-  if (existing) throw new AppError("Ban da xin lam nhiem vu nay", 409, "MISSION_APPLICATION_ALREADY_EXISTS");
 
-  return prisma.missionApplication.create({
-    data: {
-      missionId: mission.id,
-      campaignId: mission.campaignId,
-      accountId,
-      status: "PENDING_REVIEW",
-      note: payload.note?.trim() || null
-    },
-    include: {
+  if (existing && existing.applicationStatus !== "REJECTED") {
+    throw new AppError("Ban da xin lam nhiem vu nay", 409, "MISSION_APPLICATION_ALREADY_EXISTS");
+  }
+
+  const created = existing
+    ? await prisma.creatorMission.update({
+        where: { id: existing.id },
+        data: {
+          applicationStatus: "PENDING_REVIEW",
+          applicationNote: payload.note?.trim() || null,
+          applicationRejectReason: null,
+          applicationReviewedById: null,
+          applicationReviewedAt: null,
+          appliedAt: now()
+        }
+      })
+    : await ensureCreatorMissionFromApprovedApplication(prisma, {
+        missionId: mission.id,
+        campaignId: mission.campaignId,
+        accountId,
+        missionApplicationId: undefined,
+        submissionId: undefined
+      }).then((row) =>
+        prisma.creatorMission.update({
+          where: { id: row.id },
+          data: {
+            applicationStatus: "PENDING_REVIEW",
+            applicationNote: payload.note?.trim() || null,
+            applicationRejectReason: null,
+            applicationReviewedById: null,
+            applicationReviewedAt: null,
+            appliedAt: now()
+          }
+        })
+      );
+
+  return prisma.creatorMission.findUniqueOrThrow({
+    where: { id: created.id },
+    select: {
+      id: true,
+      missionId: true,
+      campaignId: true,
+      applicationStatus: true,
+      applicationNote: true,
+      applicationRejectReason: true,
+      applicationReviewedAt: true,
+      appliedAt: true,
       mission: { select: { id: true, title: true, rewardPoints: true, productReceiveOption: true } },
       campaign: { select: { id: true, title: true, slug: true } }
     }
@@ -995,8 +1134,8 @@ export async function listMissionApplicationsForAdmin(input: {
   page?: number;
   limit?: number;
 }) {
-  const where: Prisma.MissionApplicationWhereInput = {};
-  if (input.status) where.status = input.status;
+  const where: Prisma.CreatorMissionWhereInput = {};
+  if (input.status) where.applicationStatus = input.status;
   if (input.campaignId) where.campaignId = input.campaignId;
   if (input.campaign?.trim()) {
     where.campaign = { title: { contains: input.campaign.trim(), mode: "insensitive" } };
@@ -1012,10 +1151,20 @@ export async function listMissionApplicationsForAdmin(input: {
   }
   const paging = toPagination(input.page, input.limit);
   const [total, items] = await prisma.$transaction([
-    prisma.missionApplication.count({ where }),
-    prisma.missionApplication.findMany({
+    prisma.creatorMission.count({ where }),
+    prisma.creatorMission.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        missionId: true,
+        campaignId: true,
+        accountId: true,
+        applicationStatus: true,
+        applicationNote: true,
+        applicationRejectReason: true,
+        applicationReviewedById: true,
+        applicationReviewedAt: true,
+        appliedAt: true,
         account: { select: { id: true, displayName: true, email: true, creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true } } } },
         campaign: {
           select: {
@@ -1036,31 +1185,54 @@ export async function listMissionApplicationsForAdmin(input: {
             }
           }
         },
-        mission: { select: { id: true, title: true, rewardPoints: true, productReceiveOption: true, productLink: true } },
-        reviewedBy: { select: { id: true, displayName: true, email: true } }
+        mission: { select: { id: true, title: true, rewardPoints: true, productReceiveOption: true, productLink: true } }
       },
-      orderBy: { createdAt: toOrder(input.sort) },
+      orderBy: { appliedAt: toOrder(input.sort) },
       skip: paging.skip,
       take: paging.limit
     })
   ]);
   const normalizedItems = items.map((item) => ({
-    ...item,
+    id: item.id,
+    missionId: item.missionId,
+    campaignId: item.campaignId,
+    accountId: item.accountId,
+    status: item.applicationStatus,
+    note: item.applicationNote,
+    rejectReason: item.applicationRejectReason,
+    reviewedAt: item.applicationReviewedAt,
+    createdAt: item.appliedAt,
+    reviewedBy: item.applicationReviewedById
+      ? { id: item.applicationReviewedById, displayName: "N/A", email: "N/A" }
+      : null,
+    account: item.account,
     campaign: {
       ...item.campaign,
       brand: {
         ...item.campaign.brand,
         avatarUrl: resolveBrandAvatar(item.campaign.brand)
       }
-    }
+    },
+    mission: item.mission
   }));
   return { items: normalizedItems, pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
 }
 
 export async function getMissionApplicationDetailForAdmin(id: string) {
-  const item = await prisma.missionApplication.findUnique({
+  const item = await prisma.creatorMission.findUnique({
     where: { id },
-    include: {
+    select: {
+      id: true,
+      missionId: true,
+      campaignId: true,
+      accountId: true,
+      missionApplicationId: true,
+      applicationStatus: true,
+      applicationNote: true,
+      applicationRejectReason: true,
+      applicationReviewedById: true,
+      applicationReviewedAt: true,
+      appliedAt: true,
       account: { select: { id: true, displayName: true, email: true, creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true, bio: true } } } },
       campaign: {
         select: {
@@ -1082,13 +1254,25 @@ export async function getMissionApplicationDetailForAdmin(id: string) {
           }
         }
       },
-      mission: { select: { id: true, title: true, description: true, rewardPoints: true, productReceiveOption: true, productLink: true, deadlineAt: true } },
-      reviewedBy: { select: { id: true, displayName: true, email: true } }
+      mission: { select: { id: true, title: true, description: true, rewardPoints: true, productReceiveOption: true, productLink: true, deadlineAt: true } }
     }
   });
   if (!item) throw new AppError("Mission application not found", 404, "MISSION_APPLICATION_NOT_FOUND");
   return {
-    ...item,
+    id: item.id,
+    missionId: item.missionId,
+    campaignId: item.campaignId,
+    accountId: item.accountId,
+    missionApplicationId: item.missionApplicationId,
+    status: item.applicationStatus,
+    note: item.applicationNote,
+    rejectReason: item.applicationRejectReason,
+    reviewedById: item.applicationReviewedById,
+    reviewedAt: item.applicationReviewedAt,
+    createdAt: item.appliedAt,
+    reviewedBy: item.applicationReviewedById ? { id: item.applicationReviewedById, displayName: "N/A", email: "N/A" } : null,
+    account: item.account,
+    mission: item.mission,
     campaign: {
       ...item.campaign,
       brand: {
@@ -1103,29 +1287,28 @@ export async function approveMissionApplicationByAdmin(actorId: string, id: stri
   const current = await getMissionApplicationDetailForAdmin(id);
   if (current.status !== "PENDING_REVIEW") throw new AppError("Mission application is not pending review", 409, "MISSION_APPLICATION_INVALID_STATUS");
   const updated = await prisma.$transaction(async (tx) => {
-    const claimPending = await tx.missionApplication.updateMany({
-      where: { id, status: "PENDING_REVIEW" },
-      data: { status: "APPROVED", reviewedById: actorId, reviewedAt: now(), rejectReason: null }
+    const claimPending = await tx.creatorMission.updateMany({
+      where: { id, applicationStatus: "PENDING_REVIEW" },
+      data: { applicationStatus: "APPROVED", applicationReviewedById: actorId, applicationReviewedAt: now(), applicationRejectReason: null }
     });
     if (claimPending.count === 0) {
       throw new AppError("Mission application is not pending review", 409, "MISSION_APPLICATION_INVALID_STATUS");
     }
 
     await reserveCampaignUgcVideoQuota(tx, current.campaignId);
-    const next = await tx.missionApplication.findUniqueOrThrow({
-      where: { id }
+    const next = await tx.creatorMission.update({
+      where: { id },
+      data: {
+        missionApplicationId: current.missionApplicationId ?? current.id,
+        submissionLifecycleStatus: "ACCEPTED",
+        submissionStatus: "OPEN",
+        submissionNote: current.note ?? null
+      },
+      include: creatorMissionInclude
     });
-    const submission = await ensureSubmission(tx, current.missionId, current.accountId, current.note);
-    await ensureCreatorMissionFromApprovedApplication(tx, {
-      missionId: current.missionId,
-      campaignId: current.campaignId,
-      accountId: current.accountId,
-      missionApplicationId: current.id,
-      submissionId: submission.id
-    });
-    return next;
+    return mapMission(next);
   });
-  await notifyCreator(current.accountId, "MISSION_APPLICATION_APPROVED", "Don xin nhiem vu duoc duyet", `Ban da duoc duyet nhiem vu \"${current.mission.title}\".`, { missionApplicationId: id });
+  await notifyCreator(current.accountId, "MISSION_APPLICATION_APPROVED", "Don xin nhiem vu duoc duyet", `Ban da duoc duyet nhiem vu "${current.mission.title}".`, { creatorMissionId: id });
   return updated;
 }
 
@@ -1134,12 +1317,13 @@ export async function rejectMissionApplicationByAdmin(actorId: string, id: strin
   if (current.status !== "PENDING_REVIEW") throw new AppError("Mission application is not pending review", 409, "MISSION_APPLICATION_INVALID_STATUS");
   const reason = rejectReason.trim();
   if (!reason) throw new AppError("rejectReason is required", 422, "REJECT_REASON_REQUIRED");
-  const updated = await prisma.missionApplication.update({
+  const updated = await prisma.creatorMission.update({
     where: { id },
-    data: { status: "REJECTED", rejectReason: reason, reviewedById: actorId, reviewedAt: now() }
+    data: { applicationStatus: "REJECTED", applicationRejectReason: reason, applicationReviewedById: actorId, applicationReviewedAt: now() },
+    include: creatorMissionInclude
   });
-  await notifyCreator(current.accountId, "MISSION_APPLICATION_REJECTED", "Don xin nhiem vu bi tu choi", reason, { missionApplicationId: id });
-  return updated;
+  await notifyCreator(current.accountId, "MISSION_APPLICATION_REJECTED", "Don xin nhiem vu bi tu choi", reason, { creatorMissionId: id });
+  return mapMission(updated);
 }
 
 export async function listMissionVideoReviewsForAdmin(input: {
@@ -1256,18 +1440,18 @@ export async function listMissionTranscriptReviewsForAdmin(input: {
   limit?: number;
 }) {
   const where: Prisma.CreatorMissionWhereInput = {
-    submission: { is: { proofTextNote: { not: null } } }
+    submissionProofTextNote: { not: null }
   };
 
   if (input.status === "PENDING") {
     where.status = "DRAFT_PENDING";
-    where.submission = { is: { proofTextNote: { not: null }, status: "SUBMITTED" } };
+    where.submissionStatus = "SUBMITTED";
   } else if (input.status === "REJECTED") {
     where.status = "DRAFT_PENDING";
-    where.submission = { is: { proofTextNote: { not: null }, status: "REJECTED" } };
+    where.submissionStatus = "REJECTED";
   } else if (input.status === "APPROVED") {
     where.status = { not: "DRAFT_PENDING" };
-    where.submission = { is: { proofTextNote: { not: null }, status: "APPROVED" } };
+    where.submissionStatus = "APPROVED";
   } else {
     where.status = "DRAFT_PENDING";
   }
@@ -1301,33 +1485,36 @@ export async function listMissionTranscriptReviewsForAdmin(input: {
 
 export async function getMissionTranscriptReviewDetailForAdmin(id: string) {
   const item = await getMissionById(id);
-  if (!item || !item.submission?.proofTextNote) throw new AppError("Creator mission transcript not found", 404, "CREATOR_MISSION_TRANSCRIPT_NOT_FOUND");
+  if (!item || !item.submissionProofTextNote) throw new AppError("Creator mission transcript not found", 404, "CREATOR_MISSION_TRANSCRIPT_NOT_FOUND");
   return mapMission(item);
 }
 
 export async function approveMissionTranscriptReviewByAdmin(actorId: string, id: string) {
   const current = await getMissionById(id);
-  if (!current || !current.submissionId || !current.submission?.proofTextNote) throw new AppError("Creator mission transcript not found", 404, "CREATOR_MISSION_TRANSCRIPT_NOT_FOUND");
-  if (current.status !== "DRAFT_PENDING" || current.submission.status !== "SUBMITTED") {
+  if (!current || !current.submissionProofTextNote) throw new AppError("Creator mission transcript not found", 404, "CREATOR_MISSION_TRANSCRIPT_NOT_FOUND");
+  if (current.status !== "DRAFT_PENDING" || current.submissionStatus !== "SUBMITTED") {
     throw new AppError("Transcript is not pending review", 409, "CREATOR_MISSION_TRANSCRIPT_INVALID_STATUS");
   }
 
   const updated = await prisma.$transaction(async (tx) => {
-    await tx.missionSubmission.update({
-      where: { id: current.submissionId! },
-      data: {
-        status: "APPROVED",
-        lifecycleStatus: "APPROVED",
-        rejectReason: null,
-        reviewedById: actorId,
-        reviewedAt: now(),
-        approvedAt: now()
-      }
+    await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
+      status: "APPROVED",
+      lifecycleStatus: "APPROVED",
+      rejectReason: null,
+      reviewedById: actorId,
+      reviewedAt: now(),
+      approvedAt: now()
     });
 
     return tx.creatorMission.update({
       where: { id },
       data: {
+        submissionStatus: "APPROVED",
+        submissionLifecycleStatus: "APPROVED",
+        submissionRejectReason: null,
+        submissionReviewedById: actorId,
+        submissionReviewedAt: now(),
+        submissionApprovedAt: now(),
         status: "IN_PROGRESS",
         videoReviewFeedback: null,
         videoReviewStatus: "NOT_SUBMITTED",
@@ -1343,29 +1530,32 @@ export async function approveMissionTranscriptReviewByAdmin(actorId: string, id:
 
 export async function rejectMissionTranscriptReviewByAdmin(actorId: string, id: string, feedback: string) {
   const current = await getMissionById(id);
-  if (!current || !current.submissionId || !current.submission?.proofTextNote) throw new AppError("Creator mission transcript not found", 404, "CREATOR_MISSION_TRANSCRIPT_NOT_FOUND");
-  if (current.status !== "DRAFT_PENDING" || current.submission.status !== "SUBMITTED") {
+  if (!current || !current.submissionProofTextNote) throw new AppError("Creator mission transcript not found", 404, "CREATOR_MISSION_TRANSCRIPT_NOT_FOUND");
+  if (current.status !== "DRAFT_PENDING" || current.submissionStatus !== "SUBMITTED") {
     throw new AppError("Transcript is not pending review", 409, "CREATOR_MISSION_TRANSCRIPT_INVALID_STATUS");
   }
   const reason = feedback.trim();
   if (!reason) throw new AppError("feedback is required", 422, "REJECT_REASON_REQUIRED");
 
   const updated = await prisma.$transaction(async (tx) => {
-    await tx.missionSubmission.update({
-      where: { id: current.submissionId! },
-      data: {
-        status: "REJECTED",
-        lifecycleStatus: "REJECTED",
-        rejectReason: reason,
-        reviewedById: actorId,
-        reviewedAt: now(),
-        approvedAt: null
-      }
+    await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
+      status: "REJECTED",
+      lifecycleStatus: "REJECTED",
+      rejectReason: reason,
+      reviewedById: actorId,
+      reviewedAt: now(),
+      approvedAt: null
     });
 
     return tx.creatorMission.update({
       where: { id },
       data: {
+        submissionStatus: "REJECTED",
+        submissionLifecycleStatus: "REJECTED",
+        submissionRejectReason: reason,
+        submissionReviewedById: actorId,
+        submissionReviewedAt: now(),
+        submissionApprovedAt: null,
         status: "DRAFT_PENDING",
         videoReviewFeedback: reason,
         videoReviewStatus: "NOT_SUBMITTED",
@@ -1392,10 +1582,10 @@ export async function listMissionApplicationsForBrand(
   }
 ) {
   const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
-  const where: Prisma.MissionApplicationWhereInput = {
+  const where: Prisma.CreatorMissionWhereInput = {
     campaign: { brandId: brandOwnerAccountId }
   };
-  if (input.status) where.status = input.status;
+  if (input.status) where.applicationStatus = input.status;
   if (input.campaignId) where.campaignId = input.campaignId;
   if (input.campaign?.trim()) {
     where.campaign = {
@@ -1415,21 +1605,45 @@ export async function listMissionApplicationsForBrand(
 
   const paging = toPagination(input.page, input.limit);
   const [total, items] = await prisma.$transaction([
-    prisma.missionApplication.count({ where }),
-    prisma.missionApplication.findMany({
+    prisma.creatorMission.count({ where }),
+    prisma.creatorMission.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        missionId: true,
+        campaignId: true,
+        accountId: true,
+        applicationStatus: true,
+        applicationNote: true,
+        applicationRejectReason: true,
+        applicationReviewedAt: true,
+        appliedAt: true,
         account: { select: { id: true, displayName: true, email: true, creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true } } } },
         campaign: { select: { id: true, title: true, slug: true } },
-        mission: { select: { id: true, title: true, rewardPoints: true, productReceiveOption: true, productLink: true } },
-        reviewedBy: { select: { id: true, displayName: true, email: true } }
+        mission: { select: { id: true, title: true, rewardPoints: true, productReceiveOption: true, productLink: true } }
       },
-      orderBy: { createdAt: toOrder(input.sort) },
+      orderBy: { appliedAt: toOrder(input.sort) },
       skip: paging.skip,
       take: paging.limit
     })
   ]);
-  return { items, pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
+  return {
+    items: items.map((item) => ({
+      id: item.id,
+      missionId: item.missionId,
+      campaignId: item.campaignId,
+      accountId: item.accountId,
+      status: item.applicationStatus,
+      note: item.applicationNote,
+      rejectReason: item.applicationRejectReason,
+      createdAt: item.appliedAt,
+      reviewedAt: item.applicationReviewedAt,
+      account: item.account,
+      campaign: item.campaign,
+      mission: item.mission
+    })),
+    pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) }
+  };
 }
 
 export async function listMissionHistoryForBrand(accountId: string, input: MissionHistoryFilterInput) {
@@ -1537,18 +1751,18 @@ export async function listMissionTranscriptReviewsForBrand(
   const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
   const where: Prisma.CreatorMissionWhereInput = {
     campaign: { brandId: brandOwnerAccountId },
-    submission: { is: { proofTextNote: { not: null } } }
+    submissionProofTextNote: { not: null }
   };
 
   if (input.status === "PENDING") {
     where.status = "DRAFT_PENDING";
-    where.submission = { is: { proofTextNote: { not: null }, status: "SUBMITTED" } };
+    where.submissionStatus = "SUBMITTED";
   } else if (input.status === "REJECTED") {
     where.status = "DRAFT_PENDING";
-    where.submission = { is: { proofTextNote: { not: null }, status: "REJECTED" } };
+    where.submissionStatus = "REJECTED";
   } else if (input.status === "APPROVED") {
     where.status = { not: "DRAFT_PENDING" };
-    where.submission = { is: { proofTextNote: { not: null }, status: "APPROVED" } };
+    where.submissionStatus = "APPROVED";
   } else {
     where.status = "DRAFT_PENDING";
   }

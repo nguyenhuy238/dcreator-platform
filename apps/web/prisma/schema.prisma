@@ -1068,6 +1068,34 @@ model CreatorMission {
   missionId                   String
   campaignId                  String
   accountId                   String
+  applicationStatus           ApplicationStatus               @default(PENDING_REVIEW)
+  applicationNote             String?
+  applicationRejectReason     String?
+  applicationReviewedById     String?
+  applicationReviewedAt       DateTime?
+  appliedAt                   DateTime                        @default(now())
+  submissionLifecycleStatus   MissionLifecycleStatus          @default(ACCEPTED)
+  submissionStatus            MissionStatus                   @default(SUBMITTED)
+  submissionVideoUrl          String?
+  submissionImageUrl          String?
+  submissionSocialPostUrl     String?
+  submissionScreenshotUrl     String?
+  submissionFileUploadUrl     String?
+  submissionProofTextNote     String?
+  submissionNote              String?
+  submissionRejectReason      String?
+  submissionPurchaseBillImageUrl String?
+  submissionProductReviewScreenshotUrl String?
+  submissionPurchaseProofNote String?
+  submissionPurchaseConfirmedAt DateTime?
+  submissionPublicVideoUrl    String?
+  submissionAdCode            String?
+  submissionFinalProofNote    String?
+  submissionFinalSubmittedAt  DateTime?
+  submissionApprovedAt        DateTime?
+  submissionRewardGrantedAt   DateTime?
+  submissionReviewedById      String?
+  submissionReviewedAt        DateTime?
   submissionId                String?                         @unique
   missionApplicationId        String?                         @unique
   status                      CreatorMissionStatus
@@ -1106,6 +1134,8 @@ model CreatorMission {
   missionApplication MissionApplication? @relation(fields: [missionApplicationId], references: [id], onDelete: SetNull)
 
   @@unique([missionId, accountId])
+  @@index([applicationStatus, appliedAt])
+  @@index([submissionStatus, updatedAt])
   @@index([accountId, status, createdAt])
   @@index([campaignId, status, createdAt])
 }
