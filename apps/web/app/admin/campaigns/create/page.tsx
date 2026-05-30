@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ErrorState, PageHeader } from "@/app/components/dcreator/ui/base";
 import { getCampaignTypeLabel } from "@/lib/constants/campaign-type";
 
@@ -29,6 +30,18 @@ type FormState = {
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string };
 type FieldErrors = Partial<Record<keyof FormState, string>> & { participationRoadmap?: string };
+type CampaignRequestItem = {
+  id: string;
+  requestedSlug: string;
+  title: string;
+  brief: string;
+  objective: string | null;
+  priorityChannels: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  status: "PENDING_REVIEW" | "NEEDS_REVISION" | "APPROVED" | "REJECTED";
+  brand: { id: string; name: string | null; ownerAccountId: string; contactEmail: string | null };
+};
 
 const defaultForm: FormState = {
   brandAccountId: "",
@@ -51,10 +64,33 @@ function toDateTime(value: string) {
   return value ? new Date(value).toISOString() : undefined;
 }
 
+function toDateTimeLocalInput(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (num: number) => String(num).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+const COVER_IMAGE_MARKER = "[[COVER_IMAGE_URL]]:";
+const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
+
+function extractMarker(brief: string, marker: string) {
+  const line = brief
+    .split("\n")
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(marker));
+  return line ? line.slice(marker.length).trim() : "";
+}
+
 export default function AdminCreateCampaignPage() {
+  const searchParams = useSearchParams();
+  const requestId = searchParams.get("requestId")?.trim() ?? "";
   const [form, setForm] = useState<FormState>(defaultForm);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [prefillLoading, setPrefillLoading] = useState(false);
+  const [prefillNote, setPrefillNote] = useState("");
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [success, setSuccess] = useState("");
@@ -85,6 +121,59 @@ export default function AdminCreateCampaignPage() {
       participationRoadmap: current.participationRoadmap.filter((_, idx) => idx !== index)
     }));
   }
+
+  useEffect(() => {
+    if (!requestId) return;
+    let mounted = true;
+
+    async function loadRequestPrefill() {
+      setPrefillLoading(true);
+      setPrefillNote("");
+      setError("");
+      try {
+        const response = await fetch("/api/admin/dashboard/campaign-reviews", { cache: "no-store" });
+        const payload = (await response.json()) as ApiResponse<CampaignRequestItem[]>;
+        if (!response.ok || !payload.success) throw new Error(payload.success ? "Không thể tải yêu cầu campaign" : payload.error);
+        const request = payload.data.find((item) => item.id === requestId);
+        if (!request) throw new Error("Không tìm thấy yêu cầu campaign để prefill.");
+
+        const coverImageUrl = extractMarker(request.brief, COVER_IMAGE_MARKER);
+        const contentFileUrl = extractMarker(request.brief, CONTENT_FILE_MARKER);
+        const participationRoadmap = (request.priorityChannels ?? "")
+          .split("\n")
+          .map((item) => item.trim())
+          .filter(Boolean);
+        const normalizedRoadmap = participationRoadmap.length > 0 ? participationRoadmap : [""];
+
+        if (!mounted) return;
+        setForm((current) => ({
+          ...current,
+          brandAccountId: request.brand.ownerAccountId,
+          brandKeyword: request.brand.name && request.brand.contactEmail ? `${request.brand.name} (${request.brand.contactEmail})` : current.brandKeyword,
+          slug: request.requestedSlug || current.slug,
+          title: request.title || current.title,
+          brief: contentFileUrl ? `${request.brief}\n\nFile nội dung Brand gửi: ${contentFileUrl}` : request.brief || current.brief,
+          setupSource: "BRAND_REQUESTED",
+          participationRoadmap: normalizedRoadmap,
+          benefits: request.objective ?? current.benefits,
+          imageUrl: coverImageUrl || current.imageUrl,
+          startsAt: toDateTimeLocalInput(request.startsAt),
+          endsAt: toDateTimeLocalInput(request.endsAt)
+        }));
+        setPrefillNote(`Đã nạp sẵn dữ liệu từ yêu cầu #${request.requestedSlug}. Vui lòng bổ sung đầy đủ trước khi tạo campaign.`);
+      } catch (prefillError) {
+        if (!mounted) return;
+        setError(prefillError instanceof Error ? prefillError.message : "Không thể nạp dữ liệu prefill từ yêu cầu.");
+      } finally {
+        if (mounted) setPrefillLoading(false);
+      }
+    }
+
+    void loadRequestPrefill();
+    return () => {
+      mounted = false;
+    };
+  }, [requestId]);
 
   async function searchBrand(keyword: string) {
     const nextKeyword = keyword.trim();
@@ -179,11 +268,13 @@ export default function AdminCreateCampaignPage() {
     <>
       <PageHeader
         title="Tạo campaign (Admin)"
-        subtitle="Admin có thể tạo campaign trực tiếp theo cấu trúc mới."
+        subtitle={requestId ? "Form đã prefill từ yêu cầu Brand. Admin cần bổ sung thông tin còn thiếu trước khi tạo." : "Admin có thể tạo campaign trực tiếp theo cấu trúc mới."}
         action={<Link href="/admin/campaigns" className="dc-btn-secondary">Quay lại duyệt campaign</Link>}
       />
 
       {error ? <div className="mt-4"><ErrorState title="Tạo campaign thất bại" description={error} /></div> : null}
+      {prefillLoading ? <p className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">Đang nạp dữ liệu từ yêu cầu Brand...</p> : null}
+      {prefillNote ? <p className="mt-4 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-700">{prefillNote}</p> : null}
       {success ? <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p> : null}
 
       <form className="dc-card mt-6 grid gap-4 p-5" onSubmit={submit}>
