@@ -8,19 +8,10 @@ import { PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { FormField } from "@/app/components/dcreator/ui/base";
 import { PasswordInput } from "@/app/components/dcreator/ui/PasswordInput";
 import { canAccessPath, resolveWorkspaceLanding } from "@/lib/auth/workspace-choice";
-import { ROLE } from "@/lib/auth/role-constants";
 
 type LoginContext = { creatorProfile?: { id: string } | null; brandMemberships?: Array<{ id: string; name: string; role: "OWNER" | "MANAGER" | "STAFF" }> };
 
 async function resolvePostLoginPath(roles: Role[], context?: LoginContext) {
-  const brandRoles: Role[] = [ROLE.BRAND_OWNER, ROLE.BRAND_STAFF];
-  if (roles.some((role) => brandRoles.includes(role))) {
-    const response = await fetch("/api/brand/dashboard/onboarding", { cache: "no-store" });
-    const payload = await response.json();
-    if (response.ok && payload?.success && payload?.data && !payload.data.completed) {
-      return "/dashboard/brand/onboarding";
-    }
-  }
   const decision = resolveWorkspaceLanding({
     roles,
     creatorProfile: context?.creatorProfile ?? null,

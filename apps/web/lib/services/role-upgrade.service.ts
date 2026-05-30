@@ -5,7 +5,7 @@ import { AppError } from "@/lib/errors";
 import { hasSomeRole } from "@/lib/auth/roles";
 import { resolvePrimaryRole } from "@/lib/auth/role-constants";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
-import { createNotification, createNotificationForAdminOps } from "@/lib/services/notification.service";
+import { createNotification } from "@/lib/services/notification.service";
 import type { BrandApplicationInput, CreatorApplicationInput } from "@/lib/validators/role-upgrade";
 type ApplicationStatusValue = (typeof APPLICATION_STATUS)[number];
 
@@ -31,6 +31,200 @@ async function assignRole(tx: Prisma.TransactionClient, accountId: string, role:
     create: { accountId, role },
     update: {}
   });
+}
+
+async function syncCreatorAccessFromApplication(tx: Prisma.TransactionClient, app: {
+  id: string;
+  accountId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  bio: string | null;
+  mainPlatform: "TIKTOK" | "INSTAGRAM" | "YOUTUBE" | "FACEBOOK" | "SHOPEE" | "OTHER";
+  socialUrl: string;
+  handle: string | null;
+  followerCount: number | null;
+  contentCategory: string | null;
+  portfolioUrl: string | null;
+  location: string | null;
+  expectedRate: number | null;
+  maxJobsPerMonth: number | null;
+  realName: string | null;
+  phone: string | null;
+  identityNumber: string | null;
+  identityFrontUrl: string | null;
+  identityBackUrl: string | null;
+  selfieUrl: string | null;
+  bankAccountName: string | null;
+  bankAccountNumber: string | null;
+  bankName: string | null;
+  taxCode: string | null;
+}) {
+  const profile = await tx.creatorProfile.upsert({
+    where: { accountId: app.accountId },
+    create: {
+      accountId: app.accountId,
+      displayName: app.displayName,
+      avatarUrl: app.avatarUrl,
+      bio: app.bio,
+      mainPlatform: app.mainPlatform,
+      socialUrl: app.socialUrl,
+      handle: app.handle,
+      followerCount: app.followerCount,
+      contentCategory: app.contentCategory,
+      portfolioUrl: app.portfolioUrl,
+      location: app.location,
+      expectedRate: app.expectedRate,
+      maxJobsPerMonth: app.maxJobsPerMonth,
+      realName: app.realName,
+      phone: app.phone,
+      identityNumber: app.identityNumber,
+      identityFrontUrl: app.identityFrontUrl,
+      identityBackUrl: app.identityBackUrl,
+      selfieUrl: app.selfieUrl,
+      bankAccountName: app.bankAccountName,
+      bankAccountNumber: app.bankAccountNumber,
+      bankName: app.bankName,
+      taxCode: app.taxCode
+    },
+    update: {
+      displayName: app.displayName,
+      avatarUrl: app.avatarUrl,
+      bio: app.bio,
+      mainPlatform: app.mainPlatform,
+      socialUrl: app.socialUrl,
+      handle: app.handle,
+      followerCount: app.followerCount,
+      contentCategory: app.contentCategory,
+      portfolioUrl: app.portfolioUrl,
+      location: app.location,
+      expectedRate: app.expectedRate,
+      maxJobsPerMonth: app.maxJobsPerMonth,
+      realName: app.realName,
+      phone: app.phone,
+      identityNumber: app.identityNumber,
+      identityFrontUrl: app.identityFrontUrl,
+      identityBackUrl: app.identityBackUrl,
+      selfieUrl: app.selfieUrl,
+      bankAccountName: app.bankAccountName,
+      bankAccountNumber: app.bankAccountNumber,
+      bankName: app.bankName,
+      taxCode: app.taxCode
+    }
+  });
+
+  await tx.creatorSocialLink.upsert({
+    where: {
+      creatorProfileId_platform_socialUrl: {
+        creatorProfileId: profile.id,
+        platform: app.mainPlatform,
+        socialUrl: app.socialUrl
+      }
+    },
+    create: {
+      creatorProfileId: profile.id,
+      platform: app.mainPlatform,
+      socialUrl: app.socialUrl,
+      followers: app.followerCount ?? 0,
+      status: "APPROVED",
+      reviewedAt: new Date()
+    },
+    update: {
+      followers: app.followerCount ?? 0,
+      status: "APPROVED",
+      rejectReason: null,
+      reviewedAt: new Date()
+    }
+  });
+
+  await assignRole(tx, app.accountId, Role.CREATOR);
+  await tx.account.update({ where: { id: app.accountId }, data: { role: Role.CREATOR } });
+}
+
+async function syncBrandAccessFromApplication(
+  tx: Prisma.TransactionClient,
+  app: Prisma.BrandApplicationGetPayload<{}>
+) {
+  const existingBrand = await tx.brand.findFirst({
+    where: { ownerAccountId: app.accountId },
+    orderBy: { createdAt: "desc" }
+  });
+  const reviewedAt = new Date();
+  const brand = existingBrand
+    ? await tx.brand.update({
+        where: { id: existingBrand.id },
+        data: {
+          name: app.brandName,
+          logoUrl: app.logoUrl,
+          legalName: app.legalName,
+          industry: app.industry,
+          website: app.website,
+          fanpage: app.fanpage,
+          address: app.address,
+          contactName: app.contactName,
+          contactPhone: app.contactPhone,
+          contactEmail: app.contactEmail,
+          description: app.description,
+          businessGoal: app.businessGoal,
+          taxCode: app.taxCode,
+          businessLicenseUrl: app.businessLicenseUrl,
+          representativeName: app.representativeName,
+          representativePhone: app.representativePhone,
+          representativeEmail: app.representativeEmail,
+          productCategories: app.productCategories,
+          inventoryDescription: app.inventoryDescription,
+          revenueSharePercent: app.revenueSharePercent,
+          commissionRatePercent: app.commissionRatePercent,
+          bccAgreementVersion: app.bccAgreementVersion,
+          bccAgreementTerms: app.bccAgreementTerms,
+          legalResponsibilityAccepted: app.legalResponsibilityAccepted,
+          contractFileUrl: app.contractFileUrl,
+          contractSignedAt: app.contractSignedAt,
+          status: BrandStatus.ACTIVE,
+          reviewedById: null,
+          reviewedAt
+        }
+      })
+    : await tx.brand.create({
+        data: {
+          ownerAccountId: app.accountId,
+          name: app.brandName,
+          logoUrl: app.logoUrl,
+          legalName: app.legalName,
+          industry: app.industry,
+          website: app.website,
+          fanpage: app.fanpage,
+          address: app.address,
+          contactName: app.contactName,
+          contactPhone: app.contactPhone,
+          contactEmail: app.contactEmail,
+          description: app.description,
+          businessGoal: app.businessGoal,
+          taxCode: app.taxCode,
+          businessLicenseUrl: app.businessLicenseUrl,
+          representativeName: app.representativeName,
+          representativePhone: app.representativePhone,
+          representativeEmail: app.representativeEmail,
+          productCategories: app.productCategories,
+          inventoryDescription: app.inventoryDescription,
+          revenueSharePercent: app.revenueSharePercent,
+          commissionRatePercent: app.commissionRatePercent,
+          bccAgreementVersion: app.bccAgreementVersion,
+          bccAgreementTerms: app.bccAgreementTerms,
+          legalResponsibilityAccepted: app.legalResponsibilityAccepted,
+          contractFileUrl: app.contractFileUrl,
+          contractSignedAt: app.contractSignedAt,
+          status: BrandStatus.ACTIVE,
+          reviewedById: null,
+          reviewedAt
+        }
+      });
+  await tx.brandMember.upsert({
+    where: { brandId_accountId: { brandId: brand.id, accountId: app.accountId } },
+    create: { brandId: brand.id, accountId: app.accountId, role: BrandMemberRole.OWNER },
+    update: { role: BrandMemberRole.OWNER }
+  });
+  await assignRole(tx, app.accountId, Role.BRAND_OWNER);
+  await tx.account.update({ where: { id: app.accountId }, data: { role: Role.BRAND_OWNER } });
 }
 
 export async function getRoleUpgradeSnapshot(accountId: string) {
@@ -64,52 +258,57 @@ export async function applyCreator(accountId: string, input: CreatorApplicationI
   }
 
   const pending = await prisma.creatorApplication.findFirst({
-    where: { accountId, status: "PENDING_REVIEW" },
+    where: { accountId, status: { in: ["PENDING_REVIEW", "APPROVED"] } },
     select: { id: true }
   });
-  if (pending) throw new AppError("Creator application is pending review", 409, "APPLICATION_PENDING");
+  if (pending) throw new AppError("Creator profile is already active", 409, "CREATOR_ALREADY_GRANTED");
 
-  const created = await prisma.creatorApplication.create({
-    data: {
-      accountId,
-      status: "PENDING_REVIEW",
-      displayName: input.displayName,
-      avatarUrl: normalizeOptional(input.avatarUrl),
-      bio: normalizeOptional(input.bio),
-      mainPlatform: input.mainPlatform,
-      socialUrl: input.socialUrl,
-      handle: normalizeOptional(input.handle),
-      followerCount: input.followerCount,
-      contentCategory: normalizeOptional(input.contentCategory),
-      portfolioUrl: normalizeOptional(input.portfolioUrl),
-      location: normalizeOptional(input.location),
-      expectedRate: input.expectedRate,
-      maxJobsPerMonth: input.maxJobsPerMonth,
-      realName: normalizeOptional(input.realName),
-      phone: normalizeOptional(input.phone),
-      identityNumber: normalizeOptional(input.identityNumber),
-      identityFrontUrl: normalizeOptional(input.identityFrontUrl),
-      identityBackUrl: normalizeOptional(input.identityBackUrl),
-      selfieUrl: normalizeOptional(input.selfieUrl),
-      bankAccountName: normalizeOptional(input.bankAccountName),
-      bankAccountNumber: normalizeOptional(input.bankAccountNumber),
-      bankName: normalizeOptional(input.bankName),
-      taxCode: normalizeOptional(input.taxCode)
-    }
+  const created = await prisma.$transaction(async (tx) => {
+    const app = await tx.creatorApplication.create({
+      data: {
+        accountId,
+        status: "APPROVED",
+        displayName: input.displayName,
+        avatarUrl: normalizeOptional(input.avatarUrl),
+        bio: normalizeOptional(input.bio),
+        mainPlatform: input.mainPlatform,
+        socialUrl: input.socialUrl,
+        handle: normalizeOptional(input.handle),
+        followerCount: input.followerCount,
+        contentCategory: normalizeOptional(input.contentCategory),
+        portfolioUrl: normalizeOptional(input.portfolioUrl),
+        location: normalizeOptional(input.location),
+        expectedRate: input.expectedRate,
+        maxJobsPerMonth: input.maxJobsPerMonth,
+        realName: normalizeOptional(input.realName),
+        phone: normalizeOptional(input.phone),
+        identityNumber: normalizeOptional(input.identityNumber),
+        identityFrontUrl: normalizeOptional(input.identityFrontUrl),
+        identityBackUrl: normalizeOptional(input.identityBackUrl),
+        selfieUrl: normalizeOptional(input.selfieUrl),
+        bankAccountName: normalizeOptional(input.bankAccountName),
+        bankAccountNumber: normalizeOptional(input.bankAccountNumber),
+        bankName: normalizeOptional(input.bankName),
+        taxCode: normalizeOptional(input.taxCode),
+        reviewedAt: new Date()
+      }
+    });
+    await syncCreatorAccessFromApplication(tx, app);
+    return app;
   });
   await writeAuditLog({
     actorId: accountId,
-    action: "CREATOR_APPLICATION_SUBMITTED",
+    action: "CREATOR_APPLICATION_AUTO_APPROVED",
     targetType: "CreatorApplication",
     targetId: created.id,
     newStatus: created.status
   });
-  await createNotificationForAdminOps({
+  await createNotification({
+    accountId,
     event: NotificationEvent.CREATOR_APPLICATION_APPROVED,
-    title: "Có Creator application mới",
-    content: `Creator ${created.displayName} vừa gửi hồ sơ chờ duyệt.`,
-    metadata: { creatorApplicationId: created.id },
-    excludeAccountId: accountId
+    title: "Hồ sơ Creator đã được tạo",
+    content: "Bạn có thể bắt đầu thiết lập Creator Dashboard. Bổ sung xác minh để mở khóa payout nâng cao.",
+    metadata: { creatorApplicationId: created.id }
   });
   return created;
 }
@@ -146,99 +345,108 @@ export async function updateCreatorApplication(accountId: string, applicationId:
   if (!current || current.accountId !== accountId) throw new AppError("Application not found", 404, "APPLICATION_NOT_FOUND");
   ensureCanEdit(current.status);
 
-  const updated = await prisma.creatorApplication.update({
-    where: { id: applicationId },
-    data: {
-      status: "PENDING_REVIEW",
-      rejectReason: null,
-      reviewNote: null,
-      reviewedAt: null,
-      reviewedById: null,
-      displayName: input.displayName,
-      avatarUrl: normalizeOptional(input.avatarUrl),
-      bio: normalizeOptional(input.bio),
-      mainPlatform: input.mainPlatform,
-      socialUrl: input.socialUrl,
-      handle: normalizeOptional(input.handle),
-      followerCount: input.followerCount,
-      contentCategory: normalizeOptional(input.contentCategory),
-      portfolioUrl: normalizeOptional(input.portfolioUrl),
-      location: normalizeOptional(input.location),
-      expectedRate: input.expectedRate,
-      maxJobsPerMonth: input.maxJobsPerMonth,
-      realName: normalizeOptional(input.realName),
-      phone: normalizeOptional(input.phone),
-      identityNumber: normalizeOptional(input.identityNumber),
-      identityFrontUrl: normalizeOptional(input.identityFrontUrl),
-      identityBackUrl: normalizeOptional(input.identityBackUrl),
-      selfieUrl: normalizeOptional(input.selfieUrl),
-      bankAccountName: normalizeOptional(input.bankAccountName),
-      bankAccountNumber: normalizeOptional(input.bankAccountNumber),
-      bankName: normalizeOptional(input.bankName),
-      taxCode: normalizeOptional(input.taxCode)
-    }
+  const updated = await prisma.$transaction(async (tx) => {
+    const app = await tx.creatorApplication.update({
+      where: { id: applicationId },
+      data: {
+        status: "APPROVED",
+        rejectReason: null,
+        reviewNote: null,
+        reviewedById: null,
+        displayName: input.displayName,
+        avatarUrl: normalizeOptional(input.avatarUrl),
+        bio: normalizeOptional(input.bio),
+        mainPlatform: input.mainPlatform,
+        socialUrl: input.socialUrl,
+        handle: normalizeOptional(input.handle),
+        followerCount: input.followerCount,
+        contentCategory: normalizeOptional(input.contentCategory),
+        portfolioUrl: normalizeOptional(input.portfolioUrl),
+        location: normalizeOptional(input.location),
+        expectedRate: input.expectedRate,
+        maxJobsPerMonth: input.maxJobsPerMonth,
+        realName: normalizeOptional(input.realName),
+        phone: normalizeOptional(input.phone),
+        identityNumber: normalizeOptional(input.identityNumber),
+        identityFrontUrl: normalizeOptional(input.identityFrontUrl),
+        identityBackUrl: normalizeOptional(input.identityBackUrl),
+        selfieUrl: normalizeOptional(input.selfieUrl),
+        bankAccountName: normalizeOptional(input.bankAccountName),
+        bankAccountNumber: normalizeOptional(input.bankAccountNumber),
+        bankName: normalizeOptional(input.bankName),
+        taxCode: normalizeOptional(input.taxCode),
+        reviewedAt: new Date()
+      }
+    });
+    await syncCreatorAccessFromApplication(tx, app);
+    return app;
   });
   await writeAuditLog({
     actorId: accountId,
-    action: "CREATOR_APPLICATION_RESUBMITTED",
+    action: "CREATOR_APPLICATION_UPDATED",
     targetType: "CreatorApplication",
     targetId: updated.id,
     newStatus: updated.status
   });
-  await createNotificationForAdminOps({
+  await createNotification({
+    accountId,
     event: NotificationEvent.CREATOR_APPLICATION_APPROVED,
-    title: "Creator application được cập nhật",
-    content: `Creator ${updated.displayName} đã cập nhật hồ sơ và gửi lại duyệt.`,
-    metadata: { creatorApplicationId: updated.id },
-    excludeAccountId: accountId
+    title: "Hồ sơ Creator đã được cập nhật",
+    content: "Bạn có thể tiếp tục sử dụng Creator Dashboard.",
+    metadata: { creatorApplicationId: updated.id }
   });
   return updated;
 }
 
 export async function applyBrand(accountId: string, input: BrandApplicationInput) {
   const pending = await prisma.brandApplication.findFirst({
-    where: { accountId, status: "PENDING_REVIEW" },
+    where: { accountId, status: { in: ["PENDING_REVIEW", "APPROVED"] } },
     select: { id: true }
   });
-  if (pending) throw new AppError("Brand application is pending review", 409, "APPLICATION_PENDING");
+  if (pending) throw new AppError("Brand profile is already active", 409, "BRAND_ALREADY_GRANTED");
 
-  return prisma.brandApplication.create({
-    data: {
-      accountId,
-      status: "PENDING_REVIEW",
-      brandName: input.brandName,
-      logoUrl: normalizeOptional(input.logoUrl),
-      legalName: normalizeOptional(input.legalName),
-      industry: normalizeOptional(input.industry),
-      website: normalizeOptional(input.website),
-      fanpage: normalizeOptional(input.fanpage),
-      address: normalizeOptional(input.address),
-      contactName: input.contactName,
-      contactPhone: input.contactPhone,
-      contactEmail: input.contactEmail,
-      description: normalizeOptional(input.description),
-      businessGoal: normalizeOptional(input.businessGoal),
-      taxCode: normalizeOptional(input.taxCode),
-      businessLicenseUrl: normalizeOptional(input.businessLicenseUrl),
-      representativeName: normalizeOptional(input.representativeName),
-      representativePhone: normalizeOptional(input.representativePhone),
-      representativeEmail: normalizeOptional(input.representativeEmail),
-      representativeIdentityNumber: normalizeOptional(input.representativeIdentityNumber),
-      bankAccountName: normalizeOptional(input.bankAccountName),
-      bankAccountNumber: normalizeOptional(input.bankAccountNumber),
-      bankName: normalizeOptional(input.bankName),
-      productCategories: normalizeOptional(input.productCategories),
-      inventoryDescription: normalizeOptional(input.inventoryDescription),
-      expectedCampaignBudget: input.expectedCampaignBudget,
-      expectedCreatorCount: input.expectedCreatorCount,
-      revenueSharePercent: input.revenueSharePercent,
-      commissionRatePercent: input.commissionRatePercent,
-      bccAgreementAccepted: input.bccAgreementAccepted ?? false,
-      bccAgreementVersion: normalizeOptional(input.bccAgreementVersion),
-      legalResponsibilityAccepted: input.legalResponsibilityAccepted ?? false,
-      contractFileUrl: normalizeOptional(input.contractFileUrl),
-      contractSignedAt: resolveContractSignedAt()
-    }
+  return prisma.$transaction(async (tx) => {
+    const app = await tx.brandApplication.create({
+      data: {
+        accountId,
+        status: "APPROVED",
+        brandName: input.brandName,
+        logoUrl: normalizeOptional(input.logoUrl),
+        legalName: normalizeOptional(input.legalName),
+        industry: normalizeOptional(input.industry),
+        website: normalizeOptional(input.website),
+        fanpage: normalizeOptional(input.fanpage),
+        address: normalizeOptional(input.address),
+        contactName: input.contactName,
+        contactPhone: input.contactPhone,
+        contactEmail: input.contactEmail,
+        description: normalizeOptional(input.description),
+        businessGoal: normalizeOptional(input.businessGoal),
+        taxCode: normalizeOptional(input.taxCode),
+        businessLicenseUrl: normalizeOptional(input.businessLicenseUrl),
+        representativeName: normalizeOptional(input.representativeName),
+        representativePhone: normalizeOptional(input.representativePhone),
+        representativeEmail: normalizeOptional(input.representativeEmail),
+        representativeIdentityNumber: normalizeOptional(input.representativeIdentityNumber),
+        bankAccountName: normalizeOptional(input.bankAccountName),
+        bankAccountNumber: normalizeOptional(input.bankAccountNumber),
+        bankName: normalizeOptional(input.bankName),
+        productCategories: normalizeOptional(input.productCategories),
+        inventoryDescription: normalizeOptional(input.inventoryDescription),
+        expectedCampaignBudget: input.expectedCampaignBudget,
+        expectedCreatorCount: input.expectedCreatorCount,
+        revenueSharePercent: input.revenueSharePercent,
+        commissionRatePercent: input.commissionRatePercent,
+        bccAgreementAccepted: input.bccAgreementAccepted ?? false,
+        bccAgreementVersion: normalizeOptional(input.bccAgreementVersion),
+        legalResponsibilityAccepted: input.legalResponsibilityAccepted ?? false,
+        contractFileUrl: normalizeOptional(input.contractFileUrl),
+        contractSignedAt: resolveContractSignedAt(),
+        reviewedAt: new Date()
+      }
+    });
+    await syncBrandAccessFromApplication(tx, app);
+    return app;
   });
 }
 
@@ -247,47 +455,51 @@ export async function updateBrandApplication(accountId: string, applicationId: s
   if (!current || current.accountId !== accountId) throw new AppError("Application not found", 404, "APPLICATION_NOT_FOUND");
   ensureCanEdit(current.status);
 
-  return prisma.brandApplication.update({
-    where: { id: applicationId },
-    data: {
-      status: "PENDING_REVIEW",
-      rejectReason: null,
-      reviewNote: null,
-      reviewedAt: null,
-      reviewedById: null,
-      brandName: input.brandName,
-      logoUrl: normalizeOptional(input.logoUrl),
-      legalName: normalizeOptional(input.legalName),
-      industry: normalizeOptional(input.industry),
-      website: normalizeOptional(input.website),
-      fanpage: normalizeOptional(input.fanpage),
-      address: normalizeOptional(input.address),
-      contactName: input.contactName,
-      contactPhone: input.contactPhone,
-      contactEmail: input.contactEmail,
-      description: normalizeOptional(input.description),
-      businessGoal: normalizeOptional(input.businessGoal),
-      taxCode: normalizeOptional(input.taxCode),
-      businessLicenseUrl: normalizeOptional(input.businessLicenseUrl),
-      representativeName: normalizeOptional(input.representativeName),
-      representativePhone: normalizeOptional(input.representativePhone),
-      representativeEmail: normalizeOptional(input.representativeEmail),
-      representativeIdentityNumber: normalizeOptional(input.representativeIdentityNumber),
-      bankAccountName: normalizeOptional(input.bankAccountName),
-      bankAccountNumber: normalizeOptional(input.bankAccountNumber),
-      bankName: normalizeOptional(input.bankName),
-      productCategories: normalizeOptional(input.productCategories),
-      inventoryDescription: normalizeOptional(input.inventoryDescription),
-      expectedCampaignBudget: input.expectedCampaignBudget,
-      expectedCreatorCount: input.expectedCreatorCount,
-      revenueSharePercent: input.revenueSharePercent,
-      commissionRatePercent: input.commissionRatePercent,
-      bccAgreementAccepted: input.bccAgreementAccepted ?? false,
-      bccAgreementVersion: normalizeOptional(input.bccAgreementVersion),
-      legalResponsibilityAccepted: input.legalResponsibilityAccepted ?? false,
-      contractFileUrl: normalizeOptional(input.contractFileUrl),
-      contractSignedAt: resolveContractSignedAt()
-    }
+  return prisma.$transaction(async (tx) => {
+    const app = await tx.brandApplication.update({
+      where: { id: applicationId },
+      data: {
+        status: "APPROVED",
+        rejectReason: null,
+        reviewNote: null,
+        reviewedById: null,
+        brandName: input.brandName,
+        logoUrl: normalizeOptional(input.logoUrl),
+        legalName: normalizeOptional(input.legalName),
+        industry: normalizeOptional(input.industry),
+        website: normalizeOptional(input.website),
+        fanpage: normalizeOptional(input.fanpage),
+        address: normalizeOptional(input.address),
+        contactName: input.contactName,
+        contactPhone: input.contactPhone,
+        contactEmail: input.contactEmail,
+        description: normalizeOptional(input.description),
+        businessGoal: normalizeOptional(input.businessGoal),
+        taxCode: normalizeOptional(input.taxCode),
+        businessLicenseUrl: normalizeOptional(input.businessLicenseUrl),
+        representativeName: normalizeOptional(input.representativeName),
+        representativePhone: normalizeOptional(input.representativePhone),
+        representativeEmail: normalizeOptional(input.representativeEmail),
+        representativeIdentityNumber: normalizeOptional(input.representativeIdentityNumber),
+        bankAccountName: normalizeOptional(input.bankAccountName),
+        bankAccountNumber: normalizeOptional(input.bankAccountNumber),
+        bankName: normalizeOptional(input.bankName),
+        productCategories: normalizeOptional(input.productCategories),
+        inventoryDescription: normalizeOptional(input.inventoryDescription),
+        expectedCampaignBudget: input.expectedCampaignBudget,
+        expectedCreatorCount: input.expectedCreatorCount,
+        revenueSharePercent: input.revenueSharePercent,
+        commissionRatePercent: input.commissionRatePercent,
+        bccAgreementAccepted: input.bccAgreementAccepted ?? false,
+        bccAgreementVersion: normalizeOptional(input.bccAgreementVersion),
+        legalResponsibilityAccepted: input.legalResponsibilityAccepted ?? false,
+        contractFileUrl: normalizeOptional(input.contractFileUrl),
+        contractSignedAt: resolveContractSignedAt(),
+        reviewedAt: new Date()
+      }
+    });
+    await syncBrandAccessFromApplication(tx, app);
+    return app;
   });
 }
 
@@ -447,6 +659,7 @@ export async function reviewCreatorApplication(actorId: string, applicationId: s
   const current = await prisma.creatorApplication.findUnique({ where: { id: applicationId } });
   if (!current) throw new AppError("Application not found", 404, "APPLICATION_NOT_FOUND");
   if (current.status !== "PENDING_REVIEW") throw new AppError("Application already processed", 409, "APPLICATION_PROCESSED");
+  const decisionAction = status === "APPROVED" ? "VERIFY" : status === "REJECTED" ? "RISK" : status === "NEEDS_REVISION" ? "RESTRICT" : status;
 
   const updated = await prisma.$transaction(async (tx) => {
     const app = await tx.creatorApplication.update({
@@ -532,7 +745,7 @@ export async function reviewCreatorApplication(actorId: string, applicationId: s
 
   await writeAuditLog({
     actorId,
-    action: `CREATOR_APPLICATION_${status}`,
+    action: `CREATOR_APPLICATION_${decisionAction}`,
     targetType: "CreatorApplication",
     targetId: updated.id,
     oldStatus: current.status,
@@ -554,6 +767,7 @@ export async function reviewBrandApplication(actorId: string, applicationId: str
   const current = await prisma.brandApplication.findUnique({ where: { id: applicationId } });
   if (!current) throw new AppError("Application not found", 404, "APPLICATION_NOT_FOUND");
   if (current.status !== "PENDING_REVIEW") throw new AppError("Application already processed", 409, "APPLICATION_PROCESSED");
+  const decisionAction = status === "APPROVED" ? "VERIFY" : status === "REJECTED" ? "RISK" : status === "NEEDS_REVISION" ? "RESTRICT" : status;
   const isOnboardingBccUpdate = current.reviewNote === "Brand requested onboarding/BCC update and admin review.";
   const reviewedAt = new Date();
 
@@ -650,7 +864,7 @@ export async function reviewBrandApplication(actorId: string, applicationId: str
 
   await writeAuditLog({
     actorId,
-    action: `BRAND_APPLICATION_${status}`,
+    action: `BRAND_APPLICATION_${decisionAction}`,
     targetType: "BrandApplication",
     targetId: updated.id,
     oldStatus: current.status,

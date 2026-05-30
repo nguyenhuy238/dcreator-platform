@@ -48,7 +48,7 @@ export default function AdminCreatorDetailPage() {
   const [toast, setToast] = useState("");
   const [item, setItem] = useState<CreatorApplicationDetail | null>(null);
   const [acting, setActing] = useState(false);
-  const [dialogAction, setDialogAction] = useState<null | "approve" | "reject" | "request-changes">(null);
+  const [dialogAction, setDialogAction] = useState<null | "verify" | "risk" | "restrict">(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -94,7 +94,7 @@ export default function AdminCreatorDetailPage() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Creator Request Detail" subtitle="Kiểm tra hồ sơ trước khi quyết định duyệt." />
+        <PageHeader title="Creator Verification Detail" subtitle="Kiểm tra hồ sơ phục vụ risk/moderation operations." />
         <LoadingSkeleton rows={5} />
       </>
     );
@@ -157,59 +157,59 @@ export default function AdminCreatorDetailPage() {
       </section>
 
       <section className="mt-4 dc-card p-4">
-        <p className="font-semibold">Decision</p>
+        <p className="font-semibold">Risk Decision</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button className="dc-btn-primary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("approve")}>
-            Approve
+          <button className="dc-btn-primary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("verify")}>
+            Xác nhận an toàn cơ bản
           </button>
-          <button className="dc-btn-secondary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("reject")}>
-            Reject
+          <button className="dc-btn-secondary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("risk")}>
+            Gắn cờ rủi ro
           </button>
-          <button className="dc-btn-secondary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("request-changes")}>
-            Request changes
+          <button className="dc-btn-secondary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("restrict")}>
+            Yêu cầu bổ sung
           </button>
         </div>
       </section>
 
       {toast ? <ActionToast message={toast} /> : null}
       <ReviewActionDialog
-        open={dialogAction === "approve"}
-        title="Xác nhận duyệt Creator"
-        description="Hồ sơ sẽ được duyệt và chuyển sang approved."
-        confirmLabel="Duyệt"
+        open={dialogAction === "verify"}
+        title="Xác nhận hồ sơ an toàn cơ bản"
+        description="Đánh dấu hồ sơ qua kiểm tra cơ bản. Không phải bước mở quyền onboarding."
+        confirmLabel="Xác nhận"
         submitting={acting}
         onCancel={() => !acting && setDialogAction(null)}
         onConfirm={() => {
           setDialogAction(null);
-          void patch(`/api/admin/creators/${item.id}/approve`, {}, "Creator approved");
+          void patch(`/api/admin/creators/${item.id}/verify`, {}, "Creator verification confirmed");
         }}
       />
       <ReviewActionDialog
-        open={dialogAction === "reject"}
-        title="Từ chối hồ sơ Creator"
-        description="Bắt buộc nhập lý do từ chối."
-        confirmLabel="Từ chối"
+        open={dialogAction === "risk"}
+        title="Gắn cờ rủi ro Creator"
+        description="Bắt buộc nhập lý do rủi ro."
+        confirmLabel="Gắn cờ"
         requireReason
         reasonPlaceholder="Nội dung kênh chưa phù hợp guideline..."
         submitting={acting}
         onCancel={() => !acting && setDialogAction(null)}
         onConfirm={(reason) => {
           setDialogAction(null);
-          void patch(`/api/admin/creators/${item.id}/reject`, { reason }, "Creator rejected");
+          void patch(`/api/admin/creators/${item.id}/risk`, { reason }, "Creator risk flagged");
         }}
       />
       <ReviewActionDialog
-        open={dialogAction === "request-changes"}
-        title="Yêu cầu chỉnh sửa hồ sơ Creator"
-        description="Bắt buộc nhập nội dung cần chỉnh sửa."
-        confirmLabel="Yêu cầu chỉnh sửa"
+        open={dialogAction === "restrict"}
+        title="Yêu cầu bổ sung hồ sơ Creator"
+        description="Bắt buộc nhập nội dung cần bổ sung."
+        confirmLabel="Yêu cầu bổ sung"
         requireReason
         reasonPlaceholder="Bổ sung hồ sơ social/profile..."
         submitting={acting}
         onCancel={() => !acting && setDialogAction(null)}
         onConfirm={(reason) => {
           setDialogAction(null);
-          void patch(`/api/admin/creators/${item.id}/request-changes`, { reason }, "Requested changes");
+          void patch(`/api/admin/creators/${item.id}/restrict`, { reason }, "Creator restrictions requested");
         }}
       />
     </>

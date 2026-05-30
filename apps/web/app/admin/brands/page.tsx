@@ -12,7 +12,7 @@ type ApiResult<T> = { success: boolean; data: T; error?: string };
 
 const tabs = [
   { key: "", label: "Tất cả" },
-  { key: "PENDING_REVIEW", label: "Chờ duyệt" },
+  { key: "PENDING_REVIEW", label: "Chờ kiểm tra rủi ro" },
   { key: "NEEDS_REVISION", label: "Cần bổ sung" },
   { key: "APPROVED", label: "Đã xác minh" },
   { key: "REJECTED", label: "Bị từ chối" },
@@ -24,7 +24,7 @@ export default function AdminBrandsPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [status, setStatus] = useState("PENDING_REVIEW");
+  const [status, setStatus] = useState("");
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState("");
   const [acting, setActing] = useState(false);
@@ -58,7 +58,7 @@ export default function AdminBrandsPage() {
 
   return (
     <>
-      <PageHeader title="Quản lý Brand" subtitle="Quản lý KYB, credit balance, trạng thái vận hành và rủi ro Brand." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
+      <PageHeader title="Quản lý Brand" subtitle="Giám sát KYB/rủi ro, credit balance và trạng thái vận hành Brand (không dùng để duyệt onboarding ban đầu)." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
       <section className="dc-card p-4 grid gap-3">
         <AdminTabs items={tabs} value={status} onChange={setStatus} />
         <div className="flex gap-2">

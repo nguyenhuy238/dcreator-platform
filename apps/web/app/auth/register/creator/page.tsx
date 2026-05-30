@@ -139,7 +139,7 @@ export default function CreatorRegisterPage() {
         throw new Error(creatorApplicationPayload.error ?? "Không thể gửi hồ sơ Creator.");
       }
 
-      setSuccess("Đã tạo tài khoản Creator. Hồ sơ đang chờ duyệt.");
+      setSuccess("Hồ sơ Creator đã được tạo. Bạn có thể bắt đầu thiết lập dashboard ngay.");
       event.currentTarget.reset();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra. Vui lòng thử lại.");
@@ -157,7 +157,7 @@ export default function CreatorRegisterPage() {
           <p className="text-xs font-bold uppercase tracking-[0.15em] text-zinc-500">Creator Registration</p>
           <h1 className="mt-3 text-4xl font-black tracking-tight">Đăng ký Creator</h1>
           <p className="mt-3 text-zinc-600">
-            Tạo tài khoản bằng email và mật khẩu, sau đó gửi hồ sơ để được duyệt Creator.
+            Tạo tài khoản bằng email và mật khẩu, sau đó hoàn tất hồ sơ để sử dụng Creator Dashboard ngay.
           </p>
         </section>
 

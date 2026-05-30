@@ -12,7 +12,7 @@ type ApiResult<T> = { success: boolean; data: T; error?: string };
 
 const tabs = [
   { key: "", label: "Tất cả" },
-  { key: "PENDING_REVIEW", label: "Chờ duyệt" },
+  { key: "PENDING_REVIEW", label: "Chờ kiểm tra rủi ro" },
   { key: "NEEDS_REVISION", label: "Cần bổ sung" },
   { key: "APPROVED", label: "Đã duyệt" },
   { key: "REJECTED", label: "Bị từ chối" },
@@ -24,7 +24,7 @@ export default function AdminCreatorsPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [status, setStatus] = useState("PENDING_REVIEW");
+  const [status, setStatus] = useState("");
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState("");
   const [acting, setActing] = useState(false);
@@ -58,7 +58,7 @@ export default function AdminCreatorsPage() {
 
   return (
     <>
-      <PageHeader title="Quản lý Creator" subtitle="Theo dõi, can thiệp và quản lý toàn vòng đời Creator." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
+      <PageHeader title="Quản lý Creator" subtitle="Giám sát rủi ro, moderation và trạng thái vận hành Creator (không dùng để duyệt onboarding ban đầu)." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
       <section className="dc-card p-4 grid gap-3">
         <AdminTabs items={tabs} value={status} onChange={setStatus} />
         <div className="flex gap-2">

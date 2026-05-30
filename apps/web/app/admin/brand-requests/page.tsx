@@ -61,14 +61,14 @@ export default function AdminBrandRequestsPage() {
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState("");
   const [toast, setToast] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("PENDING_REVIEW");
+  const [status, setStatus] = useState<StatusFilter>("");
   const [industry, setIndustry] = useState("");
   const [sort, setSort] = useState<"newest" | "oldest">("newest");
   const [query, setQuery] = useState("");
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<BrandDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [dialogAction, setDialogAction] = useState<"approve" | "reject" | "request-changes" | null>(null);
+  const [dialogAction, setDialogAction] = useState<"verify" | "risk" | "restrict" | null>(null);
   const [acting, setActing] = useState(false);
 
   const load = useCallback(async () => {
@@ -130,8 +130,8 @@ export default function AdminBrandRequestsPage() {
 
     setActing(true);
     try {
-      const endpoint = action === "approve" ? "approve" : action === "reject" ? "reject" : "request-changes";
-      const payload = action === "approve" ? undefined : { reason: reason?.trim() };
+      const endpoint = action === "verify" ? "verify" : action === "risk" ? "risk" : "restrict";
+      const payload = action === "verify" ? undefined : { reason: reason?.trim() };
       const res = await fetch(`/api/admin/brand-requests/${detail.id}/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -152,12 +152,12 @@ export default function AdminBrandRequestsPage() {
 
   return (
     <main>
-      <PageHeader title="Quản lý Brand" subtitle="Quản lý hồ sơ Brand/SME và quyết định duyệt hoặc yêu cầu bổ sung." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
+      <PageHeader title="Brand Verification & Risk Ops" subtitle="Rà soát hồ sơ Brand cho mục đích kiểm soát rủi ro, hạn mức vận hành và moderation; không chặn onboarding cơ bản." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatsCard title="Tổng hồ sơ" value={String(stats.total)} />
-        <StatsCard title="Đang chờ duyệt" value={String(stats.pending)} />
-        <StatsCard title="Đã duyệt" value={String(stats.approved)} />
+        <StatsCard title="Chờ kiểm tra" value={String(stats.pending)} />
+        <StatsCard title="Đã xác minh" value={String(stats.approved)} />
         <StatsCard title="Cần xử lý" value={String(stats.attention)} hint="Rejected + Needs revision" />
       </section>
 
@@ -285,9 +285,9 @@ export default function AdminBrandRequestsPage() {
                 <section className="dc-card p-4">
                   <p className="font-semibold">Thao tác duyệt</p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button className="dc-btn-primary" disabled={acting || detail.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("approve")}>Approve</button>
-                    <button className="dc-btn-secondary" disabled={acting || detail.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("reject")}>Reject</button>
-                    <button className="dc-btn-secondary" disabled={acting || detail.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("request-changes")}>Request changes</button>
+                    <button className="dc-btn-primary" disabled={acting || detail.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("verify")}>Xác nhận an toàn cơ bản</button>
+                    <button className="dc-btn-secondary" disabled={acting || detail.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("risk")}>Gắn cờ rủi ro</button>
+                    <button className="dc-btn-secondary" disabled={acting || detail.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("restrict")}>Yêu cầu bổ sung hồ sơ</button>
                   </div>
                 </section>
               </div>
@@ -297,29 +297,29 @@ export default function AdminBrandRequestsPage() {
       ) : null}
 
       <ReviewActionDialog
-        open={dialogAction === "approve"}
-        title="Xác nhận duyệt Brand"
-        description="Hồ sơ sẽ được duyệt, cập nhật Brand và cấp role BRAND_OWNER."
+        open={dialogAction === "verify"}
+        title="Xác nhận hồ sơ an toàn cơ bản"
+        description="Đánh dấu hồ sơ đã qua kiểm tra cơ bản cho vận hành; không phải bước mở quyền onboarding."
         confirmLabel="Xác nhận"
         submitting={acting}
         onCancel={() => !acting && setDialogAction(null)}
         onConfirm={() => void submitDecision()}
       />
       <ReviewActionDialog
-        open={dialogAction === "reject"}
-        title="Từ chối hồ sơ Brand"
-        description="Bắt buộc nhập lý do từ chối."
-        confirmLabel="Từ chối"
+        open={dialogAction === "risk"}
+        title="Gắn cờ rủi ro Brand"
+        description="Bắt buộc nhập lý do rủi ro để phục vụ kiểm soát và audit."
+        confirmLabel="Gắn cờ rủi ro"
         requireReason
         submitting={acting}
         onCancel={() => !acting && setDialogAction(null)}
         onConfirm={(reason) => void submitDecision(reason)}
       />
       <ReviewActionDialog
-        open={dialogAction === "request-changes"}
-        title="Yêu cầu chỉnh sửa hồ sơ Brand"
-        description="Bắt buộc nhập nội dung cần chỉnh sửa."
-        confirmLabel="Yêu cầu chỉnh sửa"
+        open={dialogAction === "restrict"}
+        title="Yêu cầu bổ sung hồ sơ Brand"
+        description="Bắt buộc nhập thông tin cần bổ sung cho mục tiêu xác minh nâng cao."
+        confirmLabel="Yêu cầu bổ sung"
         requireReason
         submitting={acting}
         onCancel={() => !acting && setDialogAction(null)}

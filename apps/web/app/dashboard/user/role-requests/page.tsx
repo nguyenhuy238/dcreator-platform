@@ -13,8 +13,8 @@ type Snapshot = {
 };
 
 function statusText(value?: string) {
-  if (value === "PENDING_REVIEW") return "Đang chờ duyệt";
-  if (value === "APPROVED") return "Đã duyệt";
+  if (value === "PENDING_REVIEW") return "Hồ sơ đã được tạo";
+  if (value === "APPROVED") return "Hồ sơ đã được tạo";
   if (value === "REJECTED") return "Đã từ chối";
   if (value === "NEEDS_REVISION") return "Cần bổ sung";
   return "Chưa gửi";
@@ -43,7 +43,7 @@ export default function UserRoleRequestsPage() {
   return (
     <>
       <AppShell>
-        <PageHeader title="Đăng ký nâng cấp vai trò" subtitle="Theo dõi trạng thái đăng ký Creator/Brand và hành động tiếp theo." />
+        <PageHeader title="Đăng ký nâng cấp vai trò" subtitle="Theo dõi trạng thái hồ sơ Creator/Brand và vào workspace phù hợp." />
         {error ? <ErrorState title="Không thể tải dữ liệu" description={error} /> : null}
         {loading ? <div className="h-48 animate-pulse rounded-3xl bg-zinc-100" /> : null}
         {!loading && !data ? <EmptyState title="Không có dữ liệu" description="Vui lòng thử lại sau." /> : null}

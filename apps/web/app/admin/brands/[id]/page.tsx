@@ -43,7 +43,7 @@ export default function AdminBrandDetailPage() {
   const [toast, setToast] = useState("");
   const [item, setItem] = useState<BrandApplicationDetail | null>(null);
   const [acting, setActing] = useState(false);
-  const [dialogAction, setDialogAction] = useState<null | "approve" | "reject" | "request-changes">(null);
+  const [dialogAction, setDialogAction] = useState<null | "verify" | "risk" | "restrict">(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -89,7 +89,7 @@ export default function AdminBrandDetailPage() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Brand Request Detail" subtitle="Kiểm tra hồ sơ trước khi quyết định duyệt." />
+        <PageHeader title="Brand Verification Detail" subtitle="Kiểm tra hồ sơ phục vụ risk/KYB operations." />
         <LoadingSkeleton rows={5} />
       </>
     );
@@ -129,59 +129,59 @@ export default function AdminBrandDetailPage() {
       </section>
 
       <section className="mt-4 dc-card p-4">
-        <p className="font-semibold">Decision</p>
+        <p className="font-semibold">Risk Decision</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button className="dc-btn-primary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("approve")}>
-            Approve
+          <button className="dc-btn-primary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("verify")}>
+            Xác nhận an toàn cơ bản
           </button>
-          <button className="dc-btn-secondary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("reject")}>
-            Reject
+          <button className="dc-btn-secondary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("risk")}>
+            Gắn cờ rủi ro
           </button>
-          <button className="dc-btn-secondary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("request-changes")}>
-            Request changes
+          <button className="dc-btn-secondary" disabled={acting || item.status !== "PENDING_REVIEW"} onClick={() => setDialogAction("restrict")}>
+            Yêu cầu bổ sung
           </button>
         </div>
       </section>
 
       {toast ? <ActionToast message={toast} /> : null}
       <ReviewActionDialog
-        open={dialogAction === "approve"}
-        title="Xác nhận duyệt Brand"
-        description="Hồ sơ sẽ được duyệt và kích hoạt theo quy trình."
-        confirmLabel="Duyệt"
+        open={dialogAction === "verify"}
+        title="Xác nhận hồ sơ an toàn cơ bản"
+        description="Đánh dấu hồ sơ qua kiểm tra cơ bản. Không phải bước mở quyền onboarding."
+        confirmLabel="Xác nhận"
         submitting={acting}
         onCancel={() => !acting && setDialogAction(null)}
         onConfirm={() => {
           setDialogAction(null);
-          void patch(`/api/admin/brands/${item.id}/approve`, {}, "Brand approved");
+          void patch(`/api/admin/brands/${item.id}/verify`, {}, "Brand verification confirmed");
         }}
       />
       <ReviewActionDialog
-        open={dialogAction === "reject"}
-        title="Từ chối hồ sơ Brand"
-        description="Bắt buộc nhập lý do từ chối."
-        confirmLabel="Từ chối"
+        open={dialogAction === "risk"}
+        title="Gắn cờ rủi ro Brand"
+        description="Bắt buộc nhập lý do rủi ro."
+        confirmLabel="Gắn cờ"
         requireReason
         reasonPlaceholder="Thông tin pháp lý chưa hợp lệ..."
         submitting={acting}
         onCancel={() => !acting && setDialogAction(null)}
         onConfirm={(reason) => {
           setDialogAction(null);
-          void patch(`/api/admin/brands/${item.id}/reject`, { reason }, "Brand rejected");
+          void patch(`/api/admin/brands/${item.id}/risk`, { reason }, "Brand risk flagged");
         }}
       />
       <ReviewActionDialog
-        open={dialogAction === "request-changes"}
-        title="Yêu cầu chỉnh sửa hồ sơ Brand"
-        description="Bắt buộc nhập nội dung cần chỉnh sửa."
-        confirmLabel="Yêu cầu chỉnh sửa"
+        open={dialogAction === "restrict"}
+        title="Yêu cầu bổ sung hồ sơ Brand"
+        description="Bắt buộc nhập nội dung cần bổ sung."
+        confirmLabel="Yêu cầu bổ sung"
         requireReason
         reasonPlaceholder="Thiếu hồ sơ bổ sung ngành hàng..."
         submitting={acting}
         onCancel={() => !acting && setDialogAction(null)}
         onConfirm={(reason) => {
           setDialogAction(null);
-          void patch(`/api/admin/brands/${item.id}/request-changes`, { reason }, "Requested changes");
+          void patch(`/api/admin/brands/${item.id}/restrict`, { reason }, "Brand restrictions requested");
         }}
       />
     </>

@@ -42,8 +42,8 @@ const defaultBrand = {
 const BRAND_BCC_VERSION = "BCC-dCreator-v1";
 
 function statusText(value?: unknown) {
-  if (value === "PENDING_REVIEW") return "Đang chờ duyệt";
-  if (value === "APPROVED") return "Đã duyệt";
+  if (value === "PENDING_REVIEW") return "Hồ sơ đã được tạo";
+  if (value === "APPROVED") return "Hồ sơ đã được tạo";
   if (value === "REJECTED") return "Đã từ chối";
   if (value === "NEEDS_REVISION") return "Cần bổ sung";
   return "Chưa gửi";
@@ -153,7 +153,7 @@ export default function UserProfilePage() {
       setError(payload.error ?? "Gửi đơn Creator thất bại");
       return;
     }
-    setSuccess("Đã gửi hồ sơ Creator, trạng thái: Chờ duyệt.");
+    setSuccess("Hồ sơ Creator đã được tạo. Bạn có thể bắt đầu thiết lập dashboard.");
     await load();
   }
 
@@ -188,7 +188,7 @@ export default function UserProfilePage() {
       setError(payload.error ?? "Gửi đơn Brand thất bại");
       return;
     }
-    setSuccess("Đã gửi hồ sơ Brand, trạng thái: Chờ duyệt.");
+    setSuccess("Hồ sơ Brand đã được tạo. Bạn có thể bắt đầu thiết lập dashboard.");
     await load();
   }
 
@@ -249,7 +249,7 @@ export default function UserProfilePage() {
     <>
       <AppShell sidebarItems={sidebarItems}>
         <h1 className="text-3xl font-black">Hồ sơ cá nhân</h1>
-        <p className="mt-2 text-sm text-zinc-600">Đăng ký nâng cấp Creator/Brand tại đây và theo dõi trạng thái duyệt.</p>
+        <p className="mt-2 text-sm text-zinc-600">Đăng ký nâng cấp Creator/Brand tại đây và bắt đầu thiết lập dashboard ngay sau khi tạo hồ sơ.</p>
         {error ? <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
         {success ? <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p> : null}
 
@@ -301,7 +301,7 @@ export default function UserProfilePage() {
             <h2 className="text-xl font-bold">Nâng cấp Creator</h2>
             <p className="mt-2 text-sm">Trạng thái: <span className="font-semibold">{statusText(creatorStatus)}</span></p>
             {data.creatorApplication?.rejectReason ? <p className="mt-2 text-sm text-red-700">Lý do: {String(data.creatorApplication.rejectReason)}</p> : null}
-            {creatorStatus === "APPROVED" ? <Link className="dc-btn-primary mt-4 inline-flex" href="/dashboard/creator">Vào Bảng điều khiển Nhà sáng tạo</Link> : null}
+            {creatorStatus === "APPROVED" || creatorStatus === "PENDING_REVIEW" ? <Link className="dc-btn-primary mt-4 inline-flex" href="/dashboard/creator">Vào Bảng điều khiển Nhà sáng tạo</Link> : null}
             {creatorStatus !== "APPROVED" && creatorStatus !== "PENDING_REVIEW" ? (
               <form className="mt-4 grid gap-3" onSubmit={submitCreator}>
                 <input className="dc-input" placeholder="Tên hiển thị" value={creatorForm.displayName} onChange={(e) => setCreatorForm((x) => ({ ...x, displayName: e.target.value }))} required />
@@ -325,7 +325,7 @@ export default function UserProfilePage() {
             <h2 className="text-xl font-bold">Nâng cấp Brand</h2>
             <p className="mt-2 text-sm">Trạng thái: <span className="font-semibold">{statusText(brandStatus)}</span></p>
             {data.brandApplication?.rejectReason ? <p className="mt-2 text-sm text-red-700">Lý do: {String(data.brandApplication.rejectReason)}</p> : null}
-            {brandStatus === "APPROVED" ? <Link className="dc-btn-primary mt-4 inline-flex" href="/dashboard/brand">Vào Bảng điều khiển Nhãn hàng</Link> : null}
+            {brandStatus === "APPROVED" || brandStatus === "PENDING_REVIEW" ? <Link className="dc-btn-primary mt-4 inline-flex" href="/dashboard/brand">Vào Bảng điều khiển Nhãn hàng</Link> : null}
             {brandStatus !== "APPROVED" && brandStatus !== "PENDING_REVIEW" ? (
               <form className="mt-4 grid gap-3" onSubmit={submitBrand}>
                 <input className="dc-input" placeholder="Tên nhãn hàng" value={brandForm.brandName} onChange={(e) => setBrandForm((x) => ({ ...x, brandName: e.target.value }))} required />
