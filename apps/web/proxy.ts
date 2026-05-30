@@ -32,6 +32,10 @@ async function resolveCurrentRoles(request: NextRequest, fallbackRole: Role): Pr
 }
 
 export async function proxy(request: NextRequest) {
+  if (request.nextUrl.pathname === "/brand/register") {
+    return NextResponse.next();
+  }
+
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   if (!token) return deny(request);
 

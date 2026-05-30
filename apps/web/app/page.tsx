@@ -247,6 +247,33 @@ export default async function HomePage() {
           </div>
         </section>
 
+        <section className="mt-10 overflow-hidden rounded-[2rem] border border-zinc-900 bg-zinc-900 text-white shadow-2xl shadow-zinc-200/30">
+          <div className="grid gap-0 md:grid-cols-[1.15fr_0.85fr]">
+            <div className="p-8 md:p-10">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">Brand Growth</p>
+              <h2 className="mt-3 text-3xl font-black md:text-4xl">Brand bắt đầu chiến dịch nhanh hơn</h2>
+              <p className="mt-3 max-w-2xl text-base text-zinc-300">
+                Chọn gói phù hợp, để lại thông tin liên hệ và đội ngũ dCreator sẽ hỗ trợ bạn triển khai chiến dịch UGC theo mục tiêu doanh thu.
+              </p>
+              <div className="mt-7">
+                <Link href="/brand/register" className="dc-btn-primary bg-white text-zinc-900 hover:bg-zinc-100">
+                  Đăng ký Brand
+                </Link>
+              </div>
+            </div>
+            <div className="relative min-h-[300px] md:min-h-full">
+              <Image
+                src="https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&q=80"
+                alt="Brand team lên kế hoạch chiến dịch"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 40vw"
+              />
+              <div className="absolute inset-0 bg-gradient-to-tr from-zinc-950 via-zinc-950/40 to-transparent" />
+            </div>
+          </div>
+        </section>
+
         <section className="relative mt-10 overflow-hidden rounded-[2rem] border border-zinc-200 bg-white p-6 text-white shadow-none md:p-8">
           <h2 className="text-2xl font-black text-zinc-900">Câu hỏi thường gặp</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-3">
@@ -314,7 +341,7 @@ export default async function HomePage() {
                 <Link href="/dashboard/user/profile" className="dc-btn-secondary border-white/15 bg-white text-zinc-900 hover:bg-zinc-100">
                   Đăng ký Creator
                 </Link>
-                <Link href="/dashboard/user/profile" className="dc-btn-primary bg-white text-zinc-900 hover:bg-zinc-100">
+                <Link href="/brand/register" className="dc-btn-primary bg-white text-zinc-900 hover:bg-zinc-100">
                   Đăng ký Brand
                 </Link>
               </div>
@@ -325,8 +352,6 @@ export default async function HomePage() {
       <PublicFooter />`r`n</>
   );
 }
-
-
 
 
 

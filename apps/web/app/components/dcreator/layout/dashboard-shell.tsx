@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { Role } from "@prisma/client";
 import { getBreadcrumbsForPath, getWorkspaceForPath } from "@/lib/navigation";
+import { ROLE } from "@/lib/auth/role-constants";
 
 export type DashboardNavItem = {
   href: string;
@@ -68,7 +69,7 @@ export function DashboardShell({
   const userInitials = initials(user.displayName || user.email || "U");
   const profileHref = useMemo(() => {
     if (user.roles.includes("ADMIN")) return "/admin";
-    if (user.roles.includes("BRAND")) return "/dashboard/brand";
+    if (user.roles.includes(ROLE.BRAND_OWNER) || user.roles.includes(ROLE.BRAND_STAFF)) return "/dashboard/brand";
     if (user.roles.includes("CREATOR")) return "/dashboard/creator";
     return "/dashboard/user/profile";
   }, [user.roles]);
@@ -207,5 +208,4 @@ export function DashboardShell({
     </div>
   );
 }
-
 

@@ -45,7 +45,7 @@ export function CampaignCard({ campaign }: { campaign: CampaignCardData }) {
   const videoProgressPercent = campaign.videoProgressPercent ?? 0;
 
   return (
-    <article className="dc-card overflow-hidden p-0">
+    <article className="dc-card flex h-full flex-col overflow-hidden p-0">
       <div className="relative aspect-[16/9] w-full overflow-hidden bg-zinc-100">
         <Image
           src={resolveCoverImageSrc(campaign.coverImageUrl)}
@@ -60,7 +60,7 @@ export function CampaignCard({ campaign }: { campaign: CampaignCardData }) {
         </div>
       </div>
 
-      <div className="p-5">
+      <div className="flex h-full flex-col p-5">
         <h3 className="line-clamp-2 text-2xl font-black leading-tight text-zinc-900">{campaign.title}</h3>
         <p className="mt-3 text-sm font-semibold text-zinc-600">Brand: {campaign.brand}</p>
 
@@ -81,7 +81,7 @@ export function CampaignCard({ campaign }: { campaign: CampaignCardData }) {
         </div>
         <p className="mt-1 text-xs text-zinc-500">Tiến độ video: {videoProgressPercent}%</p>
 
-        <div className="mt-4 flex justify-end">
+        <div className="mt-auto pt-4 flex justify-end">
           <Link
             href={`/campaigns/${campaign.slug}`}
             className="inline-flex items-center gap-2 rounded-full border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
