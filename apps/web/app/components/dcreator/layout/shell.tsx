@@ -70,17 +70,17 @@ export function PublicHeader() {
 
   const canAccessAdmin = currentUser ? currentUser.roles.includes("ADMIN") || currentUser.roles.includes("OPS") : false;
   const isCreator = currentUser ? currentUser.roles.includes(ROLE.CREATOR) : false;
-  const isBrand = currentUser ? currentUser.roles.includes("BRAND") : false;
+  const isBrand = currentUser ? currentUser.roles.includes(ROLE.BRAND_OWNER) || currentUser.roles.includes(ROLE.BRAND_STAFF) : false;
+  const brandHref = isBrand ? "/dashboard/brand" : "/brand/register";
   const profileHref = currentUser
     ? currentUser.roles.includes("ADMIN")
       ? "/admin"
-      : currentUser.roles.includes("BRAND")
+      : currentUser.roles.includes(ROLE.BRAND_OWNER) || currentUser.roles.includes(ROLE.BRAND_STAFF)
         ? "/dashboard/brand"
         : currentUser.roles.includes("CREATOR")
           ? "/dashboard/creator"
           : "/dashboard/user/profile"
     : "/dashboard/user/profile";
-  const campaignHref = isCreator ? "/dashboard/creator/jobs" : isBrand ? "/brand" : "/campaigns";
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/70 bg-white/90 backdrop-blur">
@@ -97,7 +97,7 @@ export function PublicHeader() {
             <div className="h-10 w-44 animate-pulse rounded-full bg-zinc-200" />
           ) : currentUser ? (
             <>
-              <Link href={campaignHref} className="dc-btn-secondary hidden md:inline-flex">Campaign</Link>
+              <Link href={brandHref} className="dc-btn-secondary hidden md:inline-flex">Brand</Link>
               {isCreator ? <Link href="/dashboard/creator/wallet" className="dc-btn-secondary hidden md:inline-flex">Ví / N-Points</Link> : null}
               {canAccessAdmin ? (
                 <>
