@@ -252,21 +252,35 @@ export function DashboardSidebar({ items }: { items: NavItem[] }) {
 
 export function MobileBottomNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
+  const [isOpen, setIsOpen] = useState(false);
   const activeItem = items
     .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
     .sort((a, b) => b.href.length - a.href.length)[0];
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 grid grid-cols-4 border-t border-zinc-200 bg-white lg:hidden">
-      {items.slice(0, 4).map((item) => (
-        <Link
-          key={item.href}
-          href={item.href}
-          aria-current={activeItem?.href === item.href ? "page" : undefined}
-          className={`dc-focus min-h-11 px-2 py-3 text-center text-xs font-semibold leading-4 ${activeItem?.href === item.href ? "bg-zinc-900 text-white" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"}`}
-        >
-          {item.label}
-        </Link>
-      ))}
+    <div className="fixed bottom-4 right-4 z-50 lg:hidden">
+      {isOpen ? (
+        <div className="mb-2 grid min-w-80 grid-cols-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-md">
+          {items.slice(0, 4).map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={activeItem?.href === item.href ? "page" : undefined}
+              onClick={() => setIsOpen(false)}
+              className={`dc-focus min-h-11 px-2 py-3 text-center text-xs font-semibold leading-4 ${activeItem?.href === item.href ? "bg-zinc-900 text-white" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"}`}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
+      ) : null}
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-label={isOpen ? "Đóng menu" : "Mở menu"}
+        className="dc-focus rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 shadow-sm transition hover:bg-zinc-100"
+      >
+        <span aria-hidden="true">{isOpen ? "✕" : "☰"}</span>
+      </button>
     </div>
   );
 }
