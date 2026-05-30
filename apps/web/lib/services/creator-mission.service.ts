@@ -1286,6 +1286,17 @@ export async function getMissionApplicationDetailForAdmin(id: string) {
 export async function approveMissionApplicationByAdmin(actorId: string, id: string) {
   const current = await getMissionApplicationDetailForAdmin(id);
   if (current.status !== "PENDING_REVIEW") throw new AppError("Mission application is not pending review", 409, "MISSION_APPLICATION_INVALID_STATUS");
+  const approvedStatus = current.mission.productReceiveOption === "NO_PRODUCT_REQUIRED" ? "IN_PROGRESS" : "PRODUCT_PENDING";
+  const approvedProductStatus =
+    current.mission.productReceiveOption === "NO_PRODUCT_REQUIRED"
+      ? "NOT_REQUIRED"
+      : current.mission.productReceiveOption === "CREATOR_BUY_FIRST"
+        ? "WAITING_PURCHASE"
+        : "WAITING_DEPOSIT";
+  const approvedDepositStatus =
+    current.mission.productReceiveOption === "DEPOSIT_PRODUCT" ? "PENDING" : "NOT_REQUIRED";
+  const approvedReimbursementStatus =
+    current.mission.productReceiveOption === "CREATOR_BUY_FIRST" ? "PENDING" : "NOT_REQUIRED";
   const updated = await prisma.$transaction(async (tx) => {
     const claimPending = await tx.creatorMission.updateMany({
       where: { id, applicationStatus: "PENDING_REVIEW" },
@@ -1299,7 +1310,11 @@ export async function approveMissionApplicationByAdmin(actorId: string, id: stri
     const next = await tx.creatorMission.update({
       where: { id },
       data: {
-        missionApplicationId: current.missionApplicationId ?? current.id,
+        status: approvedStatus,
+        productStatus: approvedProductStatus,
+        depositStatus: approvedDepositStatus,
+        reimbursementStatus: approvedReimbursementStatus,
+        startedAt: current.mission.productReceiveOption === "NO_PRODUCT_REQUIRED" ? now() : null,
         submissionLifecycleStatus: "ACCEPTED",
         submissionStatus: "OPEN",
         submissionNote: current.note ?? null
@@ -1440,6 +1455,7 @@ export async function listMissionTranscriptReviewsForAdmin(input: {
   limit?: number;
 }) {
   const where: Prisma.CreatorMissionWhereInput = {
+    applicationStatus: "APPROVED",
     submissionProofTextNote: { not: null }
   };
 
@@ -1750,6 +1766,7 @@ export async function listMissionTranscriptReviewsForBrand(
 ) {
   const brandOwnerAccountId = await resolveBrandOwnerAccountId(accountId);
   const where: Prisma.CreatorMissionWhereInput = {
+    applicationStatus: "APPROVED",
     campaign: { brandId: brandOwnerAccountId },
     submissionProofTextNote: { not: null }
   };

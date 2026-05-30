@@ -33,6 +33,10 @@ type MissionItem = {
     fileUploadUrl: string | null;
     status: string;
   } | null;
+  missionApplication: {
+    status: string;
+    rejectReason: string | null;
+  } | null;
 };
 
 type FormMap = Record<string, string>;
@@ -125,6 +129,7 @@ function UrlValue({ value, label }: { value: string | null | undefined; label?: 
 }
 
 function workflowStatus(item: MissionItem) {
+  if (item.missionApplication?.status === "PENDING_REVIEW") return "Chờ duyệt nhiệm vụ";
   if (item.status === "COMPLETED") return "Hoàn thành";
   if (item.publishStatus === "PENDING") return "Bài đăng đang chờ duyệt cuối";
   if (item.publishStatus === "REJECTED") return "Bị từ chối bước cuối";
@@ -402,8 +407,10 @@ export default function CreatorMissionsPage() {
 
                 {activeMission ? (() => {
                   const item = activeMission;
-                  const canSubmitPurchase = item.productReceiveOption === "CREATOR_BUY_FIRST" && item.productStatus !== "RECEIVED";
+                  const isApplicationPending = item.missionApplication?.status === "PENDING_REVIEW";
+                  const canSubmitPurchase = !isApplicationPending && item.productReceiveOption === "CREATOR_BUY_FIRST" && item.productStatus !== "RECEIVED";
                   const canSubmitVideoCandidate =
+                    !isApplicationPending &&
                     item.status !== "COMPLETED" &&
                     item.videoReviewStatus !== "PENDING" &&
                     item.videoReviewStatus !== "APPROVED" &&
@@ -416,7 +423,7 @@ export default function CreatorMissionsPage() {
                   const selectedChoice = preVideoChoiceMap[item.id];
                   const showTranscriptComposer = isTranscriptFlow || (needsPreVideoChoice && selectedChoice === "TRANSCRIPT");
                   const showVideoComposer = canSubmitVideoCandidate && !isTranscriptFlow && (!needsPreVideoChoice || selectedChoice === "VIDEO");
-                  const canSubmitPublish = item.videoReviewStatus === "APPROVED" && item.status !== "COMPLETED" && item.publishStatus !== "PENDING";
+                  const canSubmitPublish = !isApplicationPending && item.videoReviewStatus === "APPROVED" && item.status !== "COMPLETED" && item.publishStatus !== "PENDING";
 
                   return (
                     <div className="fixed inset-0 z-50 bg-zinc-900/50 p-3 md:p-6" onClick={() => setDetailMissionId("")}>
@@ -441,6 +448,11 @@ export default function CreatorMissionsPage() {
                         {item.status === "DRAFT_PENDING" && item.videoReviewFeedback ? <p className="mt-2 text-sm text-red-700">Feedback kịch bản: {item.videoReviewFeedback}</p> : null}
                         {item.videoReviewStatus !== "NOT_SUBMITTED" && item.videoReviewFeedback ? <p className="mt-2 text-sm text-red-700">Feedback video: {item.videoReviewFeedback}</p> : null}
                         {item.publishFeedback ? <p className="mt-1 text-sm text-red-700">Feedback bước cuối: {item.publishFeedback}</p> : null}
+                        {isApplicationPending ? (
+                          <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                            Nhiệm vụ đang chờ duyệt. Bạn sẽ bắt đầu các bước thực hiện sau khi Brand/Admin duyệt đơn.
+                          </p>
+                        ) : null}
 
                         {canSubmitPurchase ? (
                           <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
