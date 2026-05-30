@@ -29,6 +29,10 @@ export type CurrentUser = {
 
 const currentUserCache = new RuntimeTtlCache<CurrentUser>(15_000, 4000);
 
+export function invalidateCurrentUserCache(sessionId: string) {
+  currentUserCache.delete(sessionId);
+}
+
 function mapAccountToCurrentUser(
   account: {
     id: string;

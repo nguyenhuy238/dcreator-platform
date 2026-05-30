@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useCurrentBrand, useSetCurrentBrand } from "@/app/dashboard/brand/_hooks/use-brand-context";
+import { setCurrentBrandInContext, useCurrentBrand, useSetCurrentBrand } from "@/app/dashboard/brand/_hooks/use-brand-context";
 
 export function BrandSwitcher() {
   const { currentBrandId, brands, isLoading, error } = useCurrentBrand();
@@ -42,7 +42,7 @@ export function BrandSwitcher() {
             setIsSaving(true);
             try {
               await setCurrentBrand(nextBrandId);
-              window.location.reload();
+              setCurrentBrandInContext(nextBrandId);
             } catch (switchError) {
               setLocalError(switchError instanceof Error ? switchError.message : "Không thể chuyển Brand");
             } finally {

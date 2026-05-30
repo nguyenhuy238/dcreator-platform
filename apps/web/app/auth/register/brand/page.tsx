@@ -5,6 +5,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { FormField } from "@/app/components/dcreator/ui/base";
+import { upsertCurrentBrandInContext } from "@/app/dashboard/brand/_hooks/use-brand-context";
 
 type UploadState = {
   idCardFrontImageUrl: string;
@@ -135,8 +136,14 @@ export default function BrandRegisterPage() {
         throw new Error(applicationPayload.error ?? "Không thể gửi đăng ký Brand.");
       }
 
-      setSuccess("Đã gửi đăng ký Brand. Sau khi duyệt, Brand Dashboard sẽ mở bước hoàn tất BCC/onboarding.");
+      upsertCurrentBrandInContext({
+        id: applicationPayload.data.brand.id,
+        name: applicationPayload.data.brand.name,
+        role: "OWNER"
+      });
+      setSuccess("Brand đã được tạo. Bạn có thể bắt đầu thiết lập sản phẩm/campaign.");
       event.currentTarget.reset();
+      router.push("/dashboard/brand?created=1");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra. Vui lòng thử lại.");
@@ -154,12 +161,12 @@ export default function BrandRegisterPage() {
           <p className="text-xs font-bold uppercase tracking-[0.15em] text-zinc-500">Brand Onboarding</p>
           <h1 className="mt-3 text-4xl font-black tracking-tight">Đăng ký Brand</h1>
           <p className="mt-3 text-zinc-600">
-            Hoàn tất thông tin pháp lý, ngành hàng, danh mục sản phẩm và xác nhận BCC để dCreator duyệt Brand Portal.
+            Hoàn tất thông tin thương hiệu để vào Brand Dashboard ngay. Hồ sơ xác minh nâng cao có thể bổ sung sau.
           </p>
           <div className="mt-6 grid gap-3 text-sm text-zinc-600">
             <p>1. Tạo tài khoản Brand Portal.</p>
-            <p>2. Gửi hồ sơ pháp lý và danh mục sản phẩm.</p>
-            <p>3. Xác nhận BCC về doanh thu, hoa hồng và trách nhiệm pháp lý.</p>
+            <p>2. Bắt đầu quản lý sản phẩm/campaign ngay sau khi tạo.</p>
+            <p>3. Bổ sung xác minh để mở khóa payout/campaign nâng cao.</p>
           </div>
         </section>
 
@@ -274,7 +281,7 @@ export default function BrandRegisterPage() {
           {error ? <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
 
           <button className="dc-btn-primary w-full" disabled={loading || uploading}>
-            {loading || uploading ? "Đang gửi..." : "Gửi đăng ký Brand"}
+            {loading || uploading ? "Đang tạo..." : "Tạo Brand"}
           </button>
 
           <p className="text-sm text-zinc-600">

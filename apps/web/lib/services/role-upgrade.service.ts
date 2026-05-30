@@ -225,6 +225,7 @@ async function syncBrandAccessFromApplication(
   });
   await assignRole(tx, app.accountId, Role.BRAND_OWNER);
   await tx.account.update({ where: { id: app.accountId }, data: { role: Role.BRAND_OWNER } });
+  return brand;
 }
 
 export async function getRoleUpgradeSnapshot(accountId: string) {
@@ -445,8 +446,8 @@ export async function applyBrand(accountId: string, input: BrandApplicationInput
         reviewedAt: new Date()
       }
     });
-    await syncBrandAccessFromApplication(tx, app);
-    return app;
+    const brand = await syncBrandAccessFromApplication(tx, app);
+    return { application: app, brand: { id: brand.id, name: brand.name, status: brand.status } };
   });
 }
 
