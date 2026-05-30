@@ -8,7 +8,7 @@ import { canAccessWorkspace } from "@/lib/navigation";
 export function canAccessWorkspaceByRoles(
   workspace: Workspace,
   roles: Role[],
-  context?: { creatorProfile?: { id: string } | null; brandMemberships?: Array<{ id: string; role: "OWNER" | "STAFF" }> }
+  context?: { creatorProfile?: { id: string } | null; brandMemberships?: Array<{ id: string; role: "OWNER" | "MANAGER" | "STAFF" }> }
 ) {
   const capabilities = deriveCapabilities({
     roles,
@@ -20,7 +20,7 @@ export function canAccessWorkspaceByRoles(
 
 export function deniedWorkspaceMessage(workspace: Workspace) {
   if (workspace === "creator") return "Bạn chưa có quyền truy cập khu vực này.";
-  if (workspace === "brand") return "Bạn chưa có quyền truy cập khu vực này.";
+  if (workspace === "brand") return "Bạn chưa thuộc Brand nào. Vui lòng tạo Brand mới để vào Brand Dashboard.";
   if (workspace === "admin") return "Bạn chưa có quyền truy cập khu vực này.";
   return "Bạn chưa có quyền truy cập khu vực này.";
 }

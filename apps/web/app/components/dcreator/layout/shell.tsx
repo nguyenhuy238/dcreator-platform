@@ -19,7 +19,7 @@ type AuthUser = {
   avatarUrl: string | null;
   roles: Role[];
   creatorProfile?: { id: string } | null;
-  brandMemberships?: Array<{ id: string; role: "OWNER" | "STAFF" }>;
+  brandMemberships?: Array<{ id: string; role: "OWNER" | "MANAGER" | "STAFF" }>;
   capabilities?: UserCapabilities;
 };
 

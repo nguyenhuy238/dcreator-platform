@@ -14,21 +14,17 @@ type PrismaClientLike = Prisma.TransactionClient | typeof prisma;
 
 type PackageStatus = "ACTIVE" | "AVAILABLE" | "LOCKED";
 
-async function resolveBrandContext(db: PrismaClientLike, accountId: string): Promise<BrandContext> {
-  const ownedBrand = await db.brand.findFirst({
-    where: { ownerAccountId: accountId },
-    select: { id: true, name: true, ownerAccountId: true },
-    orderBy: { createdAt: "desc" }
-  });
-  if (ownedBrand) return ownedBrand;
-
+async function resolveBrandContext(db: PrismaClientLike, accountId: string, currentBrandId?: string | null): Promise<BrandContext> {
   const membership = await db.brandMember.findFirst({
-    where: { accountId },
+    where: { accountId, ...(currentBrandId ? { brandId: currentBrandId } : {}) },
     include: { brand: { select: { id: true, name: true, ownerAccountId: true } } },
     orderBy: { createdAt: "desc" }
   });
   if (membership) return membership.brand;
 
+  if (currentBrandId) {
+    throw new AppError("Bạn không có quyền truy cập Brand này", 403, "BRAND_FORBIDDEN");
+  }
   throw new AppError("Bạn chưa được gắn vào Nhãn hàng nào", 403, "BRAND_ACCESS_NOT_CONFIGURED");
 }
 
@@ -38,8 +34,8 @@ function toPackageStatus(currentPackageCode: BrandSubscriptionPackageCode, packa
   return "LOCKED";
 }
 
-export async function getBrandSubscriptionState(accountId: string) {
-  const brand = await resolveBrandContext(prisma, accountId);
+export async function getBrandSubscriptionState(accountId: string, currentBrandId?: string | null) {
+  const brand = await resolveBrandContext(prisma, accountId, currentBrandId);
   const [wallet, subscription] = await Promise.all([
     ensureWalletByAccountId(brand.ownerAccountId),
     prisma.brandSubscription.upsert({
@@ -64,7 +60,7 @@ export async function getBrandSubscriptionState(accountId: string) {
   };
 }
 
-export async function purchaseBrandSubscription(accountId: string, packageCode: BrandSubscriptionPackageCode) {
+export async function purchaseBrandSubscription(accountId: string, packageCode: BrandSubscriptionPackageCode, currentBrandId?: string | null) {
   const selectedPackage = BRAND_SUBSCRIPTION_PACKAGE_MAP[packageCode];
   if (!selectedPackage) {
     throw new AppError("Gói không hợp lệ", 422, "BRAND_SUBSCRIPTION_PACKAGE_INVALID");
@@ -74,7 +70,7 @@ export async function purchaseBrandSubscription(accountId: string, packageCode: 
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    const brand = await resolveBrandContext(tx, accountId);
+    const brand = await resolveBrandContext(tx, accountId, currentBrandId);
     const subscription = await tx.brandSubscription.upsert({
       where: { brandId: brand.id },
       create: { brandId: brand.id, packageCode: "FREE", activatedAt: new Date() },

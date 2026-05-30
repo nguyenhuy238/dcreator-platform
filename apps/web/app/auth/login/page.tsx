@@ -12,7 +12,7 @@ import { ROLE } from "@/lib/auth/role-constants";
 
 async function resolvePostLoginPath(
   roles: Role[],
-  context?: { creatorProfile?: { id: string } | null; brandMemberships?: Array<{ id: string; role: "OWNER" | "STAFF" }> }
+  context?: { creatorProfile?: { id: string } | null; brandMemberships?: Array<{ id: string; role: "OWNER" | "MANAGER" | "STAFF" }> }
 ) {
   const brandRoles: Role[] = [ROLE.BRAND_OWNER, ROLE.BRAND_STAFF];
   if (roles.some((role) => brandRoles.includes(role))) {
@@ -32,7 +32,7 @@ async function resolvePostLoginPath(
 async function resolveTargetPath(
   roles: Role[],
   nextPath: string | null,
-  context?: { creatorProfile?: { id: string } | null; brandMemberships?: Array<{ id: string; role: "OWNER" | "STAFF" }> }
+  context?: { creatorProfile?: { id: string } | null; brandMemberships?: Array<{ id: string; role: "OWNER" | "MANAGER" | "STAFF" }> }
 ) {
   const defaultPath = await resolvePostLoginPath(roles, context);
   if (!nextPath) return defaultPath;

@@ -19,7 +19,7 @@ export type CurrentUser = {
   roles: Role[];
   isActive: boolean;
   creatorProfile: { id: string } | null;
-  brandMemberships: Array<{ id: string; name: string; role: "OWNER" | "STAFF" }>;
+  brandMemberships: Array<{ id: string; name: string; role: "OWNER" | "MANAGER" | "STAFF" }>;
   activeBrandId: string | null;
   capabilities: UserCapabilities;
   permissions: string[];
@@ -40,7 +40,7 @@ function mapAccountToCurrentUser(
     creatorProfile: { id: string } | null;
     creatorApplications: Array<{ status: string }>;
     brandApplications: Array<{ status: string }>;
-    ownedBrandMemberships: Array<{ role: "OWNER" | "STAFF"; brand: { id: string; name: string } }>;
+    ownedBrandMemberships: Array<{ role: "OWNER" | "MANAGER" | "STAFF"; brand: { id: string; name: string } }>;
   },
   fallbackRole: Role
 ): CurrentUser {

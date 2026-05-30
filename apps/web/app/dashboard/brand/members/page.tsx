@@ -6,7 +6,7 @@ import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Secti
 type Member = {
   id: string;
   accountId: string;
-  role: "OWNER" | "STAFF";
+  role: "OWNER" | "MANAGER" | "STAFF";
   status: "ACTIVE" | "DISABLED";
   joinedAt: string;
   user: { displayName: string; email: string };
@@ -27,7 +27,7 @@ export default function BrandMembersPage() {
   const [toast, setToast] = useState("");
 
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<"OWNER" | "STAFF">("STAFF");
+  const [role, setRole] = useState<"OWNER" | "MANAGER" | "STAFF">("STAFF");
 
   async function load() {
     setLoading(true);
@@ -68,7 +68,7 @@ export default function BrandMembersPage() {
     }
   }
 
-  async function updateRole(memberId: string, nextRole: "OWNER" | "STAFF") {
+  async function updateRole(memberId: string, nextRole: "OWNER" | "MANAGER" | "STAFF") {
     try {
       const res = await fetch("/api/brand/dashboard/members", {
         method: "PATCH",
@@ -116,8 +116,9 @@ export default function BrandMembersPage() {
             <SectionHeader title={`Nhãn hàng: ${data.brand.name}`} subtitle={`Tổng thành viên: ${data.members.length}`} />
             <form onSubmit={invite} className="grid gap-2 md:grid-cols-4">
               <input className="dc-input md:col-span-2" placeholder="Email thành viên" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={!data.canManage} />
-              <select className="dc-input" value={role} onChange={(e) => setRole(e.target.value as "OWNER" | "STAFF")} disabled={!data.canManage}>
+              <select className="dc-input" value={role} onChange={(e) => setRole(e.target.value as "OWNER" | "MANAGER" | "STAFF")} disabled={!data.canManage}>
                 <option value="STAFF">STAFF</option>
+                <option value="MANAGER">MANAGER</option>
                 <option value="OWNER">OWNER</option>
               </select>
               <button className="dc-btn-primary" type="submit" disabled={!data.canManage}>Mời thành viên</button>
@@ -147,7 +148,13 @@ export default function BrandMembersPage() {
                       </div>
                       <p className="mt-1 text-sm text-zinc-600">Ngày tham gia: {new Date(member.joinedAt).toLocaleDateString("vi-VN")}</p>
                       <div className="mt-3 flex flex-wrap gap-2">
-                        <button className="dc-btn-secondary" disabled={!data.canManage || isOwnerAccount} onClick={() => void updateRole(member.id, member.role === "OWNER" ? "STAFF" : "OWNER")}>Đổi role</button>
+                        <button
+                          className="dc-btn-secondary"
+                          disabled={!data.canManage || isOwnerAccount}
+                          onClick={() => void updateRole(member.id, member.role === "STAFF" ? "MANAGER" : "STAFF")}
+                        >
+                          Đổi role
+                        </button>
                         <button className="dc-btn-secondary" disabled={!data.canManage || isOwnerAccount} onClick={() => void remove(member.id)}>Vô hiệu hoá / xoá</button>
                       </div>
                       {isOwnerAccount ? <p className="mt-1 text-xs text-zinc-500">Owner cuối cùng không thể bị xoá hoặc hạ quyền.</p> : null}
