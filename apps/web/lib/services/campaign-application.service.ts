@@ -1,4 +1,4 @@
-import { ApplicationStatus, CampaignStatus, MissionAudience, MissionLifecycleStatus, ProductReceiveOption, Role } from "@prisma/client";
+﻿import { ApplicationStatus, CampaignStatus, MissionAudience, MissionLifecycleStatus, ProductReceiveOption, Role } from "@prisma/client";
 import { appendCreatorCampaignApplicationTag } from "@/lib/constants/campaign-application";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
@@ -7,6 +7,7 @@ export type CreatorCampaignApplicationState =
   | "LOGIN_REQUIRED"
   | "NOT_CREATOR"
   | "PROFILE_REQUIRED"
+  | "SOCIAL_CHANNEL_REQUIRED"
   | "CAMPAIGN_UNAVAILABLE"
   | "MISSION_UNAVAILABLE"
   | "CAN_APPLY"
@@ -56,7 +57,16 @@ function toSnapshot(
     PROFILE_REQUIRED: {
       label: "Hoàn thiện thông tin mạng xã hội",
       disabled: true,
-      message: "Bạn cần hoàn thiện hồ sơ Creator và chọn nền tảng chính trước khi xin làm nhiệm vụ.",
+      message: "Bạn cần hoàn thiện hồ sơ Creator trước khi xin làm nhiệm vụ.",
+      rejectReason: null,
+      submissionId: null,
+      missionId: null,
+      lifecycleStatus: null
+    },
+    SOCIAL_CHANNEL_REQUIRED: {
+      label: "Bổ sung kênh mạng xã hội",
+      disabled: true,
+      message: "Bạn cần có ít nhất 1 kênh mạng xã hội đã duyệt và đang kích hoạt để tham gia campaign.",
       rejectReason: null,
       submissionId: null,
       missionId: null,
@@ -195,19 +205,20 @@ export async function getCreatorCampaignApplicationStatus(
   const approvedVideos = campaign.ugcVideoApprovedCount ?? 0;
   if (videoTarget > 0 && approvedVideos >= videoTarget) {
     return toSnapshot("MISSION_UNAVAILABLE", {
-      label: "Hết lượt video",
-      message: `Campaign đã đủ ${videoTarget}/${videoTarget} video được duyệt.`
+      label: "Háº¿t lÆ°á»£t video",
+      message: `Campaign Ä‘Ã£ Ä‘á»§ ${videoTarget}/${videoTarget} video Ä‘Æ°á»£c duyá»‡t.`
     });
   }
 
   if (!viewer) return toSnapshot("LOGIN_REQUIRED");
   if (!viewer.roles.includes(Role.CREATOR)) return toSnapshot("NOT_CREATOR");
 
-  const creatorProfile = await prisma.creatorProfile.findUnique({
-    where: { accountId: viewer.id },
-    select: { id: true, mainPlatform: true }
+  const creatorProfile = await prisma.creatorProfile.findUnique({ where: { accountId: viewer.id }, select: { id: true } });
+  if (!creatorProfile) return toSnapshot("PROFILE_REQUIRED");
+  const approvedActiveChannelCount = await prisma.creatorSocialLink.count({
+    where: { creatorProfileId: creatorProfile.id, status: "APPROVED", isActive: true }
   });
-  if (!creatorProfile || !creatorProfile.mainPlatform) return toSnapshot("PROFILE_REQUIRED");
+  if (approvedActiveChannelCount < 1) return toSnapshot("SOCIAL_CHANNEL_REQUIRED");
 
   const existing = await prisma.creatorMission.findFirst({
     where: { accountId: viewer.id, campaignId: campaign.id },
@@ -242,22 +253,24 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
   const videoTarget = campaign.ugcVideoQuota ?? 0;
   const approvedVideos = campaign.ugcVideoApprovedCount ?? 0;
   if (videoTarget > 0 && approvedVideos >= videoTarget) {
-    throw new AppError("Campaign đã hết lượt video được phê duyệt", 409, "CAMPAIGN_UGC_VIDEO_QUOTA_REACHED");
+    throw new AppError("Campaign Ä‘Ã£ háº¿t lÆ°á»£t video Ä‘Æ°á»£c phÃª duyá»‡t", 409, "CAMPAIGN_UGC_VIDEO_QUOTA_REACHED");
   }
 
   if (!firstMission) {
     throw new AppError("Campaign has no creator mission", 409, "CREATOR_MISSION_NOT_AVAILABLE");
   }
 
-  const creatorProfile = await prisma.creatorProfile.findUnique({
-    where: { accountId },
-    select: { id: true, mainPlatform: true, socialUrl: true, followerCount: true }
+  const creatorProfile = await prisma.creatorProfile.findUnique({ where: { accountId }, select: { id: true } });
+  if (!creatorProfile) throw new AppError("Creator profile is required", 422, "CREATOR_PROFILE_REQUIRED");
+  const approvedActiveChannels = await prisma.creatorSocialLink.findMany({
+    where: { creatorProfileId: creatorProfile.id, status: "APPROVED", isActive: true },
+    select: { platform: true, socialUrl: true, followers: true, handle: true }
   });
-  if (!creatorProfile || !creatorProfile.mainPlatform) {
+  if (approvedActiveChannels.length < 1) {
     throw new AppError(
-      "Bạn cần hoàn thiện hồ sơ Creator và chọn nền tảng chính trước khi xin làm nhiệm vụ.",
+      "Bạn cần có ít nhất 1 kênh mạng xã hội đã duyệt và đang kích hoạt trước khi xin làm nhiệm vụ.",
       422,
-      "CREATOR_PROFILE_MAIN_PLATFORM_REQUIRED"
+      "CREATOR_SOCIAL_CHANNEL_REQUIRED"
     );
   }
 
@@ -341,11 +354,7 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
         metadata: {
           campaignId: campaign.id,
         missionId: firstMission.id,
-        creatorProfile: {
-          mainPlatform: creatorProfile.mainPlatform,
-          socialUrl: creatorProfile.socialUrl,
-          followerCount: creatorProfile.followerCount
-        }
+        creatorSocialChannels: approvedActiveChannels
       }
     }
   });
@@ -361,3 +370,5 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
     })
   };
 }
+
+

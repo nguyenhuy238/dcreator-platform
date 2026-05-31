@@ -36,7 +36,17 @@ const creatorMissionInclude = {
       id: true,
       displayName: true,
       email: true,
-      creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true } }
+      creatorProfile: {
+        select: {
+          mainPlatform: true,
+          socialUrl: true,
+          followerCount: true,
+          socialLinks: {
+            where: { status: "APPROVED", isActive: true },
+            select: { id: true, platform: true, socialUrl: true, followers: true, handle: true, isActive: true, status: true }
+          }
+        }
+      }
     }
   }
 } satisfies Prisma.CreatorMissionInclude;
@@ -1023,9 +1033,18 @@ export async function submitCreatorMissionPublish(
 }
 
 export async function createMissionApplicationForCreator(accountId: string, payload: { missionId: string; note?: string }) {
-  const profile = await prisma.creatorProfile.findUnique({ where: { accountId }, select: { id: true, mainPlatform: true } });
-  if (!profile || !profile.mainPlatform) {
-    throw new AppError("Ban can hoan thien ho so Creator va chon nen tang chinh truoc khi xin lam nhiem vu.", 422, "CREATOR_PROFILE_MAIN_PLATFORM_REQUIRED");
+  const profile = await prisma.creatorProfile.findUnique({ where: { accountId }, select: { id: true } });
+  if (!profile) throw new AppError("Creator profile is required", 422, "CREATOR_PROFILE_REQUIRED");
+  const approvedActiveChannels = await prisma.creatorSocialLink.findMany({
+    where: { creatorProfileId: profile.id, status: "APPROVED", isActive: true },
+    select: { id: true, platform: true, socialUrl: true, followers: true, handle: true }
+  });
+  if (approvedActiveChannels.length < 1) {
+    throw new AppError(
+      "Bạn cần có ít nhất 1 kênh mạng xã hội đã duyệt và đang kích hoạt trước khi xin làm nhiệm vụ.",
+      422,
+      "CREATOR_SOCIAL_CHANNEL_REQUIRED"
+    );
   }
   const mission = await prisma.mission.findUnique({
     where: { id: payload.missionId },
@@ -1080,6 +1099,20 @@ export async function createMissionApplicationForCreator(accountId: string, payl
           }
         })
       );
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: accountId,
+      action: existing ? "CREATOR_MISSION_APPLICATION_RESUBMITTED" : "CREATOR_MISSION_APPLICATION_SUBMITTED",
+      targetType: "CreatorMission",
+      targetId: created.id,
+      metadata: {
+        missionId: created.missionId,
+        campaignId: created.campaignId,
+        creatorSocialChannels: approvedActiveChannels
+      }
+    }
+  });
 
   return prisma.creatorMission.findUniqueOrThrow({
     where: { id: created.id },
