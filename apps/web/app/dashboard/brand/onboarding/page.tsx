@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
 
 const BCC_AGREEMENT_TERMS = `HỢP ĐỒNG BCC dCreator v1
@@ -350,6 +351,10 @@ export default function BrandOnboardingPage() {
     <>
       
       <>
+        <Link href="/dashboard/brand/settings" className="mb-4 inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 hover:text-zinc-900">
+          <span aria-hidden="true">←</span>
+          Quay lại
+        </Link>
         <PageHeader title="Onboarding / BCC" subtitle="Hoàn tất hồ sơ pháp lý để mở khóa các tác vụ nâng cao như campaign ngân sách lớn và kiểm soát rủi ro." />
         {error ? <ErrorState title="Không thể xử lý onboarding" description={error} onRetry={() => void load()} /> : null}
         {success ? <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p> : null}
@@ -518,8 +523,6 @@ export default function BrandOnboardingPage() {
     </>
   );
 }
-
-
 
 
 

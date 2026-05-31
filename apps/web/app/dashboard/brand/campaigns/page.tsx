@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { BrandSubscriptionPanel } from "@/app/dashboard/brand/_components/BrandSubscriptionPanel";
 
 type CampaignItem = {
   id: string;
@@ -46,10 +47,10 @@ function progress(current: number, target: number) {
 }
 
 export default function BrandCampaignsPage() {
+  const [activeTab, setActiveTab] = useState<"campaigns" | "packages">("campaigns");
   const [items, setItems] = useState<CampaignItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [toast, setToast] = useState("");
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -109,6 +110,31 @@ export default function BrandCampaignsPage() {
         action={<Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Gửi yêu cầu tạo campaign</Link>}
       />
 
+      <div className="mb-5 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab("campaigns")}
+          className={`rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 ${
+            activeTab === "campaigns" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:bg-zinc-100"
+          }`}
+        >
+          Campaign / Job
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("packages")}
+          className={`rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 ${
+            activeTab === "packages" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:bg-zinc-100"
+          }`}
+        >
+          Mục tiêu gói
+        </button>
+      </div>
+
+      {activeTab === "packages" ? <BrandSubscriptionPanel showHeader={false} /> : null}
+
+      {activeTab === "campaigns" ? (
+        <>
       <section className="dc-card p-4">
         <div className="grid gap-2 md:grid-cols-5">
           <input className="dc-input" placeholder="Tìm tên campaign" value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -224,8 +250,8 @@ export default function BrandCampaignsPage() {
           )}
         </section>
       ) : null}
-
-      {toast ? <ActionToast message={toast} /> : null}
+        </>
+      ) : null}
     </>
   );
 }

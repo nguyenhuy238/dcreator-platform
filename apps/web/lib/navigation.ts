@@ -50,15 +50,17 @@ const creatorNavItems: readonly NavItem[] = [
 
 const brandNavItems: readonly NavItem[] = [
   { href: "/dashboard/brand", label: "T\u1ed5ng quan Brand", description: "To\u00e0n c\u1ea3nh v\u1eadn h\u00e0nh Brand", icon: "Gauge" },
-  { href: "/dashboard/brand/subscriptions", label: "M\u1ee5c ti\u00eau g\u00f3i", description: "Ch\u1ecdn g\u00f3i \u0111\u0103ng k\u00fd d\u00e0nh cho Brand", icon: "SlidersHorizontal" },
-  { href: "/dashboard/brand/wallet", label: "V\u00ed N-Point", description: "S\u1ed1 d\u01b0 N-Point v\u00e0 y\u00eau c\u1ea7u n\u1ea1p/ho\u00e0n ti\u1ec1n", icon: "Coins" },
-  { href: "/dashboard/brand/onboarding", label: "Onboarding / BCC", description: "H\u1ed3 s\u01a1 ph\u00e1p l\u00fd v\u00e0 BCC", icon: "IdentificationCard" },
-  { href: "/dashboard/brand/profile", label: "H\u1ed3 s\u01a1 nh\u00e3n h\u00e0ng", description: "Th\u00f4ng tin nh\u00e3n h\u00e0ng", icon: "Storefront" },
   { href: "/dashboard/brand/campaigns", label: "Campaign / Job", description: "T\u1ea1o v\u00e0 qu\u1ea3n l\u00fd campaign", icon: "Megaphone" },
   { href: "/dashboard/brand/mission-reviews", label: "Duy\u1ec7t nhi\u1ec7m v\u1ee5 Creator", description: "Duy\u1ec7t k\u1ecbch b\u1ea3n, video v\u00e0 ho\u00e0n th\u00e0nh", icon: "ClipboardText" },
   { href: "/dashboard/brand/mission-history", label: "L\u1ecbch s\u1eed nhi\u1ec7m v\u1ee5", description: "To\u00e0n b\u1ed9 Creator Mission theo campaign", icon: "Scroll" },
   { href: "/dashboard/brand/products", label: "S\u1ea3n ph\u1ea9m / SKU / Variant", description: "Qu\u1ea3n l\u00fd danh m\u1ee5c s\u1ea3n ph\u1ea9m", icon: "Package" },
-  { href: "/dashboard/brand/settings", label: "C\u00e0i \u0111\u1eb7t Brand", description: "Thi\u1ebft l\u1eadp v\u1eadn h\u00e0nh Brand", icon: "GearSix" }
+  {
+    href: "/dashboard/brand/settings",
+    label: "C\u00e0i \u0111\u1eb7t Brand",
+    description: "V\u00ed N-Point, onboarding v\u00e0 h\u1ed3 s\u01a1 nh\u00e3n h\u00e0ng",
+    icon: "GearSix",
+    activePrefixes: ["/dashboard/brand/wallet", "/dashboard/brand/onboarding", "/dashboard/brand/profile"]
+  }
 ];
 
 const adminNavItems: readonly NavItem[] = [
@@ -234,5 +236,3 @@ export function getBreadcrumbsForPath(pathname: string, workspace: Workspace): B
   }
   return crumbs;
 }
-
-
