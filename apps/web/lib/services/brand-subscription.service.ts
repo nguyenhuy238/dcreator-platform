@@ -35,20 +35,9 @@ function toPackageStatus(currentPackageCode: BrandSubscriptionPackageCode, packa
   return "LOCKED";
 }
 
-function canPurchasePackage(input: {
-  currentPackageCode: BrandSubscriptionPackageCode;
-  packageCode: BrandSubscriptionPackageCode;
-  pricePoints: number;
-}) {
-  return (
-    input.pricePoints > 0 &&
-    toPackageStatus(input.currentPackageCode, input.packageCode) === "AVAILABLE"
-  );
-}
-
-export async function getBrandSubscriptionState(accountId: string, currentBrandId?: string | null) {
-  const brand = await resolveBrandContext(prisma, accountId, currentBrandId);
-  const [wallet, subscription, videoUsage] = await Promise.all([
+export async function getBrandSubscriptionState(accountId: string) {
+  const brand = await resolveBrandContext(prisma, accountId);
+  const [wallet, subscription] = await Promise.all([
     ensureWalletByAccountId(brand.ownerAccountId),
     prisma.brandSubscription.upsert({
       where: { brandId: brand.id },

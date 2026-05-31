@@ -244,6 +244,19 @@ async function resolveBrandActorContext(
     });
     if (!membership) throw new AppError("Bạn không có quyền truy cập Brand này.", 403, "BRAND_FORBIDDEN");
     return { brand: membership.brand, brandOwnerAccountId: membership.brand.ownerAccountId, membershipRole: membership.role };
+async function resolveBrandActorContext(
+  accountId: string,
+  options?: { provisionIfOwner?: boolean; currentBrandId?: string | null }
+): Promise<BrandActorContext> {
+  const currentBrandId = options?.currentBrandId?.trim() || null;
+
+  if (currentBrandId) {
+    const membership = await prisma.brandMember.findFirst({
+      where: { accountId, brandId: currentBrandId },
+      include: { brand: true }
+    });
+    if (!membership) throw new AppError("Bạn không có quyền truy cập Brand này.", 403, "BRAND_FORBIDDEN");
+    return { brand: membership.brand, brandOwnerAccountId: membership.brand.ownerAccountId, membershipRole: membership.role };
   }
 
   const membership = await prisma.brandMember.findFirst({
@@ -251,6 +264,7 @@ async function resolveBrandActorContext(
     include: { brand: true },
     orderBy: { createdAt: "desc" }
   });
+  if (membership) return { brand: membership.brand, brandOwnerAccountId: membership.brand.ownerAccountId, membershipRole: membership.role };
   if (membership) return { brand: membership.brand, brandOwnerAccountId: membership.brand.ownerAccountId, membershipRole: membership.role };
 
   const shouldProvision = options?.provisionIfOwner ?? true;
@@ -309,7 +323,20 @@ function toBrandProductDto(product: BrandProductWithBatches) {
 
 export async function getBrandOverview(accountId: string, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
+export async function getBrandOverview(accountId: string, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const wallet = await ensureWalletByAccountId(ctx.brandOwnerAccountId);
+  const campaignIds = await getScopedCampaignIds(ctx.brand.id, ctx.brandOwnerAccountId);
+  if (campaignIds.length === 0) {
+    return {
+      activeCampaigns: 0,
+      totalBudget: 0,
+      prepaidFundBalance: wallet.pointsBalance,
+      totalCreators: 0,
+      totalVideosSubmitted: 0,
+      totalSalesConversions: 0
+    };
+  }
   const campaignIds = await getScopedCampaignIds(ctx.brand.id, ctx.brandOwnerAccountId);
   if (campaignIds.length === 0) {
     return {
@@ -324,10 +351,15 @@ export async function getBrandOverview(accountId: string, currentBrandId?: strin
   const [activeCampaigns, campaigns, creatorSetRaw, totalVideosSubmitted, totalSales] = await Promise.all([
     prisma.campaign.count({ where: { id: { in: campaignIds }, status: CampaignStatus.ACTIVE } }),
     prisma.campaign.findMany({ where: { id: { in: campaignIds } }, select: { id: true, budgetVnd: true } }),
+    prisma.campaign.count({ where: { id: { in: campaignIds }, status: CampaignStatus.ACTIVE } }),
+    prisma.campaign.findMany({ where: { id: { in: campaignIds } }, select: { id: true, budgetVnd: true } }),
     prisma.missionSubmission.findMany({
+      where: { mission: { campaignId: { in: campaignIds } } },
       where: { mission: { campaignId: { in: campaignIds } } },
       select: { accountId: true }
     }),
+    prisma.missionSubmission.count({ where: { mission: { campaignId: { in: campaignIds } }, status: "SUBMITTED" } }),
+    prisma.contribution.aggregate({ _sum: { amountVnd: true }, where: { campaignId: { in: campaignIds }, status: "SUCCESS" } })
     prisma.missionSubmission.count({ where: { mission: { campaignId: { in: campaignIds } }, status: "SUBMITTED" } }),
     prisma.contribution.aggregate({ _sum: { amountVnd: true }, where: { campaignId: { in: campaignIds }, status: "SUCCESS" } })
   ]);
@@ -502,7 +534,48 @@ async function ensureBrandForOwner(accountId: string) {
     return brand;
   });
 }
+  return prisma.$transaction(async (tx) => {
+    const brand = await tx.brand.create({
+      data: {
+        ownerAccountId: accountId,
+        name: latestApplication?.brandName ?? account.displayName ?? "Brand",
+        logoUrl: latestApplication?.logoUrl ?? null,
+        legalName: latestApplication?.legalName ?? null,
+        industry: latestApplication?.industry ?? null,
+        website: latestApplication?.website ?? null,
+        fanpage: latestApplication?.fanpage ?? null,
+        address: latestApplication?.address ?? null,
+        contactName: latestApplication?.contactName ?? account.displayName ?? "Brand Owner",
+        contactPhone: latestApplication?.contactPhone ?? "",
+        contactEmail: latestApplication?.contactEmail ?? account.email,
+        description: latestApplication?.description ?? null,
+        businessGoal: latestApplication?.businessGoal ?? null,
+        taxCode: latestApplication?.taxCode ?? null,
+        businessLicenseUrl: latestApplication?.businessLicenseUrl ?? null,
+        representativeName: latestApplication?.representativeName ?? null,
+        representativePhone: latestApplication?.representativePhone ?? null,
+        representativeEmail: latestApplication?.representativeEmail ?? null,
+        productCategories: latestApplication?.productCategories ?? null,
+        inventoryDescription: latestApplication?.inventoryDescription ?? null,
+        revenueSharePercent: latestApplication?.revenueSharePercent ?? null,
+        commissionRatePercent: latestApplication?.commissionRatePercent ?? null,
+        bccAgreementVersion: latestApplication?.bccAgreementVersion ?? null,
+        legalResponsibilityAccepted: latestApplication?.legalResponsibilityAccepted ?? false,
+        contractFileUrl: latestApplication?.contractFileUrl ?? null,
+        contractSignedAt: latestApplication?.contractSignedAt ?? null
+      }
+    });
+    await tx.brandMember.upsert({
+      where: { brandId_accountId: { brandId: brand.id, accountId } },
+      create: { brandId: brand.id, accountId, role: BrandMemberRole.OWNER },
+      update: { role: BrandMemberRole.OWNER }
+    });
+    return brand;
+  });
+}
 
+export async function getBrandOnboarding(accountId: string, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
 export async function getBrandOnboarding(accountId: string, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const brand = ctx.brand;
@@ -517,6 +590,8 @@ export async function getBrandOnboarding(accountId: string, currentBrandId?: str
   return { ...toOnboardingStatus(brand, latestApplication), contractDocuments };
 }
 
+export async function updateBrandOnboarding(accountId: string, input: BrandOnboardingInput, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
 export async function updateBrandOnboarding(accountId: string, input: BrandOnboardingInput, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const brand = ctx.brand;
@@ -588,6 +663,7 @@ export async function updateBrandOnboarding(accountId: string, input: BrandOnboa
       contractSignedAt: null,
       rejectReason: null,
       reviewNote: "Brand requested KYB/BCC verification update.",
+      reviewNote: "Brand requested KYB/BCC verification update.",
       reviewedById: null,
       reviewedAt: null
     };
@@ -612,6 +688,7 @@ export async function updateBrandOnboarding(accountId: string, input: BrandOnboa
     await writeAuditLog({
       actorId: accountId,
       action: "BRAND_KYB_UPDATE_SUBMITTED",
+      action: "BRAND_KYB_UPDATE_SUBMITTED",
       targetType: "Brand",
       targetId: brand.id,
       oldStatus: brand.status,
@@ -619,6 +696,8 @@ export async function updateBrandOnboarding(accountId: string, input: BrandOnboa
     });
     await createNotificationForAdminOps({
       event: "CAMPAIGN_APPROVED",
+      title: "Brand gửi cập nhật KYB/BCC",
+      content: `${brand.name} đã gửi cập nhật KYB/BCC để Ops kiểm tra.`,
       title: "Brand gửi cập nhật KYB/BCC",
       content: `${brand.name} đã gửi cập nhật KYB/BCC để Ops kiểm tra.`,
       metadata: { brandId: brand.id, ownerAccountId: brand.ownerAccountId },
@@ -647,8 +726,11 @@ export async function updateBrandOnboarding(accountId: string, input: BrandOnboa
 
 export async function getBrandProfile(accountId: string, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
+export async function getBrandProfile(accountId: string, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const [account, brand, latestApplication] = await Promise.all([
     prisma.account.findUnique({ where: { id: accountId }, include: { profile: true } }),
+    prisma.brand.findFirst({ where: { id: ctx.brand.id } }),
     prisma.brand.findFirst({ where: { id: ctx.brand.id } }),
     prisma.brandApplication.findFirst({ where: { accountId }, orderBy: { createdAt: "desc" } })
   ]);
@@ -675,6 +757,8 @@ export async function getBrandProfile(accountId: string, currentBrandId?: string
   };
 }
 
+export async function updateBrandProfile(accountId: string, input: BrandProfileInput, currentBrandId?: string | null) {
+  await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
 export async function updateBrandProfile(accountId: string, input: BrandProfileInput, currentBrandId?: string | null) {
   await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const current = await prisma.profile.findUnique({ where: { accountId } });
@@ -714,6 +798,8 @@ export async function updateBrandProfile(accountId: string, input: BrandProfileI
 
 export async function listProducts(accountId: string, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
+export async function listProducts(accountId: string, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const brand = ctx.brand;
   const products = await prisma.brandProduct.findMany({
     where: { brandId: brand.id },
@@ -727,6 +813,8 @@ export async function listProducts(accountId: string, currentBrandId?: string | 
   return parseBrandMeta(profile?.socialLinks).products;
 }
 
+export async function upsertProduct(accountId: string, input: ProductInput, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
 export async function upsertProduct(accountId: string, input: ProductInput, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const brand = ctx.brand;
@@ -787,6 +875,8 @@ export async function upsertProduct(accountId: string, input: ProductInput, curr
   return dto;
 }
 
+export async function createBrandCampaign(accountId: string, input: CampaignInput, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
 export async function createBrandCampaign(accountId: string, input: CampaignInput, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const campaign = await prisma.campaign.create({
@@ -950,7 +1040,11 @@ export async function requestCampaignAdjustment(accountId: string, campaignId: s
 export async function listBrandCampaigns(accountId: string, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const campaignIds = await getScopedCampaignIds(ctx.brand.id, ctx.brandOwnerAccountId);
+export async function listBrandCampaigns(accountId: string, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
+  const campaignIds = await getScopedCampaignIds(ctx.brand.id, ctx.brandOwnerAccountId);
   const campaigns = await prisma.campaign.findMany({
+    where: { id: { in: campaignIds } },
     where: { id: { in: campaignIds } },
     orderBy: { createdAt: "desc" },
     include: {
@@ -965,6 +1059,7 @@ export async function listBrandCampaigns(accountId: string, currentBrandId?: str
 
   const applicationsByCampaign = await prisma.missionSubmission.groupBy({
     by: ["missionId"],
+    where: { mission: { campaignId: { in: campaignIds } } },
     where: { mission: { campaignId: { in: campaignIds } } },
     _count: { _all: true }
   });
@@ -983,6 +1078,7 @@ export async function listBrandCampaigns(accountId: string, currentBrandId?: str
   const approvedCreatorPairs = await prisma.missionApplication.groupBy({
     by: ["campaignId", "accountId"],
     where: {
+      campaignId: { in: campaignIds },
       campaignId: { in: campaignIds },
       status: "APPROVED"
     }
@@ -1026,6 +1122,8 @@ function parseCreatorMeta(value: unknown): CreatorMeta {
 
 export async function listBrandCampaignRequests(accountId: string, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
+export async function listBrandCampaignRequests(accountId: string, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const brand = ctx.brand;
   return prisma.brandCampaignRequest.findMany({
     where: { brandId: brand.id },
@@ -1058,6 +1156,8 @@ export async function listBrandCampaignRequests(accountId: string, currentBrandI
   });
 }
 
+export async function createBrandCampaignRequest(accountId: string, input: CampaignRequestInput, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
 export async function createBrandCampaignRequest(accountId: string, input: CampaignRequestInput, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const brand = ctx.brand;
@@ -1105,6 +1205,8 @@ export async function createBrandCampaignRequest(accountId: string, input: Campa
 
 export async function getBrandCampaignTemplateConfig(accountId: string, currentBrandId?: string | null) {
   await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
+export async function getBrandCampaignTemplateConfig(accountId: string, currentBrandId?: string | null) {
+  await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   try {
     const rows = await prisma.$queryRaw<Array<{ campaignContentTemplateUrl: string }>>`
       SELECT "campaignContentTemplateUrl"
@@ -1118,6 +1220,8 @@ export async function getBrandCampaignTemplateConfig(accountId: string, currentB
   }
 }
 
+export async function respondBrandCampaignRequest(accountId: string, requestId: string, input: CampaignBrandFeedbackInput, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
 export async function respondBrandCampaignRequest(accountId: string, requestId: string, input: CampaignBrandFeedbackInput, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const brand = ctx.brand;
@@ -1155,9 +1259,13 @@ export async function addRewardTier(accountId: string, input: RewardInput, curre
 export async function listCreatorApplications(accountId: string, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const campaignIds = await getScopedCampaignIds(ctx.brand.id, ctx.brandOwnerAccountId);
+export async function listCreatorApplications(accountId: string, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
+  const campaignIds = await getScopedCampaignIds(ctx.brand.id, ctx.brandOwnerAccountId);
   const submissions = await prisma.missionSubmission.findMany({
     where: {
       mission: {
+        campaignId: { in: campaignIds },
         campaignId: { in: campaignIds },
         audience: { in: [MissionAudience.CREATOR, MissionAudience.USER] }
       },
@@ -1291,6 +1399,8 @@ export async function listCampaignMissionsForBrand(accountId: string, campaignId
 
 export async function decideCreatorApplication(accountId: string, input: CreatorApplicationDecisionInput, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
+export async function decideCreatorApplication(accountId: string, input: CreatorApplicationDecisionInput, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const submission = await prisma.missionSubmission.findUnique({
     where: { id: input.submissionId },
     include: { mission: { include: { campaign: true } } }
@@ -1355,8 +1465,12 @@ export async function decideCreatorApplication(accountId: string, input: Creator
 export async function listBrandProofs(accountId: string, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const campaignIds = await getScopedCampaignIds(ctx.brand.id, ctx.brandOwnerAccountId);
+export async function listBrandProofs(accountId: string, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
+  const campaignIds = await getScopedCampaignIds(ctx.brand.id, ctx.brandOwnerAccountId);
   return prisma.missionSubmission.findMany({
     where: {
+      mission: { campaignId: { in: campaignIds }, audience: MissionAudience.CREATOR },
       mission: { campaignId: { in: campaignIds }, audience: MissionAudience.CREATOR },
       lifecycleStatus: { in: ["PENDING_REVIEW", "REJECTED", "SUBMITTED", "APPROVED", "DONE"] }
     },
@@ -1374,6 +1488,8 @@ export async function listBrandProofs(accountId: string, currentBrandId?: string
   });
 }
 
+export async function reviewBrandProof(accountId: string, role: Role, input: ProofReviewDecisionInput, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
 export async function reviewBrandProof(accountId: string, role: Role, input: ProofReviewDecisionInput, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const submission = await prisma.missionSubmission.findUnique({
@@ -1455,11 +1571,19 @@ export async function lockCampaignBudget(accountId: string, input: BudgetLockInp
 
 export async function getBrandBudget(accountId: string, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
+export async function getBrandBudget(accountId: string, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const wallet = await ensureWalletByAccountId(ctx.brandOwnerAccountId);
   const tx = await getWalletTransactions(ctx.brandOwnerAccountId, 1, 30);
   return { prepaidFundBalance: wallet.pointsBalance, transactionHistory: tx.items };
 }
 
+export async function getBrandAnalytics(accountId: string, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
+  const campaigns = await prisma.campaign.findMany({
+    where: { id: { in: await getScopedCampaignIds(ctx.brand.id, ctx.brandOwnerAccountId) } },
+    select: { id: true, title: true }
+  });
 export async function getBrandAnalytics(accountId: string, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const campaigns = await prisma.campaign.findMany({
@@ -1517,6 +1641,8 @@ export async function getBrandAnalytics(accountId: string, currentBrandId?: stri
 
 export async function listBrandMembers(accountId: string, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
+export async function listBrandMembers(accountId: string, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const canManage = ctx.membershipRole === "OWNER";
   const members = await prisma.brandMember.findMany({
     where: { brandId: ctx.brand.id },
@@ -1548,6 +1674,8 @@ export async function listBrandMembers(accountId: string, currentBrandId?: strin
 
 export async function inviteBrandMember(accountId: string, input: BrandMemberInviteInput, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
+export async function inviteBrandMember(accountId: string, input: BrandMemberInviteInput, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   if (ctx.membershipRole !== "OWNER") {
     throw new AppError("Only brand owner can invite members", 403, "BRAND_MEMBER_FORBIDDEN");
   }
@@ -1567,7 +1695,9 @@ export async function inviteBrandMember(accountId: string, input: BrandMemberInv
       brandId: ctx.brand.id,
       accountId: account.id,
       role: input.role as BrandMemberRole
+      role: input.role as BrandMemberRole
     },
+    update: { role: input.role as BrandMemberRole }
     update: { role: input.role as BrandMemberRole }
   });
 
@@ -1591,6 +1721,8 @@ export async function inviteBrandMember(accountId: string, input: BrandMemberInv
 
 export async function updateBrandMemberRole(accountId: string, input: BrandMemberRoleUpdateInput, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
+export async function updateBrandMemberRole(accountId: string, input: BrandMemberRoleUpdateInput, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   if (ctx.membershipRole !== "OWNER") {
     throw new AppError("Only brand owner can update member role", 403, "BRAND_MEMBER_FORBIDDEN");
   }
@@ -1600,6 +1732,7 @@ export async function updateBrandMemberRole(accountId: string, input: BrandMembe
     throw new AppError("Không thể thay đổi role owner cuối cùng", 409, "OWNER_LOCKED");
   }
 
+  const updated = await prisma.brandMember.update({ where: { id: member.id }, data: { role: input.role as BrandMemberRole } });
   const updated = await prisma.brandMember.update({ where: { id: member.id }, data: { role: input.role as BrandMemberRole } });
   await writeAuditLog({
     actorId: accountId,
@@ -1611,6 +1744,8 @@ export async function updateBrandMemberRole(accountId: string, input: BrandMembe
   return updated;
 }
 
+export async function removeBrandMember(accountId: string, input: BrandMemberRemoveInput, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
 export async function removeBrandMember(accountId: string, input: BrandMemberRemoveInput, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   if (ctx.membershipRole !== "OWNER") {
@@ -1632,8 +1767,10 @@ export async function removeBrandMember(accountId: string, input: BrandMemberRem
 }
 
 export async function createProductSubmissionForReview(accountId: string, input: ProductSubmissionInput, currentBrandId?: string | null) {
+export async function createProductSubmissionForReview(accountId: string, input: ProductSubmissionInput, currentBrandId?: string | null) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const prismaAny = prisma as any;
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const brand = ctx.brand;
   if (input.campaignId) {
@@ -1663,8 +1800,10 @@ export async function createProductSubmissionForReview(accountId: string, input:
 }
 
 export async function listProductSubmissionsForBrand(accountId: string, currentBrandId?: string | null) {
+export async function listProductSubmissionsForBrand(accountId: string, currentBrandId?: string | null) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const prismaAny = prisma as any;
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const brand = ctx.brand;
   return prismaAny.productSubmission.findMany({
