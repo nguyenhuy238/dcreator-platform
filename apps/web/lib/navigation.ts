@@ -42,8 +42,6 @@ const creatorNavItems: readonly NavItem[] = [
   { href: "/dashboard/creator", label: "T\u1ed5ng quan Creator", description: "Ti\u1ebfn \u0111\u1ed9 nhi\u1ec7m v\u1ee5 v\u00e0 hoa h\u1ed3ng", icon: "Gauge" },
   { href: "/dashboard/creator/jobs", label: "Campaign / Job", description: "Chi\u1ebfn d\u1ecbch c\u00f3 th\u1ec3 tham gia", icon: "Briefcase" },
   { href: "/dashboard/creator/missions", label: "Nhi\u1ec7m v\u1ee5 c\u1ee7a t\u00f4i", description: "Danh s\u00e1ch nhi\u1ec7m v\u1ee5 Creator", icon: "ClipboardText" },
-  { href: "/dashboard/creator/proofs", label: "Proof / Ho\u00e0n th\u00e0nh", description: "N\u1ed9p minh ch\u1ee9ng v\u00e0 theo d\u00f5i duy\u1ec7t", icon: "CheckCircle" },
-  { href: "/dashboard/creator/channels", label: "K\u00eanh social", description: "K\u1ebft n\u1ed1i k\u00eanh m\u1ea1ng x\u00e3 h\u1ed9i", icon: "UsersThree" },
   { href: "/dashboard/creator/profile", label: "H\u1ed3 s\u01a1 Creator", description: "Portfolio v\u00e0 th\u00f4ng tin Creator", icon: "UserCircle" },
   { href: "/dashboard/creator/wallet", label: "V\u00ed Creator", description: "Hoa h\u1ed3ng v\u00e0 payout", icon: "Wallet" }
 ];
@@ -234,4 +232,3 @@ export function getBreadcrumbsForPath(pathname: string, workspace: Workspace): B
   }
   return crumbs;
 }
-

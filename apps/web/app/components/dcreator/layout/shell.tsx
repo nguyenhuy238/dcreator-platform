@@ -7,7 +7,7 @@ import type { Role } from "@prisma/client";
 import { DashboardSwitcher } from "@/app/components/dcreator/layout/dashboard-switcher";
 import { DashboardShell } from "@/app/components/dcreator/layout/dashboard-shell";
 import { deriveCapabilities, type UserCapabilities } from "@/lib/auth/capabilities";
-import { canAccessWorkspace, getNavItemsForWorkspace, getWorkspaceConfig, getWorkspaceForPath } from "@/lib/navigation";
+import { canAccessWorkspace, getAvailableWorkspaces, getNavItemsForWorkspace, getWorkspaceConfig, getWorkspaceForPath } from "@/lib/navigation";
 
 type NavItem = { href: string; label: string };
 
@@ -88,6 +88,26 @@ export function PublicHeader() {
           ? "/dashboard/creator"
           : "/dashboard/user/profile"
     : "/dashboard/user/profile";
+  const roleSwitch = useMemo(() => {
+    if (!currentUser) {
+      return { href: "/auth/register", label: "Tham Gia" };
+    }
+
+    const available = getAvailableWorkspaces({
+      roles: currentUser.roles,
+      capabilities: capabilities ?? { user: true, creator: false, brand: false, admin: false }
+    });
+    const currentWorkspace = getWorkspaceForPath(pathname);
+    const nextWorkspace = available.find((item) => item.id !== currentWorkspace);
+
+    if (nextWorkspace) {
+      return { href: nextWorkspace.href, label: nextWorkspace.label };
+    }
+
+    return { href: profileHref, label: "Hồ sơ" };
+  }, [capabilities, currentUser, pathname, profileHref]);
+  const roleSwitchHref = roleSwitch.href;
+  const roleSwitchLabel = roleSwitch.label;
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/70 bg-white/90 backdrop-blur">

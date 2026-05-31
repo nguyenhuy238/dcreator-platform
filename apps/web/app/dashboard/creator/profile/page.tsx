@@ -1,7 +1,6 @@
 ﻿"use client";
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import {
   ActionToast,
   EmptyState,
@@ -87,8 +86,7 @@ function formatIntForInput(value: number) {
 }
 
 export default function CreatorProfilePage() {
-  const searchParams = useSearchParams();
-  const activeTab = searchParams.get("tab") === "channels" ? "channels" : "profile";
+  const [activeTab, setActiveTab] = useState<"profile" | "channels">("profile");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -298,12 +296,20 @@ export default function CreatorProfilePage() {
       <PageHeader title="Hồ sơ Creator" subtitle="Quản lý thông tin cá nhân, kênh xã hội và lĩnh vực nội dung." />
 
       <div className="mb-4 flex gap-2 border-b border-zinc-200 pb-2">
-        <a href="?tab=profile" className={`rounded-full px-4 py-2 text-sm font-semibold ${activeTab === "profile" ? "bg-zinc-900 !text-white" : "text-zinc-600 hover:bg-zinc-100"}`}>
+        <button
+          type="button"
+          onClick={() => setActiveTab("profile")}
+          className={`rounded-full px-4 py-2 text-sm font-semibold ${activeTab === "profile" ? "bg-zinc-900 !text-white" : "text-zinc-600 hover:bg-zinc-100"}`}
+        >
           Thông tin cơ bản
-        </a>
-        <a href="?tab=channels" className={`rounded-full px-4 py-2 text-sm font-semibold ${activeTab === "channels" ? "bg-zinc-900 !text-white" : "text-zinc-600 hover:bg-zinc-100"}`}>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("channels")}
+          className={`rounded-full px-4 py-2 text-sm font-semibold ${activeTab === "channels" ? "bg-zinc-900 !text-white" : "text-zinc-600 hover:bg-zinc-100"}`}
+        >
           Kênh mạng xã hội
-        </a>
+        </button>
       </div>
 
       {error ? <ErrorState title="Không thể xử lý hồ sơ" description={error} onRetry={() => void loadAll()} /> : null}
