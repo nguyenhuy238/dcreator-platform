@@ -31,6 +31,11 @@ function parseRoadmap(value: string | null): string[] {
     .filter(Boolean);
 }
 
+function normalizeRoadmap(steps: string[], legacyRaw: string | null): string[] {
+  if (steps.length > 0) return steps;
+  return parseRoadmap(legacyRaw);
+}
+
 export async function getCampaignDetailBySlug(slug: string, viewerId?: string): Promise<CampaignDetailDTO> {
   const result = await findPublicCampaignDetailBySlug(slug, viewerId);
   if (!result) {
@@ -65,8 +70,8 @@ export async function getCampaignDetailBySlug(slug: string, viewerId?: string): 
       campaignType: campaign.campaignType,
       category: campaign.category,
       objective: campaign.objective,
-      benefits: campaign.objective,
-      participationRoadmap: parseRoadmap(campaign.priorityChannels),
+      benefits: campaign.benefits ?? campaign.objective,
+      participationRoadmap: normalizeRoadmap(campaign.participationRoadmap, campaign.priorityChannels),
       status: campaign.status,
       deadline: campaign.endsAt?.toISOString() ?? null
     },
@@ -100,9 +105,16 @@ export async function getCampaignDetailBySlug(slug: string, viewerId?: string): 
     missions: campaign.missions.map((mission) => ({
       id: mission.id,
       title: mission.title,
+      description: mission.description,
+      audience: mission.audience,
+      productReceiveOption: mission.productReceiveOption,
+      productName: mission.productName,
+      productDescription: mission.productDescription,
+      productImageUrl: mission.productImageUrl,
+      productLink: mission.productLink,
+      allowRepeat: mission.allowRepeat,
       rewardPoints: mission.rewardPoints,
-      deadline: campaign.endsAt?.toISOString() ?? null,
-      eligibility: "Creator da KYC va du dieu kien tham gia mission",
+      deadline: mission.deadlineAt?.toISOString() ?? campaign.endsAt?.toISOString() ?? null,
       status: mission.status
     })),
     timeline: {

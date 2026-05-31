@@ -495,10 +495,6 @@ export default function AdminCreateCampaignPage() {
                 <input className="dc-input" type="datetime-local" value={form.mission.deadlineAt} onChange={(event) => setMissionField("deadlineAt", event.target.value)} />
               </label>
               <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-                <span>Thưởng hoa hồng (VND)</span>
-                <input className="dc-input" type="number" min={0} value={form.mission.rewardCommissionVnd} onChange={(event) => setMissionField("rewardCommissionVnd", Number(event.target.value || 0))} />
-              </label>
-              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
                 <span>Thưởng điểm (Points)</span>
                 <input className="dc-input" type="number" min={0} value={form.mission.rewardPoints} onChange={(event) => setMissionField("rewardPoints", Number(event.target.value || 0))} />
               </label>
