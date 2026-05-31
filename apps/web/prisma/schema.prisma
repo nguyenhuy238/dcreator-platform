@@ -173,8 +173,7 @@ enum MissionAudience {
 }
 
 enum ProductReceiveOption {
-  DEPOSIT_PRODUCT
-  CREATOR_BUY_FIRST
+  PRODUCT_REQUIRED
   NO_PRODUCT_REQUIRED
 }
 
@@ -996,6 +995,9 @@ model Mission {
   campaignId           String
   title                String
   description          String
+  productName          String?
+  productDescription   String?
+  productImageUrl      String?
   productLink          String?
   rewardPoints         Int
   rewardCommissionVnd  Int                  @default(0)

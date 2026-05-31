@@ -30,6 +30,27 @@ type CampaignDetail = {
   quota: { creator: number; user: number };
 };
 
+function getStatusLabel(value: string) {
+  const map: Record<string, string> = {
+    DRAFT: "Bản nháp",
+    ACTIVE: "Đang hoạt động",
+    PAUSED: "Tạm dừng",
+    COMPLETED: "Đã hoàn thành",
+    ARCHIVED: "Đã lưu trữ",
+    APPROVED: "Đã duyệt",
+    REJECTED: "Đã từ chối",
+    PENDING_REVIEW: "Chờ duyệt",
+    NEEDS_REVISION: "Cần chỉnh sửa"
+  };
+  return map[value] ?? value;
+}
+
+function getAudienceLabel(value: string) {
+  if (value === "CREATOR") return "Nhà sáng tạo";
+  if (value === "USER") return "Người dùng";
+  return value;
+}
+
 export default function AdminCampaignDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -155,9 +176,8 @@ export default function AdminCampaignDetailPage() {
         subtitle={`Brand: ${item.brand.displayName}`}
         action={
           <div className="flex gap-2">
-            <button className="dc-btn-secondary" onClick={() => router.push(`/admin/campaigns/${item.id}/applications`)}>Applications</button>
-            <button className="dc-btn-secondary" onClick={() => router.push(`/admin/campaigns/${item.id}/missions`)}>Quản lý mission/job</button>
-            <button className="dc-btn-secondary" onClick={() => router.push("/admin/campaigns")}>Back</button>
+            <button className="dc-btn-secondary" onClick={() => router.push(`/admin/campaigns/${item.id}/applications`)}>Đơn đăng ký</button>
+            <button className="dc-btn-secondary" onClick={() => router.push("/admin/campaigns")}>Quay lại</button>
           </div>
         }
       />
@@ -223,7 +243,7 @@ export default function AdminCampaignDetailPage() {
       </section>
 
       <section className="mt-4 dc-card p-4">
-        <p className="font-semibold">Product / Inventory</p>
+        <p className="font-semibold">Sản phẩm / tồn kho</p>
         <div className="mt-3 grid gap-2">
           {item.productSubmissions.length === 0 ? (
             <p className="text-sm text-zinc-600">Chưa có sản phẩm/lô hàng gắn vào campaign.</p>
@@ -231,7 +251,7 @@ export default function AdminCampaignDetailPage() {
             item.productSubmissions.map((product) => (
               <div key={product.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm">
                 <p className="font-semibold">{product.name}</p>
-                <p>Status: {product.reviewStatus}</p>
+                <p>Trạng thái: {getStatusLabel(product.reviewStatus)}</p>
                 <p>Stock remaining: {product.inventoryBatches.reduce((sum, b) => sum + b.quantityRemaining, 0).toLocaleString("vi-VN")}</p>
               </div>
             ))
@@ -240,7 +260,7 @@ export default function AdminCampaignDetailPage() {
       </section>
 
       <section className="mt-4 dc-card p-4">
-        <p className="font-semibold">Rewards & missions</p>
+        <p className="font-semibold">Phần thưởng & nhiệm vụ</p>
         <div className="mt-3 grid gap-2 md:grid-cols-2">
           <div>
             <p className="mb-2 text-sm font-semibold">Rewards</p>
@@ -253,12 +273,12 @@ export default function AdminCampaignDetailPage() {
             ))}
           </div>
           <div>
-            <p className="mb-2 text-sm font-semibold">Missions</p>
-            {item.missions.length === 0 ? <p className="text-sm text-zinc-600">No missions</p> : item.missions.map((mission) => (
+            <p className="mb-2 text-sm font-semibold">Nhiệm vụ</p>
+            {item.missions.length === 0 ? <p className="text-sm text-zinc-600">Chưa có nhiệm vụ</p> : item.missions.map((mission) => (
               <div key={mission.id} className="mb-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm">
                 <p className="font-semibold">{mission.title}</p>
-                <p>Audience: {mission.audience}</p>
-                <p>Mission linked for audience {mission.audience}</p>
+                <p>Đối tượng: {getAudienceLabel(mission.audience)}</p>
+                <p>Nhiệm vụ đã gắn cho {getAudienceLabel(mission.audience).toLowerCase()}.</p>
               </div>
             ))}
           </div>

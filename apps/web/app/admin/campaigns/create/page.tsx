@@ -9,7 +9,23 @@ import { getCampaignTypeLabel } from "@/lib/constants/campaign-type";
 type CampaignCategory = "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
 type CampaignType = "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
 type SetupSource = "JOIN_EXISTING_DCREATOR_CAMP" | "BRAND_REQUESTED";
+type ProductReceiveOption = "PRODUCT_REQUIRED" | "NO_PRODUCT_REQUIRED";
 type BrandOption = { id: string; displayName: string; email: string };
+
+type MissionForm = {
+  title: string;
+  description: string;
+  audience: "CREATOR" | "USER";
+  rewardCommissionVnd: number;
+  rewardPoints: number;
+  productReceiveOption: ProductReceiveOption;
+  productName: string;
+  productDescription: string;
+  productLink: string;
+  productImageUrl: string;
+  allowRepeat: boolean;
+  deadlineAt: string;
+};
 
 type FormState = {
   brandAccountId: string;
@@ -23,13 +39,15 @@ type FormState = {
   participationRoadmap: string[];
   benefits: string;
   imageUrl: string;
+  ugcVideoQuota: number;
   startsAt: string;
   endsAt: string;
+  mission: MissionForm;
   publishNow: boolean;
 };
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string };
-type FieldErrors = Partial<Record<keyof FormState, string>> & { participationRoadmap?: string };
+type FieldErrors = Partial<Record<keyof FormState, string>> & { participationRoadmap?: string; mission?: string };
 type CampaignRequestItem = {
   id: string;
   requestedSlug: string;
@@ -55,8 +73,23 @@ const defaultForm: FormState = {
   participationRoadmap: [""],
   benefits: "",
   imageUrl: "",
+  ugcVideoQuota: 1,
   startsAt: "",
   endsAt: "",
+  mission: {
+    title: "",
+    description: "",
+    audience: "CREATOR",
+    rewardCommissionVnd: 0,
+    rewardPoints: 0,
+    productReceiveOption: "NO_PRODUCT_REQUIRED",
+    productName: "",
+    productDescription: "",
+    productLink: "",
+    productImageUrl: "",
+    allowRepeat: false,
+    deadlineAt: ""
+  },
   publishNow: false
 };
 
@@ -89,6 +122,7 @@ export default function AdminCreateCampaignPage() {
   const [form, setForm] = useState<FormState>(defaultForm);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingProductImage, setUploadingProductImage] = useState(false);
   const [prefillLoading, setPrefillLoading] = useState(false);
   const [prefillNote, setPrefillNote] = useState("");
   const [error, setError] = useState("");
@@ -101,6 +135,11 @@ export default function AdminCreateCampaignPage() {
   function setField<K extends keyof FormState>(name: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [name]: value }));
     setFieldErrors((current) => ({ ...current, [name]: undefined }));
+  }
+
+  function setMissionField<K extends keyof MissionForm>(name: K, value: MissionForm[K]) {
+    setForm((current) => ({ ...current, mission: { ...current.mission, [name]: value } }));
+    setFieldErrors((current) => ({ ...current, mission: undefined }));
   }
 
   function setRoadmapStep(index: number, value: string) {
@@ -188,8 +227,9 @@ export default function AdminCreateCampaignPage() {
     setBrandOptions(payload.data);
   }
 
-  async function uploadImage(file: File) {
-    setUploading(true);
+  async function uploadImage(file: File, target: "cover" | "product" = "cover") {
+    if (target === "cover") setUploading(true);
+    else setUploadingProductImage(true);
     setError("");
     try {
       const formData = new FormData();
@@ -197,11 +237,13 @@ export default function AdminCreateCampaignPage() {
       const response = await fetch("/api/uploads/brand-logo", { method: "POST", body: formData });
       const payload = (await response.json()) as ApiResponse<{ logoUrl: string }>;
       if (!response.ok || !payload.success) throw new Error(payload.success ? "Upload ảnh thất bại." : payload.error);
-      setField("imageUrl", payload.data.logoUrl);
+      if (target === "cover") setField("imageUrl", payload.data.logoUrl);
+      else setMissionField("productImageUrl", payload.data.logoUrl);
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Upload ảnh thất bại.");
     } finally {
-      setUploading(false);
+      if (target === "cover") setUploading(false);
+      else setUploadingProductImage(false);
     }
   }
 
@@ -218,11 +260,28 @@ export default function AdminCreateCampaignPage() {
     if (imageUrl && !imageUrl.startsWith("/uploads/") && !/^https?:\/\//.test(imageUrl)) {
       nextErrors.imageUrl = "Ảnh phải là URL bắt đầu bằng /uploads/ hoặc http(s)://";
     }
+    if (!Number.isInteger(form.ugcVideoQuota) || form.ugcVideoQuota <= 0) {
+      nextErrors.ugcVideoQuota = "Số lượng video review phải lớn hơn 0.";
+    }
     if (!form.participationRoadmap.some((item) => item.trim().length > 0)) {
       nextErrors.participationRoadmap = "Cần ít nhất 1 bước lộ trình tham gia.";
     }
     if (form.startsAt && form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) {
       nextErrors.endsAt = "Ngày kết thúc phải sau ngày bắt đầu.";
+    }
+    if (form.mission.title.trim().length < 3) nextErrors.mission = "Tên nhiệm vụ cần tối thiểu 3 ký tự.";
+    if (form.mission.description.trim().length < 10) nextErrors.mission = "Mô tả nhiệm vụ cần tối thiểu 10 ký tự.";
+    if (form.mission.productReceiveOption === "PRODUCT_REQUIRED") {
+      if (!form.mission.productName.trim()) nextErrors.mission = "Vui lòng nhập tên sản phẩm.";
+      if (!form.mission.productDescription.trim()) nextErrors.mission = "Vui lòng nhập mô tả sản phẩm.";
+      if (!form.mission.productLink.trim()) nextErrors.mission = "Vui lòng nhập link sản phẩm.";
+      if (!form.mission.productImageUrl.trim()) nextErrors.mission = "Vui lòng nhập hình ảnh sản phẩm.";
+    }
+    if (form.mission.deadlineAt && form.startsAt && new Date(form.mission.deadlineAt) < new Date(form.startsAt)) {
+      nextErrors.startsAt = "Hạn nộp nhiệm vụ không được sớm hơn ngày bắt đầu campaign.";
+    }
+    if (form.mission.deadlineAt && form.endsAt && new Date(form.mission.deadlineAt) > new Date(form.endsAt)) {
+      nextErrors.endsAt = "Hạn nộp nhiệm vụ không được trễ hơn ngày kết thúc campaign.";
     }
     return nextErrors;
   }
@@ -248,7 +307,15 @@ export default function AdminCreateCampaignPage() {
           ...form,
           startsAt: toDateTime(form.startsAt),
           endsAt: toDateTime(form.endsAt),
-          participationRoadmap: form.participationRoadmap.filter((item) => item.trim().length > 0)
+          participationRoadmap: form.participationRoadmap.filter((item) => item.trim().length > 0),
+          mission: {
+            ...form.mission,
+            productName: form.mission.productReceiveOption === "PRODUCT_REQUIRED" ? form.mission.productName : "",
+            productDescription: form.mission.productReceiveOption === "PRODUCT_REQUIRED" ? form.mission.productDescription : "",
+            productLink: form.mission.productReceiveOption === "PRODUCT_REQUIRED" ? form.mission.productLink : "",
+            productImageUrl: form.mission.productReceiveOption === "PRODUCT_REQUIRED" ? form.mission.productImageUrl : "",
+            deadlineAt: toDateTime(form.mission.deadlineAt)
+          }
         })
       });
       const payload = (await response.json()) as ApiResponse<{ id: string; title: string }>;
@@ -280,7 +347,7 @@ export default function AdminCreateCampaignPage() {
       <form className="dc-card mt-6 grid gap-4 p-5" onSubmit={submit}>
         <div className="grid gap-4 md:grid-cols-2">
           <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-            <span>Brand Account ID</span>
+            <span>Tài khoản Brand</span>
             <input className={`dc-input ${fieldErrors.brandAccountId ? "border-red-500 ring-1 ring-red-300" : ""}`} value={form.brandKeyword} onChange={(event) => void searchBrand(event.target.value)} placeholder="Nhập tên brand để tìm" required />
             {brandOptions.length > 0 ? (
               <div className="rounded-xl border border-zinc-200 bg-white p-2">
@@ -323,27 +390,27 @@ export default function AdminCreateCampaignPage() {
           </label>
 
           <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-            <span>Category</span>
+            <span>Ngành hàng</span>
             <select className="dc-input" value={form.category} onChange={(event) => setField("category", event.target.value as CampaignCategory)}>
-              <option value="LIFESTYLE">LIFESTYLE</option>
-              <option value="FOOD">FOOD</option>
-              <option value="BEAUTY">BEAUTY</option>
-              <option value="FASHION">FASHION</option>
-              <option value="TECH">TECH</option>
-              <option value="EDUCATION">EDUCATION</option>
+              <option value="LIFESTYLE">Lối sống</option>
+              <option value="FOOD">Ẩm thực</option>
+              <option value="BEAUTY">Làm đẹp</option>
+              <option value="FASHION">Thời trang</option>
+              <option value="TECH">Công nghệ</option>
+              <option value="EDUCATION">Giáo dục</option>
             </select>
           </label>
           <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-            <span>Campaign type</span>
+            <span>Loại chiến dịch</span>
             <select className="dc-input" value={form.campaignType} onChange={(event) => setField("campaignType", event.target.value as CampaignType)}>
               <option value="COMMUNITY">{getCampaignTypeLabel()}</option>
             </select>
           </label>
           <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-            <span>Setup source</span>
+            <span>Nguồn thiết lập</span>
             <select className="dc-input" value={form.setupSource} onChange={(event) => setField("setupSource", event.target.value as SetupSource)}>
-              <option value="BRAND_REQUESTED">BRAND_REQUESTED</option>
-              <option value="JOIN_EXISTING_DCREATOR_CAMP">JOIN_EXISTING_DCREATOR_CAMP</option>
+              <option value="BRAND_REQUESTED">Brand yêu cầu</option>
+              <option value="JOIN_EXISTING_DCREATOR_CAMP">Tham gia chiến dịch dCreator có sẵn</option>
             </select>
           </label>
 
@@ -375,15 +442,111 @@ export default function AdminCreateCampaignPage() {
           </div>
 
           <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-            <span>Starts at</span>
+            <span>Ngày bắt đầu</span>
             <input className={`dc-input ${fieldErrors.startsAt ? "border-red-500 ring-1 ring-red-300" : ""}`} type="datetime-local" value={form.startsAt} onChange={(event) => setField("startsAt", event.target.value)} />
             {fieldErrors.startsAt ? <span className="text-xs text-red-600">{fieldErrors.startsAt}</span> : null}
           </label>
           <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-            <span>Ends at</span>
+            <span>Ngày kết thúc</span>
             <input className={`dc-input ${fieldErrors.endsAt ? "border-red-500 ring-1 ring-red-300" : ""}`} type="datetime-local" value={form.endsAt} onChange={(event) => setField("endsAt", event.target.value)} />
             {fieldErrors.endsAt ? <span className="text-xs text-red-600">{fieldErrors.endsAt}</span> : null}
           </label>
+          <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+            <span>Số lượng video review</span>
+            <input
+              className={`dc-input ${fieldErrors.ugcVideoQuota ? "border-red-500 ring-1 ring-red-300" : ""}`}
+              type="number"
+              min={1}
+              value={form.ugcVideoQuota}
+              onChange={(event) => setField("ugcVideoQuota", Number(event.target.value || 0))}
+            />
+            {fieldErrors.ugcVideoQuota ? <span className="text-xs text-red-600">{fieldErrors.ugcVideoQuota}</span> : null}
+          </label>
+
+          <section className="grid gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:col-span-2">
+            <h3 className="text-base font-semibold text-zinc-900">Mission của campaign</h3>
+            <p className="text-sm text-zinc-600">Campaign hiện chỉ có 1 mission, nên bạn cần nhập luôn tại bước tạo campaign.</p>
+            {fieldErrors.mission ? <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{fieldErrors.mission}</p> : null}
+            <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+              <span>Tên mission</span>
+              <input className="dc-input" value={form.mission.title} onChange={(event) => setMissionField("title", event.target.value)} placeholder="Ví dụ: Quay video review 30 giây" required />
+            </label>
+            <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+              <span>Mô tả mission</span>
+              <textarea className="dc-input min-h-24" value={form.mission.description} onChange={(event) => setMissionField("description", event.target.value)} placeholder="Mô tả yêu cầu đầu ra và tiêu chí duyệt" required />
+            </label>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                <span>Đối tượng thực hiện</span>
+                <select className="dc-input" value={form.mission.audience} onChange={(event) => setMissionField("audience", event.target.value as MissionForm["audience"])}>
+                  <option value="CREATOR">Nhà sáng tạo</option>
+                  <option value="USER">Người dùng</option>
+                </select>
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                <span>Yêu cầu sản phẩm</span>
+                <select className="dc-input" value={form.mission.productReceiveOption} onChange={(event) => setMissionField("productReceiveOption", event.target.value as ProductReceiveOption)}>
+                  <option value="NO_PRODUCT_REQUIRED">Không yêu cầu sản phẩm</option>
+                  <option value="PRODUCT_REQUIRED">Yêu cầu sản phẩm</option>
+                </select>
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                <span>Hạn nộp mission</span>
+                <input className="dc-input" type="datetime-local" value={form.mission.deadlineAt} onChange={(event) => setMissionField("deadlineAt", event.target.value)} />
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                <span>Thưởng hoa hồng (VND)</span>
+                <input className="dc-input" type="number" min={0} value={form.mission.rewardCommissionVnd} onChange={(event) => setMissionField("rewardCommissionVnd", Number(event.target.value || 0))} />
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                <span>Thưởng điểm (Points)</span>
+                <input className="dc-input" type="number" min={0} value={form.mission.rewardPoints} onChange={(event) => setMissionField("rewardPoints", Number(event.target.value || 0))} />
+              </label>
+              <label className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700">
+                <input type="checkbox" checked={form.mission.allowRepeat} onChange={(event) => setMissionField("allowRepeat", event.target.checked)} />
+                Cho phép làm lại
+              </label>
+            </div>
+
+            {form.mission.productReceiveOption === "PRODUCT_REQUIRED" ? (
+              <div className="grid gap-3 rounded-xl border border-zinc-200 bg-white p-3 md:grid-cols-2">
+                <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                  <span>Tên sản phẩm</span>
+                  <input className="dc-input" value={form.mission.productName} onChange={(event) => setMissionField("productName", event.target.value)} required />
+                </label>
+                <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                  <span>Hình ảnh sản phẩm</span>
+                  <input
+                    className="dc-input"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void uploadImage(file, "product");
+                    }}
+                    required={!form.mission.productImageUrl}
+                  />
+                  {uploadingProductImage ? <span className="text-xs text-zinc-500">Đang tải ảnh sản phẩm...</span> : null}
+                  <input
+                    className="dc-input"
+                    value={form.mission.productImageUrl}
+                    onChange={(event) => setMissionField("productImageUrl", event.target.value)}
+                    placeholder="Ảnh sản phẩm sau khi tải sẽ hiển thị tại đây"
+                    required
+                  />
+                  {form.mission.productImageUrl ? <img src={form.mission.productImageUrl} alt="Ảnh sản phẩm" className="h-28 w-full rounded-xl border border-zinc-200 object-cover" /> : null}
+                </label>
+                <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                  <span>Link sản phẩm</span>
+                  <input className="dc-input" value={form.mission.productLink} onChange={(event) => setMissionField("productLink", event.target.value)} placeholder="https://..." required />
+                </label>
+                <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                  <span>Mô tả sản phẩm</span>
+                  <textarea className="dc-input min-h-24" value={form.mission.productDescription} onChange={(event) => setMissionField("productDescription", event.target.value)} required />
+                </label>
+              </div>
+            ) : null}
+          </section>
         </div>
 
         <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
@@ -392,11 +555,11 @@ export default function AdminCreateCampaignPage() {
             checked={form.publishNow}
             onChange={(event) => setField("publishNow", event.target.checked)}
           />
-          Publish ngay sau khi tạo (ACTIVE)
+          Kích hoạt ngay sau khi tạo
         </label>
 
         <div className="flex justify-end">
-          <button className="dc-btn-primary" type="submit" disabled={saving || uploading}>
+          <button className="dc-btn-primary" type="submit" disabled={saving || uploading || uploadingProductImage}>
             {saving ? "Đang tạo..." : "Tạo campaign"}
           </button>
         </div>

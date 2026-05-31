@@ -148,20 +148,11 @@ function toInitialMissionState(option: ProductReceiveOption) {
       startedAt: new Date()
     };
   }
-  if (option === "CREATOR_BUY_FIRST") {
-    return {
-      status: "PRODUCT_PENDING" as const,
-      productStatus: "WAITING_PURCHASE" as const,
-      depositStatus: "NOT_REQUIRED" as const,
-      reimbursementStatus: "PENDING" as const,
-      startedAt: null
-    };
-  }
   return {
     status: "PRODUCT_PENDING" as const,
-    productStatus: "WAITING_DEPOSIT" as const,
-    depositStatus: "PENDING" as const,
-    reimbursementStatus: "NOT_REQUIRED" as const,
+    productStatus: "WAITING_PURCHASE" as const,
+    depositStatus: "NOT_REQUIRED" as const,
+    reimbursementStatus: "PENDING" as const,
     startedAt: null
   };
 }
@@ -205,8 +196,8 @@ export async function getCreatorCampaignApplicationStatus(
   const approvedVideos = campaign.ugcVideoApprovedCount ?? 0;
   if (videoTarget > 0 && approvedVideos >= videoTarget) {
     return toSnapshot("MISSION_UNAVAILABLE", {
-      label: "Háº¿t lÆ°á»£t video",
-      message: `Campaign Ä‘Ã£ Ä‘á»§ ${videoTarget}/${videoTarget} video Ä‘Æ°á»£c duyá»‡t.`
+      label: "Hết lượt video",
+      message: `Campaign đã đủ ${videoTarget}/${videoTarget} video được duyệt.`
     });
   }
 
@@ -253,7 +244,7 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
   const videoTarget = campaign.ugcVideoQuota ?? 0;
   const approvedVideos = campaign.ugcVideoApprovedCount ?? 0;
   if (videoTarget > 0 && approvedVideos >= videoTarget) {
-    throw new AppError("Campaign Ä‘Ã£ háº¿t lÆ°á»£t video Ä‘Æ°á»£c phÃª duyá»‡t", 409, "CAMPAIGN_UGC_VIDEO_QUOTA_REACHED");
+    throw new AppError("Campaign đã hết lượt video được phê duyệt", 409, "CAMPAIGN_UGC_VIDEO_QUOTA_REACHED");
   }
 
   if (!firstMission) {

@@ -214,7 +214,7 @@ export default function AdminCampaignApplicationsPage() {
     () =>
       creatorMissionFiltered.filter(
         (item) =>
-          item.productReceiveOption === "CREATOR_BUY_FIRST" &&
+          item.productReceiveOption === "PRODUCT_REQUIRED" &&
           (item.status === "PRODUCT_PENDING" || item.reimbursementStatus === "PURCHASE_SUBMITTED")
       ),
     [creatorMissionFiltered]
@@ -363,4 +363,3 @@ export default function AdminCampaignApplicationsPage() {
     </>
   );
 }
-

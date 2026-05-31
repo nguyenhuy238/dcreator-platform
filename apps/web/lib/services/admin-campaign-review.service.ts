@@ -1,9 +1,5 @@
 import { CampaignStatus, NotificationEvent } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import {
-  BRAND_SUBSCRIPTION_PACKAGE_VIDEO_QUOTA,
-  type BrandSubscriptionPackageCode
-} from "@/lib/constants/brand-subscription";
 import { AppError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
 import { createNotification } from "@/lib/services/notification.service";
@@ -364,44 +360,64 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
     throw new AppError("Brand chua hoan tat onboarding", 409, "BRAND_PROFILE_NOT_FOUND");
   }
 
-  const subscription = await prisma.brandSubscription.findUnique({
-    where: { brandId: brandProfile.id },
-    select: { packageCode: true }
-  });
-  const packageCode = (subscription?.packageCode ?? "FREE") as BrandSubscriptionPackageCode;
-  const ugcVideoQuota = BRAND_SUBSCRIPTION_PACKAGE_VIDEO_QUOTA[packageCode] ?? 0;
-  if (ugcVideoQuota <= 0) {
-    throw new AppError(
-      "Brand đang ở gói Free nên không thể tạo campaign. Vui lòng nâng cấp gói UGC để tiếp tục.",
-      409,
-      "BRAND_SUBSCRIPTION_FREE_CANNOT_CREATE_CAMPAIGN"
-    );
+  const ugcVideoQuota = input.ugcVideoQuota;
+
+  const startsAt = input.startsAt ? new Date(input.startsAt) : null;
+  const endsAt = input.endsAt ? new Date(input.endsAt) : null;
+  const missionDeadlineAt = input.mission.deadlineAt ? new Date(input.mission.deadlineAt) : null;
+  if (missionDeadlineAt && startsAt && missionDeadlineAt < startsAt) {
+    throw new AppError("Mission deadline cannot be earlier than campaign start", 422, "MISSION_DEADLINE_INVALID");
+  }
+  if (missionDeadlineAt && endsAt && missionDeadlineAt > endsAt) {
+    throw new AppError("Mission deadline cannot be later than campaign end", 422, "MISSION_DEADLINE_INVALID");
   }
 
-  const campaign = await prisma.campaign.create({
-    data: {
-      brandId: brandAccount.id,
-      slug: input.slug,
-      title: input.title,
-      brief: input.brief,
-      budgetVnd: 10000000,
-      targetAmountVnd: 10000000,
-      category: input.category,
-      campaignType: input.campaignType,
-      setupSource: input.setupSource,
-      objective: input.benefits || null,
-      priorityChannels: input.participationRoadmap.join("\n"),
-      missionTypes: null,
-      creatorCommissionPercent: 0,
-      userCommissionPercent: 0,
-      bonusBudgetVnd: 0,
-      coverImageUrl: input.imageUrl || null,
-      startsAt: input.startsAt ? new Date(input.startsAt) : null,
-      endsAt: input.endsAt ? new Date(input.endsAt) : null,
-      feasibilityStatus: input.publishNow ? "APPROVED" : "DRAFT",
-      brandApprovalStatus: input.publishNow ? "APPROVED" : "DRAFT",
-      status: input.publishNow ? "ACTIVE" : "DRAFT"
-    }
+  const campaign = await prisma.$transaction(async (tx) => {
+    const createdCampaign = await tx.campaign.create({
+      data: {
+        brandId: brandAccount.id,
+        slug: input.slug,
+        title: input.title,
+        brief: input.brief,
+        budgetVnd: 10000000,
+        targetAmountVnd: 10000000,
+        category: input.category,
+        campaignType: input.campaignType,
+        setupSource: input.setupSource,
+        objective: input.benefits || null,
+        priorityChannels: input.participationRoadmap.join("\n"),
+        missionTypes: null,
+        creatorCommissionPercent: 0,
+        userCommissionPercent: 0,
+        bonusBudgetVnd: 0,
+        coverImageUrl: input.imageUrl || null,
+        startsAt,
+        endsAt,
+        feasibilityStatus: input.publishNow ? "APPROVED" : "DRAFT",
+        brandApprovalStatus: input.publishNow ? "APPROVED" : "DRAFT",
+        status: input.publishNow ? "ACTIVE" : "DRAFT"
+      }
+    });
+
+    await tx.mission.create({
+      data: {
+        campaignId: createdCampaign.id,
+        title: input.mission.title,
+        description: input.mission.description,
+        productName: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productName || null : null,
+        productDescription: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productDescription || null : null,
+        productImageUrl: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productImageUrl || null : null,
+        productLink: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productLink || null : null,
+        rewardPoints: input.mission.rewardPoints,
+        rewardCommissionVnd: input.mission.rewardCommissionVnd,
+        audience: input.mission.audience,
+        productReceiveOption: input.mission.productReceiveOption,
+        allowRepeat: input.mission.allowRepeat,
+        deadlineAt: missionDeadlineAt
+      }
+    });
+
+    return createdCampaign;
   });
   await trySyncCampaignNewFields(campaign.id, input.benefits || null, input.participationRoadmap);
   await syncCampaignUgcVideoQuota(campaign.id, ugcVideoQuota);
@@ -412,7 +428,7 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
     targetType: "Campaign",
     targetId: campaign.id,
     newStatus: campaign.status,
-    metadata: { publishNow: Boolean(input.publishNow), brandAccountId: brandAccount.id, packageCode, ugcVideoQuota }
+    metadata: { publishNow: Boolean(input.publishNow), brandAccountId: brandAccount.id, ugcVideoQuota }
   });
 
   await createNotification({
@@ -431,6 +447,10 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
 export async function addCampaignMissionByAdmin(actorId: string, campaignId: string, input: CampaignMissionInput) {
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
   if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
+  const missionCount = await prisma.mission.count({ where: { campaignId: campaign.id } });
+  if (missionCount > 0) {
+    throw new AppError("Mỗi campaign chỉ được phép có 1 mission.", 409, "CAMPAIGN_MISSION_LIMIT_REACHED");
+  }
 
   const deadlineAt = input.deadlineAt ? new Date(input.deadlineAt) : null;
   if (deadlineAt && campaign.startsAt && deadlineAt < campaign.startsAt) {
@@ -445,7 +465,10 @@ export async function addCampaignMissionByAdmin(actorId: string, campaignId: str
       campaignId: campaign.id,
       title: input.title,
       description: input.description,
-      productLink: input.productLink || null,
+      productName: input.productReceiveOption === "PRODUCT_REQUIRED" ? input.productName || null : null,
+      productDescription: input.productReceiveOption === "PRODUCT_REQUIRED" ? input.productDescription || null : null,
+      productImageUrl: input.productReceiveOption === "PRODUCT_REQUIRED" ? input.productImageUrl || null : null,
+      productLink: input.productReceiveOption === "PRODUCT_REQUIRED" ? input.productLink || null : null,
       rewardPoints: input.rewardPoints,
       rewardCommissionVnd: input.rewardCommissionVnd,
       audience: input.audience,

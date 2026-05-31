@@ -307,7 +307,7 @@ function AdminMissionTranscriptReviewsTab() {
                 <p><strong>Campaign:</strong> {detail.campaign.title}</p>
                 <p><strong>Nhiệm vụ:</strong> {detail.mission.title}</p>
                 <p><strong>Mô tả nhiệm vụ:</strong> {detail.mission.description}</p>
-                <p><strong>Hình thức nhận sản phẩm:</strong> {detail.mission.productReceiveOption}</p>
+                <p><strong>Hình thức nhận sản phẩm:</strong> {missionStatusLabel(detail.mission.productReceiveOption)}</p>
                 <p><strong>Link sản phẩm:</strong> <UrlValue value={detail.mission.productLink} /></p>
                 <p><strong>Deadline:</strong> {fmtDate(detail.mission.deadlineAt)}</p>
                 <p><strong>Kịch bản:</strong></p>
@@ -412,7 +412,9 @@ function missionStatusLabel(status: string) {
     APPROVED: "Đã duyệt",
     REJECTED: "Đã từ chối",
     PENDING: "Chờ duyệt",
-    IN_PROGRESS: "Đang thực hiện"
+    IN_PROGRESS: "Đang thực hiện",
+    PRODUCT_REQUIRED: "Yêu cầu sản phẩm",
+    NO_PRODUCT_REQUIRED: "Không yêu cầu sản phẩm"
   };
   return map[status] ?? status;
 }
@@ -613,7 +615,7 @@ function AdminMissionApplicationsTab() {
                   <p className="mt-1 text-sm">Campaign: {item.campaign.title}</p>
                   <p className="text-sm">Mission: {item.mission.title}</p>
                   <p className="text-sm">Reward: {item.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
-                  <p className="text-sm">Hình thức nhận sản phẩm: {item.mission.productReceiveOption}</p>
+                  <p className="text-sm">Hình thức nhận sản phẩm: {missionStatusLabel(item.mission.productReceiveOption)}</p>
                   <p className="text-xs text-zinc-500 mt-1">Trạng thái: {item.status} · Tạo lúc: {fmtDate(item.createdAt)}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
@@ -649,7 +651,7 @@ function AdminMissionApplicationsTab() {
                 <p><strong>Campaign:</strong> {detail.campaign.title}</p>
                 <p><strong>Mission:</strong> {detail.mission.title}</p>
                 <p><strong>Mô tả:</strong> {detail.mission.description}</p>
-                <p><strong>Hình thức nhận sản phẩm:</strong> {detail.mission.productReceiveOption}</p>
+                <p><strong>Hình thức nhận sản phẩm:</strong> {missionStatusLabel(detail.mission.productReceiveOption)}</p>
                 <p><strong>Link sản phẩm:</strong> <UrlValue value={detail.mission.productLink} /></p>
                 <p><strong>Ghi chú creator:</strong> {detail.note ?? "-"}</p>
                 <p><strong>Trạng thái:</strong> {detail.status}</p>
@@ -927,8 +929,7 @@ const finalPublishStatusOptions = [
 const finalProductOptions = [
   { value: "", label: "Tất cả hình thức nhận sản phẩm" },
   { value: "NO_PRODUCT_REQUIRED", label: "Không yêu cầu sản phẩm" },
-  { value: "CREATOR_BUY_FIRST", label: "Creator tự mua trước" },
-  { value: "DEPOSIT_PRODUCT", label: "Đặt cọc sản phẩm" }
+  { value: "PRODUCT_REQUIRED", label: "Yêu cầu sản phẩm" }
 ];
 
 function AdminMissionFinalReviewsTab() {
@@ -992,7 +993,7 @@ function AdminMissionFinalReviewsTab() {
     setNotice("");
     setError("");
     let reimbursementAmountVnd: number | undefined;
-    if (item.productReceiveOption === "CREATOR_BUY_FIRST") {
+    if (item.productReceiveOption === "PRODUCT_REQUIRED") {
       const raw = window.prompt("Nhập số tiền hoàn lại sản phẩm (VND):", "0")?.trim();
       if (!raw) return;
       const parsed = Number(raw);
@@ -1072,7 +1073,7 @@ function AdminMissionFinalReviewsTab() {
                   <p className="mt-1 text-sm">Campaign: {item.campaign.title}</p>
                   <p className="text-sm">Nhiệm vụ: {item.mission.title}</p>
                   <p className="text-sm">Reward: {item.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
-                  <p className="text-sm">Hình thức nhận sản phẩm: {item.productReceiveOption}</p>
+                  <p className="text-sm">Hình thức nhận sản phẩm: {missionStatusLabel(item.productReceiveOption)}</p>
                   <p className="text-xs text-zinc-500 mt-1">Nộp lúc: {fmtDate(item.publishSubmittedAt)} · Trạng thái publish: {item.publishStatus}</p>
                   {item.submission?.rejectReason ? <p className="mt-1 text-sm text-red-700 line-clamp-2">Lý do từ chối gần nhất: {item.submission.rejectReason}</p> : null}
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -1103,7 +1104,7 @@ function AdminMissionFinalReviewsTab() {
                 <p><strong>Campaign:</strong> {detail.campaign.title}</p>
                 <p><strong>Nhiệm vụ:</strong> {detail.mission.title}</p>
                 <p><strong>Reward:</strong> {detail.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
-                <p><strong>Hình thức nhận sản phẩm:</strong> {detail.productReceiveOption}</p>
+                <p><strong>Hình thức nhận sản phẩm:</strong> {missionStatusLabel(detail.productReceiveOption)}</p>
                 <p><strong>Trạng thái hoàn tiền:</strong> {detail.reimbursementStatus}</p>
                 <p><strong>Video review đã duyệt:</strong> <UrlValue value={detail.submission?.videoUrl} /></p>
                 <p><strong>Link video social public:</strong> <UrlValue value={detail.submission?.publicVideoUrl ?? detail.submission?.socialPostUrl} /></p>

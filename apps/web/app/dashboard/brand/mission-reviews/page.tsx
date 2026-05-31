@@ -850,8 +850,7 @@ const finalPublishStatusOptions = [
 const finalProductOptions = [
   { value: "", label: "Tất cả hình thức nhận sản phẩm" },
   { value: "NO_PRODUCT_REQUIRED", label: "Không yêu cầu sản phẩm" },
-  { value: "CREATOR_BUY_FIRST", label: "Creator tự mua trước" },
-  { value: "DEPOSIT_PRODUCT", label: "Đặt cọc sản phẩm" }
+  { value: "PRODUCT_REQUIRED", label: "Yêu cầu sản phẩm" }
 ];
 
 function BrandMissionFinalReviewsTab() {
@@ -914,7 +913,7 @@ function BrandMissionFinalReviewsTab() {
     setNotice("");
     setError("");
     let reimbursementAmountVnd: number | undefined;
-    if (item.productReceiveOption === "CREATOR_BUY_FIRST") {
+    if (item.productReceiveOption === "PRODUCT_REQUIRED") {
       const raw = window.prompt("Nhập số tiền hoàn lại sản phẩm (VND):", "0")?.trim();
       if (!raw) return;
       const parsed = Number(raw);

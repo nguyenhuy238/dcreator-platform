@@ -125,21 +125,11 @@ function toCreatorMissionState(option: ProductReceiveOption) {
     };
   }
 
-  if (option === "CREATOR_BUY_FIRST") {
-    return {
-      status: "PRODUCT_PENDING" as const,
-      productStatus: "WAITING_PURCHASE" as ProductStatus,
-      depositStatus: "NOT_REQUIRED" as DepositStatus,
-      reimbursementStatus: "PENDING" as ReimbursementStatus,
-      startedAt: null
-    };
-  }
-
   return {
     status: "PRODUCT_PENDING" as const,
-    productStatus: "WAITING_DEPOSIT" as ProductStatus,
-    depositStatus: "PENDING" as DepositStatus,
-    reimbursementStatus: "NOT_REQUIRED" as ReimbursementStatus,
+    productStatus: "WAITING_PURCHASE" as ProductStatus,
+    depositStatus: "NOT_REQUIRED" as DepositStatus,
+    reimbursementStatus: "PENDING" as ReimbursementStatus,
     startedAt: null
   };
 }
@@ -356,8 +346,7 @@ async function syncCreatorMissions(accountId: string) {
 }
 
 export function getCreatorMissionGuidanceByOption(option: ProductReceiveOption) {
-  if (option === "DEPOSIT_PRODUCT") return "Ban can dat coc va nhan san pham truoc khi quay video.";
-  if (option === "CREATOR_BUY_FIRST") return "Ban tu mua san pham, gui bill + anh danh gia, sau do nop video va link public.";
+  if (option === "PRODUCT_REQUIRED") return "Bạn cần xác nhận sản phẩm theo yêu cầu trước khi nộp video và link public.";
   return "Nhiem vu khong yeu cau san pham, co the nop video ngay.";
 }
 
@@ -515,7 +504,7 @@ export async function getMissionHistoryDetailForAdmin(id: string) {
 
 export async function confirmDepositPaid(creatorMissionId: string, accountId: string) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
-  if (current.productReceiveOption !== "DEPOSIT_PRODUCT") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
+  if (current.productReceiveOption !== "PRODUCT_REQUIRED") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
   const updated = await prisma.creatorMission.update({
     where: { id: creatorMissionId },
     data: { status: "IN_PROGRESS", productStatus: "RECEIVED", depositStatus: "PAID", startedAt: current.startedAt ?? now() },
@@ -526,7 +515,7 @@ export async function confirmDepositPaid(creatorMissionId: string, accountId: st
 
 export async function submitPurchaseProof(creatorMissionId: string, accountId: string, payload: { proofTextNote: string; screenshotUrl?: string; note?: string }) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
-  if (current.productReceiveOption !== "CREATOR_BUY_FIRST") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
+  if (current.productReceiveOption !== "PRODUCT_REQUIRED") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
   await prisma.$transaction(async (tx) => {
     await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
       purchaseBillImageUrl: payload.screenshotUrl ?? null,
@@ -562,7 +551,7 @@ export async function submitDraft(creatorMissionId: string, accountId: string, p
   if (current.status === "DRAFT_PENDING") {
     throw new AppError("Transcript must be approved first", 409, "CREATOR_MISSION_TRANSCRIPT_NOT_APPROVED");
   }
-  if (current.productReceiveOption === "CREATOR_BUY_FIRST" && current.productStatus !== "RECEIVED") {
+  if (current.productReceiveOption === "PRODUCT_REQUIRED" && current.productStatus !== "RECEIVED") {
     throw new AppError("Purchase proof is required before video submission", 409, "PURCHASE_PROOF_REQUIRED");
   }
   await prisma.$transaction(async (tx) => {
@@ -604,7 +593,7 @@ export async function submitDraft(creatorMissionId: string, accountId: string, p
 export async function confirmDepositAndProductReceivedByAdmin(actorId: string, creatorMissionId: string) {
   const current = await getMissionById(creatorMissionId);
   if (!current) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  if (current.productReceiveOption !== "DEPOSIT_PRODUCT") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
+  if (current.productReceiveOption !== "PRODUCT_REQUIRED") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
   const updated = await prisma.creatorMission.update({
     where: { id: creatorMissionId },
     data: {
@@ -624,7 +613,7 @@ export async function confirmDepositAndProductReceivedByAdmin(actorId: string, c
 export async function approvePurchaseProofByAdmin(actorId: string, creatorMissionId: string) {
   const current = await getMissionById(creatorMissionId);
   if (!current) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  if (current.productReceiveOption !== "CREATOR_BUY_FIRST") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
+  if (current.productReceiveOption !== "PRODUCT_REQUIRED") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
   const updated = await prisma.creatorMission.update({
     where: { id: creatorMissionId },
     data: {
@@ -644,7 +633,7 @@ export async function approvePurchaseProofByAdmin(actorId: string, creatorMissio
 export async function rejectPurchaseProofByAdmin(actorId: string, creatorMissionId: string, reason?: string) {
   const current = await getMissionById(creatorMissionId);
   if (!current) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  if (current.productReceiveOption !== "CREATOR_BUY_FIRST") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
+  if (current.productReceiveOption !== "PRODUCT_REQUIRED") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
   const feedback = reason?.trim() || "Purchase proof rejected";
   const updated = await prisma.creatorMission.update({
     where: { id: creatorMissionId },
@@ -663,7 +652,7 @@ export async function rejectPurchaseProofByAdmin(actorId: string, creatorMission
 
 export async function confirmProductPurchased(creatorMissionId: string, accountId: string) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
-  if (current.productReceiveOption !== "CREATOR_BUY_FIRST") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
+  if (current.productReceiveOption !== "PRODUCT_REQUIRED") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
   const updated = await prisma.creatorMission.update({
     where: { id: creatorMissionId },
     data: {
@@ -811,10 +800,10 @@ export async function approvePublishReportByAdmin(actorId: string, creatorMissio
   if (current.publishStatus === "APPROVED" && current.status === "COMPLETED") return mapMission(current);
   if (current.publishStatus !== "PENDING") throw new AppError("Invalid status", 409, "CREATOR_MISSION_INVALID_STATUS");
   if (current.videoReviewStatus !== "APPROVED") throw new AppError("Video must be approved first", 409, "CREATOR_MISSION_VIDEO_NOT_APPROVED");
-  if (current.productReceiveOption === "CREATOR_BUY_FIRST" && purchaseAmountVnd <= 0) {
+  if (current.productReceiveOption === "PRODUCT_REQUIRED" && purchaseAmountVnd <= 0) {
     throw new AppError("Reimbursement amount is required", 422, "REIMBURSEMENT_AMOUNT_REQUIRED");
   }
-  const reimbursementVnd = current.productReceiveOption === "CREATOR_BUY_FIRST" ? Math.floor(purchaseAmountVnd) : 0;
+  const reimbursementVnd = current.productReceiveOption === "PRODUCT_REQUIRED" ? Math.floor(purchaseAmountVnd) : 0;
   const reimbursementPoints = reimbursementVnd > 0 ? Math.floor(reimbursementVnd / 100) : 0;
   const updated = await prisma.$transaction(async (tx) => {
     await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
@@ -850,7 +839,7 @@ export async function approvePublishReportByAdmin(actorId: string, creatorMissio
         rewardCreditedAt: current.rewardCreditedAt ?? now(),
         publishPurchaseAmountVnd: reimbursementVnd > 0 ? reimbursementVnd : current.publishPurchaseAmountVnd,
         reimbursementAmountVnd: reimbursementVnd > 0 ? reimbursementVnd : current.reimbursementAmountVnd,
-        reimbursementStatus: current.productReceiveOption === "CREATOR_BUY_FIRST" ? "PAID" : current.reimbursementStatus
+        reimbursementStatus: current.productReceiveOption === "PRODUCT_REQUIRED" ? "PAID" : current.reimbursementStatus
       },
       include: creatorMissionInclude
     });
@@ -931,7 +920,7 @@ export async function submitCreatorMissionPurchaseProof(
   payload: { purchaseBillImageUrl: string; productReviewScreenshotUrl: string; purchaseProofNote?: string }
 ) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
-  if (current.productReceiveOption !== "CREATOR_BUY_FIRST") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
+  if (current.productReceiveOption !== "PRODUCT_REQUIRED") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
   const updated = await prisma.$transaction(async (tx) => {
     await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
       purchaseBillImageUrl: payload.purchaseBillImageUrl,
@@ -968,7 +957,7 @@ export async function submitCreatorMissionTranscript(accountId: string, creatorM
   if (current.videoReviewStatus === "PENDING" || current.videoReviewStatus === "APPROVED") {
     throw new AppError("Video review already started", 409, "CREATOR_MISSION_VIDEO_ALREADY_STARTED");
   }
-  if (current.productReceiveOption === "CREATOR_BUY_FIRST" && current.productStatus !== "RECEIVED") {
+  if (current.productReceiveOption === "PRODUCT_REQUIRED" && current.productStatus !== "RECEIVED") {
     throw new AppError("Purchase proof is required before transcript submission", 409, "PURCHASE_PROOF_REQUIRED");
   }
 
@@ -1323,13 +1312,10 @@ export async function approveMissionApplicationByAdmin(actorId: string, id: stri
   const approvedProductStatus =
     current.mission.productReceiveOption === "NO_PRODUCT_REQUIRED"
       ? "NOT_REQUIRED"
-      : current.mission.productReceiveOption === "CREATOR_BUY_FIRST"
-        ? "WAITING_PURCHASE"
-        : "WAITING_DEPOSIT";
-  const approvedDepositStatus =
-    current.mission.productReceiveOption === "DEPOSIT_PRODUCT" ? "PENDING" : "NOT_REQUIRED";
+      : "WAITING_PURCHASE";
+  const approvedDepositStatus = "NOT_REQUIRED";
   const approvedReimbursementStatus =
-    current.mission.productReceiveOption === "CREATOR_BUY_FIRST" ? "PENDING" : "NOT_REQUIRED";
+    current.mission.productReceiveOption === "PRODUCT_REQUIRED" ? "PENDING" : "NOT_REQUIRED";
   const updated = await prisma.$transaction(async (tx) => {
     const claimPending = await tx.creatorMission.updateMany({
       where: { id, applicationStatus: "PENDING_REVIEW" },

@@ -32,8 +32,37 @@ export const adminCampaignCreateSchema = z.object({
     .refine((value) => value.startsWith("/uploads/") || /^https?:\/\//.test(value), "File URL không hợp lệ.")
     .optional()
     .or(z.literal("")),
+  ugcVideoQuota: z.number().int().min(1).max(100000),
   startsAt: z.string().datetime().optional(),
   endsAt: z.string().datetime().optional(),
+  mission: z.object({
+    title: z.string().trim().min(3).max(160),
+    description: z.string().trim().min(10).max(3000),
+    productName: z.string().trim().max(160).optional().or(z.literal("")),
+    productDescription: z.string().trim().max(2000).optional().or(z.literal("")),
+    productImageUrl: z.string().trim().max(400).optional().or(z.literal("")),
+    productLink: z.string().trim().max(400).optional().or(z.literal("")),
+    rewardPoints: z.number().int().min(0).default(0),
+    rewardCommissionVnd: z.number().int().min(0).default(0),
+    audience: z.enum(["USER", "CREATOR"]).default("CREATOR"),
+    productReceiveOption: z.enum(["PRODUCT_REQUIRED", "NO_PRODUCT_REQUIRED"]).default("NO_PRODUCT_REQUIRED"),
+    allowRepeat: z.boolean().default(false),
+    deadlineAt: z.string().datetime().optional()
+  }).superRefine((mission, ctx) => {
+    if (mission.productReceiveOption !== "PRODUCT_REQUIRED") return;
+    if (!mission.productName?.trim()) {
+      ctx.addIssue({ code: "custom", path: ["productName"], message: "Vui lòng nhập tên sản phẩm." });
+    }
+    if (!mission.productDescription?.trim()) {
+      ctx.addIssue({ code: "custom", path: ["productDescription"], message: "Vui lòng nhập mô tả sản phẩm." });
+    }
+    if (!mission.productLink?.trim()) {
+      ctx.addIssue({ code: "custom", path: ["productLink"], message: "Vui lòng nhập link sản phẩm." });
+    }
+    if (!mission.productImageUrl?.trim()) {
+      ctx.addIssue({ code: "custom", path: ["productImageUrl"], message: "Vui lòng nhập hình ảnh sản phẩm." });
+    }
+  }),
   publishNow: z.boolean().optional().default(false)
 }).superRefine((value, ctx) => {
   if (value.startsAt && value.endsAt && new Date(value.endsAt) <= new Date(value.startsAt)) {
