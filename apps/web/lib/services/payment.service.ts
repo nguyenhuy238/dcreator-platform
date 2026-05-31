@@ -57,8 +57,21 @@ export async function createPayosPayment(account: { id: string; role: string }, 
   if (input.intent === "CONTRIBUTION" && !input.campaignId) {
     throw new AppError("campaignId is required for contribution", 422, "CAMPAIGN_ID_REQUIRED");
   }
-  if (input.intent === "BRAND_TOPUP_FUND" && !["BRAND_OWNER", "BRAND_STAFF"].includes(account.role)) {
-    throw new AppError("Forbidden", 403, "AUTH_FORBIDDEN");
+  let brandTopupBrandId: string | null = null;
+  if (input.intent === "BRAND_TOPUP_FUND") {
+    const membership = await prisma.brandMember.findFirst({
+      where: {
+        accountId: account.id,
+        status: "ACTIVE",
+        ...(input.currentBrandId ? { brandId: input.currentBrandId } : {}),
+        brand: { isLocked: false, status: { notIn: ["LOCKED", "SUSPENDED"] } }
+      },
+      select: { brandId: true }
+    });
+    if (!membership) {
+      throw new AppError("Active brand membership is required", 403, "BRAND_FORBIDDEN");
+    }
+    brandTopupBrandId = membership.brandId;
   }
 
   const existing = await prisma.paymentTransaction.findUnique({
@@ -102,6 +115,7 @@ export async function createPayosPayment(account: { id: string; role: string }, 
           metadata: {
             intent: input.intent,
             campaignId: input.campaignId ?? null,
+            brandId: brandTopupBrandId,
             rewardId: input.rewardId ?? null,
             note: input.note ?? null
           }

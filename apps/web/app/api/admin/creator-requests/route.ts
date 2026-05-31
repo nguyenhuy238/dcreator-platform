@@ -5,7 +5,7 @@ import { toErrorResponse } from "@/lib/errors";
 import { listCreatorSocialLinkRequests } from "@/lib/services/creator-social-link-review.service";
 import { adminCreatorSocialLinkListQuerySchema } from "@/lib/validators/admin-creator";
 
-const SOCIAL_PLATFORMS = ["TIKTOK", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "OTHER"] as const;
+const SOCIAL_PLATFORMS = ["TIKTOK", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "SHOPEE", "OTHER"] as const;
 
 export async function GET(request: NextRequest) {
   try {

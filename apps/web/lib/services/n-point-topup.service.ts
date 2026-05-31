@@ -16,26 +16,22 @@ type RefundInfoInput = z.infer<typeof brandNPointRefundInfoSchema>;
 type ApproveInput = z.infer<typeof adminNPointTopupApproveSchema>;
 type RefundCompleteInput = z.infer<typeof adminNPointRefundCompleteSchema>;
 
-async function resolveBrandContext(accountId: string) {
-  const ownedBrand = await prisma.brand.findFirst({
-    where: { ownerAccountId: accountId },
-    select: { id: true, name: true, ownerAccountId: true },
-    orderBy: { createdAt: "desc" }
-  });
-  if (ownedBrand) return ownedBrand;
-
+async function resolveBrandContext(accountId: string, currentBrandId?: string | null) {
   const membership = await prisma.brandMember.findFirst({
-    where: { accountId },
+    where: { accountId, ...(currentBrandId ? { brandId: currentBrandId } : {}) },
     include: { brand: { select: { id: true, name: true, ownerAccountId: true } } },
     orderBy: { createdAt: "desc" }
   });
   if (membership) return membership.brand;
 
+  if (currentBrandId) {
+    throw new AppError("Bạn không có quyền truy cập Brand này", 403, "BRAND_FORBIDDEN");
+  }
   throw new AppError("Bạn chưa được gắn vào Nhãn hàng nào", 403, "BRAND_ACCESS_NOT_CONFIGURED");
 }
 
-export async function getBrandNPointWallet(accountId: string) {
-  const brand = await resolveBrandContext(accountId);
+export async function getBrandNPointWallet(accountId: string, currentBrandId?: string | null) {
+  const brand = await resolveBrandContext(accountId, currentBrandId);
   const wallet = await ensureWalletByAccountId(brand.ownerAccountId);
   const requests = await prisma.nPointTopupRequest.findMany({
     where: { brandId: brand.id },
@@ -55,8 +51,8 @@ export async function getBrandNPointWallet(accountId: string) {
   };
 }
 
-export async function createBrandNPointTopupRequest(accountId: string, input: CreateTopupInput) {
-  const brand = await resolveBrandContext(accountId);
+export async function createBrandNPointTopupRequest(accountId: string, input: CreateTopupInput, currentBrandId?: string | null) {
+  const brand = await resolveBrandContext(accountId, currentBrandId);
   const requestedPoints = calculateTopupPoints(input.amountVnd);
   if (requestedPoints <= 0) {
     throw new AppError("Số tiền nạp chưa đủ để quy đổi N-Point", 422, "NPOINT_AMOUNT_TOO_SMALL");
@@ -92,8 +88,8 @@ export async function createBrandNPointTopupRequest(accountId: string, input: Cr
   return request;
 }
 
-export async function submitBrandNPointRefundInfo(accountId: string, requestId: string, input: RefundInfoInput) {
-  const brand = await resolveBrandContext(accountId);
+export async function submitBrandNPointRefundInfo(accountId: string, requestId: string, input: RefundInfoInput, currentBrandId?: string | null) {
+  const brand = await resolveBrandContext(accountId, currentBrandId);
   const current = await prisma.nPointTopupRequest.findUnique({
     where: { id: requestId },
     select: { id: true, brandId: true, status: true, requestedPoints: true, amountVnd: true }

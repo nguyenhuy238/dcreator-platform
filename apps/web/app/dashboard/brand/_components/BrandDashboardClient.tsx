@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   ActionToast,
   EmptyState,
@@ -23,6 +24,7 @@ async function load<T>(url: string) {
 }
 
 export function BrandDashboardClient() {
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [data, setData] = useState<Record<string, unknown>>({});
@@ -97,9 +99,15 @@ export function BrandDashboardClient() {
     <div className="space-y-8">
       <PageHeader
         title="Bảng điều khiển Nhãn hàng"
-        subtitle="Theo dõi duyệt hồ sơ, campaign, creator application và proof review."
+        subtitle="Theo dõi campaign, creator application, proof review và vận hành Brand."
         action={<Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Yêu cầu Admin tạo campaign</Link>}
       />
+      {searchParams.get("created") === "1" ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <p className="font-semibold">Brand đã được tạo</p>
+          <p>Bạn có thể bắt đầu thiết lập sản phẩm/campaign.</p>
+        </div>
+      ) : null}
       {message ? <ActionToast message={message === "Thành công" ? "Cập nhật thành công" : message} /> : null}
       <section>
         <div className="dc-grid-dashboard">
@@ -121,6 +129,11 @@ export function BrandDashboardClient() {
               </div>
               <StatusBadge status={String(profile.verificationStatus).toLowerCase()} />
             </div>
+            {String(profile.verificationStatus).toUpperCase() !== "ACTIVE" ? (
+              <p className="mt-2 inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                Chưa xác minh: Xác minh giúp mở khóa payout/campaign nâng cao
+              </p>
+            ) : null}
             <p className="mt-2 text-sm text-zinc-600">Thông tin: {profile.businessInfo || "Không có"}</p>
           </article>
         )}

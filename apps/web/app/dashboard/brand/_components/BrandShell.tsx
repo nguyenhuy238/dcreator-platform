@@ -2,6 +2,7 @@
 
 import type { Role } from "@prisma/client";
 import type { BrandNavItem } from "@/app/dashboard/brand/_components/brand-nav";
+import { BrandSwitcher } from "@/app/dashboard/brand/_components/BrandSwitcher";
 import { DashboardShell } from "@/app/components/dcreator/layout/dashboard-shell";
 
 type BrandShellUser = {
@@ -29,6 +30,7 @@ export function BrandShell({
       workspaceDescription="Quản lý onboarding, campaign, creator"
       loginRedirect="/dashboard/brand"
     >
+      <BrandSwitcher />
       {children}
     </DashboardShell>
   );

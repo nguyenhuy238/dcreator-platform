@@ -6,6 +6,7 @@ import { AppError } from "@/lib/errors";
 import { getCurrentSessionFromRequest } from "@/lib/auth/session";
 import { decodeSession, SESSION_COOKIE } from "@/lib/auth/session-token";
 import { resolvePrimaryRole } from "@/lib/auth/role-constants";
+import { deriveCapabilities, type UserCapabilities } from "@/lib/auth/capabilities";
 import { RuntimeTtlCache } from "@/lib/perf/runtime-cache";
 
 export type CurrentUser = {
@@ -18,14 +19,19 @@ export type CurrentUser = {
   roles: Role[];
   isActive: boolean;
   creatorProfile: { id: string } | null;
-  brandMemberships: Array<{ id: string; name: string; role: "OWNER" | "STAFF" }>;
+  brandMemberships: Array<{ id: string; name: string; role: "OWNER" | "MANAGER" | "STAFF" }>;
   activeBrandId: string | null;
+  capabilities: UserCapabilities;
   permissions: string[];
   creatorRequestStatus: string | null;
   brandRequestStatus: string | null;
 };
 
 const currentUserCache = new RuntimeTtlCache<CurrentUser>(15_000, 4000);
+
+export function invalidateCurrentUserCache(sessionId: string) {
+  currentUserCache.delete(sessionId);
+}
 
 function mapAccountToCurrentUser(
   account: {
@@ -38,13 +44,19 @@ function mapAccountToCurrentUser(
     creatorProfile: { id: string } | null;
     creatorApplications: Array<{ status: string }>;
     brandApplications: Array<{ status: string }>;
-    ownedBrandMemberships: Array<{ role: "OWNER" | "STAFF"; brand: { id: string; name: string } }>;
+    ownedBrandMemberships: Array<{ role: "OWNER" | "MANAGER" | "STAFF"; brand: { id: string; name: string } }>;
   },
   fallbackRole: Role
 ): CurrentUser {
   const assignmentRoles = account.roleAssignments.map((item) => item.role);
   const roles = Array.from(new Set<Role>(assignmentRoles.length > 0 ? assignmentRoles : [fallbackRole]));
   const primaryRole = resolvePrimaryRole(roles);
+  const brandMemberships = account.ownedBrandMemberships.map((item) => ({ id: item.brand.id, name: item.brand.name, role: item.role }));
+  const capabilities = deriveCapabilities({
+    roles,
+    creatorProfile: account.creatorProfile,
+    brandMemberships
+  });
 
   return {
     id: account.id,
@@ -56,9 +68,10 @@ function mapAccountToCurrentUser(
     roles,
     isActive: account.isActive,
     creatorProfile: account.creatorProfile,
-    brandMemberships: account.ownedBrandMemberships.map((item) => ({ id: item.brand.id, name: item.brand.name, role: item.role })),
-    activeBrandId: account.ownedBrandMemberships[0]?.brand.id ?? null,
-    permissions: roles.map((role) => `role:${role.toLowerCase()}`),
+    brandMemberships,
+    activeBrandId: brandMemberships[0]?.id ?? null,
+    capabilities,
+    permissions: [...roles.map((role) => `role:${role.toLowerCase()}`), ...Object.entries(capabilities).filter(([, enabled]) => enabled).map(([key]) => `cap:${key}`)],
     creatorRequestStatus: account.creatorApplications[0]?.status ?? null,
     brandRequestStatus: account.brandApplications[0]?.status ?? null
   };

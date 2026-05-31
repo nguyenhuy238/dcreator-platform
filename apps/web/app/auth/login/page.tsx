@@ -7,32 +7,23 @@ import type { Role } from "@prisma/client";
 import { PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { FormField } from "@/app/components/dcreator/ui/base";
 import { PasswordInput } from "@/app/components/dcreator/ui/PasswordInput";
-import { getDefaultDashboardPath } from "@/lib/auth/dashboard-access";
-import { ROLE } from "@/lib/auth/role-constants";
+import { canAccessPath, resolveWorkspaceLanding } from "@/lib/auth/workspace-choice";
 
-async function resolvePostLoginPath(roles: Role[]) {
-  const brandRoles: Role[] = [ROLE.BRAND_OWNER, ROLE.BRAND_STAFF];
-  if (roles.some((role) => brandRoles.includes(role))) {
-    const response = await fetch("/api/brand/dashboard/onboarding", { cache: "no-store" });
-    const payload = await response.json();
-    if (response.ok && payload?.success && payload?.data && !payload.data.completed) {
-      return "/dashboard/brand/onboarding";
-    }
-  }
-  return getDefaultDashboardPath(roles);
+type LoginContext = { creatorProfile?: { id: string } | null; brandMemberships?: Array<{ id: string; name: string; role: "OWNER" | "MANAGER" | "STAFF" }> };
+
+async function resolvePostLoginPath(roles: Role[], context?: LoginContext) {
+  const decision = resolveWorkspaceLanding({
+    roles,
+    creatorProfile: context?.creatorProfile ?? null,
+    brandMemberships: context?.brandMemberships ?? []
+  });
+  return decision.href;
 }
 
-async function resolveTargetPath(roles: Role[], nextPath: string | null) {
-  const defaultPath = await resolvePostLoginPath(roles);
+async function resolveTargetPath(roles: Role[], nextPath: string | null, context?: LoginContext) {
+  const defaultPath = await resolvePostLoginPath(roles, context);
   if (!nextPath) return defaultPath;
-  if (
-    nextPath === "/dashboard/brand" ||
-    nextPath.startsWith("/dashboard/brand/") ||
-    nextPath === "/brand" ||
-    nextPath.startsWith("/brand/")
-  ) {
-    return defaultPath;
-  }
+  if (!canAccessPath(nextPath, { roles, creatorProfile: context?.creatorProfile ?? null, brandMemberships: context?.brandMemberships ?? [] })) return defaultPath;
   return nextPath;
 }
 
@@ -51,7 +42,10 @@ function LoginPageContent() {
       if (!alive) return;
       if (response.ok && payload?.success && payload?.data?.user?.roles) {
         const roles = payload.data.user.roles as Role[];
-        router.replace(await resolveTargetPath(roles, null));
+        router.replace(await resolveTargetPath(roles, null, {
+          creatorProfile: payload.data.user.creatorProfile ?? null,
+          brandMemberships: payload.data.user.brandMemberships ?? []
+        }));
       }
     }
     void checkAuth();
@@ -84,8 +78,13 @@ function LoginPageContent() {
     const payload = await response.json();
     setLoading(false);
     if (!response.ok || !payload.success) return setError(payload.error ?? "Đăng nhập thất bại");
-    const roles = (payload?.data?.roles ?? [payload?.data?.role].filter(Boolean)) as Role[];
-    const target = await resolveTargetPath(roles, searchParams.get("next"));
+    const meResponse = await fetch("/api/auth/me", { cache: "no-store" });
+    const mePayload = await meResponse.json();
+    const roles = (mePayload?.data?.user?.roles ?? payload?.data?.roles ?? [payload?.data?.role].filter(Boolean)) as Role[];
+    const target = await resolveTargetPath(roles, searchParams.get("next"), {
+      creatorProfile: mePayload?.data?.user?.creatorProfile ?? null,
+      brandMemberships: mePayload?.data?.user?.brandMemberships ?? []
+    });
     router.push(target);
     router.refresh();
   }
@@ -98,7 +97,7 @@ function LoginPageContent() {
           <p className="text-xs font-bold uppercase tracking-[0.15em] text-zinc-500">dCreator</p>
           <h1 className="mt-3 text-4xl font-black tracking-tight">Kết nối ảnh hưởng, mở rộng doanh thu.</h1>
           <p className="mt-3 text-zinc-600">
-            Đăng nhập tài khoản cơ bản, sau đó nâng cấp Creator/Brand tại User profile để gửi hồ sơ duyệt.
+            Đăng nhập tài khoản cơ bản, sau đó tạo Creator Profile hoặc Brand và dùng dashboard ngay.
           </p>
         </section>
         <form className="mx-auto w-full max-w-md space-y-4 rounded-[28px] border border-zinc-200 bg-white p-6 shadow-[0_40px_120px_-60px_rgba(24,24,27,0.55)]" onSubmit={onSubmit}>

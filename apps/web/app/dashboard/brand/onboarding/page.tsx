@@ -437,7 +437,7 @@ export default function BrandOnboardingPage() {
       legalResponsibilityAccepted: requestAdminReview ? false : payload.data.legalResponsibilityAccepted
     });
     if (requestAdminReview) {
-      setSuccess("Đã gửi nội dung bổ sung thành công. Hồ sơ đã chuyển trạng thái Chờ admin duyệt. Bạn sẽ nhận thông báo khi có kết quả.");
+      setSuccess("Đã gửi nội dung bổ sung thành công. Hệ thống sẽ kiểm tra theo luồng quản trị rủi ro và thông báo kết quả.");
     } else {
       setSuccess("Ký hợp đồng BCC thành công. Hồ sơ onboarding đã được cập nhật và sẵn sàng cho các bước vận hành tiếp theo.");
     }
@@ -465,7 +465,7 @@ export default function BrandOnboardingPage() {
     <>
       
       <>
-        <PageHeader title="Onboarding / BCC" subtitle="Hoàn tất yêu cầu sau khi Brand được duyệt trước khi vận hành campaign." />
+        <PageHeader title="Onboarding / BCC" subtitle="Hoàn tất hồ sơ pháp lý để mở khóa các tác vụ nâng cao như campaign ngân sách lớn và kiểm soát rủi ro." />
         {error ? <ErrorState title="Không thể xử lý onboarding" description={error} onRetry={() => void load()} /> : null}
         {success ? <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p> : null}
         {isSigned ? (
@@ -479,12 +479,12 @@ export default function BrandOnboardingPage() {
         )}
         {!isSigned && isWaitingReview ? (
           <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700">
-            Đang chờ admin duyệt yêu cầu sửa/bổ sung BCC.
+            Đã gửi yêu cầu kiểm tra rủi ro cho nội dung BCC bổ sung. Bạn vẫn có thể tiếp tục thiết lập dashboard.
           </p>
         ) : null}
         {!isSigned && form.reviewStatus === "NEEDS_REVISION" ? (
           <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700">
-            Admin yêu cầu chỉnh sửa hồ sơ BCC. Vui lòng cập nhật thông tin/tài liệu rồi gửi lại.
+            Hồ sơ BCC cần bổ sung thông tin. Vui lòng cập nhật và gửi lại để hoàn tất xác minh nâng cao.
           </p>
         ) : null}
         {!isSigned && form.reviewStatus === "REJECTED" ? (
@@ -494,7 +494,7 @@ export default function BrandOnboardingPage() {
         ) : null}
         {!isSigned && isSupplementaryBccApproved ? (
           <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700">
-            Admin đã duyệt nội dung bổ sung. Vui lòng ký lại BCC để hoàn tất.
+            Nội dung bổ sung đã được xác nhận. Vui lòng ký lại BCC để hoàn tất.
           </p>
         ) : null}
         {loading ? (

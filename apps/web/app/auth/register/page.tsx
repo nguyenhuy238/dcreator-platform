@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { FormField } from "@/app/components/dcreator/ui/base";
 import { PasswordInput } from "@/app/components/dcreator/ui/PasswordInput";
-import { getDefaultDashboardPath } from "@/lib/auth/dashboard-access";
+import { resolveWorkspaceLanding } from "@/lib/auth/workspace-choice";
 import type { Role } from "@prisma/client";
 
 export default function RegisterPage() {
@@ -21,7 +21,12 @@ export default function RegisterPage() {
       const payload = await response.json();
       if (!alive) return;
       if (response.ok && payload?.success && payload?.data?.user?.roles) {
-        router.replace(getDefaultDashboardPath(payload.data.user.roles as Role[]));
+        const decision = resolveWorkspaceLanding({
+          roles: payload.data.user.roles as Role[],
+          creatorProfile: payload.data.user.creatorProfile ?? null,
+          brandMemberships: payload.data.user.brandMemberships ?? []
+        });
+        router.replace(decision.href);
       }
     }
     void checkAuth();
@@ -52,10 +57,17 @@ export default function RegisterPage() {
     const payload = await response.json();
     setLoading(false);
     if (!response.ok || !payload.success) return setError(payload.error ?? "Đăng ký thất bại");
-    const roles = (payload?.data?.roles ?? [payload?.data?.role].filter(Boolean)) as Role[];
-    router.push(getDefaultDashboardPath(roles));
+    const meResponse = await fetch("/api/auth/me", { cache: "no-store" });
+    const mePayload = await meResponse.json();
+    const roles = (mePayload?.data?.user?.roles ?? payload?.data?.roles ?? [payload?.data?.role].filter(Boolean)) as Role[];
+    const decision = resolveWorkspaceLanding({
+      roles,
+      creatorProfile: mePayload?.data?.user?.creatorProfile ?? null,
+      brandMemberships: mePayload?.data?.user?.brandMemberships ?? []
+    });
+    router.push(decision.href);
     router.refresh();
   }
 
-  return <><PublicHeader /><main className="mx-auto w-full max-w-xl px-4 py-10 md:px-6"><form className="space-y-4 rounded-[28px] border border-zinc-200 bg-white p-6 shadow-[0_40px_120px_-60px_rgba(24,24,27,0.55)]" onSubmit={onSubmit}><h1 className="text-3xl font-black">Tạo tài khoản dCreator</h1><p className="text-sm text-zinc-600">Bạn đăng ký tài khoản cơ bản trước. Nếu muốn trở thành Creator hoặc Brand, hãy vào User profile sau khi đăng nhập để gửi hồ sơ chờ admin duyệt.</p><FormField label="Tên hiển thị" error={fieldErrors.displayName}><input name="displayName" className={`dc-input ${fieldErrors.displayName ? "border-red-500 ring-1 ring-red-300" : ""}`} placeholder="Ví dụ: Nguyen An" required minLength={2} /></FormField><FormField label="Email" error={fieldErrors.email}><input name="email" type="email" className={`dc-input ${fieldErrors.email ? "border-red-500 ring-1 ring-red-300" : ""}`} placeholder="example@email.com" required /></FormField><FormField label="Mật khẩu" error={fieldErrors.password}><PasswordInput name="password" className={fieldErrors.password ? "border-red-500 ring-1 ring-red-300" : ""} placeholder="Tối thiểu 8 ký tự" required minLength={8} /></FormField>{error ? <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}<button className="dc-btn-primary w-full" disabled={loading}>{loading ? "Đang tạo tài khoản..." : "Đăng ký tài khoản"}</button></form></main></>;
+  return <><PublicHeader /><main className="mx-auto w-full max-w-xl px-4 py-10 md:px-6"><form className="space-y-4 rounded-[28px] border border-zinc-200 bg-white p-6 shadow-[0_40px_120px_-60px_rgba(24,24,27,0.55)]" onSubmit={onSubmit}><h1 className="text-3xl font-black">Tạo tài khoản dCreator</h1><p className="text-sm text-zinc-600">Bạn đăng ký tài khoản cơ bản trước. Sau đó có thể tạo Creator Profile hoặc Brand và dùng dashboard ngay.</p><FormField label="Tên hiển thị" error={fieldErrors.displayName}><input name="displayName" className={`dc-input ${fieldErrors.displayName ? "border-red-500 ring-1 ring-red-300" : ""}`} placeholder="Ví dụ: Nguyen An" required minLength={2} /></FormField><FormField label="Email" error={fieldErrors.email}><input name="email" type="email" className={`dc-input ${fieldErrors.email ? "border-red-500 ring-1 ring-red-300" : ""}`} placeholder="example@email.com" required /></FormField><FormField label="Mật khẩu" error={fieldErrors.password}><PasswordInput name="password" className={fieldErrors.password ? "border-red-500 ring-1 ring-red-300" : ""} placeholder="Tối thiểu 8 ký tự" required minLength={8} /></FormField>{error ? <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}<button className="dc-btn-primary w-full" disabled={loading}>{loading ? "Đang tạo tài khoản..." : "Đăng ký tài khoản"}</button></form></main></>;
 }
