@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
             _count: { select: { campaignsAsCreator: true, submissions: true, payoutRequests: true } }
           }
         },
-        socialLinks: { select: { verificationStatus: true, status: true, isPrimary: true } },
+        socialLinks: { select: { verificationStatus: true, status: true, isActive: true } },
         _count: { select: { socialLinks: true } }
       },
       orderBy: { createdAt: "desc" },

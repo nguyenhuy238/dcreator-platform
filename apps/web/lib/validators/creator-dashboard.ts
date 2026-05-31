@@ -73,8 +73,8 @@ export const creatorChannelsUpdateSchema = z.object({
   engagementRate: z.number().min(0).max(100).optional()
 });
 
-export const creatorChannelSetMainSchema = z.object({
-  linkId: z.string().trim().min(5).max(191)
+export const creatorChannelStatusUpdateSchema = z.object({
+  isActive: z.boolean()
 });
 
 export type CreatorJobStatus = z.infer<typeof creatorJobStatusSchema>;

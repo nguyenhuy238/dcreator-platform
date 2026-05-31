@@ -28,7 +28,7 @@ type Channel = {
   url: string;
   followerCount: number;
   engagementRate: number | null;
-  isPrimary: boolean;
+  isActive: boolean;
   verificationStatus: "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
   status: "PENDING" | "APPROVED" | "REJECTED";
   rejectReason: string | null;
@@ -273,19 +273,23 @@ export default function CreatorProfilePage() {
     }
   }
 
-  async function setMainChannel(linkId: string) {
+  async function toggleChannelActive(linkId: string, isActive: boolean) {
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(`/api/creator/dashboard/channels/${linkId}/set-main`, { method: "POST" });
+      const response = await fetch(`/api/creator/dashboard/channels/${linkId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive })
+      });
       const payload = (await response.json()) as ApiResponse<ChannelsPayload>;
-      if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error ?? "Không thể cập nhật kênh chính");
+      if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error ?? "Không thể cập nhật trạng thái kênh");
       setChannels(payload.data.channels);
       setCreatorProfile(payload.data.creatorProfile);
-      setToast("Đã cập nhật kênh chính.");
+      setToast(isActive ? "Đã kích hoạt kênh." : "Đã tạm ngừng kênh.");
       setTimeout(() => setToast(""), 2200);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Không thể cập nhật kênh chính");
+      setError(requestError instanceof Error ? requestError.message : "Không thể cập nhật trạng thái kênh");
     } finally {
       setSaving(false);
     }
@@ -392,16 +396,15 @@ export default function CreatorProfilePage() {
               <div className="grid gap-3">
                 {channels.map((item) => {
                   const platformCode = toPlatformBadge(item.platform);
-                  const isMain = item.isPrimary;
-                  const isApproved = item.verificationStatus === "VERIFIED" || item.status === "APPROVED";
-
                   return (
                     <div key={item.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="font-semibold text-zinc-900">{item.platform}</p>
                           <StatusBadge status={platformCode} />
-                          {isMain ? <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">Kênh chính</span> : null}
+                          <span className={`rounded-full px-2 py-1 text-xs font-semibold ${item.isActive ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                            {item.isActive ? "Đang kích hoạt" : "Tạm ngừng"}
+                          </span>
                         </div>
                         <StatusBadge status={item.status} />
                       </div>
@@ -412,7 +415,9 @@ export default function CreatorProfilePage() {
                       <p className="text-sm text-zinc-600">Verification: {item.verificationStatus}</p>
                       {item.rejectReason ? <p className="mt-1 text-sm text-red-600">Lý do từ chối: {item.rejectReason}</p> : null}
                       <div className="mt-2 flex flex-wrap gap-2">
-                        <button className="dc-btn-secondary" onClick={() => void setMainChannel(item.id)} disabled={saving || !isApproved || isMain}>Chọn kênh chính</button>
+                        <button className="dc-btn-secondary" onClick={() => void toggleChannelActive(item.id, !item.isActive)} disabled={saving}>
+                          {item.isActive ? "Tạm ngừng" : "Kích hoạt"}
+                        </button>
                         <button className="dc-btn-secondary" onClick={() => startEditChannel(item)} disabled={saving}>Sửa</button>
                         <button className="dc-btn-secondary" onClick={() => void removeChannel(item.id)} disabled={saving}>Xóa</button>
                       </div>

@@ -574,7 +574,7 @@ model CreatorSocialLink {
   socialUrl        String
   followers        Int                     @default(0)
   engagementRate   Float?
-  isPrimary        Boolean                 @default(false)
+  isActive         Boolean                 @default(true)
   verificationStatus CreatorChannelVerificationStatus @default(UNVERIFIED)
   status           CreatorSocialLinkStatus @default(PENDING)
   rejectReason     String?
@@ -591,7 +591,7 @@ model CreatorSocialLink {
   @@unique([creatorProfileId, platform, handle])
   @@index([creatorProfileId, createdAt])
   @@index([status, createdAt])
-  @@index([creatorProfileId, isPrimary])
+  @@index([creatorProfileId, isActive])
 }
 
 model BrandApplication {
