@@ -47,7 +47,7 @@ const creatorMissionInclude = {
           socialUrl: true,
           followerCount: true,
           socialLinks: {
-            where: { status: "APPROVED", isActive: true },
+            where: { isActive: true },
             select: { id: true, platform: true, socialUrl: true, followers: true, handle: true, isActive: true, status: true }
           }
         }
@@ -1260,7 +1260,7 @@ export async function getMissionApplicationDetailForAdmin(id: string) {
       applicationReviewedById: true,
       applicationReviewedAt: true,
       appliedAt: true,
-      account: { select: { id: true, displayName: true, email: true, creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true, bio: true } } } },
+      account: { select: { id: true, displayName: true, email: true, creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true, bio: true, socialLinks: { where: { isActive: true }, select: { id: true, platform: true, socialUrl: true, followers: true, handle: true, isActive: true, status: true } } } } } },
       campaign: {
         select: {
           id: true,
