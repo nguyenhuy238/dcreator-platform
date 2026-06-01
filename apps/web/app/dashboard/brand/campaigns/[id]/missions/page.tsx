@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FormEvent, ReactNode, useCallback, useEffect, useState } from "react";
+import { FormEvent, ReactNode, useCallback, useEffect, useState } from "react";
 import { ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data?: T; error?: string };
@@ -23,6 +24,16 @@ type MissionItem = {
   allowRepeat: boolean;
   deadlineAt: string | null;
   status: string;
+};
+type CampaignMissionPayload = {
+  campaign: {
+    id: string;
+    title: string;
+    videoTarget: number;
+    videoApproved: number;
+    videoQuotaReached: boolean;
+  };
+  items: MissionItem[];
 };
 
 type MissionForm = {
@@ -97,6 +108,7 @@ export default function BrandCampaignMissionsPage() {
   const params = useParams<{ id: string }>();
   const campaignId = params?.id;
   const [items, setItems] = useState<MissionItem[]>([]);
+  const [campaign, setCampaign] = useState<CampaignMissionPayload["campaign"] | null>(null);
   const [form, setForm] = useState<MissionForm>(defaultForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -119,9 +131,11 @@ export default function BrandCampaignMissionsPage() {
       setLoading(false);
     }
   }, [campaignId]);
+  }, [campaignId]);
 
   useEffect(() => {
     void load();
+  }, [load]);
   }, [load]);
 
   async function submit(event: FormEvent) {
@@ -162,6 +176,13 @@ export default function BrandCampaignMissionsPage() {
       />
       {error ? <ErrorState title="Có lỗi" description={error} onRetry={() => void load()} /> : null}
 
+      {campaign?.videoQuotaReached ? (
+        <section className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
+          <p className="font-bold">Campaign đã duyệt đủ {campaign.videoApproved}/{campaign.videoTarget} video.</p>
+          <p className="mt-1 text-sm">Không thể tạo thêm nhiệm vụ mới. Form được giữ lại để bạn xem cấu hình.</p>
+        </section>
+      ) : null}
+      {campaign ? (
       <form className="dc-card mt-4 grid gap-4 p-4" onSubmit={submit}>
         <SectionHeader title="Tạo nhiệm vụ mới" subtitle="Campaign hiện chỉ hỗ trợ 1 nhiệm vụ. Vui lòng khai báo đầy đủ thông tin bên dưới." />
         <Field label="Tên nhiệm vụ" hint="Ví dụ: Quay video review 30 giây.">
@@ -219,6 +240,7 @@ export default function BrandCampaignMissionsPage() {
 
         <button className="dc-btn-primary w-fit" type="submit" disabled={saving}>{saving ? "Đang tạo..." : "Tạo nhiệm vụ"}</button>
       </form>
+      ) : null}
 
       <section className="mt-4">
         <SectionHeader title="Danh sách nhiệm vụ" subtitle={`${items.length} nhiệm vụ`} />
