@@ -19,6 +19,27 @@ function fmtDate(value: string | null) {
   return new Date(value).toLocaleString("vi-VN");
 }
 
+function fmtDateOnly(value: string | null) {
+  if (!value) return "-";
+  return new Date(value).toLocaleDateString("vi-VN");
+}
+
+function daysLeft(value: string | null) {
+  if (!value) return null;
+  const now = Date.now();
+  const end = new Date(value).getTime();
+  return Math.ceil((end - now) / 86400000);
+}
+
+function deadlineLabel(value: string | null) {
+  const days = daysLeft(value);
+  if (days === null) return "Không giới hạn";
+  if (days < 0) return "Đã quá hạn";
+  if (days === 0) return "Hôm nay";
+  if (days <= 7) return `${days} ngày nữa`;
+  return fmtDateOnly(value);
+}
+
 function asLink(value: string | null | undefined) {
   if (!value) return null;
   const trimmed = value.trim();
@@ -130,6 +151,19 @@ function transcriptStatusLabel(item: TranscriptItem) {
   if (item.status === "DRAFT_PENDING" && item.submission?.status === "REJECTED") return "REJECTED";
   if (item.submission?.status === "APPROVED") return "APPROVED";
   return item.submission?.status ?? "UNKNOWN";
+}
+
+function transcriptStatusText(value: string) {
+  if (value === "PENDING") return "Chờ duyệt";
+  if (value === "APPROVED") return "Đã duyệt";
+  if (value === "REJECTED") return "Cần chỉnh sửa";
+  return "Chưa rõ";
+}
+
+function transcriptStatusTone(value: string) {
+  if (value === "APPROVED") return "bg-emerald-50 text-emerald-700";
+  if (value === "REJECTED") return "bg-amber-50 text-amber-700";
+  return "bg-zinc-100 text-zinc-700";
 }
 
 function BrandMissionTranscriptReviewsTab() {
@@ -251,7 +285,7 @@ function BrandMissionTranscriptReviewsTab() {
       {loading ? <LoadingSkeleton rows={5} /> : null}
 
       {!loading && !error ? (
-        <section className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+        <section className="grid gap-4">
           <div className="grid gap-3">
             {items.length === 0 ? (
               <EmptyState title="Không có kịch bản" description="Không có kịch bản nào phù hợp bộ lọc hiện tại." />
@@ -260,13 +294,33 @@ function BrandMissionTranscriptReviewsTab() {
                 const statusLabel = transcriptStatusLabel(item);
                 const transcript = transcriptPlainText(item.submission?.proofTextNote ?? "");
                 return (
-                  <article key={item.id} className={`dc-card p-4 ${selectedId === item.id ? "border-zinc-900" : ""}`}>
-                    <p className="font-semibold">{item.account.displayName}</p>
-                    <p className="text-xs text-zinc-500">{item.account.email} · {item.account.creatorProfile?.mainPlatform ?? "-"}</p>
-                    <p className="mt-1 text-sm">Campaign: {item.campaign.title}</p>
-                    <p className="text-sm">Nhiệm vụ: {item.mission.title}</p>
-                    <p className="text-xs text-zinc-500 mt-1">Trạng thái kịch bản: {statusLabel}</p>
-                    <p className="mt-2 line-clamp-3 text-sm text-zinc-700">{transcript || "Chưa có nội dung kịch bản"}</p>
+                  <article key={item.id} className={`rounded-2xl border border-zinc-200 bg-white p-4 ${selectedId === item.id ? "border-zinc-900" : ""}`}>
+                    <div className="grid gap-3 xl:grid-cols-[2.4fr_1fr_1fr_1.2fr_1.6fr] xl:items-start">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-zinc-900">{item.mission.title}</p>
+                        <p className="line-clamp-1 text-sm text-zinc-500">Chiến dịch: {item.campaign.title}</p>
+                        <p className="line-clamp-1 text-sm text-zinc-500">Nhà sáng tạo: {item.account.displayName}</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-zinc-900">{item.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
+                        <p className="text-xs text-zinc-500">Thưởng</p>
+                      </div>
+                      <div>
+                        <p className={`font-semibold ${daysLeft(item.mission.deadlineAt) !== null && (daysLeft(item.mission.deadlineAt) ?? 0) <= 3 ? "text-red-600" : "text-zinc-900"}`}>{deadlineLabel(item.mission.deadlineAt)}</p>
+                        <p className="text-xs text-zinc-500">Deadline</p>
+                      </div>
+                      <div>
+                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${transcriptStatusTone(statusLabel)}`}>{transcriptStatusText(statusLabel)}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 xl:justify-end">
+                        <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
+                          {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
+                        </button>
+                        {statusLabel === "PENDING" ? <button className="dc-btn-primary" onClick={() => void approve(item.id)}>Duyệt</button> : null}
+                        {statusLabel === "PENDING" ? <button className="dc-btn-secondary" onClick={() => void reject(item.id)}>Từ chối</button> : null}
+                      </div>
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-sm text-zinc-700">{transcript || "Chưa có nội dung kịch bản"}</p>
                     {item.submission?.fileUploadUrl ? (
                       <a
                         href={`/api/uploads/transcript-download?url=${encodeURIComponent(item.submission.fileUploadUrl)}`}
@@ -275,13 +329,6 @@ function BrandMissionTranscriptReviewsTab() {
                         Tải file kịch bản
                       </a>
                     ) : null}
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
-                        {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
-                      </button>
-                      {statusLabel === "PENDING" ? <button className="dc-btn-primary" onClick={() => void approve(item.id)}>Duyệt</button> : null}
-                      {statusLabel === "PENDING" ? <button className="dc-btn-secondary" onClick={() => void reject(item.id)}>Từ chối</button> : null}
-                    </div>
                   </article>
                 );
               })
@@ -392,6 +439,12 @@ function missionStatusLabel(status: string) {
     IN_PROGRESS: "Đang thực hiện"
   };
   return map[status] ?? status;
+}
+
+function missionStatusTone(status: string) {
+  if (status === "APPROVED" || status === "COMPLETED") return "bg-emerald-50 text-emerald-700";
+  if (status === "REJECTED") return "bg-amber-50 text-amber-700";
+  return "bg-zinc-100 text-zinc-700";
 }
 
 function BrandMissionApplicationsTab() {
@@ -560,9 +613,9 @@ function BrandMissionApplicationsTab() {
                 ) : (
                   historyItems.map((history) => (
                     <article key={history.id} className="rounded-xl border border-zinc-200 bg-white p-3 text-sm">
-                      <p><strong>Campaign:</strong> {history.campaign.title}</p>
-                      <p><strong>Mission:</strong> {history.mission.title}</p>
-                      <p><strong>Reward:</strong> {history.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
+                      <p><strong>Chiến dịch:</strong> {history.campaign.title}</p>
+                      <p><strong>Nhiệm vụ:</strong> {history.mission.title}</p>
+                      <p><strong>Thưởng:</strong> {history.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
                       <p><strong>Trạng thái:</strong> {missionStatusLabel(history.status)} · Video: {missionStatusLabel(history.videoReviewStatus)} · Bước cuối: {missionStatusLabel(history.publishStatus)}</p>
                       <p><strong>Hoàn thành lúc:</strong> {fmtDate(history.completedAt)} · <strong>Cập nhật:</strong> {fmtDate(history.updatedAt)}</p>
                     </article>
@@ -579,29 +632,40 @@ function BrandMissionApplicationsTab() {
       {loading ? <LoadingSkeleton rows={5} /> : null}
 
       {!loading && !error ? (
-        <section className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+        <section className="grid gap-4">
           <div className="grid gap-3">
             {items.length === 0 ? (
               <EmptyState title="Không có đơn" description="Không có đơn nào phù hợp bộ lọc hiện tại." />
             ) : (
               items.map((item) => (
-                <article key={item.id} className={`dc-card p-4 ${selectedId === item.id ? "border-zinc-900" : ""}`}>
-                  <p className="font-semibold">{item.account.displayName}</p>
-                  <p className="text-xs text-zinc-500">{item.account.email} · {item.account.creatorProfile?.mainPlatform ?? "-"}</p>
-                  <p className="mt-1 text-sm">Campaign: {item.campaign.title}</p>
-                  <p className="text-sm">Mission: {item.mission.title}</p>
-                  <p className="text-sm">Reward: {item.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
-                  <p className="text-sm">Hình thức nhận sản phẩm: {item.mission.productReceiveOption}</p>
-                  <p className="text-xs text-zinc-500 mt-1">Trạng thái: {item.status} · Tạo lúc: {fmtDate(item.createdAt)}</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
-                      {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
-                    </button>
-                    <button className="dc-btn-secondary" onClick={() => void loadCompletedHistory(item.account.id, item.account.displayName)}>
-                      Lịch sử hoàn thành
-                    </button>
-                    {item.status === "PENDING_REVIEW" ? <button className="dc-btn-primary" onClick={() => void approve(item.id)}>Đồng ý</button> : null}
-                    {item.status === "PENDING_REVIEW" ? <button className="dc-btn-secondary" onClick={() => void reject(item.id)}>Từ chối</button> : null}
+                <article key={item.id} className={`rounded-2xl border border-zinc-200 bg-white p-4 ${selectedId === item.id ? "border-zinc-900" : ""}`}>
+                  <div className="grid gap-3 xl:grid-cols-[2.4fr_1fr_1fr_1.2fr_1.7fr] xl:items-start">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-zinc-900">{item.mission.title}</p>
+                      <p className="line-clamp-1 text-sm text-zinc-500">Chiến dịch: {item.campaign.title}</p>
+                      <p className="line-clamp-1 text-sm text-zinc-500">Nhà sáng tạo: {item.account.displayName}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-zinc-900">{item.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
+                      <p className="text-xs text-zinc-500">Thưởng</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-zinc-900">{fmtDateOnly(item.createdAt)}</p>
+                      <p className="text-xs text-zinc-500">Ngày gửi</p>
+                    </div>
+                    <div>
+                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${missionStatusTone(item.status)}`}>{missionStatusLabel(item.status)}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 xl:justify-end">
+                      <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
+                        {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
+                      </button>
+                      <button className="dc-btn-secondary" onClick={() => void loadCompletedHistory(item.account.id, item.account.displayName)}>
+                        Lịch sử
+                      </button>
+                      {item.status === "PENDING_REVIEW" ? <button className="dc-btn-primary" onClick={() => void approve(item.id)}>Duyệt</button> : null}
+                      {item.status === "PENDING_REVIEW" ? <button className="dc-btn-secondary" onClick={() => void reject(item.id)}>Từ chối</button> : null}
+                    </div>
                   </div>
                 </article>
               ))
@@ -768,27 +832,40 @@ function BrandMissionVideoReviewsTab() {
       {loading ? <LoadingSkeleton rows={5} /> : null}
 
       {!loading && !error ? (
-        <section className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+        <section className="grid gap-4">
           <div className="grid gap-3">
             {items.length === 0 ? (
               <EmptyState title="Không có video chờ duyệt" description="Không có item nào phù hợp bộ lọc hiện tại." />
             ) : (
               items.map((item) => (
-                <article key={item.id} className={`dc-card p-4 ${selectedId === item.id ? "border-zinc-900" : ""}`}>
-                  <p className="font-semibold">{item.account.displayName}</p>
-                  <p className="text-xs text-zinc-500">{item.account.email}</p>
-                  <p className="mt-1 text-sm">Campaign: {item.campaign.title}</p>
-                  <p className="text-sm">Nhiệm vụ: {item.mission.title}</p>
-                  <p className="text-xs text-zinc-500 mt-1">Nộp lúc: {fmtDate(item.videoSubmittedAt)} · Trạng thái: {item.videoReviewStatus}</p>
+                <article key={item.id} className={`rounded-2xl border border-zinc-200 bg-white p-4 ${selectedId === item.id ? "border-zinc-900" : ""}`}>
+                  <div className="grid gap-3 xl:grid-cols-[2.4fr_1fr_1fr_1.2fr_1.6fr] xl:items-start">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-zinc-900">{item.mission.title}</p>
+                      <p className="line-clamp-1 text-sm text-zinc-500">Chiến dịch: {item.campaign.title}</p>
+                      <p className="line-clamp-1 text-sm text-zinc-500">Nhà sáng tạo: {item.account.displayName}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-zinc-900">{fmtDateOnly(item.videoSubmittedAt)}</p>
+                      <p className="text-xs text-zinc-500">Ngày nộp</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-zinc-900">{item.submission?.videoUrl ? "Đã có video" : "Chưa có video"}</p>
+                      <p className="text-xs text-zinc-500">Bằng chứng</p>
+                    </div>
+                    <div>
+                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${missionStatusTone(item.videoReviewStatus)}`}>{missionStatusLabel(item.videoReviewStatus)}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 xl:justify-end">
+                      <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
+                        {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
+                      </button>
+                      {item.videoReviewStatus === "PENDING" ? <button className="dc-btn-primary" onClick={() => void decide(item.id, "approve")}>Duyệt</button> : null}
+                      {item.videoReviewStatus === "PENDING" ? <button className="dc-btn-secondary" onClick={() => void decide(item.id, "reject")}>Từ chối</button> : null}
+                    </div>
+                  </div>
                   <p className="mt-2 line-clamp-2 text-sm text-zinc-700">{item.submission?.note || "Không có ghi chú từ Creator"}</p>
                   {item.submission?.rejectReason ? <p className="mt-1 text-sm text-red-700 line-clamp-2">Lý do từ chối gần nhất: {item.submission.rejectReason}</p> : null}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
-                      {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
-                    </button>
-                    {item.videoReviewStatus === "PENDING" ? <button className="dc-btn-primary" onClick={() => void decide(item.id, "approve")}>Đồng ý video</button> : null}
-                    {item.videoReviewStatus === "PENDING" ? <button className="dc-btn-secondary" onClick={() => void decide(item.id, "reject")}>Từ chối video</button> : null}
-                  </div>
                 </article>
               ))
             )}
@@ -992,28 +1069,39 @@ function BrandMissionFinalReviewsTab() {
       {loading ? <LoadingSkeleton rows={5} /> : null}
 
       {!loading && !error ? (
-        <section className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+        <section className="grid gap-4">
           <div className="grid gap-3">
             {items.length === 0 ? (
               <EmptyState title="Không có item cần duyệt" description="Không có mission nào cho trạng thái lọc hiện tại." />
             ) : (
               items.map((item) => (
-                <article key={item.id} className={`dc-card p-4 ${selectedId === item.id ? "border-zinc-900" : ""}`}>
-                  <p className="font-semibold">{item.account.displayName}</p>
-                  <p className="text-xs text-zinc-500">{item.account.email}</p>
-                  <p className="mt-1 text-sm">Campaign: {item.campaign.title}</p>
-                  <p className="text-sm">Nhiệm vụ: {item.mission.title}</p>
-                  <p className="text-sm">Reward: {item.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
-                  <p className="text-sm">Hình thức nhận sản phẩm: {item.productReceiveOption}</p>
-                  <p className="text-xs text-zinc-500 mt-1">Nộp lúc: {fmtDate(item.publishSubmittedAt)} · Trạng thái publish: {item.publishStatus}</p>
-                  {item.submission?.rejectReason ? <p className="mt-1 text-sm text-red-700 line-clamp-2">Lý do từ chối gần nhất: {item.submission.rejectReason}</p> : null}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
-                      {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
-                    </button>
-                    {item.publishStatus === "PENDING" ? <button className="dc-btn-primary" onClick={() => void approve(item)}>Đồng ý hoàn thành</button> : null}
-                    {item.publishStatus === "PENDING" ? <button className="dc-btn-secondary" onClick={() => void reject(item.id)}>Từ chối bước cuối</button> : null}
+                <article key={item.id} className={`rounded-2xl border border-zinc-200 bg-white p-4 ${selectedId === item.id ? "border-zinc-900" : ""}`}>
+                  <div className="grid gap-3 xl:grid-cols-[2.4fr_1fr_1fr_1.2fr_1.6fr] xl:items-start">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-zinc-900">{item.mission.title}</p>
+                      <p className="line-clamp-1 text-sm text-zinc-500">Chiến dịch: {item.campaign.title}</p>
+                      <p className="line-clamp-1 text-sm text-zinc-500">Nhà sáng tạo: {item.account.displayName}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-zinc-900">{item.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
+                      <p className="text-xs text-zinc-500">Thưởng</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-zinc-900">{fmtDateOnly(item.publishSubmittedAt)}</p>
+                      <p className="text-xs text-zinc-500">Ngày nộp</p>
+                    </div>
+                    <div>
+                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${missionStatusTone(item.publishStatus)}`}>{missionStatusLabel(item.publishStatus)}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 xl:justify-end">
+                      <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
+                        {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
+                      </button>
+                      {item.publishStatus === "PENDING" ? <button className="dc-btn-primary" onClick={() => void approve(item)}>Duyệt</button> : null}
+                      {item.publishStatus === "PENDING" ? <button className="dc-btn-secondary" onClick={() => void reject(item.id)}>Từ chối</button> : null}
+                    </div>
                   </div>
+                  {item.submission?.rejectReason ? <p className="mt-2 text-sm text-red-700 line-clamp-2">Lý do từ chối gần nhất: {item.submission.rejectReason}</p> : null}
                 </article>
               ))
             )}
