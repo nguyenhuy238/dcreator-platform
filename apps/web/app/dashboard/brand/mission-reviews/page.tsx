@@ -23,14 +23,22 @@ function asLink(value: string | null | undefined) {
   if (!value) return null;
   const trimmed = value.trim();
   if (!trimmed) return null;
+  if (trimmed.startsWith("/uploads/creator-transcript/")) {
+    return `/api/uploads/transcript-download?url=${encodeURIComponent(trimmed)}`;
+  }
+  if (trimmed.startsWith("/uploads/creator-mission-proof/")) {
+    return `/api/uploads/creator-mission-proof-download?url=${encodeURIComponent(trimmed)}`;
+  }
+  if (trimmed.startsWith("/")) return trimmed;
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
 function UrlValue({ value, label }: { value: string | null | undefined; label?: string }) {
   const href = asLink(value);
   if (!href) return <span>-</span>;
+  const isDownload = href.startsWith("/api/uploads/");
   return (
-    <a href={href} className="font-semibold text-zinc-900 underline break-all">
+    <a href={href} download={isDownload} className="font-semibold text-zinc-900 underline break-all">
       {label ?? value}
     </a>
   );
@@ -874,6 +882,7 @@ function BrandMissionFinalReviewsTab() {
       const params = new URLSearchParams();
       if (query.trim()) params.set("query", query.trim());
       if (campaign.trim()) params.set("campaign", campaign.trim());
+      params.set("publishStatus", "PENDING");
       params.set("page", String(targetPage));
       params.set("limit", "20");
       const res = await fetch(`/api/brand/dashboard/mission-final-reviews?${params.toString()}`, { cache: "no-store" });

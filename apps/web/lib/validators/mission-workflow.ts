@@ -1,13 +1,19 @@
 import { z } from "zod";
 
+const uploadPathOrHttpUrlSchema = z
+  .string()
+  .trim()
+  .max(2000)
+  .refine((value) => value.startsWith("/uploads/") || /^https?:\/\//.test(value), "File URL không hợp lệ.");
+
 export const creatorMissionApplicationCreateSchema = z.object({
   missionId: z.string().trim().min(3),
   note: z.string().trim().max(500).optional()
 });
 
 export const creatorMissionPurchaseProofSubmitSchema = z.object({
-  purchaseBillImageUrl: z.string().trim().url().max(2000),
-  productReviewScreenshotUrl: z.string().trim().url().max(2000),
+  purchaseBillImageUrl: uploadPathOrHttpUrlSchema,
+  productReviewScreenshotUrl: uploadPathOrHttpUrlSchema,
   purchaseProofNote: z.string().trim().max(500).optional()
 });
 
@@ -25,7 +31,7 @@ export const creatorMissionPublishSubmitSchema = z
     publicVideoUrl: z.string().trim().url().max(2000).optional(),
     socialPostUrl: z.string().trim().url().max(2000).optional(),
     adCode: z.string().trim().max(200).optional(),
-    screenshotUrl: z.string().trim().url().max(2000).optional(),
+    screenshotUrl: uploadPathOrHttpUrlSchema.optional(),
     finalProofNote: z.string().trim().max(500).optional()
   })
   .superRefine((value, ctx) => {

@@ -10,6 +10,7 @@ type UploadFolder =
   | "brand-logo"
   | "avatar"
   | "creator-avatar"
+  | "creator-mission-proof"
   | "creator-transcript"
   | "n-point-bill";
 

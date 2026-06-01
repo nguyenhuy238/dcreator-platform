@@ -10,14 +10,21 @@ type ApiResult<T> = { success: boolean; data?: T; error?: string };
 
 type MissionItem = {
   id: string;
+  createdAt: string;
   status: string;
   productReceiveOption: string;
   productStatus: string;
+  purchaseProofSubmittedAt?: string | null;
+  purchaseProofReviewedAt?: string | null;
+  productPurchasedConfirmedAt?: string | null;
+  videoSubmittedAt?: string | null;
+  videoReviewedAt?: string | null;
   videoReviewStatus: string;
   videoReviewFeedback: string | null;
   publishStatus: string;
   publishFeedback: string | null;
   publishSubmittedAt: string | null;
+  publishReviewedAt?: string | null;
   mission: {
     title: string;
     description: string;
@@ -49,6 +56,8 @@ type MissionItem = {
   missionApplication: {
     status: string;
     rejectReason: string | null;
+    reviewedAt?: string | null;
+    createdAt?: string | null;
   } | null;
 };
 
@@ -56,6 +65,10 @@ type FormMap = Record<string, string>;
 type PreVideoChoice = "VIDEO" | "TRANSCRIPT";
 type PreVideoChoiceMap = Record<string, PreVideoChoice>;
 type MissionFilter = "ALL" | "DOING" | "PENDING" | "REVISION" | "COMPLETED";
+type MissionSort = "APPROVED_NEWEST" | "APPROVED_OLDEST" | "EXPIRING_SOON";
+type MissionErrorField = "form" | "bill" | "rating" | "transcript" | "videoUrl" | "videoNote" | "publicUrl" | "adCode" | "screenshot" | "finalNote";
+type MissionFormErrors = Partial<Record<MissionErrorField, string>>;
+type DetailTab = "ACTIONS" | "HISTORY";
 
 type CreatorMissionsPanelProps = {
   overview: CreatorOverview | null;
@@ -88,24 +101,47 @@ function asLink(value: string | null | undefined) {
   if (!value) return null;
   const trimmed = value.trim();
   if (!trimmed) return null;
+  if (trimmed.startsWith("/uploads/creator-transcript/")) {
+    return `/api/uploads/transcript-download?url=${encodeURIComponent(trimmed)}`;
+  }
+  if (trimmed.startsWith("/uploads/creator-mission-proof/")) {
+    return `/api/uploads/creator-mission-proof-download?url=${encodeURIComponent(trimmed)}`;
+  }
+  if (trimmed.startsWith("/")) return trimmed;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+function normalizeHttpUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
 function UrlValue({ value, label }: { value: string | null | undefined; label?: string }) {
   const href = asLink(value);
   if (!href) return <span>-</span>;
+  const isDownload = href.startsWith("/api/uploads/");
   return (
-    <a href={href} className="font-semibold text-zinc-900 underline break-all">
+    <a href={href} download={isDownload} className="font-semibold text-zinc-900 underline break-all">
       {label ?? value}
     </a>
   );
 }
 
+function transcriptDownloadHref(value: string | null | undefined) {
+  if (!value) return null;
+  if (value.startsWith("/uploads/creator-transcript/")) {
+    return `/api/uploads/transcript-download?url=${encodeURIComponent(value)}`;
+  }
+  const external = asLink(value);
+  return external ?? null;
+}
+
 function workflowStatus(item: MissionItem) {
   if (item.missionApplication?.status === "PENDING_REVIEW") return "Chờ duyệt nhiệm vụ";
   if (item.status === "COMPLETED") return "Hoàn thành";
-  if (item.publishStatus === "PENDING") return "Bài đăng đang chờ duyệt cuối";
-  if (item.publishStatus === "REJECTED") return "Bị từ chối bước cuối";
+  if (item.publishStatus === "PENDING") return "Link public đang chờ duyệt";
+  if (item.publishStatus === "REJECTED") return "Link public bị từ chối";
   if (item.videoReviewStatus === "PENDING") return "Video đang chờ duyệt";
   if (item.videoReviewStatus === "REJECTED") return "Video bị từ chối";
   if (item.videoReviewStatus === "APPROVED") return "Chờ nộp link social public";
@@ -164,12 +200,9 @@ function deadlineLabel(deadlineAt: string | null) {
 
 function missionPriority(item: MissionItem) {
   const group = missionGroup(item);
-  const due = daysLeft(item.mission.deadlineAt);
-  const urgency = due === null ? 0 : due < 0 ? 6 : due <= 1 ? 5 : due <= 3 ? 4 : due <= 7 ? 3 : 1;
-  if (group === "REVISION") return 40 + urgency;
-  if (group === "PENDING") return 20 + urgency;
-  if (group === "DOING") return 10 + urgency;
-  return 0;
+  if (group === "REVISION") return 3;
+  if (group === "DOING") return 2;
+  return 1;
 }
 
 function nextActionLabel(item: MissionItem) {
@@ -214,29 +247,64 @@ function missionAudienceLabel(value: string) {
 type TimelineStep = {
   key: string;
   label: string;
-  icon: "application" | "purchase" | "draftChoice" | "draftSubmit" | "draftReview" | "videoSubmit" | "videoReview" | "publish" | "completed";
+  icon: "application" | "purchase" | "draftChoice" | "draftSubmit" | "draftReview" | "videoSubmit" | "videoReview" | "publish" | "publishReview" | "completed";
   done: boolean;
   current: boolean;
   failed: boolean;
 };
 
 function TimelineStepIcon({ step }: { step: TimelineStep["icon"] }) {
-  if (step === "application") return <IdentificationCard size={22} weight="duotone" />;
-  if (step === "purchase") return <Package size={22} weight="duotone" />;
-  if (step === "draftChoice") return <Scroll size={22} weight="duotone" />;
-  if (step === "draftSubmit") return <Scroll size={22} weight="duotone" />;
-  if (step === "draftReview") return <CheckCircle size={22} weight="duotone" />;
-  if (step === "videoSubmit") return <VideoCamera size={22} weight="duotone" />;
-  if (step === "videoReview") return <CheckCircle size={22} weight="duotone" />;
-  if (step === "publish") return <Megaphone size={22} weight="duotone" />;
-  return <CheckCircle size={22} weight="fill" />;
+  if (step === "application") return <IdentificationCard size={18} weight="duotone" />;
+  if (step === "purchase") return <Package size={18} weight="duotone" />;
+  if (step === "draftChoice") return <Scroll size={18} weight="duotone" />;
+  if (step === "draftSubmit") return <Scroll size={18} weight="duotone" />;
+  if (step === "draftReview") return <CheckCircle size={18} weight="duotone" />;
+  if (step === "videoSubmit") return <VideoCamera size={18} weight="duotone" />;
+  if (step === "videoReview") return <CheckCircle size={18} weight="duotone" />;
+  if (step === "publish") return <Megaphone size={18} weight="duotone" />;
+  if (step === "publishReview") return <CheckCircle size={18} weight="duotone" />;
+  return <CheckCircle size={18} weight="fill" />;
+}
+
+function missionApprovedTime(item: MissionItem) {
+  const value =
+    item.missionApplication?.status === "APPROVED"
+      ? item.missionApplication?.reviewedAt ?? item.missionApplication?.createdAt ?? item.createdAt
+      : item.missionApplication?.createdAt ?? item.createdAt;
+  const timestamp = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function missionDeadlineTime(item: MissionItem) {
+  if (!item.mission.deadlineAt) return Number.POSITIVE_INFINITY;
+  const timestamp = new Date(item.mission.deadlineAt).getTime();
+  return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
 }
 
 async function fetchJson<T>(url: string, init?: RequestInit) {
   const res = await fetch(url, init);
-  const body = (await res.json()) as ApiResult<T>;
-  if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? "Không thể thực hiện thao tác");
+  const body = (await res.json()) as ApiResult<T> & { code?: string; details?: { fieldErrors?: Record<string, string[]>; formErrors?: string[] } };
+  if (!res.ok || !body.success || !body.data) {
+    if (body.code === "VALIDATION_ERROR") {
+      const firstFormError = body.details?.formErrors?.[0];
+      if (firstFormError) throw new Error(firstFormError);
+      const fieldEntries = Object.entries(body.details?.fieldErrors ?? {});
+      const firstFieldMessage = fieldEntries.find(([, values]) => Array.isArray(values) && values.length > 0)?.[1]?.[0];
+      if (firstFieldMessage) throw new Error(firstFieldMessage);
+    }
+    throw new Error(body.error ?? `Yêu cầu thất bại (${res.status})`);
+  }
   return body.data;
+}
+
+function toErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
 }
 
 export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
@@ -249,6 +317,10 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
   const [detailMissionId, setDetailMissionId] = useState("");
   const [activeFilter, setActiveFilter] = useState<MissionFilter>("ALL");
   const [currentPage, setCurrentPage] = useState(1);
+  const [missionSort, setMissionSort] = useState<MissionSort>("APPROVED_NEWEST");
+  const [detailTab, setDetailTab] = useState<DetailTab>("ACTIONS");
+  const [missionErrors, setMissionErrors] = useState<Record<string, MissionFormErrors>>({});
+  const [uploadingKey, setUploadingKey] = useState("");
 
   const [billUrlMap, setBillUrlMap] = useState<FormMap>({});
   const [ratingUrlMap, setRatingUrlMap] = useState<FormMap>({});
@@ -261,6 +333,30 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
   const [adCodeMap, setAdCodeMap] = useState<FormMap>({});
   const [screenshotMap, setScreenshotMap] = useState<FormMap>({});
   const [finalNoteMap, setFinalNoteMap] = useState<FormMap>({});
+
+  function setMissionFormErrors(missionId: string, nextErrors: MissionFormErrors) {
+    setMissionErrors((prev) => ({ ...prev, [missionId]: nextErrors }));
+  }
+
+  function clearMissionFormErrors(missionId: string) {
+    setMissionErrors((prev) => {
+      if (!prev[missionId]) return prev;
+      const next = { ...prev };
+      delete next[missionId];
+      return next;
+    });
+  }
+
+  function clearMissionErrorField(missionId: string, field: MissionErrorField) {
+    setMissionErrors((prev) => {
+      const current = prev[missionId];
+      if (!current?.[field] && !current?.form) return prev;
+      return {
+        ...prev,
+        [missionId]: { ...current, [field]: undefined, form: undefined }
+      };
+    });
+  }
 
   async function load() {
     setLoading(true);
@@ -278,12 +374,15 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
   async function submitPurchaseProof(item: MissionItem) {
     const bill = billUrlMap[item.id]?.trim();
     const rating = ratingUrlMap[item.id]?.trim();
-    if (!bill || !rating) {
-      setError("Cần nhập đầy đủ ảnh bill và ảnh đánh giá 5 sao.");
+    const errors: MissionFormErrors = {};
+    if (!bill) errors.bill = "Bạn chưa tải ảnh bill mua hàng.";
+    if (!rating) errors.rating = "Bạn chưa tải ảnh đã đánh giá 5 sao.";
+    if (errors.bill || errors.rating) {
+      setMissionFormErrors(item.id, errors);
       return;
     }
+    clearMissionFormErrors(item.id);
     setBusyId(item.id);
-    setError("");
     setNotice("");
     try {
       await fetchJson(`/api/creator/missions/${item.id}/purchase-proof`, {
@@ -298,21 +397,21 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
       setNotice("Đã xác nhận mua hàng. Bạn có thể chọn nộp kịch bản trước hoặc nộp video trực tiếp.");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Không thể gửi bằng chứng mua hàng");
+      setMissionFormErrors(item.id, { form: toErrorMessage(e) });
     } finally {
       setBusyId("");
     }
   }
 
   async function submitTranscript(item: MissionItem) {
-    const transcript = transcriptMap[item.id]?.trim() ?? item.submission?.proofTextNote?.trim() ?? "";
+    const transcript = transcriptMap[item.id]?.trim() ?? toPlainTranscript(item.submission?.proofTextNote);
     if (!transcript) {
-      setError("Cần nhập nội dung kịch bản.");
+      setMissionFormErrors(item.id, { transcript: "Bạn chưa nhập nội dung kịch bản." });
       return;
     }
 
+    clearMissionFormErrors(item.id);
     setBusyId(item.id);
-    setError("");
     setNotice("");
     try {
       await fetchJson(`/api/creator/missions/${item.id}/transcript-submission`, {
@@ -323,7 +422,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
       setNotice("Đã gửi kịch bản. Vui lòng chờ Brand/Admin duyệt trước khi nộp video review.");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Không thể gửi kịch bản");
+      setMissionFormErrors(item.id, { form: toErrorMessage(e) });
     } finally {
       setBusyId("");
     }
@@ -332,11 +431,11 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
   async function submitVideo(item: MissionItem) {
     const videoUrl = videoUrlMap[item.id]?.trim();
     if (!videoUrl) {
-      setError("Cần nhập video URL.");
+      setMissionFormErrors(item.id, { videoUrl: "Bạn chưa nhập URL video review." });
       return;
     }
+    clearMissionFormErrors(item.id);
     setBusyId(item.id);
-    setError("");
     setNotice("");
     try {
       await fetchJson(`/api/creator/missions/${item.id}/video-submission`, {
@@ -347,7 +446,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
       setNotice("Đã gửi video review.");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Không thể gửi video");
+      setMissionFormErrors(item.id, { form: toErrorMessage(e) });
     } finally {
       setBusyId("");
     }
@@ -356,29 +455,56 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
   async function submitPublish(item: MissionItem) {
     const publicUrl = publicUrlMap[item.id]?.trim();
     if (!publicUrl) {
-      setError("Cần nhập link video social public.");
+      setMissionFormErrors(item.id, { publicUrl: "Bạn chưa nhập link video social public." });
       return;
     }
+    const normalizedPublicUrl = normalizeHttpUrl(publicUrl);
+    clearMissionFormErrors(item.id);
     setBusyId(item.id);
-    setError("");
     setNotice("");
     try {
       await fetchJson(`/api/creator/missions/${item.id}/publish-submission`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          publicVideoUrl: publicUrl,
+          publicVideoUrl: normalizedPublicUrl,
           adCode: adCodeMap[item.id]?.trim() || undefined,
-          screenshotUrl: screenshotMap[item.id]?.trim() || undefined,
+          screenshotUrl: screenshotMap[item.id]?.trim() || item.submission?.screenshotUrl || undefined,
           finalProofNote: finalNoteMap[item.id]?.trim() || undefined
         })
       });
       setNotice("Đã gửi bước link social public.");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Không thể gửi bước link social public");
+      setMissionFormErrors(item.id, { form: toErrorMessage(e) });
     } finally {
       setBusyId("");
+    }
+  }
+
+  async function uploadMissionImage(missionId: string, field: "bill" | "rating" | "screenshot", file: File) {
+    const formData = new FormData();
+    formData.append("screenshot", file);
+    const key = `${missionId}:${field}`;
+    setUploadingKey(key);
+    clearMissionErrorField(missionId, field);
+    try {
+      const response = await fetch("/api/uploads/creator-mission-proof", { method: "POST", body: formData });
+      const payload = (await response.json()) as ApiResult<{ screenshotUrl: string }>;
+      const uploadedScreenshotUrl = payload.data?.screenshotUrl;
+      if (!response.ok || !payload.success || !uploadedScreenshotUrl) {
+        throw new Error(payload.error ?? "Không thể tải ảnh screenshot.");
+      }
+      if (field === "bill") setBillUrlMap((prev) => ({ ...prev, [missionId]: uploadedScreenshotUrl }));
+      if (field === "rating") setRatingUrlMap((prev) => ({ ...prev, [missionId]: uploadedScreenshotUrl }));
+      if (field === "screenshot") setScreenshotMap((prev) => ({ ...prev, [missionId]: uploadedScreenshotUrl }));
+    } catch (e) {
+      setMissionErrors((prev) => ({
+        ...prev,
+        [missionId]: { ...prev[missionId], [field]: toErrorMessage(e) }
+      }));
+    } finally {
+      setUploadingKey("");
     }
   }
 
@@ -410,14 +536,40 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
       if (item.status === "COMPLETED") return false;
       return true;
     });
-    return actionable.sort((a, b) => missionPriority(b) - missionPriority(a)).slice(0, 2);
+    return actionable
+      .sort((a, b) => {
+        const priorityDiff = missionPriority(b) - missionPriority(a);
+        if (priorityDiff !== 0) return priorityDiff;
+
+        const aDue = daysLeft(a.mission.deadlineAt);
+        const bDue = daysLeft(b.mission.deadlineAt);
+        const aDueValue = aDue === null ? Number.POSITIVE_INFINITY : aDue;
+        const bDueValue = bDue === null ? Number.POSITIVE_INFINITY : bDue;
+        if (aDueValue !== bDueValue) return aDueValue - bDueValue;
+
+        const aCreated = new Date(a.createdAt).getTime();
+        const bCreated = new Date(b.createdAt).getTime();
+        return aCreated - bCreated;
+      })
+      .slice(0, 2);
   }, [items]);
 
   const filteredItems = useMemo(() => {
-    if (activeFilter === "ALL") return items;
-    if (activeFilter === "DOING") return items.filter((item) => isApprovedAndUncompleted(item));
-    return items.filter((item) => missionGroup(item) === activeFilter);
-  }, [activeFilter, items]);
+    const base =
+      activeFilter === "ALL"
+        ? items
+        : activeFilter === "DOING"
+          ? items.filter((item) => isApprovedAndUncompleted(item))
+          : items.filter((item) => missionGroup(item) === activeFilter);
+
+    const sorted = [...base];
+    sorted.sort((a, b) => {
+      if (missionSort === "APPROVED_NEWEST") return missionApprovedTime(b) - missionApprovedTime(a);
+      if (missionSort === "APPROVED_OLDEST") return missionApprovedTime(a) - missionApprovedTime(b);
+      return missionDeadlineTime(a) - missionDeadlineTime(b);
+    });
+    return sorted;
+  }, [activeFilter, items, missionSort]);
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
   const pagedItems = useMemo(() => {
@@ -428,6 +580,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
   function openMissionDetail(missionId: string) {
     setActiveFilter("ALL");
     setDetailMissionId(missionId);
+    setDetailTab("ACTIONS");
   }
 
   function closeMissionDetail() {
@@ -442,7 +595,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeFilter]);
+  }, [activeFilter, missionSort]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -465,6 +618,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
       transcriptText;
     const hasVideoSubmitted = item.videoReviewStatus !== "NOT_SUBMITTED" || Boolean(item.submission?.videoUrl?.trim());
     const videoApproved = item.videoReviewStatus === "APPROVED";
+    const hasPublishSubmitted = item.publishStatus !== "NOT_SUBMITTED";
     const publishDone = item.publishStatus === "APPROVED";
     const completed = item.status === "COMPLETED";
     const selectedFlow = preVideoChoiceMap[item.id];
@@ -473,7 +627,12 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
     const transcriptPending = item.status === "DRAFT_PENDING" && item.submission?.status === "SUBMITTED";
     const transcriptRejected = item.status === "DRAFT_PENDING" && item.submission?.status === "REJECTED";
     const transcriptApproved = hasTranscriptSubmitted && !transcriptPending && !transcriptRejected;
-    const skipTranscriptFlow = !hasTranscriptSubmitted && hasVideoSubmitted;
+    const transcriptStepPassed = hasTranscriptSubmitted || hasVideoSubmitted;
+    const transcriptReviewPassed = transcriptApproved || hasVideoSubmitted;
+    const chooseCurrent = !hasChosenPreStep && item.missionApplication?.status === "APPROVED" && purchaseDone && !completed;
+    const transcriptSubmitCurrent = hasChosenPreStep && !transcriptStepPassed && item.missionApplication?.status === "APPROVED" && purchaseDone && !completed;
+    const transcriptReviewCurrent = transcriptPending;
+    const videoSubmitCurrent = !hasVideoSubmitted && transcriptReviewPassed && item.missionApplication?.status === "APPROVED" && purchaseDone && !completed;
 
     const steps: TimelineStep[] = [
       {
@@ -497,41 +656,38 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
       });
     }
 
-    if (!hasChosenPreStep) {
-      steps.push({
-        key: "draft-choice",
-        label: "Nộp kịch bản hoặc video",
-        icon: "draftChoice",
-        done: false,
-        current: item.missionApplication?.status === "APPROVED" && purchaseDone && !completed,
-        failed: false
-      });
-    } else {
-      steps.push({
-        key: "draft-submit",
-        label: skipTranscriptFlow ? "Nộp kịch bản (bỏ qua)" : "Nộp kịch bản",
-        icon: "draftSubmit",
-        done: hasTranscriptSubmitted || skipTranscriptFlow || completed,
-        current: !hasTranscriptSubmitted && !hasVideoSubmitted && item.missionApplication?.status === "APPROVED" && purchaseDone && !completed,
-        failed: false
-      });
-      steps.push({
-        key: "draft-review",
-        label: skipTranscriptFlow ? "Duyệt kịch bản (bỏ qua)" : "Duyệt kịch bản",
-        icon: "draftReview",
-        done: transcriptApproved || skipTranscriptFlow || completed,
-        current: transcriptPending,
-        failed: transcriptRejected
-      });
-      steps.push({
-        key: "video-submit",
-        label: "Nộp video",
-        icon: "videoSubmit",
-        done: hasVideoSubmitted || completed,
-        current: !hasVideoSubmitted && (skipTranscriptFlow || transcriptApproved) && item.missionApplication?.status === "APPROVED" && purchaseDone && !completed,
-        failed: false
-      });
-    }
+    steps.push({
+      key: "draft-choice",
+      label: "Nộp kịch bản hoặc video",
+      icon: "draftChoice",
+      done: hasChosenPreStep || completed,
+      current: chooseCurrent,
+      failed: false
+    });
+    steps.push({
+      key: "draft-submit",
+      label: "Nộp kịch bản",
+      icon: "draftSubmit",
+      done: transcriptStepPassed || completed,
+      current: transcriptSubmitCurrent,
+      failed: false
+    });
+    steps.push({
+      key: "draft-review",
+      label: "Duyệt kịch bản",
+      icon: "draftReview",
+      done: transcriptReviewPassed || completed,
+      current: transcriptReviewCurrent,
+      failed: transcriptRejected
+    });
+    steps.push({
+      key: "video-submit",
+      label: "Nộp video",
+      icon: "videoSubmit",
+      done: hasVideoSubmitted || completed,
+      current: videoSubmitCurrent,
+      failed: false
+    });
 
     steps.push({
       key: "video-review",
@@ -545,8 +701,16 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
       key: "publish",
       label: "Nộp link public",
       icon: "publish",
+      done: hasPublishSubmitted || completed,
+      current: !hasPublishSubmitted && videoApproved,
+      failed: item.publishStatus === "REJECTED"
+    });
+    steps.push({
+      key: "publish-review",
+      label: "Duyệt link public",
+      icon: "publishReview",
       done: publishDone || completed,
-      current: item.publishStatus === "PENDING" || (videoApproved && item.publishStatus === "NOT_SUBMITTED"),
+      current: item.publishStatus === "PENDING",
       failed: item.publishStatus === "REJECTED"
     });
     steps.push({
@@ -578,11 +742,98 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
     const showTranscriptComposer = isTranscriptFlow || (needsPreVideoChoice && selectedChoice === "TRANSCRIPT");
     const showVideoComposer = canSubmitVideoCandidate && !isTranscriptFlow && (!needsPreVideoChoice || selectedChoice === "VIDEO");
     const canSubmitPublish = !isApplicationPending && item.videoReviewStatus === "APPROVED" && item.status !== "COMPLETED" && item.publishStatus !== "PENDING";
+    const isWaitingPublishReview = !isApplicationPending && item.videoReviewStatus === "APPROVED" && item.publishStatus === "PENDING" && item.status !== "COMPLETED";
     const showProductSection = item.productReceiveOption === "PRODUCT_REQUIRED";
     const timelineSteps = buildMissionTimeline(item);
+    const formError = missionErrors[item.id];
+    const hasAnyHistory =
+      Boolean(item.purchaseProofSubmittedAt || item.videoSubmittedAt || item.publishSubmittedAt) ||
+      Boolean(item.submission?.purchaseBillImageUrl || item.submission?.proofTextNote || item.submission?.videoUrl || item.submission?.publicVideoUrl || item.submission?.socialPostUrl);
 
     return (
       <div className="space-y-3">
+        <div className="rounded-xl border border-zinc-200 bg-white p-2">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={detailTab === "ACTIONS" ? "rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-semibold text-white" : "rounded-full border border-zinc-200 px-4 py-1.5 text-sm font-semibold text-zinc-600"}
+              onClick={() => setDetailTab("ACTIONS")}
+            >
+              Thực hiện nhiệm vụ
+            </button>
+            <button
+              type="button"
+              className={detailTab === "HISTORY" ? "rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-semibold text-white" : "rounded-full border border-zinc-200 px-4 py-1.5 text-sm font-semibold text-zinc-600"}
+              onClick={() => setDetailTab("HISTORY")}
+            >
+              Lịch sử đã nộp
+            </button>
+          </div>
+        </div>
+
+        {detailTab === "HISTORY" ? (
+          <div className="space-y-3 rounded-xl border border-zinc-200 bg-white p-3">
+            <p className="text-sm font-semibold text-zinc-900">Lịch sử các lần đã nộp</p>
+            {!hasAnyHistory ? <p className="text-sm text-zinc-500">Chưa có dữ liệu đã nộp ở các bước.</p> : null}
+
+            {item.submission?.purchaseBillImageUrl || item.submission?.productReviewScreenshotUrl ? (
+              <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
+                <summary className="cursor-pointer font-semibold text-zinc-900">Bước mua sản phẩm</summary>
+                <div className="mt-2 space-y-1">
+                  <p>Thời gian nộp: {fmtDate(item.purchaseProofSubmittedAt ?? null)}</p>
+                  <p>Ảnh bill: <UrlValue value={item.submission?.purchaseBillImageUrl} label="Tải file ảnh" /></p>
+                  <p>Ảnh đánh giá: <UrlValue value={item.submission?.productReviewScreenshotUrl} label="Tải file ảnh" /></p>
+                </div>
+              </details>
+            ) : null}
+
+            {item.submission?.proofTextNote || item.submission?.fileUploadUrl ? (
+              <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
+                <summary className="cursor-pointer font-semibold text-zinc-900">Bước kịch bản</summary>
+                <div className="mt-2 space-y-1">
+                  <p>Nội dung kịch bản:</p>
+                  <p className="whitespace-pre-line">{toPlainTranscript(item.submission?.proofTextNote) || "-"}</p>
+                  {item.submission?.fileUploadUrl ? (
+                    <p>
+                      File đính kèm:{" "}
+                      {transcriptDownloadHref(item.submission.fileUploadUrl) ? (
+                        <a href={transcriptDownloadHref(item.submission.fileUploadUrl) ?? "#"} download className="font-semibold text-zinc-900 underline break-all">
+                          Tải file kịch bản
+                        </a>
+                      ) : (
+                        "-"
+                      )}
+                    </p>
+                  ) : null}
+                </div>
+              </details>
+            ) : null}
+
+            {item.submission?.videoUrl ? (
+              <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
+                <summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp video</summary>
+                <div className="mt-2 space-y-1">
+                  <p>Thời gian nộp: {fmtDate(item.videoSubmittedAt ?? null)}</p>
+                  <p>Video URL: <UrlValue value={item.submission.videoUrl} label="Mở liên kết video" /></p>
+                </div>
+              </details>
+            ) : null}
+
+            {item.submission?.publicVideoUrl || item.submission?.socialPostUrl || item.submission?.screenshotUrl || item.submission?.adCode || item.submission?.finalProofNote ? (
+              <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
+                <summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp link social</summary>
+                <div className="mt-2 space-y-1">
+                  <p>Thời gian nộp: {fmtDate(item.publishSubmittedAt)}</p>
+                  <p>Link public: <UrlValue value={item.submission?.publicVideoUrl ?? item.submission?.socialPostUrl} label="Mở liên kết public" /></p>
+                  <p>Screenshot: <UrlValue value={item.submission?.screenshotUrl} label="Tải file ảnh" /></p>
+                  <p>Mã quảng cáo: {item.submission?.adCode || "-"}</p>
+                  <p>Ghi chú: {item.submission?.finalProofNote || "-"}</p>
+                </div>
+              </details>
+            ) : null}
+          </div>
+        ) : (
+          <>
         <div className="rounded-xl border border-zinc-200 bg-white p-3">
           <p className="text-sm font-semibold text-zinc-900">Tiến độ nhiệm vụ</p>
           <div className="mt-3 overflow-x-auto pb-2">
@@ -595,24 +846,24 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
                 const circleTone = isFailed
                   ? "border-red-300 bg-red-50 text-red-700"
                   : isCurrent
-                    ? "border-emerald-600 bg-emerald-50 text-emerald-700 ring-4 ring-emerald-100"
+                    ? "border-amber-500 bg-amber-50 text-amber-700 ring-4 ring-amber-100"
                     : isDone
                       ? "border-emerald-300 bg-emerald-50 text-emerald-700"
                       : "border-zinc-300 bg-white text-zinc-500";
                 const labelTone = isFailed ? "text-red-700" : isCurrent || isDone ? "text-zinc-900" : "text-zinc-500";
-                const leftLineTone = prevStep?.done || isCurrent || isDone ? "bg-emerald-300" : "bg-zinc-200";
-                const rightLineTone = isDone || isCurrent ? "bg-emerald-300" : "bg-zinc-200";
+                const leftLineTone = prevStep?.done ? "bg-emerald-300" : "bg-zinc-200";
+                const rightLineTone = isDone && timelineSteps[index + 1] ? "bg-emerald-300" : "bg-zinc-200";
 
                 return (
-                  <div key={step.key} className="flex w-32 flex-col items-center text-center">
+                  <div key={step.key} className="flex w-24 flex-col items-center text-center">
                     <div className="flex w-full items-center">
                       {index > 0 ? <span className={`h-[2px] flex-1 ${leftLineTone}`} /> : <span className="flex-1" />}
-                      <div className={`flex h-14 w-14 items-center justify-center rounded-full border-2 text-lg font-semibold transition-all ${circleTone}`}>
+                      <div className={`flex h-11 w-11 items-center justify-center rounded-full border-2 text-lg font-semibold transition-all ${circleTone}`}>
                         <TimelineStepIcon step={step.icon} />
                       </div>
                       {index < timelineSteps.length - 1 ? <span className={`h-[2px] flex-1 ${rightLineTone}`} /> : <span className="flex-1" />}
                     </div>
-                    <p className={`mt-3 px-2 text-sm font-medium leading-5 ${labelTone}`}>{step.label}</p>
+                    <p className={`mt-2 px-1 text-xs font-medium leading-4 ${labelTone}`}>{step.label}</p>
                   </div>
                 );
               })}
@@ -673,7 +924,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
           <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">Phản hồi video: {item.videoReviewFeedback}</p>
         ) : null}
         {item.publishFeedback ? (
-          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">Phản hồi bước cuối: {item.publishFeedback}</p>
+          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">Phản hồi duyệt link public: {item.publishFeedback}</p>
         ) : null}
 
         <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
@@ -684,6 +935,11 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
                 Nhiệm vụ đang chờ duyệt. Bạn sẽ bắt đầu các bước thực hiện sau khi Brand/Admin duyệt đơn.
               </p>
             ) : null}
+            {isWaitingPublishReview ? (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                Bạn đã nộp link public. Vui lòng chờ Admin/Brand duyệt bước này.
+              </p>
+            ) : null}
 
             {canSubmitPurchase ? (
               <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
@@ -691,9 +947,32 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
                 <p className="text-sm text-zinc-600">Link sản phẩm: <UrlValue value={item.mission.productLink} /></p>
                 <p className="text-sm text-zinc-600">Hướng dẫn: Đặt hàng đúng link, đánh giá 5 sao, upload ảnh bill và ảnh đánh giá.</p>
                 <div className="mt-2 grid gap-2">
-                  <input className="dc-input" placeholder="URL ảnh bill mua hàng" value={billUrlMap[item.id] ?? ""} onChange={(e) => setBillUrlMap((s) => ({ ...s, [item.id]: e.target.value }))} />
-                  <input className="dc-input" placeholder="URL ảnh đã đánh giá 5 sao" value={ratingUrlMap[item.id] ?? ""} onChange={(e) => setRatingUrlMap((s) => ({ ...s, [item.id]: e.target.value }))} />
+                  <input
+                    className="dc-input bg-white"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void uploadMissionImage(item.id, "bill", file);
+                    }}
+                    disabled={uploadingKey === `${item.id}:bill`}
+                  />
+                  {uploadingKey === `${item.id}:bill` ? <p className="text-xs text-zinc-500">Đang tải ảnh bill...</p> : null}
+                  {formError?.bill ? <p className="text-sm text-red-600">{formError.bill}</p> : null}
+                  <input
+                    className="dc-input bg-white"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void uploadMissionImage(item.id, "rating", file);
+                    }}
+                    disabled={uploadingKey === `${item.id}:rating`}
+                  />
+                  {uploadingKey === `${item.id}:rating` ? <p className="text-xs text-zinc-500">Đang tải ảnh đánh giá...</p> : null}
+                  {formError?.rating ? <p className="text-sm text-red-600">{formError.rating}</p> : null}
                   <textarea className="dc-input" placeholder="Ghi chú (nếu có)" value={purchaseNoteMap[item.id] ?? ""} onChange={(e) => setPurchaseNoteMap((s) => ({ ...s, [item.id]: e.target.value }))} />
+                  {formError?.form ? <p className="text-sm text-red-600">{formError.form}</p> : null}
                   <button className="dc-btn-primary" disabled={busyId === item.id} onClick={() => void submitPurchaseProof(item)}>Xác nhận đã mua hàng</button>
                 </div>
               </div>
@@ -716,7 +995,8 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
                 {isTranscriptFlow && item.submission?.status === "SUBMITTED" ? <p className="mt-1 text-sm text-zinc-600">Kịch bản đã gửi, đang chờ duyệt.</p> : null}
                 {item.submission?.fileUploadUrl ? (
                   <a
-                    href={`/api/uploads/transcript-download?url=${encodeURIComponent(item.submission.fileUploadUrl)}`}
+                    href={transcriptDownloadHref(item.submission.fileUploadUrl) ?? "#"}
+                    download
                     className="mt-2 inline-flex text-sm font-semibold text-zinc-900 underline"
                   >
                     Tải file kịch bản (.txt)
@@ -728,8 +1008,13 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
                     placeholder="Nhập nội dung kịch bản"
                     disabled={isTranscriptFlow && item.submission?.status === "SUBMITTED"}
                     value={transcriptMap[item.id] ?? toPlainTranscript(item.submission?.proofTextNote)}
-                    onChange={(event) => setTranscriptMap((s) => ({ ...s, [item.id]: event.target.value }))}
+                    onChange={(event) => {
+                      setTranscriptMap((s) => ({ ...s, [item.id]: event.target.value }));
+                      clearMissionErrorField(item.id, "transcript");
+                    }}
                   />
+                  {formError?.transcript ? <p className="text-sm text-red-600">{formError.transcript}</p> : null}
+                  {formError?.form ? <p className="text-sm text-red-600">{formError.form}</p> : null}
                   {!(isTranscriptFlow && item.submission?.status === "SUBMITTED") ? (
                     <button className="dc-btn-primary" disabled={busyId === item.id} onClick={() => void submitTranscript(item)}>
                       {item.submission?.status === "REJECTED" ? "Gửi lại kịch bản" : "Gửi kịch bản"}
@@ -743,8 +1028,27 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
               <div className="rounded-xl border border-zinc-200 bg-white p-3">
                 <p className="font-medium">Nộp video review</p>
                 <div className="mt-2 grid gap-2">
-                  <input className="dc-input" placeholder="Video URL" value={videoUrlMap[item.id] ?? item.submission?.videoUrl ?? ""} onChange={(e) => setVideoUrlMap((s) => ({ ...s, [item.id]: e.target.value }))} />
-                  <textarea className="dc-input" placeholder="Ghi chú video" value={videoNoteMap[item.id] ?? item.submission?.note ?? ""} onChange={(e) => setVideoNoteMap((s) => ({ ...s, [item.id]: e.target.value }))} />
+                  <input
+                    className="dc-input"
+                    placeholder="Video URL"
+                    value={videoUrlMap[item.id] ?? item.submission?.videoUrl ?? ""}
+                    onChange={(e) => {
+                      setVideoUrlMap((s) => ({ ...s, [item.id]: e.target.value }));
+                      clearMissionErrorField(item.id, "videoUrl");
+                    }}
+                  />
+                  {formError?.videoUrl ? <p className="text-sm text-red-600">{formError.videoUrl}</p> : null}
+                  <textarea
+                    className="dc-input"
+                    placeholder="Ghi chú video"
+                    value={videoNoteMap[item.id] ?? ""}
+                    onChange={(e) => {
+                      setVideoNoteMap((s) => ({ ...s, [item.id]: e.target.value }));
+                      clearMissionErrorField(item.id, "videoNote");
+                    }}
+                  />
+                  {formError?.videoNote ? <p className="text-sm text-red-600">{formError.videoNote}</p> : null}
+                  {formError?.form ? <p className="text-sm text-red-600">{formError.form}</p> : null}
                   <button className="dc-btn-primary" disabled={busyId === item.id} onClick={() => void submitVideo(item)}>
                     {item.videoReviewStatus === "REJECTED" ? "Gửi lại video review" : "Gửi video review"}
                   </button>
@@ -756,10 +1060,31 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
               <div className="rounded-xl border border-zinc-200 bg-white p-3">
                 <p className="font-medium">Bước 3 - Nộp link video social public</p>
                 <div className="mt-2 grid gap-2">
-                  <input className="dc-input" placeholder="Link video social public" value={publicUrlMap[item.id] ?? item.submission?.publicVideoUrl ?? item.submission?.socialPostUrl ?? ""} onChange={(e) => setPublicUrlMap((s) => ({ ...s, [item.id]: e.target.value }))} />
+                  <input
+                    className="dc-input"
+                    placeholder="Link video social public"
+                    value={publicUrlMap[item.id] ?? item.submission?.publicVideoUrl ?? item.submission?.socialPostUrl ?? ""}
+                    onChange={(e) => {
+                      setPublicUrlMap((s) => ({ ...s, [item.id]: e.target.value }));
+                      clearMissionErrorField(item.id, "publicUrl");
+                    }}
+                  />
+                  {formError?.publicUrl ? <p className="text-sm text-red-600">{formError.publicUrl}</p> : null}
                   <input className="dc-input" placeholder="Mã quảng cáo (adCode)" value={adCodeMap[item.id] ?? item.submission?.adCode ?? ""} onChange={(e) => setAdCodeMap((s) => ({ ...s, [item.id]: e.target.value }))} />
-                  <input className="dc-input" placeholder="Screenshot URL (nếu cần)" value={screenshotMap[item.id] ?? item.submission?.screenshotUrl ?? ""} onChange={(e) => setScreenshotMap((s) => ({ ...s, [item.id]: e.target.value }))} />
-                  <textarea className="dc-input" placeholder="Ghi chú bước cuối" value={finalNoteMap[item.id] ?? item.submission?.finalProofNote ?? ""} onChange={(e) => setFinalNoteMap((s) => ({ ...s, [item.id]: e.target.value }))} />
+                  <input
+                    className="dc-input bg-white"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void uploadMissionImage(item.id, "screenshot", file);
+                    }}
+                    disabled={uploadingKey === `${item.id}:screenshot`}
+                  />
+                  {uploadingKey === `${item.id}:screenshot` ? <p className="text-xs text-zinc-500">Đang tải ảnh screenshot...</p> : null}
+                  {formError?.screenshot ? <p className="text-sm text-red-600">{formError.screenshot}</p> : null}
+                  <textarea className="dc-input" placeholder="Ghi chú" value={finalNoteMap[item.id] ?? item.submission?.finalProofNote ?? ""} onChange={(e) => setFinalNoteMap((s) => ({ ...s, [item.id]: e.target.value }))} />
+                  {formError?.form ? <p className="text-sm text-red-600">{formError.form}</p> : null}
                   <button className="dc-btn-primary" disabled={busyId === item.id} onClick={() => void submitPublish(item)}>
                     {item.publishStatus === "REJECTED" ? "Gửi lại link social public" : "Gửi link social public"}
                   </button>
@@ -774,6 +1099,8 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
             ) : null}
           </div>
         </details>
+          </>
+        )}
       </div>
     );
   }
@@ -831,7 +1158,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
           <section id="nhiem-vu-cua-toi" className="space-y-3">
             <SectionHeader title="Nhiệm vụ của tôi" subtitle={`${items.length} nhiệm vụ`} />
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {[
                 { key: "ALL" as const, label: "Tất cả" },
                 { key: "PENDING" as const, label: "Chờ duyệt" },
@@ -848,6 +1175,17 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
                   {item.label}
                 </button>
               ))}
+              <select
+                id="creator-mission-sort"
+                className="ml-auto h-8 w-28 shrink-0 rounded-full border border-zinc-200 bg-white px-2 text-xs font-medium text-zinc-700"
+                value={missionSort}
+                onChange={(event) => setMissionSort(event.target.value as MissionSort)}
+                aria-label="Sắp xếp nhiệm vụ"
+              >
+                <option value="APPROVED_NEWEST">Mới nhất</option>
+                <option value="APPROVED_OLDEST">Cũ nhất</option>
+                <option value="EXPIRING_SOON">Sắp hết hạn</option>
+              </select>
             </div>
 
             {filteredItems.length === 0 ? (
