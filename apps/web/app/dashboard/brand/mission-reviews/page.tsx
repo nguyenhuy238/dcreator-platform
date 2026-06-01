@@ -945,7 +945,7 @@ type VideoItem = {
   account: { displayName: string; email: string; creatorProfile?: { socialLinks?: Array<{ id: string; platform: string; socialUrl: string; followers: number | null; handle: string | null }> } | null };
   campaign: { id: string; title: string; slug?: string };
   mission: { title: string; rewardPoints?: number | null; description?: string | null; deadlineAt?: string | null; productReceiveOption?: string | null; productName?: string | null; productDescription?: string | null; productImageUrl?: string | null; productLink?: string | null };
-  submission: { videoUrl: string | null; note: string | null; rejectReason: string | null } | null;
+  submission: { videoUrl: string | null; note: string | null; rejectReason: string | null; publicVideoUrl?: string | null; socialPostUrl?: string | null } | null;
 };
 
 type VideoListResponse = { items: VideoItem[]; pagination: { page: number; limit: number; total: number; totalPages: number } };

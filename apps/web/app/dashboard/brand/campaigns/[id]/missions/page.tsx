@@ -131,11 +131,9 @@ export default function BrandCampaignMissionsPage() {
       setLoading(false);
     }
   }, [campaignId]);
-  }, [campaignId]);
 
   useEffect(() => {
     void load();
-  }, [load]);
   }, [load]);
 
   async function submit(event: FormEvent) {
