@@ -200,26 +200,38 @@ function parseBrandMeta(value: unknown): BrandMeta {
 async function getBrandScopedCampaign(campaignId: string, brandId: string) {
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
   if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
-  const linked = await prisma.brandCampaignRequest.findFirst({
-    where: { brandId, createdCampaignId: campaignId },
-    select: { id: true }
-  });
-  if (!linked) throw new AppError("Forbidden", 403, "BRAND_FORBIDDEN");
+  const [linked, brand] = await Promise.all([
+    prisma.brandCampaignRequest.findFirst({
+      where: { brandId, createdCampaignId: campaignId },
+      select: { id: true }
+    }),
+    prisma.brand.findUnique({
+      where: { id: brandId },
+      select: { ownerAccountId: true }
+    })
+  ]);
+  const isLegacyOwnedCampaign = Boolean(brand && campaign.brandId === brand.ownerAccountId);
+  if (!linked && !isLegacyOwnedCampaign) throw new AppError("Forbidden", 403, "BRAND_FORBIDDEN");
   return campaign;
 }
 
 async function getScopedCampaignIds(brandId: string, ownerAccountId: string) {
-  const linked = await prisma.brandCampaignRequest.findMany({
-    where: { brandId, createdCampaignId: { not: null } },
-    select: { createdCampaignId: true }
-  });
-  const ids = linked.map((item) => item.createdCampaignId).filter((value): value is string => Boolean(value));
-  if (ids.length > 0) return ids;
-  const legacy = await prisma.campaign.findMany({
-    where: { brandId: ownerAccountId },
-    select: { id: true }
-  });
-  return legacy.map((item) => item.id);
+  const [linked, legacy] = await Promise.all([
+    prisma.brandCampaignRequest.findMany({
+      where: { brandId, createdCampaignId: { not: null } },
+      select: { createdCampaignId: true }
+    }),
+    prisma.campaign.findMany({
+      where: { brandId: ownerAccountId },
+      select: { id: true }
+    })
+  ]);
+  return [
+    ...new Set([
+      ...linked.map((item) => item.createdCampaignId).filter((value): value is string => Boolean(value)),
+      ...legacy.map((item) => item.id)
+    ])
+  ];
 }
 
 type BrandActorContext = {
@@ -1199,6 +1211,15 @@ export async function listCreatorApplications(accountId: string, currentBrandId?
 export async function addCampaignMissionForBrand(accountId: string, campaignId: string, input: CampaignMissionInput, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const campaign = await getBrandScopedCampaign(campaignId, ctx.brand.id);
+  const videoTarget = Math.max(0, campaign.ugcVideoQuota ?? 0);
+  const videoApproved = Math.max(0, campaign.ugcVideoApprovedCount ?? 0);
+  if (videoTarget > 0 && videoApproved >= videoTarget) {
+    throw new AppError(
+      `Campaign đã duyệt đủ ${videoApproved}/${videoTarget} video. Không thể tạo thêm nhiệm vụ.`,
+      409,
+      "CAMPAIGN_UGC_VIDEO_QUOTA_REACHED"
+    );
+  }
 
   const deadlineAt = input.deadlineAt ? new Date(input.deadlineAt) : null;
   if (deadlineAt && campaign.startsAt && deadlineAt < campaign.startsAt) {
@@ -1227,10 +1248,22 @@ export async function addCampaignMissionForBrand(accountId: string, campaignId: 
 export async function listCampaignMissionsForBrand(accountId: string, campaignId: string, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const campaign = await getBrandScopedCampaign(campaignId, ctx.brand.id);
-  return prisma.mission.findMany({
+  const items = await prisma.mission.findMany({
     where: { campaignId: campaign.id },
     orderBy: { createdAt: "desc" }
   });
+  const videoTarget = Math.max(0, campaign.ugcVideoQuota ?? 0);
+  const videoApproved = Math.max(0, campaign.ugcVideoApprovedCount ?? 0);
+  return {
+    campaign: {
+      id: campaign.id,
+      title: campaign.title,
+      videoTarget,
+      videoApproved,
+      videoQuotaReached: videoTarget > 0 && videoApproved >= videoTarget
+    },
+    items
+  };
 }
 
 export async function decideCreatorApplication(accountId: string, input: CreatorApplicationDecisionInput, currentBrandId?: string | null) {
@@ -1617,4 +1650,3 @@ export async function listProductSubmissionsForBrand(accountId: string, currentB
     include: { inventoryBatches: true }
   });
 }
-
