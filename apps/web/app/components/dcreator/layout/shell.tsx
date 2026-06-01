@@ -22,7 +22,15 @@ type AuthUser = {
   capabilities?: UserCapabilities;
 };
 
-export function PublicHeader() {
+type PublicHeaderProps = {
+  hideRoleSwitch?: boolean;
+  audienceToggle?: {
+    href: string;
+    label: string;
+  } | null;
+};
+
+export function PublicHeader({ hideRoleSwitch = false, audienceToggle = null }: PublicHeaderProps = {}) {
   const pathname = usePathname();
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -108,6 +116,7 @@ export function PublicHeader() {
   }, [capabilities, currentUser, pathname, profileHref]);
   const roleSwitchHref = roleSwitch.href;
   const roleSwitchLabel = roleSwitch.label;
+  const shouldShowRoleSwitch = !hideRoleSwitch;
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/70 bg-white/90 backdrop-blur">
@@ -124,7 +133,8 @@ export function PublicHeader() {
             <div className="h-10 w-44 animate-pulse rounded-full bg-zinc-200" />
           ) : currentUser ? (
             <>
-              <Link href={roleSwitchHref} className="dc-btn-secondary">{roleSwitchLabel}</Link>
+              {shouldShowRoleSwitch ? <Link href={roleSwitchHref} className="dc-btn-secondary">{roleSwitchLabel}</Link> : null}
+              {audienceToggle ? <Link href={audienceToggle.href} className="dc-btn-secondary">{audienceToggle.label}</Link> : null}
               {canAccessAdmin ? (
                 <>
                   <Link href="/admin" className="dc-btn-secondary hidden xl:inline-flex">Admin</Link>
@@ -161,7 +171,8 @@ export function PublicHeader() {
             </>
           ) : (
             <>
-              <Link href={roleSwitchHref} className="dc-btn-secondary">{roleSwitchLabel}</Link>
+              {shouldShowRoleSwitch ? <Link href={roleSwitchHref} className="dc-btn-secondary">{roleSwitchLabel}</Link> : null}
+              {audienceToggle ? <Link href={audienceToggle.href} className="dc-btn-secondary">{audienceToggle.label}</Link> : null}
               <Link href="/auth/login" className="dc-btn-secondary">Đăng nhập</Link>
               <Link href="/auth/register" className="dc-btn-primary hidden px-7 py-3 text-base sm:inline-flex">Đăng ký tài khoản</Link>
             </>
