@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { CheckCircle, IdentificationCard, Megaphone, Package, Scroll, VideoCamera } from "@phosphor-icons/react";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data?: T; error?: string };
+type DetailTab = "ACTIONS" | "HISTORY";
 
 type TabKey = "transcript-reviews" | "applications" | "video-reviews" | "final-reviews";
 
@@ -82,6 +84,161 @@ function transcriptPlainText(value: string | null | undefined) {
     .trim();
 }
 
+function productReceiveOptionLabel(value: string | null | undefined) {
+  if (value === "PRODUCT_REQUIRED") return "Có yêu cầu sản phẩm";
+  if (value === "NO_PRODUCT_REQUIRED") return "Không yêu cầu sản phẩm";
+  return "Không xác định";
+}
+
+function missionAudienceLabel() {
+  return "Người dùng";
+}
+
+function mapStatusVi(value: string | null | undefined) {
+  if (!value) return "-";
+  const map: Record<string, string> = {
+    PENDING_REVIEW: "Chờ duyệt",
+    APPROVED: "Đã duyệt",
+    REJECTED: "Đã từ chối",
+    PENDING: "Chờ duyệt",
+    SUBMITTED: "Đã nộp",
+    OPEN: "Đang mở",
+    COMPLETED: "Hoàn thành",
+    IN_PROGRESS: "Đang thực hiện",
+    PRODUCT_PENDING: "Chờ mua sản phẩm",
+    DRAFT_PENDING: "Chờ duyệt kịch bản",
+    NOT_SUBMITTED: "Chưa nộp",
+    NOT_REQUIRED: "Không yêu cầu",
+    WAITING_PURCHASE: "Chờ mua hàng",
+    WAITING_DEPOSIT: "Chờ đặt cọc"
+  };
+  return map[value] ?? value;
+}
+
+function CreatorSocialLinks({ profile }: { profile: { socialLinks?: Array<{ id: string; platform: string; socialUrl: string; followers: number | null; handle: string | null }> } | null | undefined }) {
+  const links = profile?.socialLinks ?? [];
+  return (
+    <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
+      <summary className="cursor-pointer font-semibold text-zinc-900">Thông tin Creator</summary>
+      <div className="mt-2 text-sm text-zinc-700">
+        {links.length === 0 ? <p>Chưa có mạng xã hội</p> : links.map((link) => (
+          <p key={link.id}>
+            {link.platform}: <UrlValue value={link.socialUrl} /> {link.followers ? `(${link.followers.toLocaleString("vi-VN")} follower)` : ""}
+          </p>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+type TimelineStep = {
+  key: string;
+  label: string;
+  icon: "application" | "purchase" | "draftSubmit" | "videoSubmit" | "videoReview" | "publish" | "publishReview" | "completed";
+  done: boolean;
+  current: boolean;
+  failed: boolean;
+};
+
+function TimelineStepIcon({ step }: { step: TimelineStep["icon"] }) {
+  if (step === "application") return <IdentificationCard size={18} weight="duotone" />;
+  if (step === "purchase") return <Package size={18} weight="duotone" />;
+  if (step === "draftSubmit") return <Scroll size={18} weight="duotone" />;
+  if (step === "videoSubmit") return <VideoCamera size={18} weight="duotone" />;
+  if (step === "videoReview") return <CheckCircle size={18} weight="duotone" />;
+  if (step === "publish") return <Megaphone size={18} weight="duotone" />;
+  if (step === "publishReview") return <CheckCircle size={18} weight="duotone" />;
+  return <CheckCircle size={18} weight="fill" />;
+}
+
+function MissionDetailModal({
+  open,
+  title,
+  subtitle,
+  onClose,
+  detailTab,
+  setDetailTab,
+  timelineSteps,
+  campaignNode,
+  missionNode,
+  historyNode,
+  actionNode,
+  feedbackNode
+}: {
+  open: boolean;
+  title: string;
+  subtitle?: string;
+  onClose: () => void;
+  detailTab: DetailTab;
+  setDetailTab: (tab: DetailTab) => void;
+  timelineSteps: TimelineStep[];
+  campaignNode: ReactNode;
+  missionNode: ReactNode;
+  historyNode: ReactNode;
+  actionNode: ReactNode;
+  feedbackNode?: ReactNode;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 bg-zinc-900/50 p-3 md:p-6" onClick={onClose}>
+      <div className="mx-auto max-h-[95vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:p-6" onClick={(event) => event.stopPropagation()}>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-xl font-semibold text-zinc-900">{title}</h3>
+            {subtitle ? <p className="text-sm text-zinc-600">{subtitle}</p> : null}
+          </div>
+          <button type="button" className="dc-btn-secondary" onClick={onClose}>Đóng</button>
+        </div>
+
+        <div className="space-y-3">
+          <div className="rounded-xl border border-zinc-200 bg-white p-2">
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={detailTab === "ACTIONS" ? "rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-semibold text-white" : "rounded-full border border-zinc-200 px-4 py-1.5 text-sm font-semibold text-zinc-600"} onClick={() => setDetailTab("ACTIONS")}>Thực hiện nhiệm vụ</button>
+              <button type="button" className={detailTab === "HISTORY" ? "rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-semibold text-white" : "rounded-full border border-zinc-200 px-4 py-1.5 text-sm font-semibold text-zinc-600"} onClick={() => setDetailTab("HISTORY")}>Lịch sử đã nộp</button>
+            </div>
+          </div>
+
+          {detailTab === "HISTORY" ? historyNode : (
+            <>
+              <div className="rounded-xl border border-zinc-200 bg-white p-3">
+                <p className="text-sm font-semibold text-zinc-900">Tiến độ nhiệm vụ</p>
+                <div className="mt-3 overflow-x-auto pb-2">
+                  <div className="flex min-w-max items-start">
+                    {timelineSteps.map((step, index) => {
+                      const prevStep = index > 0 ? timelineSteps[index - 1] : null;
+                      const circleTone = step.failed ? "border-red-300 bg-red-50 text-red-700" : step.current ? "border-amber-500 bg-amber-50 text-amber-700 ring-4 ring-amber-100" : step.done ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-zinc-300 bg-white text-zinc-500";
+                      const labelTone = step.failed ? "text-red-700" : step.current || step.done ? "text-zinc-900" : "text-zinc-500";
+                      const leftLineTone = prevStep?.done ? "bg-emerald-300" : "bg-zinc-200";
+                      const rightLineTone = step.done && timelineSteps[index + 1] ? "bg-emerald-300" : "bg-zinc-200";
+                      return (
+                        <div key={step.key} className="flex w-24 flex-col items-center text-center">
+                          <div className="flex w-full items-center">
+                            {index > 0 ? <span className={`h-[2px] flex-1 ${leftLineTone}`} /> : <span className="flex-1" />}
+                            <div className={`flex h-11 w-11 items-center justify-center rounded-full border-2 text-lg font-semibold transition-all ${circleTone}`}><TimelineStepIcon step={step.icon} /></div>
+                            {index < timelineSteps.length - 1 ? <span className={`h-[2px] flex-1 ${rightLineTone}`} /> : <span className="flex-1" />}
+                          </div>
+                          <p className={`mt-2 px-1 text-xs font-medium leading-4 ${labelTone}`}>{step.label}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              {campaignNode}
+              {missionNode}
+              {feedbackNode}
+              <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
+                <summary className="cursor-pointer font-semibold text-zinc-900">Thực hiện nhiệm vụ</summary>
+                <div className="mt-3 space-y-3">{actionNode}</div>
+              </details>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BrandMissionReviewsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("applications");
 
@@ -120,7 +277,7 @@ type TranscriptItem = {
     id: string;
     displayName: string;
     email: string;
-    creatorProfile: { mainPlatform: string | null; socialUrl: string | null; followerCount: number | null; bio?: string | null } | null;
+    creatorProfile: { mainPlatform: string | null; socialUrl: string | null; followerCount: number | null; bio?: string | null; socialLinks?: Array<{ id: string; platform: string; socialUrl: string; followers: number | null; handle: string | null }> } | null;
   };
   campaign: { id: string; title: string; slug: string; brandId: string };
   mission: { id: string; title: string; description: string; rewardPoints: number; productReceiveOption: string; productLink: string | null; deadlineAt: string | null };
@@ -175,6 +332,7 @@ function BrandMissionTranscriptReviewsTab() {
   const [selectedId, setSelectedId] = useState<string>("");
   const [detail, setDetail] = useState<TranscriptItem | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailTab, setDetailTab] = useState<DetailTab>("ACTIONS");
 
   const [query, setQuery] = useState("");
   const [campaign, setCampaign] = useState("");
@@ -203,14 +361,7 @@ function BrandMissionTranscriptReviewsTab() {
     }
   }
 
-  async function loadDetail(id: string, options?: { force?: boolean }) {
-    if (!options?.force && selectedId === id) {
-      setSelectedId("");
-      setDetail(null);
-      setDetailLoading(false);
-      return;
-    }
-
+  async function loadDetail(id: string) {
     setSelectedId(id);
     setDetailLoading(true);
     try {
@@ -235,7 +386,7 @@ function BrandMissionTranscriptReviewsTab() {
       if (!res.ok || !body.success) throw new Error(body.error ?? "Duyệt thất bại");
       setNotice("Đã duyệt kịch bản. Creator có thể nộp video review.");
       await load();
-      if (selectedId === id) await loadDetail(id, { force: true });
+      if (selectedId === id) await loadDetail(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Duyệt thất bại");
     }
@@ -256,7 +407,7 @@ function BrandMissionTranscriptReviewsTab() {
       if (!res.ok || !body.success) throw new Error(body.error ?? "Từ chối thất bại");
       setNotice("Đã từ chối kịch bản. Creator có thể nộp lại.");
       await load();
-      if (selectedId === id) await loadDetail(id, { force: true });
+      if (selectedId === id) await loadDetail(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Từ chối thất bại");
     }
@@ -294,7 +445,7 @@ function BrandMissionTranscriptReviewsTab() {
                 const statusLabel = transcriptStatusLabel(item);
                 const transcript = transcriptPlainText(item.submission?.proofTextNote ?? "");
                 return (
-                  <article key={item.id} className={`rounded-2xl border border-zinc-200 bg-white p-4 ${selectedId === item.id ? "border-zinc-900" : ""}`}>
+                  <article key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
                     <div className="grid gap-3 xl:grid-cols-[2.4fr_1fr_1fr_1.2fr_1.6fr] xl:items-start">
                       <div className="min-w-0">
                         <p className="font-semibold text-zinc-900">{item.mission.title}</p>
@@ -313,11 +464,9 @@ function BrandMissionTranscriptReviewsTab() {
                         <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${transcriptStatusTone(statusLabel)}`}>{transcriptStatusText(statusLabel)}</span>
                       </div>
                       <div className="flex flex-wrap gap-2 xl:justify-end">
-                        <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
-                          {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
+                        <button className="dc-btn-secondary" onClick={() => { setDetailTab("ACTIONS"); void loadDetail(item.id); }}>
+                          Xem chi tiết
                         </button>
-                        {statusLabel === "PENDING" ? <button className="dc-btn-primary" onClick={() => void approve(item.id)}>Duyệt</button> : null}
-                        {statusLabel === "PENDING" ? <button className="dc-btn-secondary" onClick={() => void reject(item.id)}>Từ chối</button> : null}
                       </div>
                     </div>
                     <p className="mt-2 line-clamp-2 text-sm text-zinc-700">{transcript || "Chưa có nội dung kịch bản"}</p>
@@ -340,41 +489,92 @@ function BrandMissionTranscriptReviewsTab() {
             </div>
           </div>
 
-          <aside className="dc-card p-4">
-            <h2 className="font-semibold">Chi tiết kịch bản</h2>
-            {!selectedId ? <p className="text-sm text-zinc-500 mt-2">Chọn một item để xem chi tiết.</p> : null}
-            {detailLoading ? <div className="mt-3"><LoadingSkeleton rows={4} /></div> : null}
-            {detail && !detailLoading ? (
-              <div className="mt-3 grid gap-2 text-sm">
-                <p><strong>Creator:</strong> {detail.account.displayName}</p>
-                <p><strong>Email:</strong> {detail.account.email}</p>
-                <p><strong>Nền tảng chính:</strong> {detail.account.creatorProfile?.mainPlatform ?? "-"}</p>
-                <p><strong>Social URL:</strong> <UrlValue value={detail.account.creatorProfile?.socialUrl} /></p>
-                <p><strong>Follower:</strong> {(detail.account.creatorProfile?.followerCount ?? 0).toLocaleString("vi-VN")}</p>
-                <p><strong>Campaign:</strong> {detail.campaign.title}</p>
-                <p><strong>Nhiệm vụ:</strong> {detail.mission.title}</p>
-                <p><strong>Mô tả nhiệm vụ:</strong> {detail.mission.description}</p>
-                <p><strong>Hình thức nhận sản phẩm:</strong> {detail.mission.productReceiveOption}</p>
-                <p><strong>Link sản phẩm:</strong> <UrlValue value={detail.mission.productLink} /></p>
-                <p><strong>Deadline:</strong> {fmtDate(detail.mission.deadlineAt)}</p>
-                <p><strong>Kịch bản:</strong></p>
-                <div
-                  className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 prose prose-zinc max-w-none"
-                  dangerouslySetInnerHTML={{ __html: detail.submission?.proofTextNote ?? "-" }}
-                />
-                {detail.submission?.fileUploadUrl ? (
-                  <a
-                    href={`/api/uploads/transcript-download?url=${encodeURIComponent(detail.submission.fileUploadUrl)}`}
-                    className="inline-flex text-sm font-semibold text-zinc-900 underline"
-                  >
-                    Tải file kịch bản (.txt)
-                  </a>
-                ) : null}
-                <p><strong>Trạng thái:</strong> {transcriptStatusLabel(detail)}</p>
-                <p><strong>Lý do từ chối:</strong> {detail.submission?.rejectReason ?? detail.videoReviewFeedback ?? "-"}</p>
+          <MissionDetailModal
+            open={Boolean(detail) || detailLoading}
+            title={detail?.mission.title ?? "Chi tiết nhiệm vụ"}
+            subtitle={detail ? `${detail.account.displayName} • ${detail.campaign.title}` : undefined}
+            onClose={() => { setSelectedId(""); setDetail(null); setDetailLoading(false); }}
+            detailTab={detailTab}
+            setDetailTab={setDetailTab}
+            timelineSteps={[
+              { key: "application", label: "Duyệt tham gia", icon: "application", done: true, current: false, failed: false },
+              { key: "draftChoice", label: "Nộp kịch bản hoặc video", icon: "draftSubmit", done: true, current: false, failed: false },
+              { key: "draftSubmit", label: "Nộp kịch bản", icon: "draftSubmit", done: true, current: false, failed: false },
+              { key: "draftReview", label: "Duyệt kịch bản", icon: "videoReview", done: detail ? transcriptStatusLabel(detail) === "APPROVED" : false, current: detail ? transcriptStatusLabel(detail) === "PENDING" : false, failed: detail ? transcriptStatusLabel(detail) === "REJECTED" : false },
+              { key: "videoSubmit", label: "Nộp video", icon: "videoSubmit", done: false, current: false, failed: false },
+              { key: "videoReview", label: "Duyệt video", icon: "videoReview", done: false, current: false, failed: false },
+              { key: "publish", label: "Nộp link public", icon: "publish", done: false, current: false, failed: false },
+              { key: "publishReview", label: "Duyệt link public", icon: "publishReview", done: false, current: false, failed: false },
+              { key: "completed", label: "Hoàn thành", icon: "completed", done: false, current: false, failed: false }
+            ]}
+            campaignNode={
+              <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
+                <summary className="cursor-pointer font-semibold text-zinc-900">Thông tin campaign</summary>
+                <div className="mt-3 grid gap-1 text-sm text-zinc-600">
+                  <p>Tên campaign: <strong className="text-zinc-900">{detail?.campaign.title ?? "-"}</strong></p>
+                  <p>Đường dẫn campaign: <strong className="text-zinc-900">/campaigns/{detail?.campaign.slug ?? "-"}</strong></p>
+                </div>
+              </details>
+            }
+            missionNode={
+              <>
+                <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
+                  <summary className="cursor-pointer font-semibold text-zinc-900">Thông tin nhiệm vụ</summary>
+                  {detailLoading ? <LoadingSkeleton rows={3} /> : (
+                    <div className="mt-3 grid gap-2 text-sm text-zinc-700 md:grid-cols-2">
+                      <p>Trạng thái luồng: <strong className="text-zinc-900">{detail ? transcriptStatusText(transcriptStatusLabel(detail)) : "-"}</strong></p>
+                      <p>Trạng thái nhiệm vụ: <strong className="text-zinc-900">{mapStatusVi(detail?.status)}</strong></p>
+                      <p>Đối tượng: <strong className="text-zinc-900">{missionAudienceLabel()}</strong></p>
+                      <p>Cho phép làm lại: <strong className="text-zinc-900">Không</strong></p>
+                      <p>Điểm thưởng: <strong className="text-zinc-900">{detail?.mission.rewardPoints.toLocaleString("vi-VN") ?? "-"} N-Points</strong></p>
+                      <p>Hạn hoàn thành: <strong className="text-zinc-900">{fmtDate(detail?.mission.deadlineAt ?? null)}</strong></p>
+                      <p>Yêu cầu sản phẩm: <strong className="text-zinc-900">{productReceiveOptionLabel(detail?.mission.productReceiveOption)}</strong></p>
+                      <p>Trạng thái sản phẩm: <strong className="text-zinc-900">Không xác định</strong></p>
+                    </div>
+                  )}
+                  <p className="mt-2 text-sm text-zinc-700 whitespace-pre-line">{detail?.mission.description ?? "-"}</p>
+                </details>
+                <CreatorSocialLinks profile={detail?.account.creatorProfile} />
+              </>
+            }
+            historyNode={
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-zinc-900">Lịch sử các lần đã nộp</p>
+                <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
+                  <summary className="cursor-pointer font-semibold text-zinc-900">Bước mua sản phẩm</summary>
+                  <div className="mt-2 space-y-1"><p>Không áp dụng</p></div>
+                </details>
+                <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
+                  <summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp kịch bản</summary>
+                  <div className="mt-2 space-y-1">
+                    <p>Thời gian duyệt: {fmtDate(detail?.submission?.reviewedAt ?? null)}</p>
+                    <p>Trạng thái: {mapStatusVi(detail?.submission?.status)}</p>
+                    <p>File kịch bản: <UrlValue value={detail?.submission?.fileUploadUrl} label="Tải file kịch bản (.txt)" /></p>
+                  </div>
+                </details>
+                <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
+                  <summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp video</summary>
+                  <div className="mt-2 space-y-1"><p>Chưa có dữ liệu video ở bước này</p></div>
+                </details>
+                <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
+                  <summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp link social</summary>
+                  <div className="mt-2 space-y-1"><p>Chưa có dữ liệu link social ở bước này</p></div>
+                </details>
               </div>
-            ) : null}
-          </aside>
+            }
+            actionNode={
+              <div className="grid gap-2 text-sm">
+                <p><strong>Trạng thái:</strong> {detail ? transcriptStatusText(transcriptStatusLabel(detail)) : "-"}</p>
+                {(detail?.submission?.rejectReason ?? detail?.videoReviewFeedback) ? <p><strong>Lý do từ chối:</strong> {detail?.submission?.rejectReason ?? detail?.videoReviewFeedback}</p> : null}
+                {detail && transcriptStatusLabel(detail) === "PENDING" ? (
+                  <div className="flex flex-wrap gap-2">
+                    <button className="dc-btn-primary" onClick={() => void approve(detail.id)}>Duyệt</button>
+                    <button className="dc-btn-secondary" onClick={() => void reject(detail.id)}>Từ chối</button>
+                  </div>
+                ) : null}
+              </div>
+            }
+          />
         </section>
       ) : null}
     </section>
@@ -392,7 +592,7 @@ type ApplicationListItem = {
     id: string;
     displayName: string;
     email: string;
-    creatorProfile: { mainPlatform: string | null; socialUrl: string | null; followerCount: number | null } | null;
+    creatorProfile: { mainPlatform: string | null; socialUrl: string | null; followerCount: number | null; socialLinks?: Array<{ id: string; platform: string; socialUrl: string; followers: number | null; handle: string | null }> } | null;
   };
   campaign: { id: string; title: string; slug: string };
   mission: { id: string; title: string; rewardPoints: number; productReceiveOption: string; productLink: string | null };
@@ -431,14 +631,7 @@ const applicationStatusOptions = [
 ];
 
 function missionStatusLabel(status: string) {
-  const map: Record<string, string> = {
-    COMPLETED: "Hoàn thành",
-    APPROVED: "Đã duyệt",
-    REJECTED: "Đã từ chối",
-    PENDING: "Chờ duyệt",
-    IN_PROGRESS: "Đang thực hiện"
-  };
-  return map[status] ?? status;
+  return mapStatusVi(status);
 }
 
 function missionStatusTone(status: string) {
@@ -456,6 +649,7 @@ function BrandMissionApplicationsTab() {
   const [selectedId, setSelectedId] = useState<string>("");
   const [detail, setDetail] = useState<ApplicationDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailTab, setDetailTab] = useState<DetailTab>("ACTIONS");
   const [historyCreator, setHistoryCreator] = useState<{ id: string; displayName: string } | null>(null);
   const [historyItems, setHistoryItems] = useState<CompletedMissionHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -489,13 +683,7 @@ function BrandMissionApplicationsTab() {
     }
   }
 
-  async function loadDetail(id: string, options?: { force?: boolean }) {
-    if (!options?.force && selectedId === id) {
-      setSelectedId("");
-      setDetail(null);
-      setDetailLoading(false);
-      return;
-    }
+  async function loadDetail(id: string) {
     setSelectedId(id);
     setDetailLoading(true);
     try {
@@ -520,7 +708,7 @@ function BrandMissionApplicationsTab() {
       if (!res.ok || !body.success) throw new Error(body.error ?? "Duyệt thất bại");
       setNotice("Đã duyệt đơn xin nhiệm vụ.");
       await load();
-      if (selectedId === id) await loadDetail(id, { force: true });
+      if (selectedId === id) await loadDetail(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Duyệt thất bại");
     }
@@ -541,7 +729,7 @@ function BrandMissionApplicationsTab() {
       if (!res.ok || !body.success) throw new Error(body.error ?? "Từ chối thất bại");
       setNotice("Đã từ chối đơn xin nhiệm vụ.");
       await load();
-      if (selectedId === id) await loadDetail(id, { force: true });
+      if (selectedId === id) await loadDetail(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Từ chối thất bại");
     }
@@ -590,7 +778,7 @@ function BrandMissionApplicationsTab() {
       </section>
 
       {historyCreator ? (
-        <div className="fixed inset-0 z-50 bg-zinc-900/50 p-3 md:p-6" onClick={() => { setHistoryCreator(null); setHistoryItems([]); setHistoryError(""); }}>
+        <div className="fixed inset-0 z-[70] bg-zinc-900/50 p-3 md:p-6" onClick={() => { setHistoryCreator(null); setHistoryItems([]); setHistoryError(""); }}>
           <div className="mx-auto max-h-[95vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 md:p-6" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <h3 className="text-xl font-semibold text-zinc-900">Lịch sử nhiệm vụ đã hoàn thành - {historyCreator.displayName}</h3>
@@ -638,7 +826,7 @@ function BrandMissionApplicationsTab() {
               <EmptyState title="Không có đơn" description="Không có đơn nào phù hợp bộ lọc hiện tại." />
             ) : (
               items.map((item) => (
-                <article key={item.id} className={`rounded-2xl border border-zinc-200 bg-white p-4 ${selectedId === item.id ? "border-zinc-900" : ""}`}>
+                <article key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
                   <div className="grid gap-3 xl:grid-cols-[2.4fr_1fr_1fr_1.2fr_1.7fr] xl:items-start">
                     <div className="min-w-0">
                       <p className="font-semibold text-zinc-900">{item.mission.title}</p>
@@ -657,14 +845,9 @@ function BrandMissionApplicationsTab() {
                       <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${missionStatusTone(item.status)}`}>{missionStatusLabel(item.status)}</span>
                     </div>
                     <div className="flex flex-wrap gap-2 xl:justify-end">
-                      <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
-                        {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
+                      <button className="dc-btn-secondary" onClick={() => { setDetailTab("ACTIONS"); void loadDetail(item.id); }}>
+                        Xem chi tiết
                       </button>
-                      <button className="dc-btn-secondary" onClick={() => void loadCompletedHistory(item.account.id, item.account.displayName)}>
-                        Lịch sử
-                      </button>
-                      {item.status === "PENDING_REVIEW" ? <button className="dc-btn-primary" onClick={() => void approve(item.id)}>Duyệt</button> : null}
-                      {item.status === "PENDING_REVIEW" ? <button className="dc-btn-secondary" onClick={() => void reject(item.id)}>Từ chối</button> : null}
                     </div>
                   </div>
                 </article>
@@ -677,29 +860,80 @@ function BrandMissionApplicationsTab() {
             </div>
           </div>
 
-          <aside className="dc-card p-4">
-            <h2 className="font-semibold">Chi tiết đơn</h2>
-            {!selectedId ? <p className="text-sm text-zinc-500 mt-2">Chọn một đơn để xem chi tiết.</p> : null}
-            {detailLoading ? <div className="mt-3"><LoadingSkeleton rows={3} /></div> : null}
-            {detail && !detailLoading ? (
-              <div className="mt-3 grid gap-2 text-sm">
-                <p><strong>Creator:</strong> {detail.account.displayName}</p>
-                <p><strong>Email:</strong> {detail.account.email}</p>
-                <p><strong>Nền tảng chính:</strong> {detail.account.creatorProfile?.mainPlatform ?? "-"}</p>
-                <p><strong>Social URL:</strong> <UrlValue value={detail.account.creatorProfile?.socialUrl} /></p>
-                <p><strong>Follower:</strong> {(detail.account.creatorProfile?.followerCount ?? 0).toLocaleString("vi-VN")}</p>
-                <p><strong>Campaign:</strong> {detail.campaign.title}</p>
-                <p><strong>Mission:</strong> {detail.mission.title}</p>
-                <p><strong>Mô tả:</strong> {detail.mission.description}</p>
-                <p><strong>Hình thức nhận sản phẩm:</strong> {detail.mission.productReceiveOption}</p>
-                <p><strong>Link sản phẩm:</strong> <UrlValue value={detail.mission.productLink} /></p>
-                <p><strong>Ghi chú creator:</strong> {detail.note ?? "-"}</p>
-                <p><strong>Trạng thái:</strong> {detail.status}</p>
-                <p><strong>Lý do từ chối:</strong> {detail.rejectReason ?? "-"}</p>
-                <p><strong>Duyệt lúc:</strong> {fmtDate(detail.reviewedAt)}</p>
+          <MissionDetailModal
+            open={Boolean(detail) || detailLoading}
+            title={detail?.mission.title ?? "Chi tiết nhiệm vụ"}
+            subtitle={detail ? `${detail.account.displayName} • ${detail.campaign.title}` : undefined}
+            onClose={() => { setSelectedId(""); setDetail(null); setDetailLoading(false); }}
+            detailTab={detailTab}
+            setDetailTab={setDetailTab}
+            timelineSteps={[
+              { key: "application", label: "Duyệt tham gia", icon: "application", done: true, current: false, failed: false },
+              { key: "draftChoice", label: "Nộp kịch bản hoặc video", icon: "draftSubmit", done: true, current: false, failed: false },
+              { key: "draftSubmit", label: "Nộp kịch bản", icon: "draftSubmit", done: true, current: false, failed: false },
+              { key: "draftReview", label: "Duyệt kịch bản", icon: "videoReview", done: true, current: false, failed: false },
+              { key: "videoSubmit", label: "Nộp video", icon: "videoSubmit", done: true, current: false, failed: false },
+              { key: "videoReview", label: "Duyệt video", icon: "videoReview", done: detail?.status === "APPROVED", current: detail?.status === "PENDING_REVIEW", failed: detail?.status === "REJECTED" },
+              { key: "publish", label: "Nộp link public", icon: "publish", done: false, current: false, failed: false },
+              { key: "publishReview", label: "Duyệt link public", icon: "publishReview", done: false, current: false, failed: false },
+              { key: "completed", label: "Hoàn thành", icon: "completed", done: false, current: false, failed: false }
+            ]}
+            campaignNode={<details className="rounded-xl border border-zinc-200 bg-white p-3" open><summary className="cursor-pointer font-semibold text-zinc-900">Thông tin campaign</summary><div className="mt-3 grid gap-1 text-sm text-zinc-600"><p>Tên campaign: <strong className="text-zinc-900">{detail?.campaign.title ?? "-"}</strong></p><p>Đường dẫn campaign: <strong className="text-zinc-900">/campaigns/{detail?.campaign.slug ?? "-"}</strong></p></div></details>}
+            missionNode={
+              <>
+                <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
+                  <summary className="cursor-pointer font-semibold text-zinc-900">Thông tin nhiệm vụ</summary>
+                  <div className="mt-3 grid gap-2 text-sm text-zinc-700 md:grid-cols-2">
+                    <p>Trạng thái luồng: <strong className="text-zinc-900">{detail ? missionStatusLabel(detail.status) : "-"}</strong></p>
+                    <p>Trạng thái nhiệm vụ: <strong className="text-zinc-900">{detail ? missionStatusLabel(detail.status) : "-"}</strong></p>
+                    <p>Đối tượng: <strong className="text-zinc-900">{missionAudienceLabel()}</strong></p>
+                    <p>Cho phép làm lại: <strong className="text-zinc-900">Không</strong></p>
+                    <p>Điểm thưởng: <strong className="text-zinc-900">{detail?.mission.rewardPoints.toLocaleString("vi-VN") ?? "-"} N-Points</strong></p>
+                    <p>Hạn hoàn thành: <strong className="text-zinc-900">{fmtDate(detail?.mission.deadlineAt ?? null)}</strong></p>
+                    <p>Yêu cầu sản phẩm: <strong className="text-zinc-900">{productReceiveOptionLabel(detail?.mission.productReceiveOption)}</strong></p>
+                    <p>Trạng thái sản phẩm: <strong className="text-zinc-900">Không xác định</strong></p>
+                  </div>
+                  <p className="mt-2 text-sm text-zinc-700 whitespace-pre-line">{detail?.mission.description ?? "-"}</p>
+                </details>
+                <CreatorSocialLinks profile={detail?.account.creatorProfile} />
+              </>
+            }
+            historyNode={
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-zinc-900">Lịch sử các lần đã nộp</p>
+                <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
+                  <summary className="cursor-pointer font-semibold text-zinc-900">Bước mua sản phẩm</summary>
+                  <div className="mt-2 space-y-1"><p>Không áp dụng</p></div>
+                </details>
+                <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
+                  <summary className="cursor-pointer font-semibold text-zinc-900">Bước kịch bản</summary>
+                  <div className="mt-2 space-y-1"><p>Không áp dụng</p></div>
+                </details>
+                <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
+                  <summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp video</summary>
+                  <div className="mt-2 space-y-1"><p>Không áp dụng</p></div>
+                </details>
+                <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
+                  <summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp link social</summary>
+                  <div className="mt-2 space-y-1"><p>Không áp dụng</p></div>
+                </details>
               </div>
-            ) : null}
-          </aside>
+            }
+            actionNode={
+              <div className="grid gap-2 text-sm">
+                <p><strong>Trạng thái:</strong> {detail ? missionStatusLabel(detail.status) : "-"}</p>
+                {detail?.note && !detail.note.includes("[CREATOR_CAMPAIGN_APPLICATION]") ? <p><strong>Ghi chú Creator:</strong> {detail.note}</p> : null}
+                {detail?.rejectReason ? <p><strong>Lý do từ chối:</strong> {detail.rejectReason}</p> : null}
+                {detail ? <button className="dc-btn-secondary" onClick={() => void loadCompletedHistory(detail.account.id, detail.account.displayName)}>Xem lịch sử Creator</button> : null}
+                {detail?.status === "PENDING_REVIEW" ? (
+                  <div className="flex flex-wrap gap-2">
+                    <button className="dc-btn-primary" onClick={() => void approve(detail.id)}>Duyệt</button>
+                    <button className="dc-btn-secondary" onClick={() => void reject(detail.id)}>Từ chối</button>
+                  </div>
+                ) : null}
+              </div>
+            }
+          />
         </section>
       ) : null}
     </section>
@@ -710,9 +944,9 @@ type VideoItem = {
   id: string;
   videoReviewStatus: string;
   videoSubmittedAt: string | null;
-  account: { displayName: string; email: string };
-  campaign: { id: string; title: string };
-  mission: { title: string };
+  account: { displayName: string; email: string; creatorProfile?: { socialLinks?: Array<{ id: string; platform: string; socialUrl: string; followers: number | null; handle: string | null }> } | null };
+  campaign: { id: string; title: string; slug?: string };
+  mission: { title: string; rewardPoints?: number | null; description?: string | null; deadlineAt?: string | null; productReceiveOption?: string | null };
   submission: { videoUrl: string | null; note: string | null; rejectReason: string | null } | null;
 };
 
@@ -733,6 +967,7 @@ function BrandMissionVideoReviewsTab() {
   const [selectedId, setSelectedId] = useState<string>("");
   const [detail, setDetail] = useState<VideoItem | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailTab, setDetailTab] = useState<DetailTab>("ACTIONS");
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [query, setQuery] = useState("");
@@ -761,13 +996,7 @@ function BrandMissionVideoReviewsTab() {
     }
   }
 
-  async function loadDetail(id: string, options?: { force?: boolean }) {
-    if (!options?.force && selectedId === id) {
-      setSelectedId("");
-      setDetail(null);
-      setDetailLoading(false);
-      return;
-    }
+  async function loadDetail(id: string) {
     setSelectedId(id);
     setDetailLoading(true);
     try {
@@ -803,7 +1032,7 @@ function BrandMissionVideoReviewsTab() {
       }
       setNotice(action === "approve" ? "Đã duyệt video." : "Đã từ chối video.");
       await load();
-      if (selectedId === id) await loadDetail(id, { force: true });
+      if (selectedId === id) await loadDetail(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Thao tác thất bại");
     }
@@ -838,7 +1067,7 @@ function BrandMissionVideoReviewsTab() {
               <EmptyState title="Không có video chờ duyệt" description="Không có item nào phù hợp bộ lọc hiện tại." />
             ) : (
               items.map((item) => (
-                <article key={item.id} className={`rounded-2xl border border-zinc-200 bg-white p-4 ${selectedId === item.id ? "border-zinc-900" : ""}`}>
+                <article key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
                   <div className="grid gap-3 xl:grid-cols-[2.4fr_1fr_1fr_1.2fr_1.6fr] xl:items-start">
                     <div className="min-w-0">
                       <p className="font-semibold text-zinc-900">{item.mission.title}</p>
@@ -857,11 +1086,9 @@ function BrandMissionVideoReviewsTab() {
                       <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${missionStatusTone(item.videoReviewStatus)}`}>{missionStatusLabel(item.videoReviewStatus)}</span>
                     </div>
                     <div className="flex flex-wrap gap-2 xl:justify-end">
-                      <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
-                        {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
+                      <button className="dc-btn-secondary" onClick={() => { setDetailTab("ACTIONS"); void loadDetail(item.id); }}>
+                        Xem chi tiết
                       </button>
-                      {item.videoReviewStatus === "PENDING" ? <button className="dc-btn-primary" onClick={() => void decide(item.id, "approve")}>Duyệt</button> : null}
-                      {item.videoReviewStatus === "PENDING" ? <button className="dc-btn-secondary" onClick={() => void decide(item.id, "reject")}>Từ chối</button> : null}
                     </div>
                   </div>
                   <p className="mt-2 line-clamp-2 text-sm text-zinc-700">{item.submission?.note || "Không có ghi chú từ Creator"}</p>
@@ -876,24 +1103,40 @@ function BrandMissionVideoReviewsTab() {
             </div>
           </div>
 
-          <aside className="dc-card p-4">
-            <h2 className="font-semibold">Chi tiết video review</h2>
-            {!selectedId ? <p className="mt-2 text-sm text-zinc-500">Chọn một item để xem chi tiết.</p> : null}
-            {detailLoading ? <div className="mt-3"><LoadingSkeleton rows={4} /></div> : null}
-            {detail && !detailLoading ? (
-              <div className="mt-3 grid gap-2 text-sm">
-                <p><strong>Creator:</strong> {detail.account.displayName}</p>
-                <p><strong>Email:</strong> {detail.account.email}</p>
-                <p><strong>Campaign:</strong> {detail.campaign.title}</p>
-                <p><strong>Nhiệm vụ:</strong> {detail.mission.title}</p>
-                <p><strong>Video URL:</strong> <UrlValue value={detail.submission?.videoUrl} /></p>
-                <p><strong>Ghi chú creator:</strong> {detail.submission?.note ?? "-"}</p>
-                <p><strong>Trạng thái:</strong> {detail.videoReviewStatus}</p>
-                <p><strong>Nộp lúc:</strong> {fmtDate(detail.videoSubmittedAt)}</p>
-                <p><strong>Lý do từ chối:</strong> {detail.submission?.rejectReason ?? "-"}</p>
+          <MissionDetailModal
+            open={Boolean(detail) || detailLoading}
+            title={detail?.mission.title ?? "Chi tiết nhiệm vụ"}
+            subtitle={detail ? `${detail.account.displayName} • ${detail.campaign.title}` : undefined}
+            onClose={() => { setSelectedId(""); setDetail(null); setDetailLoading(false); }}
+            detailTab={detailTab}
+            setDetailTab={setDetailTab}
+            timelineSteps={[
+              { key: "application", label: "Duyệt tham gia", icon: "application", done: true, current: false, failed: false },
+              { key: "draftChoice", label: "Nộp kịch bản hoặc video", icon: "draftSubmit", done: true, current: false, failed: false },
+              { key: "draftSubmit", label: "Nộp kịch bản", icon: "draftSubmit", done: true, current: false, failed: false },
+              { key: "draftReview", label: "Duyệt kịch bản", icon: "videoReview", done: true, current: false, failed: false },
+              { key: "videoSubmit", label: "Nộp video", icon: "videoSubmit", done: true, current: false, failed: false },
+              { key: "videoReview", label: "Duyệt video", icon: "videoReview", done: detail?.videoReviewStatus === "APPROVED", current: detail?.videoReviewStatus === "PENDING", failed: detail?.videoReviewStatus === "REJECTED" },
+              { key: "publish", label: "Nộp link public", icon: "publish", done: false, current: false, failed: false },
+              { key: "publishReview", label: "Duyệt link public", icon: "publishReview", done: false, current: false, failed: false },
+              { key: "completed", label: "Hoàn thành", icon: "completed", done: false, current: false, failed: false }
+            ]}
+            campaignNode={<details className="rounded-xl border border-zinc-200 bg-white p-3" open><summary className="cursor-pointer font-semibold text-zinc-900">Thông tin campaign</summary><div className="mt-3 grid gap-1 text-sm text-zinc-600"><p>Tên campaign: <strong className="text-zinc-900">{detail?.campaign.title ?? "-"}</strong></p><p>Đường dẫn campaign: <strong className="text-zinc-900">/campaigns/{detail?.campaign.slug ?? "-"}</strong></p></div></details>}
+            missionNode={<><details className="rounded-xl border border-zinc-200 bg-white p-3" open><summary className="cursor-pointer font-semibold text-zinc-900">Thông tin nhiệm vụ</summary><div className="mt-3 grid gap-2 text-sm text-zinc-700 md:grid-cols-2"><p>Trạng thái luồng: <strong className="text-zinc-900">{detail ? missionStatusLabel(detail.videoReviewStatus) : "-"}</strong></p><p>Trạng thái nhiệm vụ: <strong className="text-zinc-900">{detail ? missionStatusLabel(detail.videoReviewStatus) : "-"}</strong></p><p>Đối tượng: <strong className="text-zinc-900">{missionAudienceLabel()}</strong></p><p>Cho phép làm lại: <strong className="text-zinc-900">Không</strong></p><p>Điểm thưởng: <strong className="text-zinc-900">{detail?.mission.rewardPoints?.toLocaleString("vi-VN") ?? "-"} N-Points</strong></p><p>Hạn hoàn thành: <strong className="text-zinc-900">{fmtDate(detail?.mission.deadlineAt ?? null)}</strong></p><p>Yêu cầu sản phẩm: <strong className="text-zinc-900">{productReceiveOptionLabel(detail?.mission.productReceiveOption)}</strong></p><p>Trạng thái sản phẩm: <strong className="text-zinc-900">Không xác định</strong></p></div><p className="mt-2 text-sm text-zinc-700 whitespace-pre-line">{detail?.mission.description ?? "-"}</p></details><CreatorSocialLinks profile={detail?.account.creatorProfile} /></>}
+            historyNode={<div className="space-y-3"><p className="text-sm font-semibold text-zinc-900">Lịch sử các lần đã nộp</p><details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước mua sản phẩm</summary><div className="mt-2 space-y-1"><p>Không áp dụng</p></div></details><details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước kịch bản</summary><div className="mt-2 space-y-1"><p>Không áp dụng</p></div></details><details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp video</summary><div className="mt-2 space-y-1"><p>Thời gian nộp: {fmtDate(detail?.videoSubmittedAt ?? null)}</p><p>Video URL: <UrlValue value={detail?.submission?.videoUrl} /></p><p>Ghi chú: {detail?.submission?.note ?? "-"}</p></div></details><details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp link social</summary><div className="mt-2 space-y-1"><p>Chưa nộp link social</p></div></details></div>}
+            actionNode={
+              <div className="grid gap-2 text-sm">
+                <p><strong>Ghi chú creator:</strong> {detail?.submission?.note ?? "-"}</p>
+                {detail?.submission?.rejectReason ? <p><strong>Lý do từ chối:</strong> {detail.submission.rejectReason}</p> : null}
+                {detail?.videoReviewStatus === "PENDING" ? (
+                  <div className="flex flex-wrap gap-2">
+                    <button className="dc-btn-primary" onClick={() => void decide(detail.id, "approve")}>Duyệt</button>
+                    <button className="dc-btn-secondary" onClick={() => void decide(detail.id, "reject")}>Từ chối</button>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </aside>
+            }
+          />
         </section>
       ) : null}
     </section>
@@ -907,9 +1150,9 @@ type FinalItem = {
   publishStatus: string;
   publishSubmittedAt: string | null;
   reimbursementStatus: string;
-  account: { displayName: string; email: string };
-  campaign: { id: string; title: string };
-  mission: { title: string; rewardPoints: number; productLink: string | null };
+  account: { displayName: string; email: string; creatorProfile?: { socialLinks?: Array<{ id: string; platform: string; socialUrl: string; followers: number | null; handle: string | null }> } | null };
+  campaign: { id: string; title: string; slug?: string };
+  mission: { title: string; rewardPoints: number; productLink: string | null; description?: string | null; deadlineAt?: string | null };
   submission: {
     videoUrl: string | null;
     publicVideoUrl: string | null;
@@ -946,6 +1189,7 @@ function BrandMissionFinalReviewsTab() {
   const [selectedId, setSelectedId] = useState<string>("");
   const [detail, setDetail] = useState<FinalItem | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailTab, setDetailTab] = useState<DetailTab>("ACTIONS");
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [query, setQuery] = useState("");
@@ -974,13 +1218,7 @@ function BrandMissionFinalReviewsTab() {
     }
   }
 
-  async function loadDetail(id: string, options?: { force?: boolean }) {
-    if (!options?.force && selectedId === id) {
-      setSelectedId("");
-      setDetail(null);
-      setDetailLoading(false);
-      return;
-    }
+  async function loadDetail(id: string) {
     setSelectedId(id);
     setDetailLoading(true);
     try {
@@ -1019,7 +1257,7 @@ function BrandMissionFinalReviewsTab() {
       if (!res.ok || !body.success) throw new Error(body.error ?? "Duyệt thất bại");
       setNotice("Đã duyệt hoàn thành nhiệm vụ và cộng điểm.");
       await load();
-      if (selectedId === item.id) await loadDetail(item.id, { force: true });
+      if (selectedId === item.id) await loadDetail(item.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Duyệt thất bại");
     }
@@ -1040,7 +1278,7 @@ function BrandMissionFinalReviewsTab() {
       if (!res.ok || !body.success) throw new Error(body.error ?? "Từ chối thất bại");
       setNotice("Đã từ chối bước hoàn thành.");
       await load();
-      if (selectedId === id) await loadDetail(id, { force: true });
+      if (selectedId === id) await loadDetail(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Từ chối thất bại");
     }
@@ -1075,7 +1313,7 @@ function BrandMissionFinalReviewsTab() {
               <EmptyState title="Không có item cần duyệt" description="Không có mission nào cho trạng thái lọc hiện tại." />
             ) : (
               items.map((item) => (
-                <article key={item.id} className={`rounded-2xl border border-zinc-200 bg-white p-4 ${selectedId === item.id ? "border-zinc-900" : ""}`}>
+                <article key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
                   <div className="grid gap-3 xl:grid-cols-[2.4fr_1fr_1fr_1.2fr_1.6fr] xl:items-start">
                     <div className="min-w-0">
                       <p className="font-semibold text-zinc-900">{item.mission.title}</p>
@@ -1094,11 +1332,9 @@ function BrandMissionFinalReviewsTab() {
                       <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${missionStatusTone(item.publishStatus)}`}>{missionStatusLabel(item.publishStatus)}</span>
                     </div>
                     <div className="flex flex-wrap gap-2 xl:justify-end">
-                      <button className="dc-btn-secondary" onClick={() => void loadDetail(item.id)}>
-                        {selectedId === item.id ? "Ẩn chi tiết" : "Xem chi tiết"}
+                      <button className="dc-btn-secondary" onClick={() => { setDetailTab("ACTIONS"); void loadDetail(item.id); }}>
+                        Xem chi tiết
                       </button>
-                      {item.publishStatus === "PENDING" ? <button className="dc-btn-primary" onClick={() => void approve(item)}>Duyệt</button> : null}
-                      {item.publishStatus === "PENDING" ? <button className="dc-btn-secondary" onClick={() => void reject(item.id)}>Từ chối</button> : null}
                     </div>
                   </div>
                   {item.submission?.rejectReason ? <p className="mt-2 text-sm text-red-700 line-clamp-2">Lý do từ chối gần nhất: {item.submission.rejectReason}</p> : null}
@@ -1112,32 +1348,40 @@ function BrandMissionFinalReviewsTab() {
             </div>
           </div>
 
-          <aside className="dc-card p-4">
-            <h2 className="font-semibold">Chi tiết duyệt hoàn thành</h2>
-            {!selectedId ? <p className="mt-2 text-sm text-zinc-500">Chọn một item để xem chi tiết.</p> : null}
-            {detailLoading ? <div className="mt-3"><LoadingSkeleton rows={5} /></div> : null}
-            {detail && !detailLoading ? (
-              <div className="mt-3 grid gap-2 text-sm">
-                <p><strong>Creator:</strong> {detail.account.displayName}</p>
-                <p><strong>Email:</strong> {detail.account.email}</p>
-                <p><strong>Campaign:</strong> {detail.campaign.title}</p>
-                <p><strong>Nhiệm vụ:</strong> {detail.mission.title}</p>
-                <p><strong>Reward:</strong> {detail.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
-                <p><strong>Hình thức nhận sản phẩm:</strong> {detail.productReceiveOption}</p>
-                <p><strong>Trạng thái hoàn tiền:</strong> {detail.reimbursementStatus}</p>
-                <p><strong>Video review đã duyệt:</strong> <UrlValue value={detail.submission?.videoUrl} /></p>
-                <p><strong>Link video social public:</strong> <UrlValue value={detail.submission?.publicVideoUrl ?? detail.submission?.socialPostUrl} /></p>
-                <p><strong>Mã quảng cáo:</strong> {detail.submission?.adCode ?? "-"}</p>
-                <p><strong>Screenshot bài đăng:</strong> <UrlValue value={detail.submission?.screenshotUrl} /></p>
-                <p><strong>Ảnh bill mua hàng:</strong> <UrlValue value={detail.submission?.purchaseBillImageUrl} /></p>
-                <p><strong>Ảnh đánh giá 5 sao:</strong> <UrlValue value={detail.submission?.productReviewScreenshotUrl} /></p>
-                <p><strong>Ghi chú creator:</strong> {detail.submission?.finalProofNote ?? "-"}</p>
-                <p><strong>Trạng thái publish:</strong> {detail.publishStatus}</p>
-                <p><strong>Nộp lúc:</strong> {fmtDate(detail.publishSubmittedAt)}</p>
-                <p><strong>Lý do từ chối:</strong> {detail.submission?.rejectReason ?? "-"}</p>
+          <MissionDetailModal
+            open={Boolean(detail) || detailLoading}
+            title={detail?.mission.title ?? "Chi tiết nhiệm vụ"}
+            subtitle={detail ? `${detail.account.displayName} • ${detail.campaign.title}` : undefined}
+            onClose={() => { setSelectedId(""); setDetail(null); setDetailLoading(false); }}
+            detailTab={detailTab}
+            setDetailTab={setDetailTab}
+            timelineSteps={[
+              { key: "application", label: "Duyệt tham gia", icon: "application", done: true, current: false, failed: false },
+              { key: "draftChoice", label: "Nộp kịch bản hoặc video", icon: "draftSubmit", done: true, current: false, failed: false },
+              { key: "draftSubmit", label: "Nộp kịch bản", icon: "draftSubmit", done: true, current: false, failed: false },
+              { key: "draftReview", label: "Duyệt kịch bản", icon: "videoReview", done: true, current: false, failed: false },
+              { key: "videoSubmit", label: "Nộp video", icon: "videoSubmit", done: true, current: false, failed: false },
+              { key: "videoReview", label: "Duyệt video", icon: "videoReview", done: true, current: false, failed: false },
+              { key: "publish", label: "Nộp link public", icon: "publish", done: true, current: false, failed: false },
+              { key: "publishReview", label: "Duyệt link public", icon: "publishReview", done: detail?.publishStatus === "APPROVED", current: detail?.publishStatus === "PENDING", failed: detail?.publishStatus === "REJECTED" },
+              { key: "completed", label: "Hoàn thành", icon: "completed", done: detail?.publishStatus === "APPROVED", current: false, failed: false }
+            ]}
+            campaignNode={<details className="rounded-xl border border-zinc-200 bg-white p-3" open><summary className="cursor-pointer font-semibold text-zinc-900">Thông tin campaign</summary><div className="mt-3 grid gap-1 text-sm text-zinc-600"><p>Tên campaign: <strong className="text-zinc-900">{detail?.campaign.title ?? "-"}</strong></p><p>Đường dẫn campaign: <strong className="text-zinc-900">/campaigns/{detail?.campaign.slug ?? "-"}</strong></p></div></details>}
+            missionNode={<><details className="rounded-xl border border-zinc-200 bg-white p-3" open><summary className="cursor-pointer font-semibold text-zinc-900">Thông tin nhiệm vụ</summary><div className="mt-3 grid gap-2 text-sm text-zinc-700 md:grid-cols-2"><p>Trạng thái luồng: <strong className="text-zinc-900">{detail ? missionStatusLabel(detail.publishStatus) : "-"}</strong></p><p>Trạng thái nhiệm vụ: <strong className="text-zinc-900">{detail ? missionStatusLabel(detail.status) : "-"}</strong></p><p>Đối tượng: <strong className="text-zinc-900">{missionAudienceLabel()}</strong></p><p>Cho phép làm lại: <strong className="text-zinc-900">Không</strong></p><p>Điểm thưởng: <strong className="text-zinc-900">{detail?.mission.rewardPoints?.toLocaleString("vi-VN") ?? "-"} N-Points</strong></p><p>Hạn hoàn thành: <strong className="text-zinc-900">{fmtDate(detail?.mission.deadlineAt ?? null)}</strong></p><p>Yêu cầu sản phẩm: <strong className="text-zinc-900">{productReceiveOptionLabel(detail?.productReceiveOption)}</strong></p><p>Trạng thái sản phẩm: <strong className="text-zinc-900">{mapStatusVi(detail?.reimbursementStatus)}</strong></p></div><p className="mt-2 text-sm text-zinc-700 whitespace-pre-line">{detail?.mission.description ?? "-"}</p></details><CreatorSocialLinks profile={detail?.account.creatorProfile} /></>}
+            historyNode={<div className="space-y-3"><p className="text-sm font-semibold text-zinc-900">Lịch sử các lần đã nộp</p><details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước mua sản phẩm</summary><div className="mt-2 space-y-1"><p>Ảnh bill: <UrlValue value={detail?.submission?.purchaseBillImageUrl} /></p><p>Ảnh đánh giá: <UrlValue value={detail?.submission?.productReviewScreenshotUrl} /></p></div></details><details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước kịch bản</summary><div className="mt-2 space-y-1"><p>Không áp dụng</p></div></details><details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp video</summary><div className="mt-2 space-y-1"><p>Video review: <UrlValue value={detail?.submission?.videoUrl} /></p></div></details><details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp link social</summary><div className="mt-2 space-y-1"><p>Thời gian nộp: {fmtDate(detail?.publishSubmittedAt ?? null)}</p><p>Link public: <UrlValue value={detail?.submission?.publicVideoUrl ?? detail?.submission?.socialPostUrl} label="Mở liên kết public" /></p><p>Screenshot: <UrlValue value={detail?.submission?.screenshotUrl} label="Tải file ảnh" /></p><p>Mã quảng cáo: {detail?.submission?.adCode ?? "-"}</p><p>Ghi chú: {detail?.submission?.finalProofNote ?? "-"}</p></div></details></div>}
+            actionNode={
+              <div className="grid gap-2 text-sm">
+                <p><strong>Mã quảng cáo:</strong> {detail?.submission?.adCode ?? "-"}</p>
+                {detail?.submission?.rejectReason ? <p><strong>Lý do từ chối:</strong> {detail.submission.rejectReason}</p> : null}
+                {detail?.publishStatus === "PENDING" ? (
+                  <div className="flex flex-wrap gap-2">
+                    <button className="dc-btn-primary" onClick={() => void approve(detail)}>Duyệt</button>
+                    <button className="dc-btn-secondary" onClick={() => void reject(detail.id)}>Từ chối</button>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </aside>
+            }
+          />
         </section>
       ) : null}
     </section>
