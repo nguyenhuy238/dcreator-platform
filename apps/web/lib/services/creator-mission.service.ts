@@ -23,10 +23,15 @@ const creatorMissionInclude = {
       id: true,
       title: true,
       description: true,
+      productName: true,
+      productDescription: true,
+      productImageUrl: true,
       productLink: true,
       rewardPoints: true,
       rewardCommissionVnd: true,
+      audience: true,
       productReceiveOption: true,
+      allowRepeat: true,
       deadlineAt: true
     }
   },
