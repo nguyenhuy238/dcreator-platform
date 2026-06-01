@@ -23,7 +23,7 @@ export async function GET(request: NextRequest, { params }: Props) {
             _count: { select: { campaignsAsCreator: true, submissions: true, payoutRequests: true } }
           }
         },
-        socialLinks: { orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }] }
+        socialLinks: { orderBy: [{ createdAt: "desc" }] }
       }
     });
     if (!item) throw new AppError("Creator profile not found", 404, "CREATOR_NOT_FOUND");

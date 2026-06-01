@@ -1,4 +1,4 @@
-import { ApplicationStatus, CampaignStatus, MissionAudience, MissionLifecycleStatus, Role } from "@prisma/client";
+﻿import { ApplicationStatus, CampaignStatus, MissionAudience, MissionLifecycleStatus, ProductReceiveOption, Role } from "@prisma/client";
 import { appendCreatorCampaignApplicationTag } from "@/lib/constants/campaign-application";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
@@ -7,6 +7,7 @@ export type CreatorCampaignApplicationState =
   | "LOGIN_REQUIRED"
   | "NOT_CREATOR"
   | "PROFILE_REQUIRED"
+  | "SOCIAL_CHANNEL_REQUIRED"
   | "CAMPAIGN_UNAVAILABLE"
   | "MISSION_UNAVAILABLE"
   | "CAN_APPLY"
@@ -56,7 +57,16 @@ function toSnapshot(
     PROFILE_REQUIRED: {
       label: "Hoàn thiện thông tin mạng xã hội",
       disabled: true,
-      message: "Bạn cần hoàn thiện hồ sơ Creator và chọn nền tảng chính trước khi xin làm nhiệm vụ.",
+      message: "Bạn cần hoàn thiện hồ sơ Creator trước khi xin làm nhiệm vụ.",
+      rejectReason: null,
+      submissionId: null,
+      missionId: null,
+      lifecycleStatus: null
+    },
+    SOCIAL_CHANNEL_REQUIRED: {
+      label: "Bổ sung kênh mạng xã hội",
+      disabled: true,
+      message: "Bạn cần có ít nhất 1 kênh mạng xã hội đã duyệt và đang kích hoạt để tham gia campaign.",
       rejectReason: null,
       submissionId: null,
       missionId: null,
@@ -128,6 +138,25 @@ function toStateFromApplicationStatus(status: ApplicationStatus): CreatorCampaig
   return "CAN_APPLY";
 }
 
+function toInitialMissionState(option: ProductReceiveOption) {
+  if (option === "NO_PRODUCT_REQUIRED") {
+    return {
+      status: "IN_PROGRESS" as const,
+      productStatus: "NOT_REQUIRED" as const,
+      depositStatus: "NOT_REQUIRED" as const,
+      reimbursementStatus: "NOT_REQUIRED" as const,
+      startedAt: new Date()
+    };
+  }
+  return {
+    status: "PRODUCT_PENDING" as const,
+    productStatus: "WAITING_PURCHASE" as const,
+    depositStatus: "NOT_REQUIRED" as const,
+    reimbursementStatus: "PENDING" as const,
+    startedAt: null
+  };
+}
+
 async function getCampaignAndCreatorMission(slug: string) {
   const campaign = await prisma.campaign.findUnique({
     where: { slug },
@@ -143,7 +172,7 @@ async function getCampaignAndCreatorMission(slug: string) {
           audience: { in: [MissionAudience.CREATOR, MissionAudience.USER] }
         },
         orderBy: { createdAt: "asc" },
-        select: { id: true, audience: true }
+        select: { id: true, audience: true, productReceiveOption: true }
       }
     }
   });
@@ -175,25 +204,26 @@ export async function getCreatorCampaignApplicationStatus(
   if (!viewer) return toSnapshot("LOGIN_REQUIRED");
   if (!viewer.roles.includes(Role.CREATOR)) return toSnapshot("NOT_CREATOR");
 
-  const creatorProfile = await prisma.creatorProfile.findUnique({
-    where: { accountId: viewer.id },
-    select: { id: true, mainPlatform: true }
+  const creatorProfile = await prisma.creatorProfile.findUnique({ where: { accountId: viewer.id }, select: { id: true } });
+  if (!creatorProfile) return toSnapshot("PROFILE_REQUIRED");
+  const approvedActiveChannelCount = await prisma.creatorSocialLink.count({
+    where: { creatorProfileId: creatorProfile.id, status: "APPROVED", isActive: true }
   });
-  if (!creatorProfile || !creatorProfile.mainPlatform) return toSnapshot("PROFILE_REQUIRED");
+  if (approvedActiveChannelCount < 1) return toSnapshot("SOCIAL_CHANNEL_REQUIRED");
 
-  const existing = await prisma.missionApplication.findFirst({
+  const existing = await prisma.creatorMission.findFirst({
     where: { accountId: viewer.id, campaignId: campaign.id },
-    orderBy: { createdAt: "desc" },
-    select: { id: true, missionId: true, status: true, rejectReason: true }
+    orderBy: { appliedAt: "desc" },
+    select: { id: true, missionId: true, applicationStatus: true, applicationRejectReason: true }
   });
 
   if (existing) {
-    const state = toStateFromApplicationStatus(existing.status);
+    const state = toStateFromApplicationStatus(existing.applicationStatus);
     return toSnapshot(state, {
       submissionId: existing.id,
       missionId: existing.missionId,
       lifecycleStatus: state === "ASSIGNED" ? "DOING" : state === "REJECTED" ? "REJECTED" : "ACCEPTED",
-      rejectReason: existing.rejectReason
+      rejectReason: existing.applicationRejectReason
     });
   }
 
@@ -221,40 +251,43 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
     throw new AppError("Campaign has no creator mission", 409, "CREATOR_MISSION_NOT_AVAILABLE");
   }
 
-  const creatorProfile = await prisma.creatorProfile.findUnique({
-    where: { accountId },
-    select: { id: true, mainPlatform: true, socialUrl: true, followerCount: true }
+  const creatorProfile = await prisma.creatorProfile.findUnique({ where: { accountId }, select: { id: true } });
+  if (!creatorProfile) throw new AppError("Creator profile is required", 422, "CREATOR_PROFILE_REQUIRED");
+  const approvedActiveChannels = await prisma.creatorSocialLink.findMany({
+    where: { creatorProfileId: creatorProfile.id, status: "APPROVED", isActive: true },
+    select: { platform: true, socialUrl: true, followers: true, handle: true }
   });
-  if (!creatorProfile || !creatorProfile.mainPlatform) {
+  if (approvedActiveChannels.length < 1) {
     throw new AppError(
-      "Bạn cần hoàn thiện hồ sơ Creator và chọn nền tảng chính trước khi xin làm nhiệm vụ.",
+      "Bạn cần có ít nhất 1 kênh mạng xã hội đã duyệt và đang kích hoạt trước khi xin làm nhiệm vụ.",
       422,
-      "CREATOR_PROFILE_MAIN_PLATFORM_REQUIRED"
+      "CREATOR_SOCIAL_CHANNEL_REQUIRED"
     );
   }
 
-  const existing = await prisma.missionApplication.findUnique({
+  const existing = await prisma.creatorMission.findUnique({
     where: {
       missionId_accountId: {
         missionId: firstMission.id,
         accountId
       }
     },
-    select: { id: true, status: true }
+    select: { id: true, applicationStatus: true }
   });
   if (existing) {
-    if (existing.status !== "REJECTED") {
+    if (existing.applicationStatus !== "REJECTED") {
       throw new AppError("Creator has already applied to this campaign", 409, "CREATOR_CAMPAIGN_ALREADY_APPLIED");
     }
 
-    const reapplied = await prisma.missionApplication.update({
+    const reapplied = await prisma.creatorMission.update({
       where: { id: existing.id },
       data: {
-        status: "PENDING_REVIEW",
-        rejectReason: null,
-        reviewedById: null,
-        reviewedAt: null,
-        note: appendCreatorCampaignApplicationTag(null, slug)
+        applicationStatus: "PENDING_REVIEW",
+        applicationRejectReason: null,
+        applicationReviewedById: null,
+        applicationReviewedAt: null,
+        applicationNote: appendCreatorCampaignApplicationTag(null, slug),
+        appliedAt: new Date()
       }
     });
 
@@ -262,7 +295,7 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
       data: {
         actorId: accountId,
         action: "CREATOR_CAMPAIGN_APPLICATION_RESUBMITTED",
-        targetType: "MissionApplication",
+        targetType: "CreatorMission",
         targetId: reapplied.id,
         metadata: {
           campaignId: campaign.id,
@@ -283,30 +316,36 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
     };
   }
 
-  const application = await prisma.missionApplication.create({
+  const initial = toInitialMissionState(firstMission.productReceiveOption);
+  const application = await prisma.creatorMission.create({
     data: {
       missionId: firstMission.id,
       campaignId: campaign.id,
       accountId,
-      status: "PENDING_REVIEW",
-      note: appendCreatorCampaignApplicationTag(null, slug)
+      status: initial.status,
+      productReceiveOption: firstMission.productReceiveOption,
+      productStatus: initial.productStatus,
+      depositStatus: initial.depositStatus,
+      reimbursementStatus: initial.reimbursementStatus,
+      startedAt: initial.startedAt,
+      applicationStatus: "PENDING_REVIEW",
+      applicationNote: appendCreatorCampaignApplicationTag(null, slug),
+      appliedAt: new Date(),
+      submissionStatus: "OPEN",
+      submissionLifecycleStatus: "ACCEPTED"
     }
   });
 
   await prisma.auditLog.create({
-    data: {
-      actorId: accountId,
-      action: "CREATOR_CAMPAIGN_APPLICATION_SUBMITTED",
-      targetType: "MissionApplication",
-      targetId: application.id,
-      metadata: {
-        campaignId: campaign.id,
+      data: {
+        actorId: accountId,
+        action: "CREATOR_CAMPAIGN_APPLICATION_SUBMITTED",
+        targetType: "CreatorMission",
+        targetId: application.id,
+        metadata: {
+          campaignId: campaign.id,
         missionId: firstMission.id,
-        creatorProfile: {
-          mainPlatform: creatorProfile.mainPlatform,
-          socialUrl: creatorProfile.socialUrl,
-          followerCount: creatorProfile.followerCount
-        }
+        creatorSocialChannels: approvedActiveChannels
       }
     }
   });
@@ -322,3 +361,5 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
     })
   };
 }
+
+

@@ -85,7 +85,10 @@ export default async function HomePage() {
   const partneredBrands = Array.from(brandMap.values()).slice(0, 12);
   return (
     <>
-      <PublicHeader />
+      <PublicHeader
+        hideRoleSwitch
+        audienceToggle={{ href: "/brand", label: "Dành cho brand" }}
+      />
       <main className="mx-auto w-full max-w-7xl overflow-x-hidden px-4 pb-16 pt-5 md:px-6">
         <section className="rounded-[2.2rem] bg-gradient-to-b from-zinc-100 via-zinc-50/50 to-white px-4 py-8 md:py-10">
           <div className="mx-auto max-w-2xl text-center">
@@ -360,7 +363,6 @@ export default async function HomePage() {
       <PublicFooter />`r`n</>
   );
 }
-
 
 
 

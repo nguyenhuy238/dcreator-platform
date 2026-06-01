@@ -53,8 +53,7 @@ const missionStatusOptions = [
 const productReceiveOptions = [
   { value: "", label: "Hình thức sản phẩm: Tất cả" },
   { value: "NO_PRODUCT_REQUIRED", label: "Không yêu cầu sản phẩm" },
-  { value: "CREATOR_BUY_FIRST", label: "Creator tự mua trước" },
-  { value: "DEPOSIT_PRODUCT", label: "Đặt cọc sản phẩm" }
+  { value: "PRODUCT_REQUIRED", label: "Yêu cầu sản phẩm" }
 ];
 
 const productStatusOptions = [
@@ -80,8 +79,7 @@ const statusViMap: Record<string, string> = {
   WAITING_PURCHASE: "Chờ mua hàng",
   RECEIVED: "Đã nhận",
   NO_PRODUCT_REQUIRED: "Không yêu cầu sản phẩm",
-  CREATOR_BUY_FIRST: "Creator tự mua trước",
-  DEPOSIT_PRODUCT: "Đặt cọc sản phẩm",
+  PRODUCT_REQUIRED: "Yêu cầu sản phẩm",
   PURCHASE_SUBMITTED: "Đã nộp chứng từ mua",
   PAYOUT_PENDING: "Chờ chi trả",
   PAID: "Đã chi trả"

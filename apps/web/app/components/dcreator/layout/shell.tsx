@@ -7,7 +7,7 @@ import type { Role } from "@prisma/client";
 import { DashboardSwitcher } from "@/app/components/dcreator/layout/dashboard-switcher";
 import { DashboardShell } from "@/app/components/dcreator/layout/dashboard-shell";
 import { deriveCapabilities, type UserCapabilities } from "@/lib/auth/capabilities";
-import { canAccessWorkspace, getNavItemsForWorkspace, getWorkspaceConfig, getWorkspaceForPath } from "@/lib/navigation";
+import { canAccessWorkspace, getAvailableWorkspaces, getNavItemsForWorkspace, getWorkspaceConfig, getWorkspaceForPath } from "@/lib/navigation";
 
 type NavItem = { href: string; label: string };
 
@@ -22,7 +22,16 @@ type AuthUser = {
   capabilities?: UserCapabilities;
 };
 
-export function PublicHeader() {
+type PublicHeaderProps = {
+  hideRoleSwitch?: boolean;
+  audienceToggle?: {
+    href: string;
+    label: string;
+  } | null;
+};
+
+export function PublicHeader({ hideRoleSwitch = false, audienceToggle = null }: PublicHeaderProps = {}) {
+  const pathname = usePathname();
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -87,6 +96,27 @@ export function PublicHeader() {
           ? "/dashboard/creator"
           : "/dashboard/user/profile"
     : "/dashboard/user/profile";
+  const roleSwitch = useMemo(() => {
+    if (!currentUser) {
+      return { href: "/auth/register", label: "Tham Gia" };
+    }
+
+    const available = getAvailableWorkspaces({
+      roles: currentUser.roles,
+      capabilities: capabilities ?? { user: true, creator: false, brand: false, admin: false }
+    });
+    const currentWorkspace = getWorkspaceForPath(pathname);
+    const nextWorkspace = available.find((item) => item.id !== currentWorkspace);
+
+    if (nextWorkspace) {
+      return { href: nextWorkspace.href, label: nextWorkspace.label };
+    }
+
+    return { href: profileHref, label: "Hồ sơ" };
+  }, [capabilities, currentUser, pathname, profileHref]);
+  const roleSwitchHref = roleSwitch.href;
+  const roleSwitchLabel = roleSwitch.label;
+  const shouldShowRoleSwitch = !hideRoleSwitch;
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/70 bg-white/90 backdrop-blur">
@@ -103,8 +133,8 @@ export function PublicHeader() {
             <div className="h-10 w-44 animate-pulse rounded-full bg-zinc-200" />
           ) : currentUser ? (
             <>
-              <Link href={brandHref} className="dc-btn-secondary hidden md:inline-flex">Brand</Link>
-              {isCreator ? <Link href="/dashboard/creator/wallet" className="dc-btn-secondary hidden md:inline-flex">Ví / N-Points</Link> : null}
+              {shouldShowRoleSwitch ? <Link href={roleSwitchHref} className="dc-btn-secondary">{roleSwitchLabel}</Link> : null}
+              {audienceToggle ? <Link href={audienceToggle.href} className="dc-btn-secondary">{audienceToggle.label}</Link> : null}
               {canAccessAdmin ? (
                 <>
                   <Link href="/admin" className="dc-btn-secondary hidden xl:inline-flex">Admin</Link>
@@ -141,6 +171,8 @@ export function PublicHeader() {
             </>
           ) : (
             <>
+              {shouldShowRoleSwitch ? <Link href={roleSwitchHref} className="dc-btn-secondary">{roleSwitchLabel}</Link> : null}
+              {audienceToggle ? <Link href={audienceToggle.href} className="dc-btn-secondary">{audienceToggle.label}</Link> : null}
               <Link href="/auth/login" className="dc-btn-secondary">Đăng nhập</Link>
               <Link href="/auth/register" className="dc-btn-primary hidden px-7 py-3 text-base sm:inline-flex">Đăng ký tài khoản</Link>
             </>

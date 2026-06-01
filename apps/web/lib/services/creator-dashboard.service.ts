@@ -1,4 +1,4 @@
-import { CreatorSocialLinkStatus, MissionLifecycleStatus, SocialPlatform } from "@prisma/client";
+import { MissionLifecycleStatus, SocialPlatform } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { acceptMission, submitMissionProof } from "@/lib/services/mission.service";
@@ -330,7 +330,7 @@ export async function getCreatorChannels(accountId: string) {
     where: { accountId },
     include: {
       socialLinks: {
-        orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }]
+        orderBy: [{ createdAt: "desc" }]
       }
     }
   });
@@ -353,7 +353,7 @@ export async function getCreatorChannels(accountId: string) {
           url: item.socialUrl,
           followerCount: item.followers,
           engagementRate: item.engagementRate ?? null,
-          isPrimary: item.isPrimary,
+          isActive: item.isActive,
           verificationStatus: item.verificationStatus,
           status: item.status,
           rejectReason: item.rejectReason,
@@ -381,8 +381,6 @@ export async function createCreatorChannel(accountId: string, input: CreatorChan
     throw new AppError("Kênh trùng platform + handle", 409, "CHANNEL_DUPLICATE_HANDLE");
   }
 
-  const hasAny = await prisma.creatorSocialLink.count({ where: { creatorProfileId: creatorProfile.id } });
-
   try {
     await prisma.creatorSocialLink.create({
       data: {
@@ -392,7 +390,7 @@ export async function createCreatorChannel(accountId: string, input: CreatorChan
         socialUrl: input.url,
         followers: input.followerCount,
         engagementRate: input.engagementRate ?? null,
-        isPrimary: hasAny === 0,
+        isActive: true,
         verificationStatus: "PENDING",
         status: "PENDING",
         rejectReason: null,
@@ -465,60 +463,19 @@ export async function removeCreatorChannel(accountId: string, linkId: string) {
   if (!link || link.creatorProfile.accountId !== accountId) {
     throw new AppError("Channel not found", 404, "CHANNEL_NOT_FOUND");
   }
-  await prisma.$transaction(async (tx) => {
-    await tx.creatorSocialLink.delete({ where: { id: linkId } });
-    if (link.isPrimary) {
-      const next = await tx.creatorSocialLink.findFirst({
-        where: { creatorProfileId: link.creatorProfileId },
-        orderBy: { createdAt: "asc" }
-      });
-      if (next) {
-        await tx.creatorSocialLink.update({ where: { id: next.id }, data: { isPrimary: true } });
-        await tx.creatorProfile.update({
-          where: { id: next.creatorProfileId },
-          data: { mainPlatform: next.platform, socialUrl: next.socialUrl, followerCount: next.followers }
-        });
-      } else {
-        await tx.creatorProfile.update({
-          where: { id: link.creatorProfileId },
-          data: { mainPlatform: null, socialUrl: null, followerCount: null }
-        });
-      }
-    }
-  });
+  await prisma.creatorSocialLink.delete({ where: { id: linkId } });
   return getCreatorChannels(accountId);
 }
 
-export async function setCreatorMainChannel(accountId: string, linkId: string) {
+export async function setCreatorChannelActiveStatus(accountId: string, linkId: string, isActive: boolean) {
   const link = await prisma.creatorSocialLink.findUnique({
     where: { id: linkId },
-    include: { creatorProfile: true }
+    include: { creatorProfile: { select: { accountId: true } } }
   });
   if (!link || link.creatorProfile.accountId !== accountId) {
     throw new AppError("Channel not found", 404, "CHANNEL_NOT_FOUND");
   }
-  if (link.verificationStatus !== "VERIFIED" && link.status !== CreatorSocialLinkStatus.APPROVED) {
-    throw new AppError("Channel must be approved before selecting as main", 409, "CHANNEL_NOT_APPROVED");
-  }
-
-  await prisma.$transaction(async (tx) => {
-    await tx.creatorSocialLink.updateMany({
-      where: { creatorProfileId: link.creatorProfileId },
-      data: { isPrimary: false }
-    });
-    await tx.creatorSocialLink.update({
-      where: { id: link.id },
-      data: { isPrimary: true }
-    });
-    await tx.creatorProfile.update({
-      where: { id: link.creatorProfileId },
-      data: {
-        mainPlatform: link.platform,
-        socialUrl: link.socialUrl,
-        followerCount: link.followers
-      }
-    });
-  });
+  await prisma.creatorSocialLink.update({ where: { id: link.id }, data: { isActive } });
 
   return getCreatorChannels(accountId);
 }

@@ -1211,14 +1211,9 @@ export async function listCreatorApplications(accountId: string, currentBrandId?
 export async function addCampaignMissionForBrand(accountId: string, campaignId: string, input: CampaignMissionInput, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const campaign = await getBrandScopedCampaign(campaignId, ctx.brand.id);
-  const videoTarget = Math.max(0, campaign.ugcVideoQuota ?? 0);
-  const videoApproved = Math.max(0, campaign.ugcVideoApprovedCount ?? 0);
-  if (videoTarget > 0 && videoApproved >= videoTarget) {
-    throw new AppError(
-      `Campaign đã duyệt đủ ${videoApproved}/${videoTarget} video. Không thể tạo thêm nhiệm vụ.`,
-      409,
-      "CAMPAIGN_UGC_VIDEO_QUOTA_REACHED"
-    );
+  const missionCount = await prisma.mission.count({ where: { campaignId: campaign.id } });
+  if (missionCount > 0) {
+    throw new AppError("Mỗi campaign chỉ được phép có 1 mission.", 409, "CAMPAIGN_MISSION_LIMIT_REACHED");
   }
 
   const deadlineAt = input.deadlineAt ? new Date(input.deadlineAt) : null;
@@ -1234,7 +1229,10 @@ export async function addCampaignMissionForBrand(accountId: string, campaignId: 
       campaignId: campaign.id,
       title: input.title,
       description: input.description,
-      productLink: input.productLink || null,
+      productName: input.productReceiveOption === "PRODUCT_REQUIRED" ? input.productName || null : null,
+      productDescription: input.productReceiveOption === "PRODUCT_REQUIRED" ? input.productDescription || null : null,
+      productImageUrl: input.productReceiveOption === "PRODUCT_REQUIRED" ? input.productImageUrl || null : null,
+      productLink: input.productReceiveOption === "PRODUCT_REQUIRED" ? input.productLink || null : null,
       rewardPoints: input.rewardPoints,
       rewardCommissionVnd: input.rewardCommissionVnd,
       audience: input.audience,

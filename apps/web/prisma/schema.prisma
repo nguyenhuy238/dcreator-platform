@@ -173,8 +173,7 @@ enum MissionAudience {
 }
 
 enum ProductReceiveOption {
-  DEPOSIT_PRODUCT
-  CREATOR_BUY_FIRST
+  PRODUCT_REQUIRED
   NO_PRODUCT_REQUIRED
 }
 
@@ -574,7 +573,7 @@ model CreatorSocialLink {
   socialUrl        String
   followers        Int                     @default(0)
   engagementRate   Float?
-  isPrimary        Boolean                 @default(false)
+  isActive         Boolean                 @default(true)
   verificationStatus CreatorChannelVerificationStatus @default(UNVERIFIED)
   status           CreatorSocialLinkStatus @default(PENDING)
   rejectReason     String?
@@ -591,7 +590,7 @@ model CreatorSocialLink {
   @@unique([creatorProfileId, platform, handle])
   @@index([creatorProfileId, createdAt])
   @@index([status, createdAt])
-  @@index([creatorProfileId, isPrimary])
+  @@index([creatorProfileId, isActive])
 }
 
 model BrandApplication {
@@ -996,6 +995,9 @@ model Mission {
   campaignId           String
   title                String
   description          String
+  productName          String?
+  productDescription   String?
+  productImageUrl      String?
   productLink          String?
   rewardPoints         Int
   rewardCommissionVnd  Int                  @default(0)
@@ -1089,6 +1091,34 @@ model CreatorMission {
   missionId                   String
   campaignId                  String
   accountId                   String
+  applicationStatus           ApplicationStatus               @default(PENDING_REVIEW)
+  applicationNote             String?
+  applicationRejectReason     String?
+  applicationReviewedById     String?
+  applicationReviewedAt       DateTime?
+  appliedAt                   DateTime                        @default(now())
+  submissionLifecycleStatus   MissionLifecycleStatus          @default(ACCEPTED)
+  submissionStatus            MissionStatus                   @default(SUBMITTED)
+  submissionVideoUrl          String?
+  submissionImageUrl          String?
+  submissionSocialPostUrl     String?
+  submissionScreenshotUrl     String?
+  submissionFileUploadUrl     String?
+  submissionProofTextNote     String?
+  submissionNote              String?
+  submissionRejectReason      String?
+  submissionPurchaseBillImageUrl String?
+  submissionProductReviewScreenshotUrl String?
+  submissionPurchaseProofNote String?
+  submissionPurchaseConfirmedAt DateTime?
+  submissionPublicVideoUrl    String?
+  submissionAdCode            String?
+  submissionFinalProofNote    String?
+  submissionFinalSubmittedAt  DateTime?
+  submissionApprovedAt        DateTime?
+  submissionRewardGrantedAt   DateTime?
+  submissionReviewedById      String?
+  submissionReviewedAt        DateTime?
   submissionId                String?                         @unique
   missionApplicationId        String?                         @unique
   status                      CreatorMissionStatus
@@ -1127,6 +1157,8 @@ model CreatorMission {
   missionApplication MissionApplication? @relation(fields: [missionApplicationId], references: [id], onDelete: SetNull)
 
   @@unique([missionId, accountId])
+  @@index([applicationStatus, appliedAt])
+  @@index([submissionStatus, updatedAt])
   @@index([accountId, status, createdAt])
   @@index([campaignId, status, createdAt])
 }

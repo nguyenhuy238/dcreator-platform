@@ -149,13 +149,30 @@ export const rewardTierSchema = z.object({
 export const campaignMissionCreateSchema = z.object({
   title: z.string().trim().min(3).max(160),
   description: z.string().trim().min(10).max(3000),
+  productName: z.string().trim().max(160).optional().or(z.literal("")),
+  productDescription: z.string().trim().max(2000).optional().or(z.literal("")),
+  productImageUrl: z.string().trim().max(400).optional().or(z.literal("")),
   productLink: z.string().trim().max(400).optional().or(z.literal("")),
   rewardPoints: z.number().int().min(0).default(0),
   rewardCommissionVnd: z.number().int().min(0).default(0),
   audience: z.enum(["USER", "CREATOR"]).default("CREATOR"),
-  productReceiveOption: z.enum(["DEPOSIT_PRODUCT", "CREATOR_BUY_FIRST", "NO_PRODUCT_REQUIRED"]).default("NO_PRODUCT_REQUIRED"),
+  productReceiveOption: z.enum(["PRODUCT_REQUIRED", "NO_PRODUCT_REQUIRED"]).default("NO_PRODUCT_REQUIRED"),
   allowRepeat: z.boolean().default(false),
   deadlineAt: z.string().datetime().optional()
+}).superRefine((value, ctx) => {
+  if (value.productReceiveOption !== "PRODUCT_REQUIRED") return;
+  if (!value.productName?.trim()) {
+    ctx.addIssue({ code: "custom", path: ["productName"], message: "Vui lòng nhập tên sản phẩm." });
+  }
+  if (!value.productDescription?.trim()) {
+    ctx.addIssue({ code: "custom", path: ["productDescription"], message: "Vui lòng nhập mô tả sản phẩm." });
+  }
+  if (!value.productLink?.trim()) {
+    ctx.addIssue({ code: "custom", path: ["productLink"], message: "Vui lòng nhập link sản phẩm." });
+  }
+  if (!value.productImageUrl?.trim()) {
+    ctx.addIssue({ code: "custom", path: ["productImageUrl"], message: "Vui lòng nhập hình ảnh sản phẩm." });
+  }
 });
 
 export const creatorApplicationDecisionSchema = z.object({

@@ -46,9 +46,16 @@ export type CampaignDetailDTO = {
   missions: Array<{
     id: string;
     title: string;
+    description: string;
+    audience: "CREATOR" | "USER";
+    productReceiveOption: "PRODUCT_REQUIRED" | "NO_PRODUCT_REQUIRED";
+    productName: string | null;
+    productDescription: string | null;
+    productImageUrl: string | null;
+    productLink: string | null;
+    allowRepeat: boolean;
     rewardPoints: number;
     deadline: string | null;
-    eligibility: string;
     status: "OPEN" | "SUBMITTED" | "APPROVED" | "REJECTED";
   }>;
   timeline: {

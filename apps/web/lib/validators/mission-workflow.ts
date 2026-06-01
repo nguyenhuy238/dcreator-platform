@@ -1,13 +1,19 @@
 import { z } from "zod";
 
+const uploadPathOrHttpUrlSchema = z
+  .string()
+  .trim()
+  .max(2000)
+  .refine((value) => value.startsWith("/uploads/") || /^https?:\/\//.test(value), "File URL không hợp lệ.");
+
 export const creatorMissionApplicationCreateSchema = z.object({
   missionId: z.string().trim().min(3),
   note: z.string().trim().max(500).optional()
 });
 
 export const creatorMissionPurchaseProofSubmitSchema = z.object({
-  purchaseBillImageUrl: z.string().trim().url().max(2000),
-  productReviewScreenshotUrl: z.string().trim().url().max(2000),
+  purchaseBillImageUrl: uploadPathOrHttpUrlSchema,
+  productReviewScreenshotUrl: uploadPathOrHttpUrlSchema,
   purchaseProofNote: z.string().trim().max(500).optional()
 });
 
@@ -25,7 +31,7 @@ export const creatorMissionPublishSubmitSchema = z
     publicVideoUrl: z.string().trim().url().max(2000).optional(),
     socialPostUrl: z.string().trim().url().max(2000).optional(),
     adCode: z.string().trim().max(200).optional(),
-    screenshotUrl: z.string().trim().url().max(2000).optional(),
+    screenshotUrl: uploadPathOrHttpUrlSchema.optional(),
     finalProofNote: z.string().trim().max(500).optional()
   })
   .superRefine((value, ctx) => {
@@ -84,7 +90,7 @@ export const missionFinalReviewAdminQuerySchema = z.object({
   query: z.string().trim().min(1).max(120).optional(),
   campaignId: z.string().trim().min(3).optional(),
   campaign: z.string().trim().min(1).max(120).optional(),
-  productReceiveOption: z.enum(["DEPOSIT_PRODUCT", "CREATOR_BUY_FIRST", "NO_PRODUCT_REQUIRED"]).optional(),
+  productReceiveOption: z.enum(["PRODUCT_REQUIRED", "NO_PRODUCT_REQUIRED"]).optional(),
   publishStatus: z.enum(["NOT_SUBMITTED", "PENDING", "APPROVED", "REJECTED"]).optional(),
   sort: z.enum(["newest", "oldest"]).optional(),
   page: z.coerce.number().int().min(1).optional(),
@@ -106,7 +112,7 @@ export const missionHistoryQuerySchema = z.object({
   status: z.enum(["PRODUCT_PENDING", "DRAFT_PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
   videoReviewStatus: z.enum(["NOT_SUBMITTED", "PENDING", "APPROVED", "REJECTED"]).optional(),
   publishStatus: z.enum(["NOT_SUBMITTED", "PENDING", "APPROVED", "REJECTED"]).optional(),
-  productReceiveOption: z.enum(["DEPOSIT_PRODUCT", "CREATOR_BUY_FIRST", "NO_PRODUCT_REQUIRED"]).optional(),
+  productReceiveOption: z.enum(["PRODUCT_REQUIRED", "NO_PRODUCT_REQUIRED"]).optional(),
   productStatus: z.enum(["NOT_REQUIRED", "WAITING_DEPOSIT", "WAITING_PURCHASE", "RECEIVED"]).optional(),
   reimbursementStatus: z.enum(["NOT_REQUIRED", "PENDING", "PURCHASE_SUBMITTED", "APPROVED", "PAYOUT_PENDING", "PAID", "REJECTED"]).optional(),
   page: z.coerce.number().int().min(1).optional(),

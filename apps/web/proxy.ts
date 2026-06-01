@@ -49,7 +49,7 @@ async function resolveCurrentAccessContext(request: NextRequest, fallbackRole: R
 }
 
 export async function proxy(request: NextRequest) {
-  if (request.nextUrl.pathname === "/brand/register") {
+  if (request.nextUrl.pathname === "/brand" || request.nextUrl.pathname === "/brand/register") {
     return NextResponse.next();
   }
 
