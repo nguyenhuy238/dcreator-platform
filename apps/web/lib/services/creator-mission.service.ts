@@ -1281,7 +1281,20 @@ export async function getMissionApplicationDetailForAdmin(id: string) {
           }
         }
       },
-      mission: { select: { id: true, title: true, description: true, rewardPoints: true, productReceiveOption: true, productLink: true, deadlineAt: true } }
+      mission: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          rewardPoints: true,
+          productReceiveOption: true,
+          productLink: true,
+          deadlineAt: true,
+          productName: true,
+          productDescription: true,
+          productImageUrl: true
+        }
+      }
     }
   });
   if (!item) throw new AppError("Mission application not found", 404, "MISSION_APPLICATION_NOT_FOUND");
