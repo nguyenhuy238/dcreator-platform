@@ -115,8 +115,8 @@ export default async function HomePage() {
                 </Link>
               ) : null}
               {canUpgradeRole ? (
-                <Link href="/dashboard/user/profile" className="dc-btn-secondary h-10 min-w-[190px] rounded-full px-6 text-base font-semibold">
-                  Nâng cấp vai trò tại hồ sơ
+                <Link href="/dashboard/user/upgrade" className="dc-btn-secondary h-10 min-w-[190px] rounded-full px-6 text-base font-semibold">
+                  Nâng cấp vai trò
                 </Link>
               ) : null}
             </div>
@@ -345,10 +345,10 @@ export default async function HomePage() {
               <h2 className="mt-2 text-2xl font-black text-white">Sẵn sàng mở rộng doanh thu cùng dCreator?</h2>
               <p className="mt-1 text-sm text-zinc-300">Chọn vai trò phù hợp để bắt đầu chiến dịch hoặc nhận job mới.</p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Link href={isLoggedIn ? "/dashboard/user/profile" : "/auth/register?redirect=/&role=creator"} className="dc-btn-secondary border-white/15 bg-white text-zinc-900 hover:bg-zinc-100">
+                <Link href={isLoggedIn ? "/dashboard/user/upgrade" : "/auth/register?redirect=/&role=creator"} className="dc-btn-secondary border-white/15 bg-white text-zinc-900 hover:bg-zinc-100">
                   Đăng ký Creator
                 </Link>
-                <Link href={isLoggedIn ? "/brand/register" : "/auth/register?redirect=/&role=brand"} className="dc-btn-primary bg-white text-zinc-900 hover:bg-zinc-100">
+                <Link href={isLoggedIn ? "/dashboard/user/upgrade" : "/auth/register?redirect=/&role=brand"} className="dc-btn-primary bg-white text-zinc-900 hover:bg-zinc-100">
                   Đăng ký Brand
                 </Link>
               </div>
@@ -359,5 +359,4 @@ export default async function HomePage() {
       <PublicFooter />`r`n</>
   );
 }
-
 

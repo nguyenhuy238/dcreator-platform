@@ -29,12 +29,11 @@ type WorkspaceConfig = {
 
 const userNavItems: readonly NavItem[] = [
   { href: "/dashboard/user", label: "T\u1ed5ng quan c\u00e1 nh\u00e2n", description: "T\u1ed5ng quan t\u00e0i kho\u1ea3n c\u1ee7a b\u1ea1n", icon: "House" },
-  { href: "/dashboard/user/profile", label: "H\u1ed3 s\u01a1 c\u00e1 nh\u00e2n", description: "Th\u00f4ng tin c\u00e1 nh\u00e2n v\u00e0 x\u00e1c minh", icon: "UserCircle" },
   { href: "/dashboard/user/wallet", label: "V\u00ed / N-Points", description: "S\u1ed1 d\u01b0 v\u00e0 l\u1ecbch s\u1eed giao d\u1ecbch", icon: "Wallet" },
   { href: "/dashboard/user/vouchers", label: "Voucher c\u1ee7a t\u00f4i", description: "Voucher \u0111\u00e3 nh\u1eadn v\u00e0 tr\u1ea1ng th\u00e1i", icon: "Ticket" },
   { href: "/dashboard/user/missions", label: "Nhi\u1ec7m v\u1ee5 c\u1ee7a t\u00f4i", description: "Nhi\u1ec7m v\u1ee5 user v\u00e0 proof \u0111\u00e3 n\u1ed9p", icon: "ListChecks" },
-  { href: "/dashboard/user/role-requests", label: "\u0110\u0103ng k\u00fd n\u00e2ng c\u1ea5p vai tr\u00f2", description: "\u0110\u0103ng k\u00fd Creator/Brand", icon: "UserPlus" },
-  { href: "/dashboard/user/settings", label: "C\u00e0i \u0111\u1eb7t t\u00e0i kho\u1ea3n", description: "M\u1eadt kh\u1ea9u, th\u00f4ng b\u00e1o, \u0111\u0103ng xu\u1ea5t", icon: "GearSix" }
+  { href: "/dashboard/user/upgrade", label: "\u0110\u0103ng k\u00fd n\u00e2ng c\u1ea5p vai tr\u00f2", description: "\u0110\u0103ng k\u00fd Creator/Brand", icon: "UserPlus" },
+  { href: "/dashboard/user/settings", label: "C\u00e0i \u0111\u1eb7t t\u00e0i kho\u1ea3n", description: "Th\u00f4ng tin c\u00e1 nh\u00e2n, m\u1eadt kh\u1ea9u, th\u00f4ng b\u00e1o", icon: "GearSix" }
 ];
 
 const creatorNavItems: readonly NavItem[] = [
@@ -175,6 +174,7 @@ const breadcrumbLabelMap: Record<string, string> = {
   "/dashboard/user/campaigns": "Campaign \u0111\u00e3 tham gia",
   "/dashboard/user/missions": "Nhi\u1ec7m v\u1ee5 c\u1ee7a t\u00f4i",
   "/dashboard/user/role-requests": "\u0110\u0103ng k\u00fd n\u00e2ng c\u1ea5p vai tr\u00f2",
+  "/dashboard/user/upgrade": "\u0110\u0103ng k\u00fd n\u00e2ng c\u1ea5p vai tr\u00f2",
   "/dashboard/user/settings": "C\u00e0i \u0111\u1eb7t t\u00e0i kho\u1ea3n",
   "/dashboard/creator": "Creator Dashboard",
   "/dashboard/creator/jobs": "Campaign / Job",

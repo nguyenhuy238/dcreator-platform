@@ -129,7 +129,7 @@ export function DashboardShell({
     if (workspace === "admin") return "/admin";
     if (workspace === "brand") return "/dashboard/brand";
     if (workspace === "creator") return "/dashboard/creator";
-    return "/dashboard/user/profile";
+    return "/dashboard/user/settings";
   }, [workspace]);
 
   useEffect(() => {

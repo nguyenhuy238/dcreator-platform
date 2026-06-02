@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function RoleRequestRedirectPage() {
-  redirect("/dashboard/user/profile");
+  redirect("/dashboard/user/upgrade");
 }

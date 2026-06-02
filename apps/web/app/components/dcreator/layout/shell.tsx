@@ -86,7 +86,6 @@ export function PublicHeader({ hideRoleSwitch = false, audienceToggle = null }: 
   const canAccessAdmin = Boolean(capabilities?.admin);
   const isCreator = Boolean(capabilities?.creator);
   const isBrand = Boolean(capabilities?.brand);
-  const brandHref = isBrand ? "/dashboard/brand" : "/brand/register";
   const profileHref = currentUser
     ? currentUser.roles.includes("ADMIN")
       ? "/admin"
@@ -94,8 +93,8 @@ export function PublicHeader({ hideRoleSwitch = false, audienceToggle = null }: 
         ? "/dashboard/brand"
         : isCreator
           ? "/dashboard/creator"
-          : "/dashboard/user/profile"
-    : "/dashboard/user/profile";
+          : "/dashboard/user/settings"
+    : "/dashboard/user/settings";
   const roleSwitch = useMemo(() => {
     if (!currentUser) {
       return { href: "/auth/register", label: "Tham Gia" };
@@ -217,7 +216,7 @@ export function PublicFooter() {
               <div className="mt-3 grid gap-2 text-sm">
                 <Link href="/campaigns" className="transition hover:text-white">Chiến dịch</Link>
                 <Link href="/auth/register" className="transition hover:text-white">Đăng ký tài khoản</Link>
-                <Link href="/dashboard/user/profile" className="transition hover:text-white">User profile</Link>
+                <Link href="/dashboard/user/settings" className="transition hover:text-white">Cài đặt tài khoản</Link>
               </div>
             </div>
           <div>

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -91,7 +91,7 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
     }
 
     if (status.state === "NOT_CREATOR") {
-      return { href: "/dashboard/user/profile#role-requests", label: "Đăng ký quyền Creator" };
+      return { href: "/dashboard/user/upgrade", label: "Đăng ký quyền Creator" };
     }
 
     if (status.state === "PROFILE_REQUIRED") {
