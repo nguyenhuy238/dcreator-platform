@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { ExploreCampaignsButton } from "@/app/components/dcreator/home/ExploreCampaignsButton";
 import { FeaturedCampaignsSection } from "@/app/components/dcreator/home/FeaturedCampaignsSection";
 import { PartnerLogo } from "@/app/components/dcreator/home/PartnerLogo";
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
@@ -106,9 +107,7 @@ export default async function HomePage() {
               Lan tỏa giá trị, giảm áp lực tài chính.
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3 md:mt-7">
-              <Link href="/campaigns" className="dc-btn-primary h-10 min-w-[190px] rounded-full px-6 text-base font-bold tracking-[0.02em]">
-                Khám phá chiến dịch
-              </Link>
+              <ExploreCampaignsButton />
               {!isLoggedIn ? (
                 <Link href="/auth/register" className="dc-btn-secondary h-10 min-w-[190px] rounded-full px-6 text-base font-semibold">
                   Tạo tài khoản
@@ -363,7 +362,6 @@ export default async function HomePage() {
       <PublicFooter />`r`n</>
   );
 }
-
 
 
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { FEATURED_CAMPAIGNS_RESET_EVENT } from "@/app/components/dcreator/home/ExploreCampaignsButton";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 
 type CampaignType = "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
@@ -44,6 +45,15 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
     setSlideStart(0);
   }, [activeFilter]);
 
+  useEffect(() => {
+    function showAllCampaigns() {
+      setActiveFilter("ALL");
+    }
+
+    window.addEventListener(FEATURED_CAMPAIGNS_RESET_EVENT, showAllCampaigns);
+    return () => window.removeEventListener(FEATURED_CAMPAIGNS_RESET_EVENT, showAllCampaigns);
+  }, []);
+
   const visibleCampaigns = filteredCampaigns.slice(slideStart, slideStart + pageSize);
   const canSlide = filteredCampaigns.length > pageSize;
 
@@ -54,7 +64,7 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
   }
 
   return (
-    <section className="mt-10">
+    <section id="featured-campaigns" className="mt-10">
       <div className="mb-4 flex items-end justify-between gap-4">
         <h2 className="text-2xl font-black">Chiến dịch nổi bật</h2>
         <div className="flex items-center gap-3">
