@@ -5,6 +5,7 @@ import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverIm
 import type { CampaignDetailDTO } from "@/lib/dto/campaign-detail";
 import { getCampaignTypeLabel } from "@/lib/constants/campaign-type";
 import { CAMPAIGN_IMAGE_FALLBACK, resolveImageUrl } from "@/lib/images/resolve-image-url";
+import { CampaignBriefRequirements } from "./CampaignBriefRequirements";
 import { CampaignReviewProducts } from "./CampaignReviewProducts";
 import { formatDateTime } from "./campaign-detail.utils";
 
@@ -149,18 +150,9 @@ export function OverviewTab({ data }: { data: CampaignDetailDTO }) {
 }
 
 export function BriefTab({ data }: { data: CampaignDetailDTO }) {
-  const mission = data.missions[0] ?? null;
   return (
     <section className="grid gap-4">
-      <article className="dc-card p-5">
-        <h3 className="text-2xl font-black text-zinc-900">Yêu cầu & brief</h3>
-        <div className="mt-3 grid gap-2 text-zinc-700">
-          <p>Mục tiêu: {data.hero.objective ?? "Đang cập nhật"}</p>
-          <p>Quyền lợi: {data.hero.benefits ?? "Đang cập nhật"}</p>
-          <p>Mô tả campaign: {data.hero.description}</p>
-          {mission ? <p>Mô tả nhiệm vụ: {mission.description}</p> : null}
-        </div>
-      </article>
+      <CampaignBriefRequirements />
       <CampaignJoinTimeline data={data} />
     </section>
   );
