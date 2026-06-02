@@ -71,12 +71,27 @@ export const adminCampaignCreateSchema = z.object({
 });
 
 export const adminCampaignUpdateSchema = z.object({
+  slug: z
+    .string()
+    .trim()
+    .min(3)
+    .max(120)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug chỉ gồm chữ thường, số và dấu gạch ngang (-), không có khoảng trắng.")
+    .optional(),
   title: z.string().trim().min(3).max(200).optional(),
   brief: z.string().trim().min(10).max(3000).optional(),
+  category: z.enum(["TECH", "FASHION", "FOOD", "BEAUTY", "LIFESTYLE", "EDUCATION"]).optional(),
+  campaignType: z.enum(["DONATION", "PREORDER", "SPONSORSHIP", "COMMUNITY"]).optional(),
+  setupSource: z.enum(["JOIN_EXISTING_DCREATOR_CAMP", "BRAND_REQUESTED"]).optional(),
+  participationRoadmap: z.array(z.string().trim().min(1).max(300)).min(1).optional(),
+  benefits: z.string().trim().max(2000).optional().or(z.literal("")),
+  objective: z.string().trim().max(2000).optional().or(z.literal("")),
   startsAt: z.string().datetime().nullable().optional(),
   endsAt: z.string().datetime().nullable().optional(),
   budgetVnd: z.number().int().positive().optional(),
   targetAmountVnd: z.number().int().positive().optional(),
+  ugcVideoQuota: z.number().int().min(1).max(100000).optional(),
+  isPublic: z.boolean().optional(),
   imageUrl: z
     .string()
     .trim()

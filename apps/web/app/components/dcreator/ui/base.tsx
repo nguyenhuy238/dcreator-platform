@@ -85,8 +85,15 @@ export function LoadingSpinner({ label = "Đang tải..." }: { label?: string })
   );
 }
 
-export function ActionToast({ message }: { message: string }) {
-  return <div className="fixed bottom-20 right-4 z-50 rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white shadow-xl">{message}</div>;
+export function ActionToast({ message, tone = "success" }: { message: string; tone?: "success" | "error" | "info" }) {
+  const toneClass =
+    tone === "error"
+      ? "bg-red-600 text-white"
+      : tone === "info"
+        ? "bg-zinc-900 text-white"
+        : "bg-emerald-600 text-white";
+
+  return <div className={`fixed bottom-20 right-4 z-50 rounded-2xl px-4 py-3 text-sm font-semibold shadow-xl ${toneClass}`}>{message}</div>;
 }
 
 export function FormField({ label, error, children }: { label: ReactNode; error?: string; children: ReactNode }) {
