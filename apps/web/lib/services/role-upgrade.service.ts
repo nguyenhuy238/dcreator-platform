@@ -1,4 +1,4 @@
-import { BrandMemberRole, BrandStatus, NotificationEvent, Prisma, Role } from "@prisma/client";
+import { BrandMemberRole, BrandMemberStatus, BrandStatus, NotificationEvent, Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { APPLICATION_STATUS } from "@/lib/constants/enums";
 import { AppError } from "@/lib/errors";
@@ -222,7 +222,7 @@ async function syncBrandAccessFromApplication(
   await tx.brandMember.upsert({
     where: { brandId_accountId: { brandId: brand.id, accountId: app.accountId } },
     create: { brandId: brand.id, accountId: app.accountId, role: BrandMemberRole.OWNER },
-    update: { role: BrandMemberRole.OWNER, status: "ACTIVE" }
+    update: { role: BrandMemberRole.OWNER, status: BrandMemberStatus.ACTIVE }
   });
   await assignRole(tx, app.accountId, Role.BRAND_OWNER);
   await tx.account.update({ where: { id: app.accountId }, data: { role: Role.BRAND_OWNER } });
@@ -243,7 +243,7 @@ export async function getRoleUpgradeSnapshot(accountId: string) {
         roleAssignments: { select: { role: true } },
         creatorProfile: { select: { id: true } },
         ownedBrandMemberships: {
-          where: { status: "ACTIVE" },
+          where: { status: BrandMemberStatus.ACTIVE },
           select: { brand: { select: { id: true, name: true } }, role: true }
         }
       }
