@@ -16,7 +16,17 @@ export function CampaignFilters({
   return (
     <section className="dc-card p-4">
       <div className="grid gap-3">
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">Bộ lọc chiến dịch</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">Bộ lọc chiến dịch</p>
+          <label className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+            <input
+              type="checkbox"
+              checked={value.rewardAvailable}
+              onChange={(e) => onChange({ ...value, rewardAvailable: e.target.checked })}
+            />{" "}
+            Chỉ hiển thị campaign còn reward
+          </label>
+        </div>
         <input
           className="dc-input"
           placeholder="Tìm theo tên chiến dịch, brand, creator"
@@ -34,24 +44,11 @@ export function CampaignFilters({
             <option value="EDUCATION">Giáo dục</option>
           </select>
           <select className="dc-input" value={value.sort} onChange={(e) => onChange({ ...value, sort: e.target.value })}>
-            <option value="trending">Phổ biến</option>
+            <option value="trending">Đang diễn ra</option>
             <option value="newest">Mới nhất</option>
             <option value="ending-soon">Sắp kết thúc</option>
             <option value="most-funded">Nhiều ủng hộ nhất</option>
           </select>
-        </div>
-        <div className="grid gap-2 md:grid-cols-3">
-          <select className="dc-input" value={value.status} onChange={(e) => onChange({ ...value, status: e.target.value })}>
-            <option value="ACTIVE">Đang diễn ra</option>
-          </select>
-          <label className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
-            <input
-              type="checkbox"
-              checked={value.rewardAvailable}
-              onChange={(e) => onChange({ ...value, rewardAvailable: e.target.checked })}
-            />{" "}
-            Chỉ hiển thị campaign còn reward
-          </label>
         </div>
       </div>
     </section>
