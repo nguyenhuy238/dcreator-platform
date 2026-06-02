@@ -39,17 +39,6 @@ type MyMission = {
   mission: { title: string; rewardPoints: number; deadlineAt: string | null };
 };
 
-type MyContribution = {
-  id: string;
-  amountVnd: number;
-  status: "PENDING" | "SUCCESS" | "FAILED";
-  createdAt: string;
-  paymentMethod: "N_POINTS" | "PAYOS";
-  campaign: { id: string; title: string; slug: string };
-  reward: { id: string; title: string } | null;
-  rewardClaim: { voucherCode: string } | null;
-};
-
 const voucherStatusLabel: Record<Voucher["status"], string> = {
   ISSUED: "active",
   ACTIVE: "active",
@@ -63,12 +52,6 @@ function formatDate(value: string | null) {
   return new Date(value).toLocaleDateString("vi-VN");
 }
 
-function contributionStatusLabel(status: MyContribution["status"]) {
-  if (status === "SUCCESS") return "Thành công";
-  if (status === "PENDING") return "Đang chờ";
-  return "Thất bại";
-}
-
 export default function UserDashboardPage() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -76,7 +59,6 @@ export default function UserDashboardPage() {
   const [wallet, setWallet] = useState<WalletMe | null>(null);
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [missions, setMissions] = useState<MyMission[]>([]);
-  const [contributions, setContributions] = useState<MyContribution[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -85,14 +67,12 @@ export default function UserDashboardPage() {
     Promise.all([
       fetch("/api/wallet/me", { cache: "no-store" }),
       fetch("/api/me/vouchers", { cache: "no-store" }),
-      fetch("/api/me/missions", { cache: "no-store" }),
-      fetch("/api/me/contributions", { cache: "no-store" })
+      fetch("/api/me/missions", { cache: "no-store" })
     ])
-      .then(async ([walletRes, voucherRes, missionRes, contributionRes]) => {
+      .then(async ([walletRes, voucherRes, missionRes]) => {
         const walletBody = (await walletRes.json()) as ApiResponse<WalletMe>;
         const voucherBody = (await voucherRes.json()) as ApiResponse<Voucher[]>;
         const missionBody = (await missionRes.json()) as ApiResponse<MyMission[]>;
-        const contributionBody = (await contributionRes.json()) as ApiResponse<MyContribution[]>;
 
         if (!walletRes.ok || !walletBody.success) {
           throw new Error(walletBody.success ? "Tải ví thất bại" : walletBody.error);
@@ -103,17 +83,17 @@ export default function UserDashboardPage() {
         if (!missionRes.ok || !missionBody.success) {
           throw new Error(missionBody.success ? "Tải nhiệm vụ thất bại" : missionBody.error);
         }
-        if (!contributionRes.ok || !contributionBody.success) {
-          throw new Error(contributionBody.success ? "Tải lượt ủng hộ thất bại" : contributionBody.error);
-        }
-
+        if (!active) return;
         setWallet(walletBody.data);
         setVouchers(voucherBody.data);
         setMissions(missionBody.data);
-        setContributions(contributionBody.data);
       })
-      .catch((requestError: Error) => setError(requestError.message))
-      .finally(() => setLoading(false));
+      .catch((requestError: Error) => {
+        if (active) setError(requestError.message);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
     return () => {
       active = false;
@@ -132,11 +112,6 @@ export default function UserDashboardPage() {
       .reduce((sum, item) => sum + item.pointsDelta, 0);
   }, [wallet]);
 
-  const successfulContributionCount = useMemo(
-    () => contributions.filter((item) => item.status === "SUCCESS").length,
-    [contributions]
-  );
-
   const activeVoucherCount = useMemo(
     () => vouchers.filter((item) => item.status === "ACTIVE" || item.status === "ISSUED").length,
     [vouchers]
@@ -148,11 +123,6 @@ export default function UserDashboardPage() {
         <PageHeader
           title="Dashboard Người dùng"
           subtitle="Theo dõi ủng hộ, voucher, mission và số dư N-Points."
-          action={
-            <Link className="dc-btn-primary" href="/campaigns">
-              Ủng hộ campaign
-            </Link>
-          }
         />
 
         {error ? <ErrorState title="Không thể tải dashboard" description={error} /> : null}
@@ -166,59 +136,10 @@ export default function UserDashboardPage() {
               value={`${wallet?.wallet.pointsBalance.toLocaleString("vi-VN") ?? "0"}`}
               hint={`+${weeklyPoints.toLocaleString("vi-VN")} tuần này`}
             />
-            <StatsCard title="Lượt ủng hộ thành công" value={`${successfulContributionCount}`} />
             <StatsCard title="Voucher đang có" value={`${activeVoucherCount}`} />
             <StatsCard title="Mission tham gia" value={`${missions.length}`} />
           </section>
         )}
-
-        <section className="mt-8">
-          <SectionHeader
-            title="Lịch sử ủng hộ"
-            subtitle="Các campaign bạn đã ủng hộ"
-            action={
-              <Link href="/campaigns" className="dc-btn-secondary">
-                Ủng hộ thêm
-              </Link>
-            }
-          />
-          {loading ? (
-            <LoadingSkeleton rows={2} />
-          ) : contributions.length === 0 ? (
-            <EmptyState
-              title="Chưa có lượt ủng hộ"
-              description="Hãy chọn campaign phù hợp và bắt đầu ủng hộ."
-              action={
-                <Link href="/campaigns" className="dc-btn-primary">
-                  Ủng hộ ngay
-                </Link>
-              }
-            />
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {contributions.slice(0, 6).map((item) => (
-                <article key={item.id} className="dc-card p-4">
-                  <p className="text-sm text-zinc-500">{new Date(item.createdAt).toLocaleString("vi-VN")}</p>
-                  <p className="mt-1 text-base font-semibold text-zinc-900">{item.campaign.title}</p>
-                  <p className="mt-1 text-sm text-zinc-600">
-                    Số tiền: {item.amountVnd.toLocaleString("vi-VN")} VND
-                  </p>
-                  <p className="text-sm text-zinc-600">Thanh toán: {item.paymentMethod}</p>
-                  <p className="text-sm text-zinc-600">Trạng thái: {contributionStatusLabel(item.status)}</p>
-                  {item.reward ? <p className="text-sm text-zinc-600">Phần thưởng: {item.reward.title}</p> : null}
-                  {item.rewardClaim ? (
-                    <p className="text-sm text-emerald-700">Voucher: {item.rewardClaim.voucherCode}</p>
-                  ) : null}
-                  <div className="mt-3">
-                    <Link href={`/campaigns/${item.campaign.slug}`} className="dc-btn-secondary">
-                      Xem campaign
-                    </Link>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
 
         <section className="mt-8">
           <SectionHeader
@@ -257,7 +178,7 @@ export default function UserDashboardPage() {
 
         <section className="mt-8">
           <SectionHeader
-            title="Mission đã tham gia"
+            title="Trò chơi nhiệm vụ đã tham gia"
             action={
               <Link href="/dashboard/user/missions" className="dc-btn-secondary">
                 Xem tất cả

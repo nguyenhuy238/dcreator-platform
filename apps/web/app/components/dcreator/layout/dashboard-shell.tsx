@@ -18,6 +18,7 @@ import {
   Gift,
   House,
   IdentificationCard,
+  ListChecks,
   Megaphone,
   X,
   Package,
@@ -25,7 +26,10 @@ import {
   ShieldWarning,
   SlidersHorizontal,
   Storefront,
+  Ticket,
   UserCircle,
+  UserPlus,
+  Wallet,
   UsersThree
 } from "@phosphor-icons/react";
 import { getBreadcrumbsForPath, getWorkspaceForPath } from "@/lib/navigation";
@@ -83,13 +87,17 @@ const iconMap = {
   Gift,
   House,
   IdentificationCard,
+  ListChecks,
   Megaphone,
   Package,
   Scroll,
   ShieldWarning,
   SlidersHorizontal,
   Storefront,
+  Ticket,
   UserCircle,
+  UserPlus,
+  Wallet,
   UsersThree
 } as const;
 
@@ -121,7 +129,7 @@ export function DashboardShell({
     if (workspace === "admin") return "/admin";
     if (workspace === "brand") return "/dashboard/brand";
     if (workspace === "creator") return "/dashboard/creator";
-    return "/dashboard/user/profile";
+    return "/dashboard/user/settings";
   }, [workspace]);
 
   useEffect(() => {
@@ -276,19 +284,24 @@ export function DashboardShell({
             </div>
             <p className="mb-3 text-xs text-zinc-500">{workspaceDescription}</p>
             <nav>
-              {navItems.map((item) => (
-                <Link
-                  key={`${item.href}-${item.label}-mobile`}
-                  href={item.href}
-                  aria-current={item.href === activeHref ? "page" : undefined}
-                  className={`dc-focus mb-1 block min-h-11 rounded-xl px-3 py-2.5 text-sm font-semibold leading-5 ${item.href === activeHref ? "bg-zinc-900 hover:bg-zinc-900" : "text-zinc-700 hover:bg-zinc-100"}`}
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <span className={`relative z-10 block ${item.href === activeHref ? "text-white" : "text-zinc-900"}`}>
-                    {item.label?.trim() || "Đi tới trang"}
-                  </span>
-                </Link>
-              ))}
+              {navItems.map((item) => {
+                const active = item.href === activeHref;
+                const Icon = iconMap[item.icon as keyof typeof iconMap] ?? House;
+                return (
+                  <Link
+                    key={`${item.href}-${item.label}-mobile`}
+                    href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    className={`dc-focus mb-1 block min-h-11 rounded-xl px-3 py-2.5 text-sm font-semibold leading-5 ${active ? "bg-zinc-900 hover:bg-zinc-900" : "text-zinc-700 hover:bg-zinc-100"}`}
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    <span className={`relative z-10 flex items-center gap-2 ${active ? "text-white" : "text-zinc-900"}`}>
+                      <Icon size={18} weight={active ? "fill" : "regular"} />
+                      {item.label?.trim() || "Đi tới trang"}
+                    </span>
+                  </Link>
+                );
+              })}
             </nav>
           </aside>
         </div>

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -7,6 +7,7 @@ type StatusState =
   | "LOGIN_REQUIRED"
   | "NOT_CREATOR"
   | "PROFILE_REQUIRED"
+  | "SOCIAL_CHANNEL_REQUIRED"
   | "CAMPAIGN_UNAVAILABLE"
   | "MISSION_UNAVAILABLE"
   | "CAN_APPLY"
@@ -41,6 +42,7 @@ type Props = {
 export function CreatorCampaignApplyButton({ slug, compact = false, inline = false, hideStatusMessage = false }: Props) {
   const [status, setStatus] = useState<StatusPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [checkingSession, setCheckingSession] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [actionNotice, setActionNotice] = useState<{ href: string } | null>(null);
@@ -85,15 +87,18 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
     if (!status) return null as { href: string; label: string } | null;
 
     if (status.state === "LOGIN_REQUIRED") {
-      const next = typeof window === "undefined" ? `/campaigns/${slug}` : window.location.pathname;
-      return { href: `/auth/login?next=${encodeURIComponent(next)}`, label: "Đăng nhập để tiếp tục" };
+      const redirect = typeof window === "undefined" ? `/campaigns/${slug}` : `${window.location.pathname}${window.location.search}`;
+      return { href: `/auth/register?redirect=${encodeURIComponent(redirect)}`, label: "Tạo tài khoản để tiếp tục" };
     }
 
     if (status.state === "NOT_CREATOR") {
-      return { href: "/dashboard/user/profile#role-requests", label: "Đăng ký quyền Creator" };
+      return {
+        href: `/dashboard/user/upgrade?message=${encodeURIComponent("Hãy nâng cấp tài khoản để đăng ký tham gia campaign")}`,
+        label: "Đăng ký quyền Creator"
+      };
     }
 
-    if (status.state === "PROFILE_REQUIRED") {
+    if (status.state === "PROFILE_REQUIRED" || status.state === "SOCIAL_CHANNEL_REQUIRED") {
       return { href: "/dashboard/creator/channels", label: "Hoàn thiện kênh Creator" };
     }
 
@@ -103,19 +108,60 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
   const buttonLabel = useMemo(() => {
     if (loading) return "Đang kiểm tra...";
     if (!status) return "Nộp đơn đăng ký";
+    if (checkingSession) return "Đang kiểm tra...";
     if (submitting) return "Đang gửi đơn...";
     if (missingAction) return "Đăng ký tham gia campaign";
     return status.label;
-  }, [loading, status, submitting, missingAction]);
+  }, [loading, status, checkingSession, submitting, missingAction]);
 
   const buttonDisabled = useMemo(() => {
-    if (loading || submitting) return true;
+    if (loading || checkingSession || submitting) return true;
     if (!status) return true;
     return status.disabled && !missingAction;
-  }, [loading, status, submitting, missingAction]);
+  }, [loading, status, checkingSession, submitting, missingAction]);
+
+  function redirectToRegister() {
+    const redirect = `${window.location.pathname}${window.location.search}`;
+    window.location.assign(`/auth/register?redirect=${encodeURIComponent(redirect)}`);
+  }
 
   async function applyCampaign() {
     if (!status) return;
+
+    if (status.state === "LOGIN_REQUIRED") {
+      redirectToRegister();
+      return;
+    }
+
+    setCheckingSession(true);
+    try {
+      const response = await fetch("/api/auth/me", { cache: "no-store" });
+      const payload = (await response.json()) as ApiResponse<{ user?: { id?: string } }>;
+      if (response.status === 401) {
+        redirectToRegister();
+        return;
+      }
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error ?? "Không thể kiểm tra trạng thái đăng nhập");
+      }
+      if (!payload.data?.user?.id) {
+        redirectToRegister();
+        return;
+      }
+    } catch (error) {
+      setNotice({
+        type: "error",
+        text: error instanceof Error ? error.message : "Không thể kiểm tra trạng thái đăng nhập"
+      });
+      return;
+    } finally {
+      setCheckingSession(false);
+    }
+
+    if (status.state === "NOT_CREATOR") {
+      window.location.assign(`/dashboard/user/upgrade?message=${encodeURIComponent("Hãy nâng cấp tài khoản để đăng ký tham gia campaign")}`);
+      return;
+    }
 
     if (missingAction) {
       setActionNotice({ href: missingAction.href });
@@ -141,7 +187,7 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
       }
 
       setStatus(payload.data.status);
-      setNotice({ type: "success", text: "Đã nộp đơn đăng ký thành công." });
+      setNotice({ type: "success", text: "Đăng kí thành công" });
     } catch (error) {
       setNotice({
         type: "error",
@@ -156,7 +202,7 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
     <div className={`${inline ? "" : "grid gap-2"} ${compact ? "" : "mt-2"}`}>
       <button
         type="button"
-        className={`dc-btn-primary ${inline ? "w-full min-w-0 px-3 py-2 text-sm leading-tight text-center" : ""}`}
+        className={`inline-flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-center font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:scale-100 ${inline ? "w-full min-w-0 px-3 py-2 text-sm leading-tight" : ""}`}
         disabled={buttonDisabled}
         onClick={() => void applyCampaign()}
       >
@@ -182,9 +228,26 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
       {portalReady && actionNotice
         ? createPortal(
             <div className="fixed bottom-4 right-4 z-[9999] w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-xl">
-              <p className="font-semibold">Bạn đang chưa điền tài khoản mạng xã hội của mình hãy vào đây <a href={actionNotice.href} className="font-semibold underline">Hồ Sơ Cá Nhân</a> để hoàn thiện hồ sơ của mình nhé.</p>
+              <p className="font-semibold">Bạn cần cập nhật kênh mạng xã hội trước khi đăng ký campaign. Hãy vào <a href={actionNotice.href} className="font-semibold underline">Kênh Creator</a> để hoàn thiện hồ sơ.</p>
 
               <button type="button" className="mt-3 text-xs font-semibold underline" onClick={() => setActionNotice(null)}>
+                Đóng
+              </button>
+            </div>,
+            document.body
+          )
+        : null}
+      {portalReady && inline && status && notice
+        ? createPortal(
+            <div
+              className={`fixed bottom-4 right-4 z-[9999] w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border p-4 text-sm shadow-xl ${
+                notice.type === "success"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                  : "border-red-200 bg-red-50 text-red-900"
+              }`}
+            >
+              <p className="font-semibold">{notice.text}</p>
+              <button type="button" className="mt-3 text-xs font-semibold underline" onClick={() => setNotice(null)}>
                 Đóng
               </button>
             </div>,
