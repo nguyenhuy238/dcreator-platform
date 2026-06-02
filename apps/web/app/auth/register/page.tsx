@@ -5,8 +5,22 @@ import { useRouter } from "next/navigation";
 import { PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { FormField } from "@/app/components/dcreator/ui/base";
 import { PasswordInput } from "@/app/components/dcreator/ui/PasswordInput";
-import { resolveWorkspaceLanding } from "@/lib/auth/workspace-choice";
+import { canAccessPath, resolveWorkspaceLanding } from "@/lib/auth/workspace-choice";
 import type { Role } from "@prisma/client";
+
+type RegisterContext = { creatorProfile?: { id: string } | null; brandMemberships?: Array<{ id: string; name: string; role: "OWNER" | "MANAGER" | "STAFF" }> };
+
+function resolveTargetPath(roles: Role[], context?: RegisterContext) {
+  const decision = resolveWorkspaceLanding({
+    roles,
+    creatorProfile: context?.creatorProfile ?? null,
+    brandMemberships: context?.brandMemberships ?? []
+  });
+  const redirect = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("redirect");
+  if (!redirect || !redirect.startsWith("/") || redirect.startsWith("//")) return decision.href;
+  if (!canAccessPath(redirect, { roles, creatorProfile: context?.creatorProfile ?? null, brandMemberships: context?.brandMemberships ?? [] })) return decision.href;
+  return redirect;
+}
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -21,12 +35,10 @@ export default function RegisterPage() {
       const payload = await response.json();
       if (!alive) return;
       if (response.ok && payload?.success && payload?.data?.user?.roles) {
-        const decision = resolveWorkspaceLanding({
-          roles: payload.data.user.roles as Role[],
+        router.replace(resolveTargetPath(payload.data.user.roles as Role[], {
           creatorProfile: payload.data.user.creatorProfile ?? null,
           brandMemberships: payload.data.user.brandMemberships ?? []
-        });
-        router.replace(decision.href);
+        }));
       }
     }
     void checkAuth();
@@ -60,12 +72,11 @@ export default function RegisterPage() {
     const meResponse = await fetch("/api/auth/me", { cache: "no-store" });
     const mePayload = await meResponse.json();
     const roles = (mePayload?.data?.user?.roles ?? payload?.data?.roles ?? [payload?.data?.role].filter(Boolean)) as Role[];
-    const decision = resolveWorkspaceLanding({
-      roles,
+    const target = resolveTargetPath(roles, {
       creatorProfile: mePayload?.data?.user?.creatorProfile ?? null,
       brandMemberships: mePayload?.data?.user?.brandMemberships ?? []
     });
-    router.push(decision.href);
+    router.push(target);
     router.refresh();
   }
 

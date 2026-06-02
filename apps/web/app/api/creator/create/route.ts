@@ -11,7 +11,11 @@ import { toErrorResponse } from "@/lib/errors";
 
 const createCreatorProfileSchema = z.object({
   displayName: z.string().trim().min(2).max(120),
-  bio: z.string().trim().max(1000).optional()
+  bio: z.string().trim().max(1000).optional(),
+  creatorLinks: z.array(z.object({
+    platform: z.enum(["tiktok", "facebook", "instagram", "shopee"]),
+    url: z.url().max(400)
+  })).max(20).optional().default([])
 });
 
 export async function POST(request: NextRequest) {
@@ -27,13 +31,33 @@ export async function POST(request: NextRequest) {
         create: {
           accountId: user.id,
           displayName: payload.displayName,
-          bio: payload.bio?.trim() || null
+          bio: payload.bio?.trim() || null,
+          mainPlatform: payload.creatorLinks[0]?.platform.toUpperCase() as "TIKTOK" | "FACEBOOK" | "INSTAGRAM" | "SHOPEE" | undefined,
+          socialUrl: payload.creatorLinks[0]?.url
         },
         update: {
           displayName: payload.displayName,
-          bio: payload.bio?.trim() || null
+          bio: payload.bio?.trim() || null,
+          ...(payload.creatorLinks[0] ? {
+            mainPlatform: payload.creatorLinks[0].platform.toUpperCase() as "TIKTOK" | "FACEBOOK" | "INSTAGRAM" | "SHOPEE",
+            socialUrl: payload.creatorLinks[0].url
+          } : {})
         }
       });
+
+      if (payload.creatorLinks.length > 0) {
+        await tx.creatorSocialLink.createMany({
+          data: payload.creatorLinks.map((item) => ({
+            creatorProfileId: creatorProfile.id,
+            platform: item.platform.toUpperCase() as "TIKTOK" | "FACEBOOK" | "INSTAGRAM" | "SHOPEE",
+            socialUrl: item.url,
+            isActive: true,
+            verificationStatus: "PENDING" as const,
+            status: "PENDING" as const
+          })),
+          skipDuplicates: true
+        });
+      }
 
       await tx.accountRole.upsert({
         where: { accountId_role: { accountId: user.id, role: Role.CREATOR } },
@@ -59,4 +83,3 @@ export async function POST(request: NextRequest) {
     return toErrorResponse(error);
   }
 }
-

@@ -84,12 +84,12 @@ export function WorkspaceChooser({ user }: Props) {
           <p className="text-sm font-semibold text-zinc-800">Nâng cấp thêm workspace</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {!hasCreator ? (
-              <Link href="/dashboard/user/profile" className="dc-btn-secondary">
+              <Link href="/dashboard/user/upgrade" className="dc-btn-secondary">
                 Trở thành Creator
               </Link>
             ) : null}
             {!hasBrand ? (
-              <Link href="/brand/register" className="dc-btn-secondary">
+              <Link href="/dashboard/user/upgrade" className="dc-btn-secondary">
                 Tạo Brand mới
               </Link>
             ) : null}

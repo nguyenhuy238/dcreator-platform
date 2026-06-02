@@ -22,7 +22,7 @@ export default async function CampaignDetailPage({ params }: Props) {
       fallback={
         <>
           <PublicHeader />
-          <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-6 md:px-6">{content}</main>
+          <main className="mx-auto w-full max-w-[1480px] px-4 pb-16 pt-6 md:px-6">{content}</main>
         </>
       }
     >

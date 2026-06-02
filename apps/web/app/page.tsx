@@ -1,6 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
+import { ExploreCampaignsButton } from "@/app/components/dcreator/home/ExploreCampaignsButton";
 import { FeaturedCampaignsSection } from "@/app/components/dcreator/home/FeaturedCampaignsSection";
+import { HomepageSectionButton } from "@/app/components/dcreator/home/HomepageSectionButton";
 import { PartnerLogo } from "@/app/components/dcreator/home/PartnerLogo";
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { getCurrentUserFromServer } from "@/lib/auth/current-user";
@@ -106,17 +108,15 @@ export default async function HomePage() {
               Lan tỏa giá trị, giảm áp lực tài chính.
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3 md:mt-7">
-              <Link href="/campaigns" className="dc-btn-primary h-10 min-w-[190px] rounded-full px-6 text-base font-bold tracking-[0.02em]">
-                Khám phá chiến dịch
-              </Link>
+              <ExploreCampaignsButton />
               {!isLoggedIn ? (
                 <Link href="/auth/register" className="dc-btn-secondary h-10 min-w-[190px] rounded-full px-6 text-base font-semibold">
                   Tạo tài khoản
                 </Link>
               ) : null}
               {canUpgradeRole ? (
-                <Link href="/dashboard/user/profile" className="dc-btn-secondary h-10 min-w-[190px] rounded-full px-6 text-base font-semibold">
-                  Nâng cấp vai trò tại hồ sơ
+                <Link href="/dashboard/user/upgrade" className="dc-btn-secondary h-10 min-w-[190px] rounded-full px-6 text-base font-semibold">
+                  Nâng cấp vai trò
                 </Link>
               ) : null}
             </div>
@@ -231,7 +231,7 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <section className="mt-10 overflow-hidden rounded-[2rem] border border-zinc-200 bg-zinc-900 text-white">
+        <section id="creator-homepage" className="mt-10 overflow-hidden rounded-[2rem] border border-zinc-200 bg-zinc-900 text-white">
           <div className="grid gap-0 md:grid-cols-[1.15fr_0.85fr]">
             <div className="p-8 md:p-10">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">Creator Jobs</p>
@@ -240,9 +240,7 @@ export default async function HomePage() {
                 Duyệt nhanh cơ hội hợp tác, nhận job đúng tệp và bắt đầu kiếm hoa hồng dễ hơn.
               </p>
               <div className="mt-7">
-                <Link href="/dashboard/user/profile" className="dc-btn-primary bg-white text-zinc-900 hover:bg-zinc-100">
-                  Đăng ký Creator tại Profile
-                </Link>
+                <HomepageSectionButton targetId="creator-homepage" />
               </div>
             </div>
             <div className="relative min-h-[300px] md:min-h-full">
@@ -258,7 +256,7 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <section className="mt-10 overflow-hidden rounded-[2rem] border border-zinc-900 bg-zinc-900 text-white shadow-2xl shadow-zinc-200/30">
+        <section id="brand-homepage" className="mt-10 overflow-hidden rounded-[2rem] border border-zinc-900 bg-zinc-900 text-white shadow-2xl shadow-zinc-200/30">
           <div className="grid gap-0 md:grid-cols-[1.15fr_0.85fr]">
             <div className="p-8 md:p-10">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">Brand Growth</p>
@@ -267,9 +265,7 @@ export default async function HomePage() {
                 Chọn gói phù hợp, để lại thông tin liên hệ và đội ngũ dCreator sẽ hỗ trợ bạn triển khai chiến dịch UGC theo mục tiêu doanh thu.
               </p>
               <div className="mt-7">
-                <Link href="/brand/register" className="dc-btn-primary bg-white text-zinc-900 hover:bg-zinc-100">
-                  Đăng ký Brand
-                </Link>
+                <HomepageSectionButton targetId="brand-homepage" />
               </div>
             </div>
             <div className="relative min-h-[300px] md:min-h-full">
@@ -282,27 +278,6 @@ export default async function HomePage() {
               />
               <div className="absolute inset-0 bg-gradient-to-tr from-zinc-950 via-zinc-950/40 to-transparent" />
             </div>
-          </div>
-        </section>
-
-        <section className="relative mt-10 overflow-hidden rounded-[2rem] border border-zinc-200 bg-white p-6 text-white shadow-none md:p-8">
-          <h2 className="text-2xl font-black text-zinc-900">Câu hỏi thường gặp</h2>
-          <div className="mt-4 grid gap-4 md:grid-cols-3">
-            {faqs.map((item) => (
-              <article
-                key={item.q}
-                className={`rounded-2xl border p-5 ${
-                  item.q.includes("Creator")
-                    ? "border-sky-200 bg-sky-50"
-                    : item.q.includes("Brand")
-                      ? "border-amber-200 bg-amber-50"
-                      : "border-zinc-200 bg-white"
-                }`}
-              >
-                <p className="font-semibold text-zinc-900">{item.q}</p>
-                <p className="mt-2 text-sm text-zinc-600">{item.a}</p>
-              </article>
-            ))}
           </div>
         </section>
 
@@ -332,6 +307,27 @@ export default async function HomePage() {
           )}
         </section>
 
+        <section className="relative mt-10 overflow-hidden rounded-[2rem] border border-zinc-200 bg-white p-6 text-white shadow-none md:p-8">
+          <h2 className="text-2xl font-black text-zinc-900">Câu hỏi thường gặp</h2>
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            {faqs.map((item) => (
+              <article
+                key={item.q}
+                className={`rounded-2xl border p-5 ${
+                  item.q.includes("Creator")
+                    ? "border-sky-200 bg-sky-50"
+                    : item.q.includes("Brand")
+                      ? "border-amber-200 bg-amber-50"
+                      : "border-zinc-200 bg-white"
+                }`}
+              >
+                <p className="font-semibold text-zinc-900">{item.q}</p>
+                <p className="mt-2 text-sm text-zinc-600">{item.a}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
         <section className="mt-10 overflow-hidden rounded-[2rem] border border-zinc-900 bg-zinc-900 text-white shadow-2xl shadow-zinc-200/30">
           <div className="grid gap-0 md:grid-cols-[1.05fr_0.95fr]">
             <div className="relative min-h-[260px] md:min-h-[320px]">
@@ -349,10 +345,10 @@ export default async function HomePage() {
               <h2 className="mt-2 text-2xl font-black text-white">Sẵn sàng mở rộng doanh thu cùng dCreator?</h2>
               <p className="mt-1 text-sm text-zinc-300">Chọn vai trò phù hợp để bắt đầu chiến dịch hoặc nhận job mới.</p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Link href="/dashboard/user/profile" className="dc-btn-secondary border-white/15 bg-white text-zinc-900 hover:bg-zinc-100">
+                <Link href={isLoggedIn ? "/dashboard/user/upgrade" : "/auth/register?redirect=/&role=creator"} className="dc-btn-secondary border-white/15 bg-white text-zinc-900 hover:bg-zinc-100">
                   Đăng ký Creator
                 </Link>
-                <Link href="/brand/register" className="dc-btn-primary bg-white text-zinc-900 hover:bg-zinc-100">
+                <Link href={isLoggedIn ? "/dashboard/user/upgrade" : "/auth/register?redirect=/&role=brand"} className="dc-btn-primary bg-white text-zinc-900 hover:bg-zinc-100">
                   Đăng ký Brand
                 </Link>
               </div>
@@ -363,9 +359,4 @@ export default async function HomePage() {
       <PublicFooter />`r`n</>
   );
 }
-
-
-
-
-
 

@@ -40,9 +40,24 @@ export default function UserWalletPage() {
           <>
             <section className="dc-grid-dashboard">
               <StatsCard title="Số dư N-Points" value={`${data.wallet.pointsBalance.toLocaleString("vi-VN")} điểm`} />
-              <StatsCard title="Ví tiền mặt" value={formatVnd(data.wallet.cashBalanceVnd)} />
-              <StatsCard title="Giao dịch pending" value={`${data.pendingPayments.length}`} />
+              <StatsCard title="Giao dịch đang xử lý" value={`${data.pendingPayments.length}`} />
               <StatsCard title="Tổng giao dịch" value={`${data.transactions.length}`} />
+            </section>
+            <section className="mt-8">
+              <SectionHeader title="Thanh toán chờ xác nhận" />
+              {data.pendingPayments.length === 0 ? (
+                <EmptyState title="Không có giao dịch đang xử lý" description="Trạng thái chờ xác nhận sẽ xuất hiện tại đây." />
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {data.pendingPayments.map((payment) => (
+                    <article key={payment.id} className="dc-card p-4">
+                      <p className="font-semibold text-zinc-900">{payment.orderCode}</p>
+                      <p className="mt-1 text-sm text-zinc-600">{formatVnd(payment.requestedAmountVnd)}</p>
+                      <div className="mt-2"><StatusBadge status={payment.status.toLowerCase()} /></div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </section>
             <section className="mt-8">
               <SectionHeader title="Lịch sử giao dịch" subtitle="20 giao dịch gần nhất" />
@@ -61,22 +76,6 @@ export default function UserWalletPage() {
                         <p>Cash: {tx.cashDeltaVnd > 0 ? "+" : ""}{formatVnd(tx.cashDeltaVnd)}</p>
                         <p>Ref: {tx.referenceType ?? "Không có"}</p>
                       </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
-            <section className="mt-8">
-              <SectionHeader title="Thanh toán chờ xác nhận" />
-              {data.pendingPayments.length === 0 ? (
-                <EmptyState title="Không có giao dịch pending" description="Trạng thái chờ xác nhận sẽ xuất hiện tại đây." />
-              ) : (
-                <div className="grid gap-3 md:grid-cols-2">
-                  {data.pendingPayments.map((payment) => (
-                    <article key={payment.id} className="dc-card p-4">
-                      <p className="font-semibold text-zinc-900">{payment.orderCode}</p>
-                      <p className="mt-1 text-sm text-zinc-600">{formatVnd(payment.requestedAmountVnd)}</p>
-                      <div className="mt-2"><StatusBadge status={payment.status.toLowerCase()} /></div>
                     </article>
                   ))}
                 </div>

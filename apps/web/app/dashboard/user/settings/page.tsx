@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell } from "@/app/components/dcreator/layout/shell";
 import { PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
+import { UserAccountInfoCard, type UserAccountInfo } from "../_components/user-account-info-card";
 
 export default function UserSettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -13,14 +14,21 @@ export default function UserSettingsPage() {
   const [newPassword, setNewPassword] = useState("");
   const [notifyReviewStatusEmail, setNotifyReviewStatusEmail] = useState(true);
   const [notifyVoucherMissionEmail, setNotifyVoucherMissionEmail] = useState(true);
+  const [account, setAccount] = useState<UserAccountInfo | null>(null);
 
   useEffect(() => {
-    fetch("/api/me/settings", { cache: "no-store" })
-      .then(async (res) => {
-        const payload = await res.json();
-        if (!res.ok || !payload.success) throw new Error(payload.error ?? "Không thể tải cài đặt.");
-        setNotifyReviewStatusEmail(Boolean(payload.data.notifyReviewStatusEmail));
-        setNotifyVoucherMissionEmail(Boolean(payload.data.notifyVoucherMissionEmail));
+    Promise.all([
+      fetch("/api/me/settings", { cache: "no-store" }),
+      fetch("/api/profile/role-upgrade", { cache: "no-store" })
+    ])
+      .then(async ([settingsRes, profileRes]) => {
+        const settingsPayload = await settingsRes.json();
+        const profilePayload = await profileRes.json();
+        if (!settingsRes.ok || !settingsPayload.success) throw new Error(settingsPayload.error ?? "Không thể tải cài đặt.");
+        if (!profileRes.ok || !profilePayload.success) throw new Error(profilePayload.error ?? "Không thể tải thông tin cá nhân.");
+        setNotifyReviewStatusEmail(Boolean(settingsPayload.data.notifyReviewStatusEmail));
+        setNotifyVoucherMissionEmail(Boolean(settingsPayload.data.notifyVoucherMissionEmail));
+        setAccount(profilePayload.data.account as UserAccountInfo);
       })
       .catch((fetchError: Error) => setError(fetchError.message))
       .finally(() => setLoading(false));
@@ -62,57 +70,38 @@ export default function UserSettingsPage() {
   return (
     <>
       <AppShell>
-        <PageHeader title="Cài đặt tài khoản" subtitle="Quản lý bảo mật, thông báo và phiên đăng nhập." />
+        <PageHeader title="Cài đặt tài khoản" subtitle="Thông tin cá nhân, bảo mật, thông báo và phiên đăng nhập." />
         {loading ? <div className="h-48 animate-pulse rounded-3xl bg-zinc-100" /> : null}
         {!loading ? (
-          <form className="grid gap-4 md:grid-cols-2" onSubmit={onSave}>
-            <article className="dc-card p-5">
-              <SectionHeader title="Bảo mật" />
-              <p className="text-sm text-zinc-600">Đổi mật khẩu bằng cách nhập mật khẩu hiện tại và mật khẩu mới.</p>
-              <div className="mt-3 grid gap-2">
-                <input
-                  className="dc-input"
-                  placeholder="Mật khẩu hiện tại"
-                  type="password"
-                  value={currentPassword}
-                  onChange={(event) => setCurrentPassword(event.target.value)}
-                />
-                <input
-                  className="dc-input"
-                  placeholder="Mật khẩu mới"
-                  type="password"
-                  value={newPassword}
-                  onChange={(event) => setNewPassword(event.target.value)}
-                />
+          <>
+            {account ? <UserAccountInfoCard account={account} onAccountUpdate={setAccount} onError={setError} onSuccess={setMessage} /> : null}
+            <form className="mt-4 grid gap-4 md:grid-cols-2" onSubmit={onSave}>
+              <article className="dc-card p-5">
+                <SectionHeader title="Bảo mật" />
+                <p className="text-sm text-zinc-600">Đổi mật khẩu bằng cách nhập mật khẩu hiện tại và mật khẩu mới.</p>
+                <div className="mt-3 grid gap-2">
+                  <input className="dc-input" placeholder="Mật khẩu hiện tại" type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
+                  <input className="dc-input" placeholder="Mật khẩu mới" type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
+                </div>
+              </article>
+              <article className="dc-card p-5">
+                <SectionHeader title="Thông báo" />
+                <div className="mt-2 grid gap-2 text-sm">
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={notifyReviewStatusEmail} onChange={(event) => setNotifyReviewStatusEmail(event.target.checked)} />
+                    Email về trạng thái duyệt
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={notifyVoucherMissionEmail} onChange={(event) => setNotifyVoucherMissionEmail(event.target.checked)} />
+                    Email về voucher/mission
+                  </label>
+                </div>
+              </article>
+              <div className="md:col-span-2">
+                <button type="submit" className="dc-btn-secondary" disabled={saving}>{saving ? "Đang lưu..." : "Lưu cài đặt"}</button>
               </div>
-            </article>
-            <article className="dc-card p-5">
-              <SectionHeader title="Thông báo" />
-              <div className="mt-2 grid gap-2 text-sm">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={notifyReviewStatusEmail}
-                    onChange={(event) => setNotifyReviewStatusEmail(event.target.checked)}
-                  />
-                  Email về trạng thái duyệt
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={notifyVoucherMissionEmail}
-                    onChange={(event) => setNotifyVoucherMissionEmail(event.target.checked)}
-                  />
-                  Email về voucher/mission
-                </label>
-              </div>
-            </article>
-            <div className="md:col-span-2">
-              <button type="submit" className="dc-btn-secondary" disabled={saving}>
-                {saving ? "Đang lưu..." : "Lưu cài đặt"}
-              </button>
-            </div>
-          </form>
+            </form>
+          </>
         ) : null}
         <section className="mt-4">
           <article className="dc-card p-5">

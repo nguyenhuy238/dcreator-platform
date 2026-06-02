@@ -145,6 +145,7 @@ export async function listCampaigns(input: ListCampaignsInput) {
         brandLogoUrl: campaign.brand.avatarUrl,
         creator: campaign.creator?.displayName ?? null,
         campaignType: campaign.campaignType,
+        featuredType: "VIDEO_SEEDING" as const,
         category: campaign.category,
         fundedAmount: toVnd(campaign.fundedAmountVnd),
         targetAmount: toVnd(campaign.targetAmountVnd),

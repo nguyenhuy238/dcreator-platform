@@ -7,8 +7,7 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
   const user = await getCurrentUserFromServer();
   if (!user) redirect("/auth/login?next=/ops");
   if (!hasRole(user.roles, DASHBOARD_ACCESS.admin)) {
-    redirect("/dashboard/user/profile?denied=Bạn không có quyền truy cập khu vực vận hành.");
+    redirect("/dashboard/user/settings?denied=Bạn không có quyền truy cập khu vực vận hành.");
   }
   return children;
 }
-

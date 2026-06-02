@@ -2,15 +2,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { FEATURED_CAMPAIGNS_RESET_EVENT } from "@/app/components/dcreator/home/ExploreCampaignsButton";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
+import { CreatorCampaignApplyButton } from "@/app/campaigns/_components/CreatorCampaignApplyButton";
 
 type CampaignType = "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
-type FilterType = "ALL" | "MASTER";
+type FeaturedType = "VIDEO_SEEDING" | "MASTER";
+type FilterType = "ALL" | FeaturedType;
 type FeaturedCampaignItem = {
   slug: string;
   title: string;
   brand: string;
   campaignType: CampaignType;
+  featuredType: FeaturedType;
   coverImageUrl?: string | null;
   backers: number;
   progressPercent: number;
@@ -21,23 +25,35 @@ type FeaturedCampaignItem = {
   creatorApplicants?: number;
 };
 
-const typeLabel: Record<FilterType, string> = { ALL: "Video seeding", MASTER: "Master Campaign" };
+const typeLabel: Record<FilterType, string> = {
+  ALL: "Tất cả",
+  VIDEO_SEEDING: "Video seeding",
+  MASTER: "Master Campaign"
+};
 
 export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCampaignItem[] }) {
   const [activeFilter, setActiveFilter] = useState<FilterType>("ALL");
   const [slideStart, setSlideStart] = useState(0);
-  const filters: FilterType[] = ["ALL", "MASTER"];
+  const filters: FilterType[] = ["ALL", "VIDEO_SEEDING", "MASTER"];
   const pageSize = 3;
 
   const filteredCampaigns = useMemo(() => {
-    if (activeFilter === "MASTER") return campaigns;
     if (activeFilter === "ALL") return campaigns;
-    return campaigns;
+    return campaigns.filter((campaign) => campaign.featuredType === activeFilter);
   }, [activeFilter, campaigns]);
 
   useEffect(() => {
     setSlideStart(0);
   }, [activeFilter]);
+
+  useEffect(() => {
+    function showAllCampaigns() {
+      setActiveFilter("ALL");
+    }
+
+    window.addEventListener(FEATURED_CAMPAIGNS_RESET_EVENT, showAllCampaigns);
+    return () => window.removeEventListener(FEATURED_CAMPAIGNS_RESET_EVENT, showAllCampaigns);
+  }, []);
 
   const visibleCampaigns = filteredCampaigns.slice(slideStart, slideStart + pageSize);
   const canSlide = filteredCampaigns.length > pageSize;
@@ -49,7 +65,7 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
   }
 
   return (
-    <section className="mt-10">
+    <section id="featured-campaigns" className="mt-10">
       <div className="mb-4 flex items-end justify-between gap-4">
         <h2 className="text-2xl font-black">Chiến dịch nổi bật</h2>
         <div className="flex items-center gap-3">
@@ -101,7 +117,7 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/55 via-zinc-950/10 to-transparent" />
                 <div className="absolute left-3 top-3 rounded-full border border-white/25 bg-zinc-900/65 px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-white">
-                  Video seeding
+                  {typeLabel[campaign.featuredType]}
                 </div>
               </div>
 
@@ -129,10 +145,13 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
                 </div>
                 <p className="mt-1 text-xs text-zinc-500">Tiến độ video: {campaign.videoProgressPercent ?? 0}%</p>
 
-                <div className="mt-4 flex justify-end">
+                <div className="mt-4 flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <CreatorCampaignApplyButton slug={campaign.slug} compact inline hideStatusMessage />
+                  </div>
                   <Link
                     href={`/campaigns/${campaign.slug}`}
-                    className="inline-flex items-center gap-2 rounded-full border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
+                    className="inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
                     aria-label={`Xem chi tiết ${campaign.title}`}
                   >
                     Xem chi tiết
