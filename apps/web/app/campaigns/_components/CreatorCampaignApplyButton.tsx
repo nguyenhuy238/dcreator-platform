@@ -7,6 +7,7 @@ type StatusState =
   | "LOGIN_REQUIRED"
   | "NOT_CREATOR"
   | "PROFILE_REQUIRED"
+  | "SOCIAL_CHANNEL_REQUIRED"
   | "CAMPAIGN_UNAVAILABLE"
   | "MISSION_UNAVAILABLE"
   | "CAN_APPLY"
@@ -91,10 +92,13 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
     }
 
     if (status.state === "NOT_CREATOR") {
-      return { href: "/dashboard/user/upgrade", label: "Đăng ký quyền Creator" };
+      return {
+        href: `/dashboard/user/upgrade?message=${encodeURIComponent("Hãy nâng cấp tài khoản để đăng ký tham gia campaign")}`,
+        label: "Đăng ký quyền Creator"
+      };
     }
 
-    if (status.state === "PROFILE_REQUIRED") {
+    if (status.state === "PROFILE_REQUIRED" || status.state === "SOCIAL_CHANNEL_REQUIRED") {
       return { href: "/dashboard/creator/channels", label: "Hoàn thiện kênh Creator" };
     }
 
@@ -154,6 +158,11 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
       setCheckingSession(false);
     }
 
+    if (status.state === "NOT_CREATOR") {
+      window.location.assign(`/dashboard/user/upgrade?message=${encodeURIComponent("Hãy nâng cấp tài khoản để đăng ký tham gia campaign")}`);
+      return;
+    }
+
     if (missingAction) {
       setActionNotice({ href: missingAction.href });
       return;
@@ -193,7 +202,7 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
     <div className={`${inline ? "" : "grid gap-2"} ${compact ? "" : "mt-2"}`}>
       <button
         type="button"
-        className={`dc-btn-primary ${inline ? "w-full min-w-0 px-3 py-2 text-sm leading-tight text-center" : ""}`}
+        className={`inline-flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-center font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:scale-100 ${inline ? "w-full min-w-0 px-3 py-2 text-sm leading-tight" : ""}`}
         disabled={buttonDisabled}
         onClick={() => void applyCampaign()}
       >
@@ -219,7 +228,7 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
       {portalReady && actionNotice
         ? createPortal(
             <div className="fixed bottom-4 right-4 z-[9999] w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-xl">
-              <p className="font-semibold">Bạn đang chưa điền tài khoản mạng xã hội của mình hãy vào đây <a href={actionNotice.href} className="font-semibold underline">Hồ Sơ Cá Nhân</a> để hoàn thiện hồ sơ của mình nhé.</p>
+              <p className="font-semibold">Bạn cần cập nhật kênh mạng xã hội trước khi đăng ký campaign. Hãy vào <a href={actionNotice.href} className="font-semibold underline">Kênh Creator</a> để hoàn thiện hồ sơ.</p>
 
               <button type="button" className="mt-3 text-xs font-semibold underline" onClick={() => setActionNotice(null)}>
                 Đóng
