@@ -187,7 +187,7 @@ export default function AdminCreateCampaignPage() {
   const [success, setSuccess] = useState("");
   const [brandOptions, setBrandOptions] = useState<BrandOption[]>([]);
 
-  const publicPathPreview = useMemo(() => `https://dcreator-platform.vercel.app/${form.slug || "..."}`, [form.slug]);
+  const publicPathPreview = useMemo(() => `https://dcreator.vn/${form.slug || "..."}`, [form.slug]);
 
   function setField<K extends keyof FormState>(name: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [name]: value }));
@@ -439,7 +439,7 @@ export default function AdminCreateCampaignPage() {
           <label className="grid gap-2 text-sm font-semibold text-zinc-700">
             <span>Đường dẫn công khai</span>
             <div className="flex overflow-hidden rounded-xl border border-zinc-200">
-              <span className="bg-zinc-100 px-3 py-2 text-xs text-zinc-600">https://dcreator-platform.vercel.app/</span>
+              <span className="bg-zinc-100 px-3 py-2 text-xs text-zinc-600">https://dcreator.vn/</span>
               <input className={`min-w-0 flex-1 px-3 py-2 text-sm outline-none ${fieldErrors.slug ? "border-l border-red-500 bg-red-50" : ""}`} value={form.slug} onChange={(event) => setField("slug", event.target.value)} placeholder="ten-chien-dich-cong-khai" required />
             </div>
             <span className="text-xs font-medium text-zinc-500">Preview: {publicPathPreview}</span>
