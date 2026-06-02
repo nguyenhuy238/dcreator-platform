@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell } from "@/app/components/dcreator/layout/shell";
 import type { Role } from "@prisma/client";
 import { getNavItemsForWorkspace } from "@/lib/navigation";
+import { CREATOR_PLATFORMS, normalizeCreatorLinks, resolveSelectedIndustries, type CreatorLink } from "@/lib/profile-upgrade-form";
 
 const nav = getNavItemsForWorkspace("user", ["USER", "CREATOR", "BRAND_OWNER", "BRAND_STAFF", "ADMIN", "OPS"]);
 
@@ -32,7 +33,6 @@ const defaultCreator = {
 
 const defaultBrand = {
   brandName: "",
-  industry: "",
   description: "",
   contactName: "",
   contactPhone: "",
@@ -41,6 +41,13 @@ const defaultBrand = {
 };
 
 const BRAND_BCC_VERSION = "BCC-dCreator-v1";
+const INDUSTRY_OPTIONS = ["Thời trang", "Mỹ phẩm", "F&B", "Đồ gia dụng", "Công nghệ", "Mẹ và bé", "Sức khỏe", "Giáo dục", "Giải trí", "Khác"] as const;
+const CREATOR_PLATFORM_LABELS: Record<CreatorLink["platform"], string> = {
+  tiktok: "TikTok",
+  facebook: "Facebook",
+  instagram: "Instagram",
+  shopee: "Shopee"
+};
 
 function statusText(value?: unknown) {
   if (value === "PENDING_REVIEW") return "Hồ sơ đã được tạo";
@@ -59,6 +66,9 @@ export default function UserProfilePage() {
   const [data, setData] = useState<Snapshot | null>(null);
   const [creatorForm, setCreatorForm] = useState(defaultCreator);
   const [brandForm, setBrandForm] = useState(defaultBrand);
+  const [creatorLinks, setCreatorLinks] = useState<CreatorLink[]>([{ platform: "tiktok", url: "" }]);
+  const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
+  const [otherIndustry, setOtherIndustry] = useState("");
   const [submittingCreator, setSubmittingCreator] = useState(false);
   const [submittingBrand, setSubmittingBrand] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -106,56 +116,86 @@ export default function UserProfilePage() {
   async function submitCreator(event: FormEvent) {
     event.preventDefault();
     if (!data) return;
-    setSubmittingCreator(true);
     setError("");
     setSuccess("");
 
-    const body = {
-      displayName: creatorForm.displayName || data.account.displayName,
-      bio: creatorForm.bio
-    };
-    const response = await fetch("/api/creator/create", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
-    const payload = await response.json();
-    setSubmittingCreator(false);
-    if (!response.ok || !payload.success) {
-      setError(payload.error ?? "Gửi đơn Creator thất bại");
+    let normalizedLinks: CreatorLink[];
+    try {
+      normalizedLinks = normalizeCreatorLinks(creatorLinks);
+    } catch (validationError) {
+      setError(validationError instanceof Error ? validationError.message : "Liên kết không hợp lệ.");
       return;
     }
-    setSuccess("Creator Profile đã được tạo. Hãy thêm kênh social đầu tiên của bạn.");
-    router.push("/dashboard/creator?created=1");
-    router.refresh();
+
+    setSubmittingCreator(true);
+    try {
+      const body = {
+        displayName: creatorForm.displayName || data.account.displayName,
+        bio: creatorForm.bio,
+        creatorLinks: normalizedLinks
+      };
+      const response = await fetch("/api/creator/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error ?? "Gửi đơn Creator thất bại");
+      }
+      setSuccess("Creator Profile đã được tạo cùng các liên kết mạng xã hội.");
+      router.push("/dashboard/creator?created=1");
+      router.refresh();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Gửi đơn Creator thất bại");
+    } finally {
+      setSubmittingCreator(false);
+    }
   }
 
   async function submitBrand(event: FormEvent) {
     event.preventDefault();
     if (!data) return;
-    setSubmittingBrand(true);
     setError("");
     setSuccess("");
 
-    const body = {
-      brandName: brandForm.brandName,
-      industry: brandForm.industry,
-      description: brandForm.description
-    };
-    const response = await fetch("/api/brand/create", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
-    const payload = await response.json();
-    setSubmittingBrand(false);
-    if (!response.ok || !payload.success) {
-      setError(payload.error ?? "Tạo Brand thất bại");
+    let industries: string[];
+    try {
+      industries = resolveSelectedIndustries(selectedIndustries, otherIndustry);
+    } catch (validationError) {
+      setError(validationError instanceof Error ? validationError.message : "Vui lòng chọn ít nhất 1 ngành hàng.");
       return;
     }
-    setSuccess("Brand đã được tạo. Bạn có thể bắt đầu thiết lập sản phẩm/campaign.");
-    router.push("/dashboard/brand?created=1");
-    router.refresh();
+
+    setSubmittingBrand(true);
+    try {
+      const body = {
+        brandName: brandForm.brandName,
+        selectedIndustries: industries,
+        industry: industries.join(", "),
+        description: brandForm.description,
+        contactName: brandForm.contactName,
+        contactPhone: brandForm.contactPhone,
+        contactEmail: brandForm.contactEmail,
+        website: brandForm.website
+      };
+      const response = await fetch("/api/brand/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error ?? "Tạo Brand thất bại");
+      }
+      setSuccess("Brand đã được tạo. Bạn có thể bắt đầu thiết lập sản phẩm/campaign.");
+      router.push("/dashboard/brand?created=1");
+      router.refresh();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Tạo Brand thất bại");
+    } finally {
+      setSubmittingBrand(false);
+    }
   }
 
   if (loading) {
@@ -271,7 +311,36 @@ export default function UserProfilePage() {
               <form className="mt-4 grid gap-3" onSubmit={submitCreator}>
                 <input className="dc-input" placeholder="Tên hiển thị" value={creatorForm.displayName} onChange={(e) => setCreatorForm((x) => ({ ...x, displayName: e.target.value }))} required />
                 <textarea className="dc-input min-h-24" placeholder="Giới thiệu bản thân" value={creatorForm.bio} onChange={(e) => setCreatorForm((x) => ({ ...x, bio: e.target.value }))} />
-                <p className="text-xs font-medium text-zinc-500">Sau khi tạo profile, hãy thêm kênh social đầu tiên trong Creator Dashboard.</p>
+                <div className="grid gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-zinc-700">Liên kết mạng xã hội / kênh bán hàng</p>
+                    <button type="button" className="dc-btn-secondary" onClick={() => setCreatorLinks((items) => [...items, { platform: "tiktok", url: "" }])}>
+                      Thêm liên kết
+                    </button>
+                  </div>
+                  {creatorLinks.map((item, index) => (
+                    <div key={`${index}-${item.platform}`} className="grid gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 sm:grid-cols-[8rem_minmax(0,1fr)_auto]">
+                      <select
+                        className="dc-input bg-white"
+                        value={item.platform}
+                        onChange={(event) => setCreatorLinks((items) => items.map((link, itemIndex) => itemIndex === index ? { ...link, platform: event.target.value as CreatorLink["platform"] } : link))}
+                      >
+                        {CREATOR_PLATFORMS.map((platform) => <option key={platform} value={platform}>{CREATOR_PLATFORM_LABELS[platform]}</option>)}
+                      </select>
+                      <input
+                        className="dc-input bg-white"
+                        inputMode="url"
+                        placeholder="https://..."
+                        value={item.url}
+                        onChange={(event) => setCreatorLinks((items) => items.map((link, itemIndex) => itemIndex === index ? { ...link, url: event.target.value } : link))}
+                      />
+                      <button type="button" className="dc-btn-secondary text-red-700" onClick={() => setCreatorLinks((items) => items.filter((_, itemIndex) => itemIndex !== index))}>
+                        Xóa
+                      </button>
+                    </div>
+                  ))}
+                  <p className="text-xs font-medium text-zinc-500">Chỉ cần ít nhất 1 liên kết hợp lệ. Có thể thêm nhiều liên kết cho cùng nền tảng.</p>
+                </div>
                 <button className="dc-btn-primary" disabled={submittingCreator} type="submit">{submittingCreator ? "Đang tạo..." : "Trở thành Creator"}</button>
               </form>
             ) : null}
@@ -285,7 +354,27 @@ export default function UserProfilePage() {
             {!hasBrand ? (
               <form className="mt-4 grid gap-3" onSubmit={submitBrand}>
                 <input className="dc-input" placeholder="Tên nhãn hàng" value={brandForm.brandName} onChange={(e) => setBrandForm((x) => ({ ...x, brandName: e.target.value }))} required />
-                <input className="dc-input" placeholder="Ngành hàng" value={brandForm.industry} onChange={(e) => setBrandForm((x) => ({ ...x, industry: e.target.value }))} required />
+                <div className="grid gap-2">
+                  <p className="text-sm font-semibold text-zinc-700">Ngành hàng</p>
+                  <div className="flex flex-wrap gap-2">
+                    {INDUSTRY_OPTIONS.map((industry) => {
+                      const selected = selectedIndustries.includes(industry);
+                      return (
+                        <button
+                          key={industry}
+                          type="button"
+                          className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${selected ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"}`}
+                          onClick={() => setSelectedIndustries((items) => selected ? items.filter((item) => item !== industry) : [...items, industry])}
+                        >
+                          {industry}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedIndustries.includes("Khác") ? (
+                    <input className="dc-input" placeholder="Nhập ngành hàng khác" value={otherIndustry} onChange={(event) => setOtherIndustry(event.target.value)} />
+                  ) : null}
+                </div>
                 <textarea className="dc-input min-h-20" placeholder="Mô tả ngắn" value={brandForm.description} onChange={(e) => setBrandForm((x) => ({ ...x, description: e.target.value }))} />
                 <input className="dc-input" placeholder="Tên người liên hệ" value={brandForm.contactName} onChange={(e) => setBrandForm((x) => ({ ...x, contactName: e.target.value }))} required />
                 <input className="dc-input" placeholder="Số điện thoại liên hệ" value={brandForm.contactPhone} onChange={(e) => setBrandForm((x) => ({ ...x, contactPhone: e.target.value }))} required />

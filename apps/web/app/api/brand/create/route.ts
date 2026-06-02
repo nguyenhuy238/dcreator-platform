@@ -12,9 +12,22 @@ import { toErrorResponse } from "@/lib/errors";
 
 const createBrandSchema = z.object({
   brandName: z.string().trim().min(2).max(160),
-  industry: z.string().trim().min(2).max(120),
+  industry: z.string().trim().min(2).max(120).optional(),
+  selectedIndustries: z.array(z.string().trim().min(1).max(80)).max(10).optional(),
   description: z.string().trim().max(300).optional(),
-  logoUrl: z.string().trim().url().max(400).optional().or(z.literal(""))
+  logoUrl: z.string().trim().url().max(400).optional().or(z.literal("")),
+  website: z.string().trim().url().max(400).optional().or(z.literal("")),
+  contactName: z.string().trim().max(160).optional(),
+  contactPhone: z.string().trim().max(40).optional(),
+  contactEmail: z.string().trim().email().max(200).optional().or(z.literal(""))
+}).superRefine((value, ctx) => {
+  const industry = value.selectedIndustries?.filter(Boolean).join(", ") || value.industry;
+  if (!industry || industry.length < 2) {
+    ctx.addIssue({ code: "custom", path: ["industry"], message: "Vui lòng chọn ít nhất 1 ngành hàng." });
+  }
+  if (industry && industry.length > 120) {
+    ctx.addIssue({ code: "custom", path: ["industry"], message: "Danh sách ngành hàng tối đa 120 ký tự." });
+  }
 });
 
 export async function POST(request: NextRequest) {
@@ -23,6 +36,7 @@ export async function POST(request: NextRequest) {
     const user = await requireAuth(request);
     const session = await getCurrentSessionFromRequest(request);
     const payload = createBrandSchema.parse(await request.json());
+    const industry = payload.selectedIndustries?.filter(Boolean).join(", ") || payload.industry!;
 
     const account = await prisma.account.findUniqueOrThrow({
       where: { id: user.id },
@@ -48,12 +62,13 @@ export async function POST(request: NextRequest) {
           data: {
             ownerAccountId: user.id,
             name: payload.brandName,
-            industry: payload.industry,
+            industry,
             description: payload.description?.trim() || null,
             logoUrl: payload.logoUrl?.trim() || null,
-            contactName: account.displayName || payload.brandName,
-            contactPhone: account.profile?.phone || "N/A",
-            contactEmail: account.email,
+            website: payload.website?.trim() || null,
+            contactName: payload.contactName?.trim() || account.displayName || payload.brandName,
+            contactPhone: payload.contactPhone?.trim() || account.profile?.phone || "N/A",
+            contactEmail: payload.contactEmail?.trim() || account.email,
             status: BrandStatus.ACTIVE
           }
         }));
