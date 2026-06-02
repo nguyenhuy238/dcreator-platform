@@ -2,14 +2,29 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
 import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, SectionCard, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
+type CampaignCategory = "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
+type CampaignType = "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
+type CampaignSetupSource = "JOIN_EXISTING_DCREATOR_CAMP" | "BRAND_REQUESTED";
+type NoticeState = { tone: "success" | "error"; message: string } | null;
 type CampaignDetail = {
   id: string;
+  slug: string;
   title: string;
   brief: string;
+  coverImageUrl: string | null;
+  category: CampaignCategory;
+  campaignType: CampaignType;
+  setupSource: CampaignSetupSource;
+  benefits: string | null;
+  participationRoadmap: string[];
+  objective: string | null;
+  ugcVideoQuota: number | null;
+  isPublic: boolean;
   status: string;
   statusView: string;
   startsAt: string | null;
@@ -56,40 +71,68 @@ export default function AdminCampaignDetailPage() {
   const router = useRouter();
   const id = params?.id;
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [toast, setToast] = useState("");
+  const [pageError, setPageError] = useState("");
+  const [notice, setNotice] = useState<NoticeState>(null);
   const [item, setItem] = useState<CampaignDetail | null>(null);
   const [acting, setActing] = useState(false);
   const [confirmAction, setConfirmAction] = useState<null | "pause" | "reject" | "request-changes">(null);
   const [editing, setEditing] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [editForm, setEditForm] = useState({
+    slug: "",
     title: "",
     brief: "",
+    imageUrl: "",
+    category: "LIFESTYLE" as CampaignCategory,
+    campaignType: "COMMUNITY" as CampaignType,
+    setupSource: "BRAND_REQUESTED" as CampaignSetupSource,
+    benefits: "",
+    objective: "",
+    participationRoadmap: [""],
+    ugcVideoQuota: 1,
+    isPublic: true,
     startsAt: "",
     endsAt: "",
     budgetVnd: 0,
     targetAmountVnd: 0
   });
 
+  function showNotice(tone: "success" | "error", message: string) {
+    setNotice({ tone, message });
+    window.setTimeout(() => {
+      setNotice((current) => (current?.message === message ? null : current));
+    }, 2200);
+  }
+
   const load = useCallback(async () => {
     if (!id) return;
     setLoading(true);
-    setError("");
+    setPageError("");
     try {
       const res = await fetch(`/api/admin/campaigns/${id}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<CampaignDetail>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Tải chi tiết chiến dịch thất bại");
       setItem(body.data);
       setEditForm({
+        slug: body.data.slug,
         title: body.data.title,
         brief: body.data.brief,
+        imageUrl: body.data.coverImageUrl ?? "",
+        category: body.data.category,
+        campaignType: body.data.campaignType,
+        setupSource: body.data.setupSource,
+        benefits: body.data.benefits ?? "",
+        objective: body.data.objective ?? "",
+        participationRoadmap: body.data.participationRoadmap.length > 0 ? body.data.participationRoadmap : [""],
+        ugcVideoQuota: body.data.ugcVideoQuota ?? 1,
+        isPublic: body.data.isPublic,
         startsAt: body.data.startsAt ? new Date(body.data.startsAt).toISOString().slice(0, 16) : "",
         endsAt: body.data.endsAt ? new Date(body.data.endsAt).toISOString().slice(0, 16) : "",
         budgetVnd: body.data.budgetVnd,
         targetAmountVnd: body.data.kpiSnapshot.targetAmountVnd
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Tải chi tiết chiến dịch thất bại");
+      setPageError(e instanceof Error ? e.message : "Tải chi tiết chiến dịch thất bại");
     } finally {
       setLoading(false);
     }
@@ -102,11 +145,10 @@ export default function AdminCampaignDetailPage() {
   async function act(action: "approve" | "reject" | "request-changes" | "pause", reason?: string) {
     if (!item) return;
     if (action !== "approve" && !reason?.trim()) {
-      setError("Reason is required");
+      showNotice("error", "Vui lòng nhập lý do trước khi thực hiện thao tác.");
       return;
     }
     setActing(true);
-    setError("");
     try {
       const res = await fetch(`/api/admin/campaigns/${item.id}/${action}`, {
         method: "PATCH",
@@ -115,27 +157,75 @@ export default function AdminCampaignDetailPage() {
       });
       const body = (await res.json()) as ApiResult<unknown>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Thao tác thất bại");
-      setToast("Đã cập nhật trạng thái campaign");
-      setTimeout(() => setToast(""), 1800);
+      showNotice("success", "Đã cập nhật trạng thái campaign.");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Thao tác thất bại");
+      showNotice("error", e instanceof Error ? e.message : "Thao tác thất bại");
     } finally {
       setActing(false);
     }
   }
 
+  async function uploadCoverImage(file: File) {
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.set("logo", file);
+      const response = await fetch("/api/uploads/brand-logo", { method: "POST", body: formData });
+      const payload = (await response.json()) as ApiResult<{ logoUrl: string }>;
+      if (!response.ok || !payload.success) throw new Error(payload.success ? "Upload ảnh thất bại" : payload.error);
+      setEditForm((current) => ({ ...current, imageUrl: payload.data.logoUrl }));
+      showNotice("success", "Đã tải ảnh campaign.");
+    } catch (uploadError) {
+      showNotice("error", uploadError instanceof Error ? uploadError.message : "Upload ảnh thất bại");
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
+  function setRoadmapStep(index: number, value: string) {
+    setEditForm((current) => ({
+      ...current,
+      participationRoadmap: current.participationRoadmap.map((step, stepIndex) => (stepIndex === index ? value : step))
+    }));
+  }
+
+  function addRoadmapStep() {
+    setEditForm((current) => ({
+      ...current,
+      participationRoadmap: [...current.participationRoadmap, ""]
+    }));
+  }
+
+  function removeRoadmapStep(index: number) {
+    setEditForm((current) => ({
+      ...current,
+      participationRoadmap: current.participationRoadmap.length === 1
+        ? current.participationRoadmap
+        : current.participationRoadmap.filter((_, stepIndex) => stepIndex !== index)
+    }));
+  }
+
   async function saveEdit() {
     if (!item) return;
     setActing(true);
-    setError("");
     try {
       const res = await fetch(`/api/admin/campaigns/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          slug: editForm.slug,
           title: editForm.title,
           brief: editForm.brief,
+          imageUrl: editForm.imageUrl,
+          category: editForm.category,
+          campaignType: editForm.campaignType,
+          setupSource: editForm.setupSource,
+          benefits: editForm.benefits,
+          objective: editForm.objective,
+          participationRoadmap: editForm.participationRoadmap.filter((itemValue) => itemValue.trim().length > 0),
+          ugcVideoQuota: Number(editForm.ugcVideoQuota),
+          isPublic: editForm.isPublic,
           startsAt: editForm.startsAt ? new Date(editForm.startsAt).toISOString() : null,
           endsAt: editForm.endsAt ? new Date(editForm.endsAt).toISOString() : null,
           budgetVnd: Number(editForm.budgetVnd),
@@ -145,12 +235,11 @@ export default function AdminCampaignDetailPage() {
       });
       const body = (await res.json()) as ApiResult<unknown>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Cập nhật campaign thất bại");
-      setToast("Đã cập nhật campaign");
-      setTimeout(() => setToast(""), 1800);
+      showNotice("success", "Đã cập nhật campaign.");
       setEditing(false);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Cập nhật campaign thất bại");
+      showNotice("error", e instanceof Error ? e.message : "Cập nhật campaign thất bại");
     } finally {
       setActing(false);
     }
@@ -165,8 +254,8 @@ export default function AdminCampaignDetailPage() {
     );
   }
 
-  if (error || !item) {
-    return <ErrorState title="Không tải được campaign detail" description={error || "Lỗi không xác định"} onRetry={() => void load()} />;
+  if (pageError || !item) {
+    return <ErrorState title="Không tải được campaign detail" description={pageError || "Lỗi không xác định"} onRetry={() => void load()} />;
   }
 
   return (
@@ -181,14 +270,18 @@ export default function AdminCampaignDetailPage() {
           </div>
         }
       />
-      {error ? <div className="mb-4"><ErrorState title="Có lỗi thao tác" description={error} onRetry={() => void load()} /></div> : null}
-
       <SectionCard title="Campaign status">
         <div className="flex items-center justify-between">
           <StatusBadge status={item.statusView.toLowerCase()} />
         </div>
         <div className="mt-3 grid gap-2 text-sm text-zinc-700">
+          <p>Slug: /campaigns/{item.slug}</p>
           <p>Brief: {item.brief}</p>
+          <p>Category / Type: {item.category} / {item.campaignType}</p>
+          <p>Setup source: {item.setupSource}</p>
+          <p>Mục tiêu: {item.objective ?? "Không có"}</p>
+          <p>Quyền lợi: {item.benefits ?? "Không có"}</p>
+          <p>UGC video quota: {item.ugcVideoQuota ?? "Không có"} • Public: {item.isPublic ? "Có" : "Không"}</p>
           <p>Timeline: {item.startsAt ? new Date(item.startsAt).toLocaleString("vi-VN") : "Không có"} - {item.endsAt ? new Date(item.endsAt).toLocaleString("vi-VN") : "Không có"}</p>
           <p>Budget: {item.budgetVnd.toLocaleString("vi-VN")} VND</p>
           <p>KPI: Target {item.kpiSnapshot.targetAmountVnd.toLocaleString("vi-VN")} / Funded {item.kpiSnapshot.fundedAmountVnd.toLocaleString("vi-VN")} / Backers {item.kpiSnapshot.backerCount}</p>
@@ -213,8 +306,48 @@ export default function AdminCampaignDetailPage() {
         {editing ? (
           <div className="grid gap-3 md:grid-cols-2">
             <label className="grid gap-1 text-sm">
+              <span className="font-semibold">Slug</span>
+              <input className="dc-input" value={editForm.slug} onChange={(e) => setEditForm((s) => ({ ...s, slug: e.target.value }))} />
+            </label>
+            <label className="grid gap-1 text-sm">
               <span className="font-semibold">Tên campaign</span>
               <input className="dc-input" value={editForm.title} onChange={(e) => setEditForm((s) => ({ ...s, title: e.target.value }))} />
+            </label>
+            <div className="grid gap-2 text-sm md:col-span-2">
+              <span className="font-semibold">Ảnh campaign</span>
+              <input className="dc-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadCoverImage(file); }} />
+              <input className="dc-input" value={editForm.imageUrl} onChange={(e) => setEditForm((s) => ({ ...s, imageUrl: e.target.value }))} placeholder="/uploads/... hoặc https://..." />
+              {uploadingImage ? <p className="text-xs text-zinc-500">Đang tải ảnh...</p> : null}
+              <div className="relative h-40 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100">
+                <CampaignCoverImage src={editForm.imageUrl} alt={editForm.title || "Campaign cover"} className="object-cover" sizes="100vw" />
+              </div>
+            </div>
+            <label className="grid gap-1 text-sm">
+              <span className="font-semibold">Ngành hàng</span>
+              <select className="dc-input" value={editForm.category} onChange={(e) => setEditForm((s) => ({ ...s, category: e.target.value as CampaignCategory }))}>
+                <option value="LIFESTYLE">Lối sống</option>
+                <option value="FOOD">Ẩm thực</option>
+                <option value="BEAUTY">Làm đẹp</option>
+                <option value="FASHION">Thời trang</option>
+                <option value="TECH">Công nghệ</option>
+                <option value="EDUCATION">Giáo dục</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="font-semibold">Loại campaign</span>
+              <select className="dc-input" value={editForm.campaignType} onChange={(e) => setEditForm((s) => ({ ...s, campaignType: e.target.value as CampaignType }))}>
+                <option value="COMMUNITY">COMMUNITY</option>
+                <option value="DONATION">DONATION</option>
+                <option value="PREORDER">PREORDER</option>
+                <option value="SPONSORSHIP">SPONSORSHIP</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="font-semibold">Nguồn thiết lập</span>
+              <select className="dc-input" value={editForm.setupSource} onChange={(e) => setEditForm((s) => ({ ...s, setupSource: e.target.value as CampaignSetupSource }))}>
+                <option value="BRAND_REQUESTED">Brand yêu cầu</option>
+                <option value="JOIN_EXISTING_DCREATOR_CAMP">Tham gia chiến dịch dCreator có sẵn</option>
+              </select>
             </label>
             <label className="grid gap-1 text-sm">
               <span className="font-semibold">Budget (VND)</span>
@@ -224,6 +357,26 @@ export default function AdminCampaignDetailPage() {
               <span className="font-semibold">Brief</span>
               <textarea className="dc-input min-h-24" value={editForm.brief} onChange={(e) => setEditForm((s) => ({ ...s, brief: e.target.value }))} />
             </label>
+            <label className="grid gap-1 text-sm md:col-span-2">
+              <span className="font-semibold">Mục tiêu campaign</span>
+              <textarea className="dc-input min-h-24" value={editForm.objective} onChange={(e) => setEditForm((s) => ({ ...s, objective: e.target.value }))} />
+            </label>
+            <label className="grid gap-1 text-sm md:col-span-2">
+              <span className="font-semibold">Quyền lợi</span>
+              <textarea className="dc-input min-h-24" value={editForm.benefits} onChange={(e) => setEditForm((s) => ({ ...s, benefits: e.target.value }))} />
+            </label>
+            <div className="grid gap-2 text-sm md:col-span-2">
+              <span className="font-semibold">Lộ trình tham gia</span>
+              {editForm.participationRoadmap.map((step, index) => (
+                <div key={`roadmap-${index}`} className="flex gap-2">
+                  <input className="dc-input" value={step} onChange={(e) => setRoadmapStep(index, e.target.value)} placeholder={`Bước ${index + 1}`} />
+                  {editForm.participationRoadmap.length > 1 ? (
+                    <button type="button" className="dc-btn-secondary" onClick={() => removeRoadmapStep(index)}>Xóa</button>
+                  ) : null}
+                </div>
+              ))}
+              <button type="button" className="dc-btn-secondary w-fit" onClick={addRoadmapStep}>+ Thêm bước</button>
+            </div>
             <label className="grid gap-1 text-sm">
               <span className="font-semibold">Starts at</span>
               <input className="dc-input" type="datetime-local" value={editForm.startsAt} onChange={(e) => setEditForm((s) => ({ ...s, startsAt: e.target.value }))} />
@@ -236,9 +389,20 @@ export default function AdminCampaignDetailPage() {
               <span className="font-semibold">Target amount (VND)</span>
               <input className="dc-input" type="number" min={1} value={editForm.targetAmountVnd} onChange={(e) => setEditForm((s) => ({ ...s, targetAmountVnd: Number(e.target.value || 0) }))} />
             </label>
+            <label className="grid gap-1 text-sm">
+              <span className="font-semibold">UGC video quota</span>
+              <input className="dc-input" type="number" min={1} value={editForm.ugcVideoQuota} onChange={(e) => setEditForm((s) => ({ ...s, ugcVideoQuota: Number(e.target.value || 0) }))} />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="font-semibold">Hiển thị public</span>
+              <select className="dc-input" value={editForm.isPublic ? "true" : "false"} onChange={(e) => setEditForm((s) => ({ ...s, isPublic: e.target.value === "true" }))}>
+                <option value="true">Có</option>
+                <option value="false">Không</option>
+              </select>
+            </label>
           </div>
         ) : (
-          <p className="text-sm text-zinc-600">Dùng nút Chỉnh sửa để cập nhật title, brief, timeline, budget và target.</p>
+          <p className="text-sm text-zinc-600">Dùng nút Chỉnh sửa để cập nhật slug, ảnh, phân loại, mục tiêu, lộ trình, quota, timeline, budget và target.</p>
         )}
       </section>
 
@@ -296,7 +460,7 @@ export default function AdminCampaignDetailPage() {
         </SectionCard>
       </section>
 
-      {toast ? <ActionToast message={toast} /> : null}
+      {notice ? <ActionToast message={notice.message} tone={notice.tone} /> : null}
       <ReviewActionDialog
         open={confirmAction === "pause"}
         title="Pause campaign?"

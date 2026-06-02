@@ -12,12 +12,21 @@ type AdminDecision = "APPROVE" | "REJECT" | "REQUEST_CHANGES" | "PAUSE";
 type AdminCampaignCreateInput = z.infer<typeof adminCampaignCreateSchema>;
 type CampaignMissionInput = z.infer<typeof campaignMissionCreateSchema>;
 type AdminCampaignUpdateInput = {
+  slug?: string;
   title?: string;
   brief?: string;
+  category?: "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
+  campaignType?: "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
+  setupSource?: "JOIN_EXISTING_DCREATOR_CAMP" | "BRAND_REQUESTED";
+  participationRoadmap?: string[];
+  benefits?: string;
+  objective?: string;
   startsAt?: string | null;
   endsAt?: string | null;
   budgetVnd?: number;
   targetAmountVnd?: number;
+  ugcVideoQuota?: number;
+  isPublic?: boolean;
   imageUrl?: string;
   reason?: string;
 };
@@ -149,6 +158,15 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
       slug: true,
       title: true,
       brief: true,
+      coverImageUrl: true,
+      campaignType: true,
+      setupSource: true,
+      benefits: true,
+      participationRoadmap: true,
+      objective: true,
+      category: true,
+      ugcVideoQuota: true,
+      isPublic: true,
       status: true,
       startsAt: true,
       endsAt: true,
@@ -500,17 +518,48 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
   if (startsAtForValidate && endsAtForValidate && endsAtForValidate <= startsAtForValidate) {
     throw new AppError("Ngày kết thúc phải sau ngày bắt đầu.", 422, "CAMPAIGN_TIMELINE_INVALID");
   }
+  const nextSlug = input.slug?.trim();
+  if (nextSlug && nextSlug !== campaign.slug) {
+    const slugConflict = await prisma.campaign.findFirst({
+      where: { slug: nextSlug, NOT: { id: campaignId } },
+      select: { id: true }
+    });
+    if (slugConflict) {
+      throw new AppError("Slug campaign đã tồn tại.", 409, "CAMPAIGN_SLUG_ALREADY_EXISTS");
+    }
+  }
+
+  const nextParticipationRoadmap = input.participationRoadmap?.map((item) => item.trim()).filter(Boolean);
+  if (input.participationRoadmap && (!nextParticipationRoadmap || nextParticipationRoadmap.length === 0)) {
+    throw new AppError("Lộ trình tham gia cần ít nhất 1 bước.", 422, "CAMPAIGN_PARTICIPATION_ROADMAP_INVALID");
+  }
+
+  const nextImageUrl =
+    input.imageUrl === undefined
+      ? undefined
+      : input.imageUrl === ""
+        ? null
+        : input.imageUrl.trim();
 
   const updated = await prisma.campaign.update({
     where: { id: campaignId },
     data: {
+      slug: nextSlug,
       title: input.title?.trim(),
       brief: input.brief?.trim(),
+      category: input.category,
+      campaignType: input.campaignType,
+      setupSource: input.setupSource,
+      participationRoadmap: nextParticipationRoadmap,
+      benefits: input.benefits === undefined ? undefined : input.benefits.trim() || null,
+      objective: input.objective === undefined ? undefined : input.objective.trim() || null,
       startsAt: nextStartsAt,
       endsAt: nextEndsAt,
       budgetVnd: input.budgetVnd,
       targetAmountVnd: input.targetAmountVnd,
-      coverImageUrl: input.imageUrl === "" ? null : input.imageUrl
+      ugcVideoQuota: input.ugcVideoQuota,
+      isPublic: input.isPublic,
+      coverImageUrl: nextImageUrl
     }
   });
 
@@ -524,21 +573,39 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
     reason: input.reason ?? null,
     metadata: {
       before: {
+        slug: campaign.slug,
         title: campaign.title,
         brief: campaign.brief,
+        category: campaign.category,
+        campaignType: campaign.campaignType,
+        setupSource: campaign.setupSource,
+        participationRoadmap: campaign.participationRoadmap,
+        benefits: campaign.benefits ?? null,
+        objective: campaign.objective ?? null,
         startsAt: campaign.startsAt?.toISOString() ?? null,
         endsAt: campaign.endsAt?.toISOString() ?? null,
         budgetVnd: campaign.budgetVnd,
         targetAmountVnd: campaign.targetAmountVnd,
+        ugcVideoQuota: campaign.ugcVideoQuota ?? null,
+        isPublic: campaign.isPublic,
         coverImageUrl: campaign.coverImageUrl ?? null
       },
       after: {
+        slug: updated.slug,
         title: updated.title,
         brief: updated.brief,
+        category: updated.category,
+        campaignType: updated.campaignType,
+        setupSource: updated.setupSource,
+        participationRoadmap: updated.participationRoadmap,
+        benefits: updated.benefits ?? null,
+        objective: updated.objective ?? null,
         startsAt: updated.startsAt?.toISOString() ?? null,
         endsAt: updated.endsAt?.toISOString() ?? null,
         budgetVnd: updated.budgetVnd,
         targetAmountVnd: updated.targetAmountVnd,
+        ugcVideoQuota: updated.ugcVideoQuota ?? null,
+        isPublic: updated.isPublic,
         coverImageUrl: updated.coverImageUrl ?? null
       }
     }
