@@ -265,7 +265,7 @@ export default async function HomePage() {
                 Chọn gói phù hợp, để lại thông tin liên hệ và đội ngũ dCreator sẽ hỗ trợ bạn triển khai chiến dịch UGC theo mục tiêu doanh thu.
               </p>
               <div className="mt-7">
-                <HomepageSectionButton targetId="brand-homepage" />
+                <HomepageSectionButton targetId="brand-homepage" href="/brand" />
               </div>
             </div>
             <div className="relative min-h-[300px] md:min-h-full">
@@ -359,4 +359,3 @@ export default async function HomePage() {
       <PublicFooter />`r`n</>
   );
 }
-
