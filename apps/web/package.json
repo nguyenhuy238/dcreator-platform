@@ -4,6 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "prebuild": "prisma generate",
     "dev": "next dev --port 3000",
     "dev:safe": "npm run db:prepare && npm run dev",
     "build": "next build",

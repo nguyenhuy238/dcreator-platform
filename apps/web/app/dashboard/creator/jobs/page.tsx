@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { PageHeader } from "@/app/components/dcreator/ui/base";
+import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 import { CampaignList } from "@/app/campaigns/_components/CampaignList";
 
 type MissionHistoryItem = {
@@ -118,10 +118,9 @@ export default function CreatorJobsPage() {
             historyItems.map((campaign) => (
               <article key={`${activeStatus}-${campaign.slug}`} className="min-w-[260px] rounded-xl border border-zinc-200 bg-white p-2">
                 <div className="relative aspect-[16/9] overflow-hidden rounded-lg bg-zinc-100">
-                  <Image
-                    src={campaign.coverImageUrl ?? "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200"}
+                  <CampaignCoverImage
+                    src={campaign.coverImageUrl}
                     alt={campaign.title}
-                    fill
                     className="object-cover"
                     sizes="260px"
                   />

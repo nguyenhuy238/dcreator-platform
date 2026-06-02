@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { BrandSubscriptionPanel } from "@/app/dashboard/brand/_components/BrandSubscriptionPanel";
 
@@ -181,19 +182,9 @@ export default function BrandCampaignsPage() {
 
                 return (
                   <article key={campaign.id} className="dc-card overflow-hidden p-0">
-                    <div
-                      className="flex h-40 items-end bg-zinc-100"
-                      style={
-                        campaign.coverImageUrl
-                          ? {
-                              backgroundImage: `url(${campaign.coverImageUrl})`,
-                              backgroundSize: "cover",
-                              backgroundPosition: "center"
-                            }
-                          : undefined
-                      }
-                    >
-                      <div className="w-full bg-black/50 px-4 py-3 text-white">
+                    <div className="relative flex h-40 items-end overflow-hidden bg-zinc-100">
+                      <CampaignCoverImage src={campaign.coverImageUrl} alt={campaign.title} className="object-cover" sizes="(max-width: 1280px) 100vw, 50vw" />
+                      <div className="relative w-full bg-black/50 px-4 py-3 text-white">
                         <p className="text-lg font-bold">{campaign.title}</p>
                         <p className="text-xs">/{campaign.slug}</p>
                       </div>

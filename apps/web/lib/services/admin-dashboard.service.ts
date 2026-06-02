@@ -1,4 +1,4 @@
-import { BrandMemberRole, BrandStatus, CampaignStatus, CreatorChannelVerificationStatus, CreatorSocialLinkStatus, MissionAudience, MissionLifecycleStatus, Prisma, Role, RoleRequestStatus, RoleRequestType } from "@prisma/client";
+import { BrandMemberRole, BrandMemberStatus, BrandStatus, CampaignStatus, CreatorChannelVerificationStatus, CreatorSocialLinkStatus, MissionAudience, MissionLifecycleStatus, Prisma, Role, RoleRequestStatus, RoleRequestType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { approveProof, rejectProof } from "@/lib/services/mission.service";
@@ -634,7 +634,7 @@ export async function getFinanceSnapshot() {
     prisma.walletTransaction.findMany({ orderBy: { createdAt: "desc" }, take: 100, select: { id: true, accountId: true, type: true, pointsDelta: true, cashDeltaVnd: true, createdAt: true } }),
     prisma.payoutRequest.findMany({ orderBy: { createdAt: "desc" }, take: 100, select: { id: true, accountId: true, amountVnd: true, status: true, createdAt: true } }),
     prisma.wallet.findMany({
-      where: { user: { ownedBrandMemberships: { some: { status: "ACTIVE" } } } },
+      where: { user: { ownedBrandMemberships: { some: { status: BrandMemberStatus.ACTIVE } } } },
       select: { userId: true, pointsBalance: true, cashBalanceVnd: true, updatedAt: true }
     })
   ]);
