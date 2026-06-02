@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { FEATURED_CAMPAIGNS_RESET_EVENT } from "@/app/components/dcreator/home/ExploreCampaignsButton";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
+import { CreatorCampaignApplyButton } from "@/app/campaigns/_components/CreatorCampaignApplyButton";
 
 type CampaignType = "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
 type FeaturedType = "VIDEO_SEEDING" | "MASTER";
@@ -144,10 +145,13 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
                 </div>
                 <p className="mt-1 text-xs text-zinc-500">Tiến độ video: {campaign.videoProgressPercent ?? 0}%</p>
 
-                <div className="mt-4 flex justify-end">
+                <div className="mt-4 flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <CreatorCampaignApplyButton slug={campaign.slug} compact inline hideStatusMessage />
+                  </div>
                   <Link
                     href={`/campaigns/${campaign.slug}`}
-                    className="inline-flex items-center gap-2 rounded-full border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
+                    className="inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
                     aria-label={`Xem chi tiết ${campaign.title}`}
                   >
                     Xem chi tiết

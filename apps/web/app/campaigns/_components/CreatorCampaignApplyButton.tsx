@@ -41,6 +41,7 @@ type Props = {
 export function CreatorCampaignApplyButton({ slug, compact = false, inline = false, hideStatusMessage = false }: Props) {
   const [status, setStatus] = useState<StatusPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [checkingSession, setCheckingSession] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [actionNotice, setActionNotice] = useState<{ href: string } | null>(null);
@@ -85,8 +86,8 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
     if (!status) return null as { href: string; label: string } | null;
 
     if (status.state === "LOGIN_REQUIRED") {
-      const next = typeof window === "undefined" ? `/campaigns/${slug}` : window.location.pathname;
-      return { href: `/auth/login?next=${encodeURIComponent(next)}`, label: "Đăng nhập để tiếp tục" };
+      const redirect = typeof window === "undefined" ? `/campaigns/${slug}` : `${window.location.pathname}${window.location.search}`;
+      return { href: `/auth/register?redirect=${encodeURIComponent(redirect)}`, label: "Tạo tài khoản để tiếp tục" };
     }
 
     if (status.state === "NOT_CREATOR") {
@@ -103,19 +104,55 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
   const buttonLabel = useMemo(() => {
     if (loading) return "Đang kiểm tra...";
     if (!status) return "Nộp đơn đăng ký";
+    if (checkingSession) return "Đang kiểm tra...";
     if (submitting) return "Đang gửi đơn...";
     if (missingAction) return "Đăng ký tham gia campaign";
     return status.label;
-  }, [loading, status, submitting, missingAction]);
+  }, [loading, status, checkingSession, submitting, missingAction]);
 
   const buttonDisabled = useMemo(() => {
-    if (loading || submitting) return true;
+    if (loading || checkingSession || submitting) return true;
     if (!status) return true;
     return status.disabled && !missingAction;
-  }, [loading, status, submitting, missingAction]);
+  }, [loading, status, checkingSession, submitting, missingAction]);
+
+  function redirectToRegister() {
+    const redirect = `${window.location.pathname}${window.location.search}`;
+    window.location.assign(`/auth/register?redirect=${encodeURIComponent(redirect)}`);
+  }
 
   async function applyCampaign() {
     if (!status) return;
+
+    if (status.state === "LOGIN_REQUIRED") {
+      redirectToRegister();
+      return;
+    }
+
+    setCheckingSession(true);
+    try {
+      const response = await fetch("/api/auth/me", { cache: "no-store" });
+      const payload = (await response.json()) as ApiResponse<{ user?: { id?: string } }>;
+      if (response.status === 401) {
+        redirectToRegister();
+        return;
+      }
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error ?? "Không thể kiểm tra trạng thái đăng nhập");
+      }
+      if (!payload.data?.user?.id) {
+        redirectToRegister();
+        return;
+      }
+    } catch (error) {
+      setNotice({
+        type: "error",
+        text: error instanceof Error ? error.message : "Không thể kiểm tra trạng thái đăng nhập"
+      });
+      return;
+    } finally {
+      setCheckingSession(false);
+    }
 
     if (missingAction) {
       setActionNotice({ href: missingAction.href });
@@ -141,7 +178,7 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
       }
 
       setStatus(payload.data.status);
-      setNotice({ type: "success", text: "Đã nộp đơn đăng ký thành công." });
+      setNotice({ type: "success", text: "Đăng kí thành công" });
     } catch (error) {
       setNotice({
         type: "error",
@@ -185,6 +222,23 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
               <p className="font-semibold">Bạn đang chưa điền tài khoản mạng xã hội của mình hãy vào đây <a href={actionNotice.href} className="font-semibold underline">Hồ Sơ Cá Nhân</a> để hoàn thiện hồ sơ của mình nhé.</p>
 
               <button type="button" className="mt-3 text-xs font-semibold underline" onClick={() => setActionNotice(null)}>
+                Đóng
+              </button>
+            </div>,
+            document.body
+          )
+        : null}
+      {portalReady && inline && status && notice
+        ? createPortal(
+            <div
+              className={`fixed bottom-4 right-4 z-[9999] w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border p-4 text-sm shadow-xl ${
+                notice.type === "success"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                  : "border-red-200 bg-red-50 text-red-900"
+              }`}
+            >
+              <p className="font-semibold">{notice.text}</p>
+              <button type="button" className="mt-3 text-xs font-semibold underline" onClick={() => setNotice(null)}>
                 Đóng
               </button>
             </div>,
