@@ -281,27 +281,6 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <section className="relative mt-10 overflow-hidden rounded-[2rem] border border-zinc-200 bg-white p-6 text-white shadow-none md:p-8">
-          <h2 className="text-2xl font-black text-zinc-900">Câu hỏi thường gặp</h2>
-          <div className="mt-4 grid gap-4 md:grid-cols-3">
-            {faqs.map((item) => (
-              <article
-                key={item.q}
-                className={`rounded-2xl border p-5 ${
-                  item.q.includes("Creator")
-                    ? "border-sky-200 bg-sky-50"
-                    : item.q.includes("Brand")
-                      ? "border-amber-200 bg-amber-50"
-                      : "border-zinc-200 bg-white"
-                }`}
-              >
-                <p className="font-semibold text-zinc-900">{item.q}</p>
-                <p className="mt-2 text-sm text-zinc-600">{item.a}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
         <section className="mt-10 rounded-[2rem] border border-zinc-200 bg-white p-6 md:p-8">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -326,6 +305,27 @@ export default async function HomePage() {
           ) : (
             <p className="mt-4 text-sm text-zinc-500">Brand sẽ hiển thị khi có chiến dịch đang hoạt động.</p>
           )}
+        </section>
+
+        <section className="relative mt-10 overflow-hidden rounded-[2rem] border border-zinc-200 bg-white p-6 text-white shadow-none md:p-8">
+          <h2 className="text-2xl font-black text-zinc-900">Câu hỏi thường gặp</h2>
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            {faqs.map((item) => (
+              <article
+                key={item.q}
+                className={`rounded-2xl border p-5 ${
+                  item.q.includes("Creator")
+                    ? "border-sky-200 bg-sky-50"
+                    : item.q.includes("Brand")
+                      ? "border-amber-200 bg-amber-50"
+                      : "border-zinc-200 bg-white"
+                }`}
+              >
+                <p className="font-semibold text-zinc-900">{item.q}</p>
+                <p className="mt-2 text-sm text-zinc-600">{item.a}</p>
+              </article>
+            ))}
+          </div>
         </section>
 
         <section className="mt-10 overflow-hidden rounded-[2rem] border border-zinc-900 bg-zinc-900 text-white shadow-2xl shadow-zinc-200/30">
@@ -359,7 +359,6 @@ export default async function HomePage() {
       <PublicFooter />`r`n</>
   );
 }
-
 
 
 
