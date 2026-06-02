@@ -499,7 +499,7 @@ export default function AdminCampaignDetailPage() {
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">
               <span>Slug</span>
               <input className={`dc-input ${fieldErrors.slug ? "border-red-500 ring-1 ring-red-300" : ""}`} value={form.slug} onChange={(event) => setField("slug", event.target.value)} />
-              <span className="text-xs text-zinc-500">Link xem trước: https://dcreator-platform.vercel.app/{form.slug || "..."}</span>
+              <span className="text-xs text-zinc-500">Link xem trước: https://dcreator.vn/{form.slug || "..."}</span>
               {fieldErrors.slug ? <span className="text-xs text-red-600">{fieldErrors.slug}</span> : null}
             </label>
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">

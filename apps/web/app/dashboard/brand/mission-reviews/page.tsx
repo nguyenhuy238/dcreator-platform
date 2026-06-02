@@ -8,9 +8,16 @@ import { EmptyState, ErrorState, LoadingSkeleton, PageHeader } from "@/app/compo
 type ApiResult<T> = { success: boolean; data?: T; error?: string };
 type DetailTab = "ACTIONS" | "HISTORY";
 
-type TabKey = "transcript-reviews" | "applications" | "video-reviews" | "final-reviews";
+export type MissionReviewsTabKey = "transcript-reviews" | "applications" | "video-reviews" | "final-reviews";
 
-const tabs: Array<{ key: TabKey; label: string }> = [
+type MissionReviewsPageProps = {
+  pageTitle: string;
+  subtitle: string;
+  apiBasePath: string;
+  initialTab?: MissionReviewsTabKey;
+};
+
+const tabs: Array<{ key: MissionReviewsTabKey; label: string }> = [
   { key: "applications", label: "Nhận nhiệm vụ" },
   { key: "transcript-reviews", label: "Duyệt kịch bản" },
   { key: "video-reviews", label: "Duyệt video" },
@@ -276,12 +283,21 @@ function MissionDetailModal({
   );
 }
 
-export default function BrandMissionReviewsPage() {
-  const [activeTab, setActiveTab] = useState<TabKey>("applications");
+export function MissionReviewsPage({
+  pageTitle,
+  subtitle,
+  apiBasePath,
+  initialTab = "applications"
+}: MissionReviewsPageProps) {
+  const [activeTab, setActiveTab] = useState<MissionReviewsTabKey>(initialTab);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   return (
     <>
-      <PageHeader title="Duyệt nhiệm vụ Creator" subtitle="Quản lý 4 bước duyệt nhiệm vụ cho các campaign thuộc Brand của bạn." />
+      <PageHeader title={pageTitle} subtitle={subtitle} />
 
       <section className="dc-card p-3">
         <div className="flex flex-wrap gap-2">
@@ -298,10 +314,10 @@ export default function BrandMissionReviewsPage() {
         </div>
       </section>
 
-      {activeTab === "transcript-reviews" ? <BrandMissionTranscriptReviewsTab /> : null}
-      {activeTab === "applications" ? <BrandMissionApplicationsTab /> : null}
-      {activeTab === "video-reviews" ? <BrandMissionVideoReviewsTab /> : null}
-      {activeTab === "final-reviews" ? <BrandMissionFinalReviewsTab /> : null}
+      {activeTab === "transcript-reviews" ? <BrandMissionTranscriptReviewsTab apiBasePath={apiBasePath} /> : null}
+      {activeTab === "applications" ? <BrandMissionApplicationsTab apiBasePath={apiBasePath} /> : null}
+      {activeTab === "video-reviews" ? <BrandMissionVideoReviewsTab apiBasePath={apiBasePath} /> : null}
+      {activeTab === "final-reviews" ? <BrandMissionFinalReviewsTab apiBasePath={apiBasePath} /> : null}
     </>
   );
 }
@@ -360,7 +376,7 @@ function transcriptStatusTone(value: string) {
   return "bg-zinc-100 text-zinc-700";
 }
 
-function BrandMissionTranscriptReviewsTab() {
+function BrandMissionTranscriptReviewsTab({ apiBasePath }: { apiBasePath: string }) {
   const [items, setItems] = useState<TranscriptItem[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
@@ -386,7 +402,7 @@ function BrandMissionTranscriptReviewsTab() {
       params.set("page", String(targetPage));
       params.set("limit", "20");
 
-      const res = await fetch(`/api/brand/dashboard/mission-transcript-reviews?${params.toString()}`, { cache: "no-store" });
+      const res = await fetch(`${apiBasePath}/mission-transcript-reviews?${params.toString()}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<TranscriptListResponse>;
       if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? "Không thể tải danh sách");
       setItems(body.data.items);
@@ -402,7 +418,7 @@ function BrandMissionTranscriptReviewsTab() {
     setSelectedId(id);
     setDetailLoading(true);
     try {
-      const res = await fetch(`/api/brand/dashboard/mission-transcript-reviews/${id}`, { cache: "no-store" });
+      const res = await fetch(`${apiBasePath}/mission-transcript-reviews/${id}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<TranscriptItem>;
       if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? "Không thể tải chi tiết");
       setDetail(body.data);
@@ -418,7 +434,7 @@ function BrandMissionTranscriptReviewsTab() {
     setError("");
     if (!window.confirm("Xác nhận duyệt kịch bản này?")) return;
     try {
-      const res = await fetch(`/api/brand/dashboard/mission-transcript-reviews/${id}/approve`, { method: "POST" });
+      const res = await fetch(`${apiBasePath}/mission-transcript-reviews/${id}/approve`, { method: "POST" });
       const body = (await res.json()) as ApiResult<unknown>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Duyệt thất bại");
       setNotice("Đã duyệt kịch bản. Creator có thể nộp video review.");
@@ -435,7 +451,7 @@ function BrandMissionTranscriptReviewsTab() {
     const feedback = window.prompt("Nhập lý do từ chối kịch bản:", "Kịch bản chưa đạt yêu cầu brief")?.trim();
     if (!feedback) return;
     try {
-      const res = await fetch(`/api/brand/dashboard/mission-transcript-reviews/${id}/reject`, {
+      const res = await fetch(`${apiBasePath}/mission-transcript-reviews/${id}/reject`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ feedback })
@@ -664,7 +680,7 @@ function missionStatusTone(status: string) {
   return "bg-zinc-100 text-zinc-700";
 }
 
-function BrandMissionApplicationsTab() {
+function BrandMissionApplicationsTab({ apiBasePath }: { apiBasePath: string }) {
   const [items, setItems] = useState<ApplicationListItem[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
@@ -695,7 +711,7 @@ function BrandMissionApplicationsTab() {
       params.set("page", String(targetPage));
       params.set("limit", "20");
 
-      const res = await fetch(`/api/brand/dashboard/mission-applications?${params.toString()}`, { cache: "no-store" });
+      const res = await fetch(`${apiBasePath}/mission-applications?${params.toString()}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<ApplicationListResponse>;
       if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? "Không thể tải danh sách");
       setItems(body.data.items);
@@ -711,7 +727,7 @@ function BrandMissionApplicationsTab() {
     setSelectedId(id);
     setDetailLoading(true);
     try {
-      const res = await fetch(`/api/brand/dashboard/mission-applications/${id}`, { cache: "no-store" });
+      const res = await fetch(`${apiBasePath}/mission-applications/${id}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<ApplicationDetail>;
       if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? "Không thể tải chi tiết");
       setDetail(body.data);
@@ -727,7 +743,7 @@ function BrandMissionApplicationsTab() {
     setError("");
     if (!window.confirm("Xác nhận duyệt đơn này?")) return;
     try {
-      const res = await fetch(`/api/brand/dashboard/mission-applications/${id}/approve`, { method: "POST" });
+      const res = await fetch(`${apiBasePath}/mission-applications/${id}/approve`, { method: "POST" });
       const body = (await res.json()) as ApiResult<unknown>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Duyệt thất bại");
       setNotice("Đã duyệt đơn xin nhiệm vụ.");
@@ -744,7 +760,7 @@ function BrandMissionApplicationsTab() {
     const rejectReason = window.prompt("Nhập lý do từ chối:", "Chưa phù hợp yêu cầu mission")?.trim();
     if (!rejectReason) return;
     try {
-      const res = await fetch(`/api/brand/dashboard/mission-applications/${id}/reject`, {
+      const res = await fetch(`${apiBasePath}/mission-applications/${id}/reject`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rejectReason })
@@ -774,7 +790,7 @@ function BrandMissionApplicationsTab() {
       params.set("status", "COMPLETED");
       params.set("limit", "10");
       params.set("page", "1");
-      const res = await fetch(`/api/brand/dashboard/mission-history?${params.toString()}`, { cache: "no-store" });
+      const res = await fetch(`${apiBasePath}/mission-history?${params.toString()}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<CompletedMissionHistoryResponse>;
       if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? "Không thể tải lịch sử hoàn thành");
       setHistoryItems(body.data.items);
@@ -957,7 +973,7 @@ const videoStatusOptions = [
   { value: "REJECTED", label: "Đã từ chối" }
 ];
 
-function BrandMissionVideoReviewsTab() {
+function BrandMissionVideoReviewsTab({ apiBasePath }: { apiBasePath: string }) {
   const [items, setItems] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -982,7 +998,7 @@ function BrandMissionVideoReviewsTab() {
       params.set("page", String(targetPage));
       params.set("limit", "20");
 
-      const res = await fetch(`/api/brand/dashboard/mission-video-reviews?${params.toString()}`, { cache: "no-store" });
+      const res = await fetch(`${apiBasePath}/mission-video-reviews?${params.toString()}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<VideoListResponse>;
       if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? "Không thể tải danh sách");
       setItems(body.data.items);
@@ -998,7 +1014,7 @@ function BrandMissionVideoReviewsTab() {
     setSelectedId(id);
     setDetailLoading(true);
     try {
-      const res = await fetch(`/api/brand/dashboard/mission-video-reviews/${id}`, { cache: "no-store" });
+      const res = await fetch(`${apiBasePath}/mission-video-reviews/${id}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<VideoItem>;
       if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? "Không thể tải chi tiết");
       setDetail(body.data);
@@ -1014,13 +1030,13 @@ function BrandMissionVideoReviewsTab() {
     setError("");
     try {
       if (action === "approve") {
-        const res = await fetch(`/api/brand/dashboard/mission-video-reviews/${id}/approve`, { method: "POST" });
+        const res = await fetch(`${apiBasePath}/mission-video-reviews/${id}/approve`, { method: "POST" });
         const body = (await res.json()) as ApiResult<unknown>;
         if (!res.ok || !body.success) throw new Error(body.error ?? "Duyệt thất bại");
       } else {
         const feedback = window.prompt("Nhập feedback từ chối:", "Video chưa đạt guideline")?.trim();
         if (!feedback) return;
-        const res = await fetch(`/api/brand/dashboard/mission-video-reviews/${id}/reject`, {
+        const res = await fetch(`${apiBasePath}/mission-video-reviews/${id}/reject`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ feedback })
@@ -1174,7 +1190,7 @@ const finalProductOptions = [
   { value: "PRODUCT_REQUIRED", label: "Yêu cầu sản phẩm" }
 ];
 
-function BrandMissionFinalReviewsTab() {
+function BrandMissionFinalReviewsTab({ apiBasePath }: { apiBasePath: string }) {
   const [items, setItems] = useState<FinalItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1199,7 +1215,7 @@ function BrandMissionFinalReviewsTab() {
       params.set("publishStatus", "PENDING");
       params.set("page", String(targetPage));
       params.set("limit", "20");
-      const res = await fetch(`/api/brand/dashboard/mission-final-reviews?${params.toString()}`, { cache: "no-store" });
+      const res = await fetch(`${apiBasePath}/mission-final-reviews?${params.toString()}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<FinalListResponse>;
       if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? "Không thể tải danh sách");
       setItems(body.data.items);
@@ -1215,7 +1231,7 @@ function BrandMissionFinalReviewsTab() {
     setSelectedId(id);
     setDetailLoading(true);
     try {
-      const res = await fetch(`/api/brand/dashboard/mission-final-reviews/${id}`, { cache: "no-store" });
+      const res = await fetch(`${apiBasePath}/mission-final-reviews/${id}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<FinalItem>;
       if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? "Không thể tải chi tiết");
       setDetail(body.data);
@@ -1241,7 +1257,7 @@ function BrandMissionFinalReviewsTab() {
       reimbursementAmountVnd = Math.floor(parsed);
     }
     try {
-      const res = await fetch(`/api/brand/dashboard/mission-final-reviews/${item.id}/approve`, {
+      const res = await fetch(`${apiBasePath}/mission-final-reviews/${item.id}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reimbursementAmountVnd })
@@ -1262,7 +1278,7 @@ function BrandMissionFinalReviewsTab() {
     const feedback = window.prompt("Nhập feedback từ chối:", "Nội dung bước cuối chưa đạt")?.trim();
     if (!feedback) return;
     try {
-      const res = await fetch(`/api/brand/dashboard/mission-final-reviews/${id}/reject`, {
+      const res = await fetch(`${apiBasePath}/mission-final-reviews/${id}/reject`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ feedback })
@@ -1378,5 +1394,15 @@ function BrandMissionFinalReviewsTab() {
         </section>
       ) : null}
     </section>
+  );
+}
+
+export default function BrandMissionReviewsPage() {
+  return (
+    <MissionReviewsPage
+      pageTitle="Duyệt nhiệm vụ Creator"
+      subtitle="Quản lý 4 bước duyệt nhiệm vụ cho các campaign thuộc Brand của bạn."
+      apiBasePath="/api/brand/dashboard"
+    />
   );
 }

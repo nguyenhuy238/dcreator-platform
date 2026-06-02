@@ -51,7 +51,7 @@ const queueCards: Array<{ key: keyof AdminOverview["queues"]; title: string; hre
   { key: "brandPendingReview", title: "Brand cần giám sát", href: "/admin/brands" },
   { key: "creatorPendingReview", title: "Creator cần giám sát", href: "/admin/creators" },
   { key: "campaignPendingReview", title: "Campaign cần xử lý", href: "/admin/campaigns" },
-  { key: "contentSubmissionsPendingReview", title: "Proof/video pending", href: "/admin/proofs" },
+  { key: "contentSubmissionsPendingReview", title: "Duyệt nhiệm vụ Creator", href: "/admin/mission-reviews" },
   { key: "payoutPendingReview", title: "Payout pending", href: "/admin/payouts" },
 ];
 
