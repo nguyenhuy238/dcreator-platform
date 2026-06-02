@@ -5,12 +5,14 @@ import Link from "next/link";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 
 type CampaignType = "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
-type FilterType = "ALL" | "MASTER";
+type FeaturedType = "VIDEO_SEEDING" | "MASTER";
+type FilterType = "ALL" | FeaturedType;
 type FeaturedCampaignItem = {
   slug: string;
   title: string;
   brand: string;
   campaignType: CampaignType;
+  featuredType: FeaturedType;
   coverImageUrl?: string | null;
   backers: number;
   progressPercent: number;
@@ -21,18 +23,21 @@ type FeaturedCampaignItem = {
   creatorApplicants?: number;
 };
 
-const typeLabel: Record<FilterType, string> = { ALL: "Video seeding", MASTER: "Master Campaign" };
+const typeLabel: Record<FilterType, string> = {
+  ALL: "Tất cả",
+  VIDEO_SEEDING: "Video seeding",
+  MASTER: "Master Campaign"
+};
 
 export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCampaignItem[] }) {
   const [activeFilter, setActiveFilter] = useState<FilterType>("ALL");
   const [slideStart, setSlideStart] = useState(0);
-  const filters: FilterType[] = ["ALL", "MASTER"];
+  const filters: FilterType[] = ["ALL", "VIDEO_SEEDING", "MASTER"];
   const pageSize = 3;
 
   const filteredCampaigns = useMemo(() => {
-    if (activeFilter === "MASTER") return campaigns;
     if (activeFilter === "ALL") return campaigns;
-    return campaigns;
+    return campaigns.filter((campaign) => campaign.featuredType === activeFilter);
   }, [activeFilter, campaigns]);
 
   useEffect(() => {
@@ -101,7 +106,7 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/55 via-zinc-950/10 to-transparent" />
                 <div className="absolute left-3 top-3 rounded-full border border-white/25 bg-zinc-900/65 px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-white">
-                  Video seeding
+                  {typeLabel[campaign.featuredType]}
                 </div>
               </div>
 
