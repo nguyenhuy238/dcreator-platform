@@ -50,22 +50,6 @@ function statusText(value?: unknown) {
   return "Chưa gửi";
 }
 
-function resolveAvatarSrc(input?: string | null) {
-  const raw = (input ?? "").trim();
-  if (!raw) return "";
-
-  try {
-    const parsed = new URL(raw);
-    if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
-      return `${parsed.pathname}${parsed.search}`;
-    }
-    return raw;
-  } catch {
-    if (raw.startsWith("/")) return raw;
-    return "";
-  }
-}
-
 export default function UserProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -78,7 +62,6 @@ export default function UserProfilePage() {
   const [submittingCreator, setSubmittingCreator] = useState(false);
   const [submittingBrand, setSubmittingBrand] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [avatarLoadError, setAvatarLoadError] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -119,11 +102,6 @@ export default function UserProfilePage() {
   const sidebarItems = useMemo(() => {
     return nav;
   }, []);
-  const avatarSrc = useMemo(() => resolveAvatarSrc(data?.account.avatarUrl), [data?.account.avatarUrl]);
-
-  useEffect(() => {
-    setAvatarLoadError(false);
-  }, [avatarSrc]);
 
   async function submitCreator(event: FormEvent) {
     event.preventDefault();
@@ -217,7 +195,6 @@ export default function UserProfilePage() {
           }
         };
       });
-      setAvatarLoadError(false);
       setSuccess("Đã cập nhật ảnh đại diện.");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Không thể tải ảnh đại diện");
@@ -234,6 +211,9 @@ export default function UserProfilePage() {
   const brandStatus = data.brandApplication?.status as string | undefined;
   const isCreator = Boolean(data.account.hasCreatorProfile) || data.account.roles.includes("CREATOR");
   const hasBrand = (data.account.brandMemberships?.length ?? 0) > 0;
+  const displayName = data.account.displayName?.trim() || "User Demo";
+  const email = data.account.email?.trim() || "user@dcreator.local";
+  const phone = data.account.profile?.phone?.trim() || "Chưa có";
 
   return (
     <>
@@ -243,46 +223,36 @@ export default function UserProfilePage() {
         {error ? <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
         {success ? <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p> : null}
 
-        <section id="role-requests" className="mt-6 grid gap-4 md:grid-cols-2">
-          <div className="dc-card p-5">
+        <section id="role-requests" className="mt-6">
+          <div className="dc-card p-5 md:p-6">
             <h2 className="text-xl font-bold">Thông tin cá nhân</h2>
-            <div className="mt-3 flex items-center gap-3">
-              {avatarSrc && !avatarLoadError ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={avatarSrc}
-                  alt={data.account.displayName || "User avatar"}
-                  className="h-12 w-12 rounded-xl border border-zinc-200 object-cover"
-                  onError={() => setAvatarLoadError(true)}
-                />
-              ) : (
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-900 text-sm font-bold text-white">
-                  {data.account.displayName.slice(0, 1).toUpperCase() || "U"}
+            <div className="mt-4 flex flex-col gap-5 md:flex-row md:items-center md:gap-8">
+              <div className="flex shrink-0 flex-col items-start gap-3 sm:flex-row sm:items-center md:flex-col md:items-start">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-900 text-xl font-bold text-white shadow-sm">
+                  {displayName.slice(0, 1).toUpperCase() || "U"}
                 </div>
-              )}
-              <label className="dc-btn-secondary cursor-pointer">
-                {uploadingAvatar ? "Đang tải..." : "Tải ảnh đại diện"}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  className="hidden"
-                  disabled={uploadingAvatar}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0] ?? null;
-                    if (file) void uploadAvatar(file);
-                    event.target.value = "";
-                  }}
-                />
-              </label>
+                <label className="dc-btn-secondary cursor-pointer">
+                  {uploadingAvatar ? "Đang tải..." : "Tải ảnh đại diện"}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    disabled={uploadingAvatar}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      if (file) void uploadAvatar(file);
+                      event.target.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+              <div className="grid min-w-0 flex-1 gap-x-8 gap-y-2 sm:grid-cols-2">
+                <p className="text-sm">Tên hiển thị: <span className="font-semibold">{displayName}</span></p>
+                <p className="text-sm">Email: <span className="break-all font-semibold">{email}</span></p>
+                <p className="text-sm">Số điện thoại: <span className="font-semibold">{phone}</span></p>
+                <p className="text-sm">Trạng thái: <span className="font-semibold">User</span></p>
+              </div>
             </div>
-            <p className="mt-2 text-sm">Tên hiển thị: <span className="font-semibold">{data.account.displayName}</span></p>
-            <p className="text-sm">Email: <span className="font-semibold">{data.account.email}</span></p>
-            <p className="text-sm">Số điện thoại: <span className="font-semibold">{data.account.profile?.phone ?? "Chưa có"}</span></p>
-          </div>
-          <div className="dc-card p-5">
-            <h2 className="text-xl font-bold">Vai trò & xác minh</h2>
-            <p className="mt-2 text-sm">Vai trò chính: <span className="font-semibold">{data.account.role}</span></p>
-            <p className="text-sm">Tất cả vai trò: <span className="font-semibold">{data.account.roles.join(", ")}</span></p>
           </div>
         </section>
 
