@@ -95,6 +95,17 @@ npm run check-types --workspace=apps/web
 npm run lint --workspace=apps/web
 ```
 
+## Production Image Storage
+
+Vercel must define `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and
+`SUPABASE_STORAGE_BUCKET=dcreator-uploads`.
+
+The `dcreator-uploads` bucket must be public because campaign covers use public
+Storage URLs. When changing Supabase projects, verify that `next.config.js`
+allows the new hostname and that an uploaded object exists under its expected
+path, for example `brand-logo/example.png`.
+
 ## E2E Smoke Checks
 
 Mobile visual regression (requires running app + Playwright installed):

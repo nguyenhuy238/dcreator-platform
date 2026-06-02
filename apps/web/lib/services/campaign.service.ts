@@ -1,5 +1,6 @@
 import { CampaignStatus, Prisma } from "@prisma/client";
 import { prisma } from "../db";
+import { resolveImageUrl } from "../images/resolve-image-url";
 
 export type ListCampaignsInput = {
   search?: string;
@@ -139,7 +140,7 @@ export async function listCampaigns(input: ListCampaignsInput) {
         id: campaign.id,
         slug: campaign.slug,
         title: campaign.title,
-        coverImageUrl: campaign.coverImageUrl,
+        coverImageUrl: resolveImageUrl(campaign.coverImageUrl),
         brand: campaign.brand.displayName,
         brandLogoUrl: campaign.brand.avatarUrl,
         creator: campaign.creator?.displayName ?? null,
