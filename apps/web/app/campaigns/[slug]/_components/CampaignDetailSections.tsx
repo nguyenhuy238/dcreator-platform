@@ -5,6 +5,7 @@ import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverIm
 import type { CampaignDetailDTO } from "@/lib/dto/campaign-detail";
 import { getCampaignTypeLabel } from "@/lib/constants/campaign-type";
 import { CAMPAIGN_IMAGE_FALLBACK, resolveImageUrl } from "@/lib/images/resolve-image-url";
+import { CampaignReviewProducts } from "./CampaignReviewProducts";
 import { formatDateTime } from "./campaign-detail.utils";
 
 const categoryLabel: Record<CampaignDetailDTO["hero"]["category"], string> = {
@@ -16,29 +17,21 @@ const categoryLabel: Record<CampaignDetailDTO["hero"]["category"], string> = {
   EDUCATION: "Giáo dục"
 };
 
+const fallbackRoadmap = [
+  "Đọc brief và đăng ký tham gia campaign.",
+  "Brand/Admin xét duyệt creator phù hợp.",
+  "Creator nhận yêu cầu nội dung và quay video review/seeding.",
+  "Creator gửi video để Brand/Admin kiểm duyệt.",
+  "Sau khi được duyệt, creator đăng video công khai theo đúng yêu cầu.",
+  "Brand/Admin kiểm tra bài đăng và hoàn tất nghiệm thu."
+];
+
+function stripStepPrefix(step: string) {
+  return step.replace(/^\s*(bước|step)\s*\d+\s*[:.)-]?\s*/i, "").trim();
+}
+
 function getAudienceLabel(value: CampaignDetailDTO["missions"][number]["audience"]) {
   return value === "CREATOR" ? "Nhà sáng tạo" : "Người dùng";
-}
-
-function getMissionStatusLabel(value: CampaignDetailDTO["missions"][number]["status"]) {
-  const map: Record<CampaignDetailDTO["missions"][number]["status"], string> = {
-    OPEN: "Đang mở",
-    SUBMITTED: "Đã nộp",
-    APPROVED: "Đã duyệt",
-    REJECTED: "Đã từ chối"
-  };
-  return map[value];
-}
-
-function getProductReceiveLabel(value: CampaignDetailDTO["missions"][number]["productReceiveOption"]) {
-  return value === "PRODUCT_REQUIRED" ? "Yêu cầu sản phẩm" : "Không yêu cầu sản phẩm";
-}
-
-function buildHeroMeta(data: CampaignDetailDTO) {
-  return {
-    startAt: data.timeline.approvedAt ?? data.timeline.createdAt,
-    endAt: data.hero.deadline
-  };
 }
 
 export function HeroSection({ data, applyCard }: { data: CampaignDetailDTO; applyCard: ReactNode }) {
@@ -46,184 +39,129 @@ export function HeroSection({ data, applyCard }: { data: CampaignDetailDTO; appl
   const showVideo = data.hero.coverMediaType === "video" && coverMediaUrl !== CAMPAIGN_IMAGE_FALLBACK;
 
   return (
-    <section className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-950 text-white">
+    <section className="relative min-h-[430px] overflow-hidden rounded-[32px] border border-zinc-200 bg-zinc-950 text-white shadow-xl md:min-h-[500px]">
       {showVideo ? (
-        <video className="h-[360px] w-full object-cover opacity-45 md:h-[460px]" src={coverMediaUrl} autoPlay muted loop playsInline />
+        <video className="absolute inset-0 h-full w-full object-cover opacity-60" src={coverMediaUrl} autoPlay muted loop playsInline />
       ) : (
-        <div className="relative h-[360px] w-full md:h-[460px]">
-          <CampaignCoverImage src={coverMediaUrl} alt={data.hero.title} className="object-cover opacity-45" sizes="100vw" priority />
-        </div>
+        <CampaignCoverImage src={coverMediaUrl} alt={data.hero.title} className="object-cover opacity-60" sizes="100vw" priority />
       )}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/50 to-black/90" />
-      <div className="absolute inset-0 p-5 md:p-8">
-        <div className="grid h-full gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
-          <div>
-            <span className="inline-flex rounded-full border border-zinc-300/60 bg-zinc-500/20 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-zinc-100">
-              {getCampaignTypeLabel()}
-            </span>
-            <h1 className="mt-4 max-w-4xl text-3xl font-black tracking-tight md:text-6xl">{data.hero.title}</h1>
-            <p className="mt-3 max-w-3xl text-sm text-zinc-100 md:text-base">Brand: {data.hero.brand}</p>
-          </div>
-          <div className="hidden lg:block">{applyCard}</div>
+      <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/45 to-black/95" />
+      <div className="relative grid min-h-[430px] gap-8 p-5 md:min-h-[500px] md:p-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-end">
+        <div className="self-end">
+          <span className="inline-flex rounded-full border border-emerald-200/40 bg-emerald-500/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-emerald-100">{getCampaignTypeLabel()}</span>
+          <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-tight md:text-6xl">{data.hero.title}</h1>
+          <p className="mt-3 text-base font-semibold text-zinc-100">Brand: {data.hero.brand}</p>
         </div>
+        <div className="hidden lg:block">{applyCard}</div>
       </div>
     </section>
   );
 }
 
-export function OverviewTab({ data }: { data: CampaignDetailDTO }) {
-  const heroMeta = buildHeroMeta(data);
-  const primaryMission = data.missions[0] ?? null;
-  const roadmap = data.hero.participationRoadmap;
-
+function CampaignDealOverview({ data }: { data: CampaignDetailDTO }) {
+  const mission = data.missions[0] ?? null;
+  const cards = [
+    { eyebrow: "QUYỀN LỢI", title: data.hero.benefits || "Nhận voucher/sản phẩm review Free", note: "Do Brand/Admin thiết lập", color: "from-emerald-50 to-teal-100" },
+    { eyebrow: "YÊU CẦU", title: mission?.description || "01 Video + 01 Đánh giá sản phẩm", note: mission ? `Đối tượng: ${getAudienceLabel(mission.audience)}` : "Theo brief campaign", color: "from-sky-50 to-cyan-100" },
+    { eyebrow: "THỜI HẠN", title: formatDateTime(mission?.deadline ?? data.hero.deadline), note: "Theo tiến độ campaign", color: "from-amber-50 to-orange-100" }
+  ];
   return (
-    <section className="grid gap-4">
-      <article className="dc-card p-5">
-        <h3 className="text-2xl font-black text-zinc-900">Thông tin chiến dịch</h3>
-        <div className="mt-3 grid gap-x-8 gap-y-2 text-sm text-zinc-700 md:grid-cols-2">
-          <p>Ngành hàng: {categoryLabel[data.hero.category]}</p>
-          <p>Loại chiến dịch: {getCampaignTypeLabel()}</p>
-          <p>Bắt đầu: {formatDateTime(heroMeta.startAt)}</p>
-          <p>Kết thúc: {formatDateTime(heroMeta.endAt)}</p>
-          <p>Mục tiêu chiến dịch: {data.hero.objective ?? "Đang cập nhật"}</p>
-          <p>Trạng thái: {data.hero.status}</p>
-        </div>
-        <p className="mt-3 text-slate-700">{data.hero.description}</p>
-      </article>
+    <section>
+      <h3 className="text-2xl font-black text-zinc-900">💎 Tổng Quan Deal</h3>
+      <div className="mt-4 grid gap-4 md:grid-cols-3">
+        {cards.map((card) => (
+          <article key={card.eyebrow} className={`rounded-[28px] border border-white/70 bg-gradient-to-br ${card.color} p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md`}>
+            <p className="text-xs font-black tracking-[0.18em] text-zinc-500">{card.eyebrow}</p>
+            <p className="mt-3 text-lg font-black text-zinc-900">{card.title}</p>
+            <p className="mt-2 text-xs font-medium text-zinc-600">{card.note}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
 
-      <article className="dc-card p-5">
-        <h3 className="text-2xl font-black text-zinc-900">Tiến độ video review</h3>
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
-          <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-600">Mục tiêu video</p>
-            <p className="mt-2 text-2xl font-black text-zinc-900">{data.videoStats.targetVideos}</p>
-          </div>
-          <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-600">Video đã duyệt</p>
-            <p className="mt-2 text-2xl font-black text-zinc-900">{data.videoStats.approvedVideos}</p>
-          </div>
-          <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-600">Creator đã tham gia</p>
-            <p className="mt-2 text-2xl font-black text-zinc-900">{data.videoStats.creatorJoined}</p>
-          </div>
-        </div>
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-100">
-          <div className="h-full bg-zinc-900 transition-all" style={{ width: `${data.videoStats.completionPercent}%` }} />
-        </div>
-        <p className="mt-2 text-xs text-zinc-500">
-          Tiến độ: {data.videoStats.completionPercent}% • Slot còn lại: {data.videoStats.remainingSlots}
-        </p>
-      </article>
+function CampaignRewardGames() {
+  return (
+    <section>
+      <h3 className="text-2xl font-black text-zinc-900">🎮 Trò chơi đổi thưởng</h3>
+      <div className="mt-4 rounded-[28px] border border-dashed border-zinc-300 bg-gradient-to-br from-zinc-50 to-emerald-50 p-6 text-sm text-zinc-600">
+        Chưa có trò chơi đổi thưởng cho campaign này.
+      </div>
+    </section>
+  );
+}
 
-      <article className="dc-card p-5">
-        <h3 className="text-2xl font-black text-zinc-900">Nhiệm vụ chính</h3>
-        {!primaryMission ? (
-          <p className="mt-3 text-sm text-zinc-600">Campaign chưa có nhiệm vụ.</p>
-        ) : (
-          <>
-            <div className="mt-3 grid gap-x-8 gap-y-2 text-sm text-zinc-700 md:grid-cols-2">
-              <p>Tên nhiệm vụ: {primaryMission.title}</p>
-              <p>Đối tượng: {getAudienceLabel(primaryMission.audience)}</p>
-              <p>Điểm thưởng: {primaryMission.rewardPoints.toLocaleString("vi-VN")} điểm</p>
-              <p>Hạn nộp: {formatDateTime(primaryMission.deadline)}</p>
-              <p>Yêu cầu sản phẩm: {getProductReceiveLabel(primaryMission.productReceiveOption)}</p>
-              <p>Làm lại: {primaryMission.allowRepeat ? "Có" : "Không"}</p>
-              <p>Trạng thái nhiệm vụ: {getMissionStatusLabel(primaryMission.status)}</p>
-            </div>
-            <p className="mt-3 text-slate-700">{primaryMission.description}</p>
-            {primaryMission.productReceiveOption === "PRODUCT_REQUIRED" ? (
-              <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-                <h4 className="text-base font-bold text-zinc-900">Thông tin sản phẩm cần review</h4>
-                <div className="mt-3 grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
-                  {primaryMission.productImageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={primaryMission.productImageUrl} alt={primaryMission.productName ?? "Sản phẩm"} className="h-44 w-full rounded-xl border border-zinc-200 object-cover" />
-                  ) : (
-                    <div className="h-44 rounded-xl border border-dashed border-zinc-300 bg-white" />
-                  )}
-                  <div className="grid gap-2 text-sm text-zinc-700">
-                    <p>Tên sản phẩm: {primaryMission.productName ?? "Đang cập nhật"}</p>
-                    <p>Mô tả: {primaryMission.productDescription ?? "Đang cập nhật"}</p>
-                    <p>
-                      Link sản phẩm:{" "}
-                      {primaryMission.productLink ? (
-                        <a href={primaryMission.productLink} target="_blank" rel="noreferrer" className="font-semibold text-zinc-900 underline">
-                          Xem sản phẩm
-                        </a>
-                      ) : (
-                        "Đang cập nhật"
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </>
-        )}
-      </article>
+function CampaignInfoDarkSection({ data }: { data: CampaignDetailDTO }) {
+  const mission = data.missions[0] ?? null;
+  const rows = [
+    ["Tên campaign", data.hero.title],
+    ["Brand", data.hero.brand],
+    ["Loại chiến dịch", getCampaignTypeLabel()],
+    ["Ngành hàng", categoryLabel[data.hero.category]],
+    ["Bắt đầu", formatDateTime(data.timeline.approvedAt ?? data.timeline.createdAt)],
+    ["Kết thúc", formatDateTime(data.hero.deadline)],
+    ["Trạng thái", data.hero.status],
+    ["Mục tiêu campaign", data.hero.objective ?? "Đang cập nhật"],
+    ["Điều kiện tham gia", mission ? getAudienceLabel(mission.audience) : "Đang cập nhật"]
+  ];
+  return (
+    <section className="rounded-[32px] bg-zinc-950 p-5 text-white shadow-xl md:p-7">
+      <h3 className="text-2xl font-black">Thông Tin Chiến Dịch</h3>
+      <div className="mt-5 grid gap-x-8 gap-y-3 text-sm md:grid-cols-2">
+        {rows.map(([label, value]) => <p key={label}><span className="text-zinc-400">{label}:</span> <span className="font-semibold text-zinc-100">{value}</span></p>)}
+      </div>
+      <div className="mt-5 border-t border-white/10 pt-5">
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-300">Brief / mô tả</p>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-zinc-300">{data.hero.description || "Đang cập nhật"}</p>
+      </div>
+    </section>
+  );
+}
 
-      <article className="dc-card p-5">
-        <h3 className="text-2xl font-black text-zinc-900">Lộ trình tham gia</h3>
-        {roadmap.length === 0 ? (
-          <p className="mt-3 text-sm text-zinc-600">Đang cập nhật lộ trình.</p>
-        ) : (
-          <ol className="mt-3 grid gap-2">
-            {roadmap.map((step, index) => (
-              <li key={`${index + 1}-${step}`} className="rounded-2xl border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
-                <span className="font-bold text-zinc-900">Bước {index + 1}:</span> {step}
-              </li>
-            ))}
-          </ol>
-        )}
-      </article>
+function CampaignJoinTimeline({ data }: { data: CampaignDetailDTO }) {
+  const roadmap = (data.hero.participationRoadmap.length > 0 ? data.hero.participationRoadmap : fallbackRoadmap).map(stripStepPrefix).filter(Boolean);
+  return (
+    <section>
+      <h3 className="text-2xl font-black text-zinc-900">Lộ trình tham gia</h3>
+      <ol className="mt-4 grid gap-3 lg:grid-cols-3">
+        {roadmap.map((step, index) => (
+          <li key={`${index}-${step}`} className="relative rounded-[24px] border border-zinc-200 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900 text-sm font-black text-white">{index + 1}</span>
+            <p className="mt-3 text-sm leading-6 text-zinc-700">{step}</p>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+export function OverviewTab({ data }: { data: CampaignDetailDTO }) {
+  return (
+    <section className="grid gap-8">
+      <CampaignDealOverview data={data} />
+      <CampaignReviewProducts data={data} />
+      <CampaignRewardGames />
+      <CampaignInfoDarkSection data={data} />
+      <CampaignJoinTimeline data={data} />
     </section>
   );
 }
 
 export function BriefTab({ data }: { data: CampaignDetailDTO }) {
-  const primaryMission = data.missions[0] ?? null;
-  const submitGuide = [
-    "Đăng ký tham gia campaign và chờ duyệt.",
-    "Thực hiện nội dung theo mô tả nhiệm vụ và lộ trình ở trên.",
-    "Nộp bài theo đúng deadline, đính kèm đầy đủ link/chứng từ theo yêu cầu."
-  ];
-
+  const mission = data.missions[0] ?? null;
   return (
     <section className="grid gap-4">
       <article className="dc-card p-5">
         <h3 className="text-2xl font-black text-zinc-900">Yêu cầu & brief</h3>
-        <div className="mt-3 grid gap-2 text-slate-700">
-          <p>Campaign: {data.hero.title}</p>
+        <div className="mt-3 grid gap-2 text-zinc-700">
           <p>Mục tiêu: {data.hero.objective ?? "Đang cập nhật"}</p>
           <p>Quyền lợi: {data.hero.benefits ?? "Đang cập nhật"}</p>
           <p>Mô tả campaign: {data.hero.description}</p>
-          {primaryMission ? <p>Mô tả nhiệm vụ: {primaryMission.description}</p> : null}
+          {mission ? <p>Mô tả nhiệm vụ: {mission.description}</p> : null}
         </div>
       </article>
-
-      <article className="dc-card p-5">
-        <h3 className="text-2xl font-black text-zinc-900">Điều kiện tham gia</h3>
-        <div className="mt-3 grid gap-2 text-slate-700">
-          <p>Đối tượng: {primaryMission ? getAudienceLabel(primaryMission.audience) : "Nhà sáng tạo"}</p>
-          <p>Số lượng video review tối đa: {data.videoStats.targetVideos}</p>
-          <p>Slot còn lại: {data.videoStats.remainingSlots}</p>
-          <p>Hạn cuối chiến dịch: {formatDateTime(data.hero.deadline)}</p>
-          <p>Hạn cuối nhiệm vụ: {primaryMission ? formatDateTime(primaryMission.deadline) : "Đang cập nhật"}</p>
-          <p>Yêu cầu sản phẩm: {primaryMission ? getProductReceiveLabel(primaryMission.productReceiveOption) : "Đang cập nhật"}</p>
-        </div>
-      </article>
-
-      <article className="rounded-3xl border border-zinc-800 bg-zinc-900 p-5 text-zinc-100">
-        <h3 className="text-2xl font-black">Checklist nộp bài</h3>
-        <ol className="mt-3 grid gap-2">
-          {submitGuide.map((step, index) => (
-            <li key={step} className="flex items-start gap-2">
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-zinc-700 text-sm font-bold">{index + 1}</span>
-              <span>{step}</span>
-            </li>
-          ))}
-        </ol>
-      </article>
+      <CampaignJoinTimeline data={data} />
     </section>
   );
 }
