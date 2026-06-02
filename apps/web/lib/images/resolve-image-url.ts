@@ -14,11 +14,15 @@ function getSupabaseUrl() {
   return process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/+$/, "") ?? "";
 }
 
+export function normalizeImageUrlInput(input?: string | null): string {
+  return input?.replace(/\s+/g, "") ?? "";
+}
+
 export function resolveImageUrl(
   input?: string | null,
   fallback = CAMPAIGN_IMAGE_FALLBACK
 ): string {
-  const value = input?.trim();
+  const value = normalizeImageUrlInput(input);
   if (!value) return fallback;
   const supabaseUrl = getSupabaseUrl();
 

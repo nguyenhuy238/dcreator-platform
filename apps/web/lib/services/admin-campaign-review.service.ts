@@ -1,6 +1,7 @@
 import { CampaignStatus, NotificationEvent } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
+import { normalizeImageUrlInput } from "@/lib/images/resolve-image-url";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
 import { createNotification } from "@/lib/services/notification.service";
 import { assertStateTransition } from "@/lib/services/admin-transition.service";
@@ -53,6 +54,11 @@ async function syncCampaignUgcVideoQuota(campaignId: string, ugcVideoQuota: numb
       "CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED"
     );
   }
+}
+
+function sanitizeCampaignImageUrl(input?: string | null) {
+  const value = normalizeImageUrlInput(input);
+  return value || null;
 }
 
 const campaignTransitionMap: Record<AdminDecision, readonly CampaignStatus[]> = {
@@ -408,7 +414,7 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
         creatorCommissionPercent: 0,
         userCommissionPercent: 0,
         bonusBudgetVnd: 0,
-        coverImageUrl: input.imageUrl || null,
+        coverImageUrl: sanitizeCampaignImageUrl(input.imageUrl),
         startsAt,
         endsAt,
         feasibilityStatus: input.publishNow ? "APPROVED" : "DRAFT",
@@ -537,9 +543,7 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
   const nextImageUrl =
     input.imageUrl === undefined
       ? undefined
-      : input.imageUrl === ""
-        ? null
-        : input.imageUrl.trim();
+      : sanitizeCampaignImageUrl(input.imageUrl);
 
   const updated = await prisma.campaign.update({
     where: { id: campaignId },
