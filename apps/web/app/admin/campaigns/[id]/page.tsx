@@ -1,69 +1,199 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
+import { useParams, useRouter } from "next/navigation";
+import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
-import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, SectionCard, StatusBadge } from "@/app/components/dcreator/ui/base";
 
-type ApiResult<T> = { success: boolean; data: T; error?: string };
 type CampaignCategory = "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
 type CampaignType = "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
-type CampaignSetupSource = "JOIN_EXISTING_DCREATOR_CAMP" | "BRAND_REQUESTED";
-type NoticeState = { tone: "success" | "error"; message: string } | null;
+type SetupSource = "JOIN_EXISTING_DCREATOR_CAMP" | "BRAND_REQUESTED";
+type ProductReceiveOption = "PRODUCT_REQUIRED" | "NO_PRODUCT_REQUIRED";
+
+type ApiFailure = { success: false; error: string; code?: string; details?: unknown };
+type ApiResponse<T> = { success: true; data: T } | ApiFailure;
+type FieldErrors = Record<string, string | undefined>;
+type ImageSelectionState = {
+  source: "existing" | "upload" | "none";
+  fileName: string;
+};
+
+type MissionForm = {
+  title: string;
+  description: string;
+  rewardPoints: number;
+  rewardCommissionVnd: number;
+  productReceiveOption: ProductReceiveOption;
+  productName: string;
+  productDescription: string;
+  productLink: string;
+  productImageUrl: string;
+  allowRepeat: boolean;
+};
+
+type FormState = {
+  slug: string;
+  title: string;
+  category: CampaignCategory;
+  campaignType: CampaignType;
+  setupSource: SetupSource;
+  benefits: string;
+  participationRoadmap: string[];
+  imageUrl: string;
+  startsAt: string;
+  endsAt: string;
+  ugcVideoQuota: number;
+  mission: MissionForm;
+};
+
 type CampaignDetail = {
   id: string;
   slug: string;
   title: string;
-  brief: string;
-  coverImageUrl: string | null;
   category: CampaignCategory;
   campaignType: CampaignType;
-  setupSource: CampaignSetupSource;
+  setupSource: SetupSource;
   benefits: string | null;
   participationRoadmap: string[];
-  objective: string | null;
-  ugcVideoQuota: number | null;
-  isPublic: boolean;
-  status: string;
-  statusView: string;
+  coverImageUrl: string | null;
   startsAt: string | null;
   endsAt: string | null;
-  budgetVnd: number;
+  status: string;
+  statusView: string;
+  ugcVideoQuota: number | null;
   brand: { id: string; displayName: string; email: string };
-  brandProfile: { id: string; name: string; status: string; commissionRatePercent: number | null; revenueSharePercent: number | null } | null;
-  productSubmissions: Array<{
+  missions: Array<{
     id: string;
-    name: string;
-    reviewStatus: string;
-    inventoryBatches: Array<{ id: string; quantityRemaining: number; stockStatus: string }>;
+    title: string;
+    description: string;
+    rewardPoints: number;
+    rewardCommissionVnd: number;
+    productReceiveOption: ProductReceiveOption;
+    productName: string | null;
+    productDescription: string | null;
+    productLink: string | null;
+    productImageUrl: string | null;
+    allowRepeat: boolean;
   }>;
-  rewards: Array<{ id: string; title: string; pointsCost: number; stockTotal: number; stockRemaining: number }>;
-  missions: Array<{ id: string; title: string; audience: string }>;
-  kpiSnapshot: { targetAmountVnd: number; fundedAmountVnd: number; backerCount: number; contributionCount: number };
-  commission: { commissionRatePercent: number | null; revenueSharePercent: number | null };
-  quota: { creator: number; user: number };
 };
 
-function getStatusLabel(value: string) {
-  const map: Record<string, string> = {
-    DRAFT: "Bản nháp",
-    ACTIVE: "Đang hoạt động",
-    PAUSED: "Tạm dừng",
-    COMPLETED: "Đã hoàn thành",
-    ARCHIVED: "Đã lưu trữ",
-    APPROVED: "Đã duyệt",
-    REJECTED: "Đã từ chối",
-    PENDING_REVIEW: "Chờ duyệt",
-    NEEDS_REVISION: "Cần chỉnh sửa"
-  };
-  return map[value] ?? value;
+const DEFAULT_FORM: FormState = {
+  slug: "",
+  title: "",
+  category: "LIFESTYLE",
+  campaignType: "COMMUNITY",
+  setupSource: "BRAND_REQUESTED",
+  benefits: "",
+  participationRoadmap: [""],
+  imageUrl: "",
+  startsAt: "",
+  endsAt: "",
+  ugcVideoQuota: 1,
+  mission: {
+    title: "",
+    description: "",
+    rewardPoints: 0,
+    rewardCommissionVnd: 0,
+    productReceiveOption: "PRODUCT_REQUIRED",
+    productName: "",
+    productDescription: "",
+    productLink: "",
+    productImageUrl: "",
+    allowRepeat: false
+  }
+};
+
+const apiErrorFieldMap: Record<string, string> = {
+  CAMPAIGN_TIMELINE_INVALID: "endsAt",
+  MISSION_DEADLINE_INVALID: "endsAt",
+  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "ugcVideoQuota"
+};
+
+const apiErrorMessageMap: Record<string, string> = {
+  CAMPAIGN_TIMELINE_INVALID: "Ngày kết thúc phải sau ngày bắt đầu.",
+  MISSION_DEADLINE_INVALID: "Hạn nộp nhiệm vụ phải nằm trong thời gian chiến dịch.",
+  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "Hệ thống chưa cập nhật quota video UGC. Vui lòng chạy migration trước khi lưu thay đổi."
+};
+
+const fieldMessageMap: Record<string, string> = {
+  slug: "Đường dẫn công khai chưa hợp lệ. Chỉ dùng chữ thường, số và dấu gạch ngang.",
+  title: "Vui lòng nhập tên chiến dịch tối thiểu 3 ký tự.",
+  benefits: "Vui lòng nhập quyền lợi tối thiểu 3 ký tự.",
+  imageUrl: "Ảnh chưa hợp lệ. Vui lòng chọn file ảnh hoặc dùng URL /uploads, http, https.",
+  ugcVideoQuota: "Số lượng video review phải lớn hơn 0.",
+  startsAt: "Ngày bắt đầu chưa hợp lệ.",
+  endsAt: "Ngày kết thúc phải sau ngày bắt đầu.",
+  participationRoadmap: "Vui lòng nhập ít nhất 1 bước lộ trình tham gia.",
+  "mission.title": "Vui lòng nhập tên nhiệm vụ tối thiểu 3 ký tự.",
+  "mission.description": "Vui lòng nhập mô tả nhiệm vụ tối thiểu 10 ký tự.",
+  "mission.productName": "Vui lòng nhập tên sản phẩm.",
+  "mission.productDescription": "Vui lòng nhập mô tả sản phẩm.",
+  "mission.productLink": "Vui lòng nhập link sản phẩm.",
+  "mission.productImageUrl": "Vui lòng chọn ảnh sản phẩm."
+};
+
+function toDateTime(value: string) {
+  return value ? new Date(value).toISOString() : undefined;
 }
 
-function getAudienceLabel(value: string) {
-  if (value === "CREATOR") return "Nhà sáng tạo";
-  if (value === "USER") return "Người dùng";
-  return value;
+function toDateTimeLocalInput(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (num: number) => String(num).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function fieldErrorsText(message?: string) {
+  return message?.trim();
+}
+
+function buildMissionForm(mission?: CampaignDetail["missions"][number]): MissionForm {
+  return {
+    title: mission?.title ?? "",
+    description: mission?.description ?? "",
+    rewardPoints: mission?.rewardPoints ?? 0,
+    rewardCommissionVnd: mission?.rewardCommissionVnd ?? 0,
+    productReceiveOption: mission?.productReceiveOption ?? "PRODUCT_REQUIRED",
+    productName: mission?.productName ?? "",
+    productDescription: mission?.productDescription ?? "",
+    productLink: mission?.productLink ?? "",
+    productImageUrl: mission?.productImageUrl ?? "",
+    allowRepeat: mission?.allowRepeat ?? false
+  };
+}
+
+function buildForm(item: CampaignDetail): FormState {
+  return {
+    slug: item.slug,
+    title: item.title,
+    category: item.category,
+    campaignType: item.campaignType,
+    setupSource: item.setupSource,
+    benefits: item.benefits ?? "",
+    participationRoadmap: item.participationRoadmap.length > 0 ? item.participationRoadmap : [""],
+    imageUrl: item.coverImageUrl ?? "",
+    startsAt: toDateTimeLocalInput(item.startsAt),
+    endsAt: toDateTimeLocalInput(item.endsAt),
+    ugcVideoQuota: item.ugcVideoQuota ?? 1,
+    mission: buildMissionForm(item.missions[0])
+  };
+}
+
+function getApiFieldErrors(payload: ApiFailure) {
+  const nextErrors: FieldErrors = {};
+  const details = payload.details as { fieldErrors?: Record<string, string[]>; formErrors?: string[] } | undefined;
+  if (details?.fieldErrors) {
+    for (const [field, messages] of Object.entries(details.fieldErrors)) {
+      const targetField = field === "mission" ? "mission.description" : field;
+      nextErrors[targetField] = fieldMessageMap[targetField] ?? fieldErrorsText(messages[0]);
+    }
+  }
+  const mappedField = payload.code ? apiErrorFieldMap[payload.code] : undefined;
+  if (mappedField) {
+    nextErrors[mappedField] = payload.code ? apiErrorMessageMap[payload.code] ?? fieldErrorsText(payload.error) : fieldErrorsText(payload.error);
+  }
+  return nextErrors;
 }
 
 export default function AdminCampaignDetailPage() {
@@ -71,177 +201,232 @@ export default function AdminCampaignDetailPage() {
   const router = useRouter();
   const id = params?.id;
   const [loading, setLoading] = useState(true);
-  const [pageError, setPageError] = useState("");
-  const [notice, setNotice] = useState<NoticeState>(null);
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
   const [item, setItem] = useState<CampaignDetail | null>(null);
-  const [acting, setActing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingProductImage, setUploadingProductImage] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [confirmAction, setConfirmAction] = useState<null | "pause" | "reject" | "request-changes">(null);
-  const [editing, setEditing] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [editForm, setEditForm] = useState({
-    slug: "",
-    title: "",
-    brief: "",
-    imageUrl: "",
-    category: "LIFESTYLE" as CampaignCategory,
-    campaignType: "COMMUNITY" as CampaignType,
-    setupSource: "BRAND_REQUESTED" as CampaignSetupSource,
-    benefits: "",
-    objective: "",
-    participationRoadmap: [""],
-    ugcVideoQuota: 1,
-    isPublic: true,
-    startsAt: "",
-    endsAt: "",
-    budgetVnd: 0,
-    targetAmountVnd: 0
-  });
+  const [form, setForm] = useState<FormState>(DEFAULT_FORM);
+  const [coverImageState, setCoverImageState] = useState<ImageSelectionState>({ source: "none", fileName: "" });
+  const [productImageState, setProductImageState] = useState<ImageSelectionState>({ source: "none", fileName: "" });
 
-  function showNotice(tone: "success" | "error", message: string) {
-    setNotice({ tone, message });
-    window.setTimeout(() => {
-      setNotice((current) => (current?.message === message ? null : current));
-    }, 2200);
-  }
-
-  const load = useCallback(async () => {
-    if (!id) return;
-    setLoading(true);
-    setPageError("");
-    try {
-      const res = await fetch(`/api/admin/campaigns/${id}`, { cache: "no-store" });
-      const body = (await res.json()) as ApiResult<CampaignDetail>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải chi tiết chiến dịch thất bại");
-      setItem(body.data);
-      setEditForm({
-        slug: body.data.slug,
-        title: body.data.title,
-        brief: body.data.brief,
-        imageUrl: body.data.coverImageUrl ?? "",
-        category: body.data.category,
-        campaignType: body.data.campaignType,
-        setupSource: body.data.setupSource,
-        benefits: body.data.benefits ?? "",
-        objective: body.data.objective ?? "",
-        participationRoadmap: body.data.participationRoadmap.length > 0 ? body.data.participationRoadmap : [""],
-        ugcVideoQuota: body.data.ugcVideoQuota ?? 1,
-        isPublic: body.data.isPublic,
-        startsAt: body.data.startsAt ? new Date(body.data.startsAt).toISOString().slice(0, 16) : "",
-        endsAt: body.data.endsAt ? new Date(body.data.endsAt).toISOString().slice(0, 16) : "",
-        budgetVnd: body.data.budgetVnd,
-        targetAmountVnd: body.data.kpiSnapshot.targetAmountVnd
-      });
-    } catch (e) {
-      setPageError(e instanceof Error ? e.message : "Tải chi tiết chiến dịch thất bại");
-    } finally {
-      setLoading(false);
-    }
+  const loadCampaign = useCallback(async () => {
+    if (!id) return null;
+    const res = await fetch(`/api/admin/campaigns/${id}`, { cache: "no-store" });
+    const body = (await res.json()) as ApiResponse<CampaignDetail>;
+    if (!res.ok || !body.success) throw new Error(body.success ? "Tải chi tiết chiến dịch thất bại" : fieldErrorsText(body.error) || "Tải chi tiết chiến dịch thất bại");
+    return body.data;
   }, [id]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let mounted = true;
+
+    async function loadInitial() {
+      setLoading(true);
+      setError("");
+      try {
+        const data = await loadCampaign();
+        if (!mounted || !data) return;
+        setItem(data);
+        setForm(buildForm(data));
+        setCoverImageState({ source: data.coverImageUrl ? "existing" : "none", fileName: "" });
+        setProductImageState({ source: data.missions[0]?.productImageUrl ? "existing" : "none", fileName: "" });
+      } catch (loadError) {
+        if (!mounted) return;
+        setError(loadError instanceof Error ? loadError.message : "Tải chi tiết chiến dịch thất bại");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    void loadInitial();
+    return () => {
+      mounted = false;
+    };
+  }, [loadCampaign]);
+
+  function setField<K extends keyof FormState>(name: K, value: FormState[K]) {
+    setForm((current) => ({ ...current, [name]: value }));
+    setFieldErrors((current) => ({ ...current, [name]: undefined }));
+  }
+
+  function setMissionField<K extends keyof MissionForm>(name: K, value: MissionForm[K]) {
+    setForm((current) => ({ ...current, mission: { ...current.mission, [name]: value } }));
+    setFieldErrors((current) => ({ ...current, [`mission.${String(name)}`]: undefined }));
+  }
+
+  function setRoadmapStep(index: number, value: string) {
+    setForm((current) => ({
+      ...current,
+      participationRoadmap: current.participationRoadmap.map((item, idx) => (idx === index ? value : item))
+    }));
+    setFieldErrors((current) => ({ ...current, participationRoadmap: undefined }));
+  }
+
+  function addRoadmapStep() {
+    setForm((current) => ({ ...current, participationRoadmap: [...current.participationRoadmap, ""] }));
+  }
+
+  function removeRoadmapStep(index: number) {
+    setForm((current) => ({
+      ...current,
+      participationRoadmap: current.participationRoadmap.filter((_, idx) => idx !== index)
+    }));
+  }
+
+  async function uploadImage(file: File, target: "cover" | "product" = "cover") {
+    if (target === "cover") setUploadingCover(true);
+    else setUploadingProductImage(true);
+    setError("");
+    if (target === "cover") setCoverImageState({ source: "upload", fileName: file.name });
+    else setProductImageState({ source: "upload", fileName: file.name });
+    try {
+      const formData = new FormData();
+      formData.set("logo", file);
+      const response = await fetch("/api/uploads/brand-logo", { method: "POST", body: formData });
+      const payload = (await response.json()) as ApiResponse<{ logoUrl: string }>;
+      if (!response.ok || !payload.success) throw new Error(payload.success ? "Upload ảnh thất bại." : fieldErrorsText(payload.error) || "Upload ảnh thất bại.");
+      if (target === "cover") setField("imageUrl", payload.data.logoUrl);
+      else setMissionField("productImageUrl", payload.data.logoUrl);
+    } catch (uploadError) {
+      const message = uploadError instanceof Error ? uploadError.message : "Upload ảnh thất bại.";
+      const targetField = target === "cover" ? "imageUrl" : "mission.productImageUrl";
+      if (target === "cover") setCoverImageState({ source: item?.coverImageUrl ? "existing" : "none", fileName: "" });
+      else setProductImageState({ source: item?.missions[0]?.productImageUrl ? "existing" : "none", fileName: "" });
+      setFieldErrors((current) => ({ ...current, [targetField]: fieldErrorsText(message) || "Upload ảnh thất bại." }));
+      setError(fieldErrorsText(message) || "Upload ảnh thất bại.");
+    } finally {
+      if (target === "cover") setUploadingCover(false);
+      else setUploadingProductImage(false);
+    }
+  }
+
+  function validateForm() {
+    const nextErrors: FieldErrors = {};
+    const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+    const imageUrl = form.imageUrl.trim();
+
+    if (form.slug.trim().length < 3) nextErrors.slug = "Slug cần tối thiểu 3 ký tự.";
+    else if (!slugPattern.test(form.slug.trim())) nextErrors.slug = "Slug chỉ gồm chữ thường, số và dấu gạch ngang (-).";
+    if (form.title.trim().length < 3) nextErrors.title = "Tên chiến dịch cần tối thiểu 3 ký tự.";
+    if (form.benefits.trim().length < 3) nextErrors.benefits = "Quyền lợi cần tối thiểu 3 ký tự.";
+    if (imageUrl && !imageUrl.startsWith("/uploads/") && !/^https?:\/\//.test(imageUrl)) {
+      nextErrors.imageUrl = "Ảnh phải là URL bắt đầu bằng /uploads/ hoặc http(s)://";
+    }
+    if (!Number.isInteger(form.ugcVideoQuota) || form.ugcVideoQuota <= 0) {
+      nextErrors.ugcVideoQuota = "Số lượng video review phải lớn hơn 0.";
+    }
+    if (!form.participationRoadmap.some((item) => item.trim().length > 0)) {
+      nextErrors.participationRoadmap = "Cần ít nhất 1 bước lộ trình tham gia.";
+    }
+    if (form.startsAt && form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) {
+      nextErrors.endsAt = "Ngày kết thúc phải sau ngày bắt đầu.";
+    }
+    if (form.mission.title.trim().length < 3) nextErrors["mission.title"] = "Tên nhiệm vụ cần tối thiểu 3 ký tự.";
+    if (form.mission.description.trim().length < 10) nextErrors["mission.description"] = "Mô tả nhiệm vụ cần tối thiểu 10 ký tự.";
+    if (form.mission.productReceiveOption === "PRODUCT_REQUIRED") {
+      if (!form.mission.productName.trim()) nextErrors["mission.productName"] = "Vui lòng nhập tên sản phẩm.";
+      if (!form.mission.productDescription.trim()) nextErrors["mission.productDescription"] = "Vui lòng nhập mô tả sản phẩm.";
+      if (!form.mission.productLink.trim()) nextErrors["mission.productLink"] = "Vui lòng nhập link sản phẩm.";
+      if (!form.mission.productImageUrl.trim()) nextErrors["mission.productImageUrl"] = "Vui lòng chọn ảnh sản phẩm.";
+    }
+    return nextErrors;
+  }
+
+  async function saveCampaign() {
+    if (!item) return;
+    const nextErrors = validateForm();
+    if (Object.values(nextErrors).some(Boolean)) {
+      setFieldErrors(nextErrors);
+      setError("Vui lòng kiểm tra các trường được đánh dấu đỏ.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    setFieldErrors({});
+    try {
+      const response = await fetch(`/api/admin/campaigns/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug: form.slug,
+          title: form.title,
+          category: form.category,
+          campaignType: form.campaignType,
+          setupSource: form.setupSource,
+          benefits: form.benefits,
+          participationRoadmap: form.participationRoadmap.filter((step) => step.trim().length > 0),
+          imageUrl: form.imageUrl,
+          startsAt: toDateTime(form.startsAt),
+          endsAt: toDateTime(form.endsAt),
+          ugcVideoQuota: form.ugcVideoQuota,
+          mission: {
+            title: form.mission.title,
+            description: form.mission.description,
+            rewardPoints: form.mission.rewardPoints,
+            rewardCommissionVnd: form.mission.rewardCommissionVnd,
+            productReceiveOption: form.mission.productReceiveOption,
+            productName: form.mission.productReceiveOption === "PRODUCT_REQUIRED" ? form.mission.productName : "",
+            productDescription: form.mission.productReceiveOption === "PRODUCT_REQUIRED" ? form.mission.productDescription : "",
+            productLink: form.mission.productReceiveOption === "PRODUCT_REQUIRED" ? form.mission.productLink : "",
+            productImageUrl: form.mission.productReceiveOption === "PRODUCT_REQUIRED" ? form.mission.productImageUrl : "",
+            allowRepeat: form.mission.allowRepeat
+          }
+        })
+      });
+      const payload = (await response.json()) as ApiResponse<CampaignDetail>;
+      if (!response.ok || !payload.success) {
+        if (!payload.success) {
+          const apiFieldErrors = getApiFieldErrors(payload);
+          if (Object.values(apiFieldErrors).some(Boolean)) setFieldErrors(apiFieldErrors);
+          throw new Error(fieldErrorsText(payload.error) || "Không thể cập nhật chiến dịch");
+        }
+        throw new Error("Không thể cập nhật chiến dịch");
+      }
+      const refreshed = await loadCampaign();
+      if (refreshed) {
+        setItem(refreshed);
+        setForm(buildForm(refreshed));
+      }
+      setToast("Đã cập nhật chiến dịch");
+      setTimeout(() => setToast(""), 1800);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Không thể cập nhật chiến dịch");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function act(action: "approve" | "reject" | "request-changes" | "pause", reason?: string) {
     if (!item) return;
     if (action !== "approve" && !reason?.trim()) {
-      showNotice("error", "Vui lòng nhập lý do trước khi thực hiện thao tác.");
+      setError("Vui lòng nhập lý do.");
       return;
     }
-    setActing(true);
+    setSaving(true);
+    setError("");
     try {
       const res = await fetch(`/api/admin/campaigns/${item.id}/${action}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: action === "approve" ? JSON.stringify({}) : JSON.stringify({ reason: reason?.trim() })
       });
-      const body = (await res.json()) as ApiResult<unknown>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Thao tác thất bại");
-      showNotice("success", "Đã cập nhật trạng thái campaign.");
-      await load();
-    } catch (e) {
-      showNotice("error", e instanceof Error ? e.message : "Thao tác thất bại");
+      const body = (await res.json()) as ApiResponse<unknown>;
+      if (!res.ok || !body.success) throw new Error(body.success ? "Thao tác thất bại" : fieldErrorsText(body.error) || "Thao tác thất bại");
+      setToast("Đã cập nhật trạng thái chiến dịch");
+      setTimeout(() => setToast(""), 1800);
+      const refreshed = await loadCampaign();
+      if (refreshed) {
+        setItem(refreshed);
+        setForm(buildForm(refreshed));
+      }
+    } catch (actError) {
+      setError(actError instanceof Error ? actError.message : "Thao tác thất bại");
     } finally {
-      setActing(false);
-    }
-  }
-
-  async function uploadCoverImage(file: File) {
-    setUploadingImage(true);
-    try {
-      const formData = new FormData();
-      formData.set("logo", file);
-      const response = await fetch("/api/uploads/brand-logo", { method: "POST", body: formData });
-      const payload = (await response.json()) as ApiResult<{ logoUrl: string }>;
-      if (!response.ok || !payload.success) throw new Error(payload.success ? "Upload ảnh thất bại" : payload.error);
-      setEditForm((current) => ({ ...current, imageUrl: payload.data.logoUrl }));
-      showNotice("success", "Đã tải ảnh campaign.");
-    } catch (uploadError) {
-      showNotice("error", uploadError instanceof Error ? uploadError.message : "Upload ảnh thất bại");
-    } finally {
-      setUploadingImage(false);
-    }
-  }
-
-  function setRoadmapStep(index: number, value: string) {
-    setEditForm((current) => ({
-      ...current,
-      participationRoadmap: current.participationRoadmap.map((step, stepIndex) => (stepIndex === index ? value : step))
-    }));
-  }
-
-  function addRoadmapStep() {
-    setEditForm((current) => ({
-      ...current,
-      participationRoadmap: [...current.participationRoadmap, ""]
-    }));
-  }
-
-  function removeRoadmapStep(index: number) {
-    setEditForm((current) => ({
-      ...current,
-      participationRoadmap: current.participationRoadmap.length === 1
-        ? current.participationRoadmap
-        : current.participationRoadmap.filter((_, stepIndex) => stepIndex !== index)
-    }));
-  }
-
-  async function saveEdit() {
-    if (!item) return;
-    setActing(true);
-    try {
-      const res = await fetch(`/api/admin/campaigns/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          slug: editForm.slug,
-          title: editForm.title,
-          brief: editForm.brief,
-          imageUrl: editForm.imageUrl,
-          category: editForm.category,
-          campaignType: editForm.campaignType,
-          setupSource: editForm.setupSource,
-          benefits: editForm.benefits,
-          objective: editForm.objective,
-          participationRoadmap: editForm.participationRoadmap.filter((itemValue) => itemValue.trim().length > 0),
-          ugcVideoQuota: Number(editForm.ugcVideoQuota),
-          isPublic: editForm.isPublic,
-          startsAt: editForm.startsAt ? new Date(editForm.startsAt).toISOString() : null,
-          endsAt: editForm.endsAt ? new Date(editForm.endsAt).toISOString() : null,
-          budgetVnd: Number(editForm.budgetVnd),
-          targetAmountVnd: Number(editForm.targetAmountVnd),
-          reason: "Cập nhật thông tin campaign từ admin"
-        })
-      });
-      const body = (await res.json()) as ApiResult<unknown>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Cập nhật campaign thất bại");
-      showNotice("success", "Đã cập nhật campaign.");
-      setEditing(false);
-      await load();
-    } catch (e) {
-      showNotice("error", e instanceof Error ? e.message : "Cập nhật campaign thất bại");
-    } finally {
-      setActing(false);
+      setSaving(false);
     }
   }
 
@@ -249,227 +434,356 @@ export default function AdminCampaignDetailPage() {
     return (
       <>
         <PageHeader title="Chi tiết chiến dịch" subtitle="Đang tải dữ liệu..." />
-        <LoadingSkeleton rows={6} />
+        <LoadingSkeleton rows={8} />
       </>
     );
   }
 
-  if (pageError || !item) {
-    return <ErrorState title="Không tải được campaign detail" description={pageError || "Lỗi không xác định"} onRetry={() => void load()} />;
+  if (error && !item) {
+    return <ErrorState title="Không tải được chiến dịch" description={error} onRetry={() => window.location.reload()} />;
+  }
+
+  if (!item) {
+    return <ErrorState title="Không tải được chiến dịch" description="Không tìm thấy dữ liệu." onRetry={() => window.location.reload()} />;
   }
 
   return (
     <>
       <PageHeader
-        title={item.title}
-        subtitle={`Brand: ${item.brand.displayName}`}
+        title="Chỉnh sửa chiến dịch"
+        subtitle={`Brand: ${item.brand.displayName} • ${item.slug}`}
         action={
-          <div className="flex gap-2">
-            <button className="dc-btn-secondary" onClick={() => router.push(`/admin/campaigns/${item.id}/applications`)}>Đơn đăng ký</button>
-            <button className="dc-btn-secondary" onClick={() => router.push("/admin/campaigns")}>Quay lại</button>
+          <div className="flex flex-wrap gap-2">
+            <button className="dc-btn-secondary" onClick={() => router.push(`/admin/campaigns/${item.id}/applications`)}>
+              Đơn đăng ký
+            </button>
+            <button className="dc-btn-secondary" onClick={() => router.push("/admin/campaigns")}>
+              Quay lại
+            </button>
           </div>
         }
       />
-      <SectionCard title="Campaign status">
-        <div className="flex items-center justify-between">
-          <StatusBadge status={item.statusView.toLowerCase()} />
-        </div>
-        <div className="mt-3 grid gap-2 text-sm text-zinc-700">
-          <p>Slug: /campaigns/{item.slug}</p>
-          <p>Brief: {item.brief}</p>
-          <p>Category / Type: {item.category} / {item.campaignType}</p>
-          <p>Setup source: {item.setupSource}</p>
-          <p>Mục tiêu: {item.objective ?? "Không có"}</p>
-          <p>Quyền lợi: {item.benefits ?? "Không có"}</p>
-          <p>UGC video quota: {item.ugcVideoQuota ?? "Không có"} • Public: {item.isPublic ? "Có" : "Không"}</p>
-          <p>Timeline: {item.startsAt ? new Date(item.startsAt).toLocaleString("vi-VN") : "Không có"} - {item.endsAt ? new Date(item.endsAt).toLocaleString("vi-VN") : "Không có"}</p>
-          <p>Budget: {item.budgetVnd.toLocaleString("vi-VN")} VND</p>
-          <p>KPI: Target {item.kpiSnapshot.targetAmountVnd.toLocaleString("vi-VN")} / Funded {item.kpiSnapshot.fundedAmountVnd.toLocaleString("vi-VN")} / Backers {item.kpiSnapshot.backerCount}</p>
-          <p>Commission: {item.commission.commissionRatePercent ?? "Không có"}% • Revenue share: {item.commission.revenueSharePercent ?? "Không có"}%</p>
-          <p>Quota Creator/User: {item.quota.creator} / {item.quota.user}</p>
-          <p>Brand approved: {item.brandProfile?.status === "ACTIVE" ? "Có" : "Không"}</p>
-        </div>
-      </SectionCard>
 
-      <section className="mt-4 dc-card p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <p className="font-semibold">Thông tin campaign</p>
-          {!editing ? (
-            <button className="dc-btn-secondary" onClick={() => setEditing(true)}>Chỉnh sửa</button>
-          ) : (
-            <div className="flex gap-2">
-              <button className="dc-btn-secondary" onClick={() => setEditing(false)} disabled={acting}>Hủy</button>
-              <button className="dc-btn-primary" onClick={() => void saveEdit()} disabled={acting}>Lưu</button>
-            </div>
-          )}
+      {error ? (
+        <div className="mt-4">
+          <ErrorState title="Có lỗi thao tác" description={error} onRetry={() => window.location.reload()} />
         </div>
-        {editing ? (
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="grid gap-1 text-sm">
-              <span className="font-semibold">Slug</span>
-              <input className="dc-input" value={editForm.slug} onChange={(e) => setEditForm((s) => ({ ...s, slug: e.target.value }))} />
-            </label>
-            <label className="grid gap-1 text-sm">
-              <span className="font-semibold">Tên campaign</span>
-              <input className="dc-input" value={editForm.title} onChange={(e) => setEditForm((s) => ({ ...s, title: e.target.value }))} />
-            </label>
-            <div className="grid gap-2 text-sm md:col-span-2">
-              <span className="font-semibold">Ảnh campaign</span>
-              <input className="dc-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadCoverImage(file); }} />
-              <input className="dc-input" value={editForm.imageUrl} onChange={(e) => setEditForm((s) => ({ ...s, imageUrl: e.target.value }))} placeholder="/uploads/... hoặc https://..." />
-              {uploadingImage ? <p className="text-xs text-zinc-500">Đang tải ảnh...</p> : null}
-              <div className="relative h-40 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100">
-                <CampaignCoverImage src={editForm.imageUrl} alt={editForm.title || "Campaign cover"} className="object-cover" sizes="100vw" />
-              </div>
+      ) : null}
+      {toast ? <ActionToast message={toast} /> : null}
+
+      <section className="mt-4 grid gap-4">
+        <div className="dc-card p-4">
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-zinc-500">Chỉnh sửa chiến dịch</p>
+              <h2 className="text-lg font-semibold text-zinc-900">Thông tin chiến dịch</h2>
+              <p className="mt-1 text-sm text-zinc-600">Brand: {item.brand.displayName}</p>
             </div>
-            <label className="grid gap-1 text-sm">
-              <span className="font-semibold">Ngành hàng</span>
-              <select className="dc-input" value={editForm.category} onChange={(e) => setEditForm((s) => ({ ...s, category: e.target.value as CampaignCategory }))}>
-                <option value="LIFESTYLE">Lối sống</option>
-                <option value="FOOD">Ẩm thực</option>
-                <option value="BEAUTY">Làm đẹp</option>
-                <option value="FASHION">Thời trang</option>
-                <option value="TECH">Công nghệ</option>
-                <option value="EDUCATION">Giáo dục</option>
+            <div className="shrink-0">
+              <StatusBadge status={item.statusView.toLowerCase()} />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+              <span>Tài khoản Brand</span>
+              <input
+                className="dc-input !bg-zinc-200 !border-zinc-300 !text-zinc-500 opacity-100 cursor-not-allowed"
+                value={item.brand.displayName}
+                readOnly
+                disabled
+              />
+              <span className="invisible text-xs">Giữ dòng cân với Slug</span>
+            </label>
+
+            <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+              <span>Slug</span>
+              <input className={`dc-input ${fieldErrors.slug ? "border-red-500 ring-1 ring-red-300" : ""}`} value={form.slug} onChange={(event) => setField("slug", event.target.value)} />
+              <span className="text-xs text-zinc-500">Link xem trước: https://dcreator-platform.vercel.app/{form.slug || "..."}</span>
+              {fieldErrors.slug ? <span className="text-xs text-red-600">{fieldErrors.slug}</span> : null}
+            </label>
+            <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+              <span>Tên chiến dịch</span>
+              <input className={`dc-input ${fieldErrors.title ? "border-red-500 ring-1 ring-red-300" : ""}`} value={form.title} onChange={(event) => setField("title", event.target.value)} />
+              {fieldErrors.title ? <span className="text-xs text-red-600">{fieldErrors.title}</span> : null}
+            </label>
+
+            <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+              <span>Danh mục</span>
+              <select className="dc-input" value={form.category} onChange={(event) => setField("category", event.target.value as CampaignCategory)}>
+                {["TECH", "FASHION", "FOOD", "BEAUTY", "LIFESTYLE", "EDUCATION"].map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
               </select>
             </label>
-            <label className="grid gap-1 text-sm">
-              <span className="font-semibold">Loại campaign</span>
-              <select className="dc-input" value={editForm.campaignType} onChange={(e) => setEditForm((s) => ({ ...s, campaignType: e.target.value as CampaignType }))}>
-                <option value="COMMUNITY">COMMUNITY</option>
-                <option value="DONATION">DONATION</option>
-                <option value="PREORDER">PREORDER</option>
-                <option value="SPONSORSHIP">SPONSORSHIP</option>
+            <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+              <span>Loại chiến dịch</span>
+              <select className="dc-input" value={form.campaignType} onChange={(event) => setField("campaignType", event.target.value as CampaignType)}>
+                {[
+                  ["DONATION", "Ủng hộ"],
+                  ["PREORDER", "Đặt trước"],
+                  ["SPONSORSHIP", "Tài trợ"],
+                  ["COMMUNITY", "Video seeding"]
+                ].map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
               </select>
             </label>
-            <label className="grid gap-1 text-sm">
-              <span className="font-semibold">Nguồn thiết lập</span>
-              <select className="dc-input" value={editForm.setupSource} onChange={(e) => setEditForm((s) => ({ ...s, setupSource: e.target.value as CampaignSetupSource }))}>
+
+            <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+              <span>Nguồn thiết lập</span>
+              <select className="dc-input" value={form.setupSource} onChange={(event) => setField("setupSource", event.target.value as SetupSource)}>
                 <option value="BRAND_REQUESTED">Brand yêu cầu</option>
-                <option value="JOIN_EXISTING_DCREATOR_CAMP">Tham gia chiến dịch dCreator có sẵn</option>
+                <option value="JOIN_EXISTING_DCREATOR_CAMP">Gia nhập chiến dịch có sẵn</option>
               </select>
             </label>
-            <label className="grid gap-1 text-sm">
-              <span className="font-semibold">Budget (VND)</span>
-              <input className="dc-input" type="number" min={1} value={editForm.budgetVnd} onChange={(e) => setEditForm((s) => ({ ...s, budgetVnd: Number(e.target.value || 0) }))} />
-            </label>
-            <label className="grid gap-1 text-sm md:col-span-2">
-              <span className="font-semibold">Brief</span>
-              <textarea className="dc-input min-h-24" value={editForm.brief} onChange={(e) => setEditForm((s) => ({ ...s, brief: e.target.value }))} />
-            </label>
-            <label className="grid gap-1 text-sm md:col-span-2">
-              <span className="font-semibold">Mục tiêu campaign</span>
-              <textarea className="dc-input min-h-24" value={editForm.objective} onChange={(e) => setEditForm((s) => ({ ...s, objective: e.target.value }))} />
-            </label>
-            <label className="grid gap-1 text-sm md:col-span-2">
-              <span className="font-semibold">Quyền lợi</span>
-              <textarea className="dc-input min-h-24" value={editForm.benefits} onChange={(e) => setEditForm((s) => ({ ...s, benefits: e.target.value }))} />
-            </label>
-            <div className="grid gap-2 text-sm md:col-span-2">
-              <span className="font-semibold">Lộ trình tham gia</span>
-              {editForm.participationRoadmap.map((step, index) => (
-                <div key={`roadmap-${index}`} className="flex gap-2">
-                  <input className="dc-input" value={step} onChange={(e) => setRoadmapStep(index, e.target.value)} placeholder={`Bước ${index + 1}`} />
-                  {editForm.participationRoadmap.length > 1 ? (
-                    <button type="button" className="dc-btn-secondary" onClick={() => removeRoadmapStep(index)}>Xóa</button>
-                  ) : null}
-                </div>
-              ))}
-              <button type="button" className="dc-btn-secondary w-fit" onClick={addRoadmapStep}>+ Thêm bước</button>
+            <div />
+
+            <div className="md:col-span-2">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-sm font-semibold text-zinc-700">Lộ trình tham gia</span>
+              </div>
+              <div className="grid gap-2">
+                {form.participationRoadmap.map((step, index) => (
+                  <div key={`roadmap-${index}`} className="flex gap-2">
+                    <input className="dc-input" value={step} onChange={(event) => setRoadmapStep(index, event.target.value)} placeholder={`Bước ${index + 1}: ...`} />
+                    {form.participationRoadmap.length > 1 ? (
+                      <button type="button" className="dc-btn-secondary" onClick={() => removeRoadmapStep(index)}>
+                        Xóa
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+                <button type="button" className="dc-btn-secondary w-fit" onClick={addRoadmapStep}>
+                  + Thêm bước
+                </button>
+                {fieldErrors.participationRoadmap ? <span className="text-xs text-red-600">{fieldErrors.participationRoadmap}</span> : null}
+              </div>
             </div>
-            <label className="grid gap-1 text-sm">
-              <span className="font-semibold">Starts at</span>
-              <input className="dc-input" type="datetime-local" value={editForm.startsAt} onChange={(e) => setEditForm((s) => ({ ...s, startsAt: e.target.value }))} />
+
+            <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
+              <span>Quyền lợi</span>
+              <textarea className={`dc-input min-h-24 ${fieldErrors.benefits ? "border-red-500 ring-1 ring-red-300" : ""}`} value={form.benefits} onChange={(event) => setField("benefits", event.target.value)} />
+              {fieldErrors.benefits ? <span className="text-xs text-red-600">{fieldErrors.benefits}</span> : null}
             </label>
-            <label className="grid gap-1 text-sm">
-              <span className="font-semibold">Ends at</span>
-              <input className="dc-input" type="datetime-local" value={editForm.endsAt} onChange={(e) => setEditForm((s) => ({ ...s, endsAt: e.target.value }))} />
+
+            <div className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
+              <span>Ảnh chiến dịch</span>
+              <input
+                className="dc-input bg-white"
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void uploadImage(file);
+                }}
+              />
+              {coverImageState.source === "existing" ? (
+                <span className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
+                  Đang dùng ảnh hiện tại của dự án
+                </span>
+              ) : null}
+              {coverImageState.source === "upload" ? (
+                <span className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700">
+                  Đã chọn ảnh mới: {coverImageState.fileName}
+                </span>
+              ) : null}
+              <span className="text-xs text-zinc-500">
+                {item.coverImageUrl ? (
+                  <>
+                    Đang có ảnh sẵn.{" "}
+                    <button
+                      type="button"
+                      className="font-semibold text-zinc-900 underline underline-offset-2"
+                      onClick={() => {
+                        setField("imageUrl", item.coverImageUrl ?? "");
+                        setCoverImageState({ source: "existing", fileName: "" });
+                      }}
+                    >
+                      Chọn ảnh hiện tại
+                    </button>
+                  </>
+                ) : (
+                  "Chưa có ảnh hiện tại. Vui lòng tải ảnh mới."
+                )}
+              </span>
+              {uploadingCover ? <span className="text-xs text-zinc-500">Đang tải ảnh...</span> : null}
+              {fieldErrors.imageUrl ? <span className="text-xs text-red-600">{fieldErrors.imageUrl}</span> : null}
+            </div>
+
+            <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+              <span>Ngày bắt đầu</span>
+              <input className={`dc-input ${fieldErrors.startsAt ? "border-red-500 ring-1 ring-red-300" : ""}`} type="datetime-local" value={form.startsAt} onChange={(event) => setField("startsAt", event.target.value)} />
+              {fieldErrors.startsAt ? <span className="text-xs text-red-600">{fieldErrors.startsAt}</span> : null}
             </label>
-            <label className="grid gap-1 text-sm">
-              <span className="font-semibold">Target amount (VND)</span>
-              <input className="dc-input" type="number" min={1} value={editForm.targetAmountVnd} onChange={(e) => setEditForm((s) => ({ ...s, targetAmountVnd: Number(e.target.value || 0) }))} />
+            <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+              <span>Ngày kết thúc</span>
+              <input className={`dc-input ${fieldErrors.endsAt ? "border-red-500 ring-1 ring-red-300" : ""}`} type="datetime-local" value={form.endsAt} onChange={(event) => setField("endsAt", event.target.value)} />
+              {fieldErrors.endsAt ? <span className="text-xs text-red-600">{fieldErrors.endsAt}</span> : null}
             </label>
-            <label className="grid gap-1 text-sm">
-              <span className="font-semibold">UGC video quota</span>
-              <input className="dc-input" type="number" min={1} value={editForm.ugcVideoQuota} onChange={(e) => setEditForm((s) => ({ ...s, ugcVideoQuota: Number(e.target.value || 0) }))} />
-            </label>
-            <label className="grid gap-1 text-sm">
-              <span className="font-semibold">Hiển thị public</span>
-              <select className="dc-input" value={editForm.isPublic ? "true" : "false"} onChange={(e) => setEditForm((s) => ({ ...s, isPublic: e.target.value === "true" }))}>
-                <option value="true">Có</option>
-                <option value="false">Không</option>
-              </select>
+
+            <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+              <span>Số lượng video UGC</span>
+              <input className={`dc-input ${fieldErrors.ugcVideoQuota ? "border-red-500 ring-1 ring-red-300" : ""}`} type="number" min={1} value={form.ugcVideoQuota} onChange={(event) => setField("ugcVideoQuota", Number(event.target.value || 0))} />
+              {fieldErrors.ugcVideoQuota ? <span className="text-xs text-red-600">{fieldErrors.ugcVideoQuota}</span> : null}
             </label>
           </div>
-        ) : (
-          <p className="text-sm text-zinc-600">Dùng nút Chỉnh sửa để cập nhật slug, ảnh, phân loại, mục tiêu, lộ trình, quota, timeline, budget và target.</p>
-        )}
-      </section>
+        </div>
 
-      <section className="mt-4 dc-card p-4">
-        <p className="font-semibold">Sản phẩm / tồn kho</p>
-        <div className="mt-3 grid gap-2">
-          {item.productSubmissions.length === 0 ? (
-            <p className="text-sm text-zinc-600">Chưa có sản phẩm/lô hàng gắn vào campaign.</p>
-          ) : (
-            item.productSubmissions.map((product) => (
-              <div key={product.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm">
-                <p className="font-semibold">{product.name}</p>
-                <p>Trạng thái: {getStatusLabel(product.reviewStatus)}</p>
-                <p>Stock remaining: {product.inventoryBatches.reduce((sum, b) => sum + b.quantityRemaining, 0).toLocaleString("vi-VN")}</p>
+        <div className="dc-card p-4">
+          <div className="mb-4">
+            <p className="text-sm font-semibold text-zinc-500">Chỉnh sửa nhiệm vụ</p>
+            <h2 className="text-lg font-semibold text-zinc-900">Thông tin nhiệm vụ</h2>
+          </div>
+
+          <div className="grid gap-4">
+            <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+              <span>Tên nhiệm vụ</span>
+              <input className="dc-input" value={form.mission.title} onChange={(event) => setMissionField("title", event.target.value)} />
+              {fieldErrors["mission.title"] ? <span className="text-xs text-red-600">{fieldErrors["mission.title"]}</span> : null}
+            </label>
+            <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+              <span>Mô tả nhiệm vụ</span>
+              <textarea className="dc-input min-h-24" value={form.mission.description} onChange={(event) => setMissionField("description", event.target.value)} />
+              {fieldErrors["mission.description"] ? <span className="text-xs text-red-600">{fieldErrors["mission.description"]}</span> : null}
+            </label>
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                <span>Yêu cầu sản phẩm</span>
+                <select className="dc-input" value={form.mission.productReceiveOption} onChange={(event) => setMissionField("productReceiveOption", event.target.value as ProductReceiveOption)}>
+                  <option value="PRODUCT_REQUIRED">Có yêu cầu</option>
+                  <option value="NO_PRODUCT_REQUIRED">Không yêu cầu</option>
+                </select>
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                <span>Thưởng điểm (N-Points)</span>
+                <input className="dc-input" type="number" min={0} value={form.mission.rewardPoints} onChange={(event) => setMissionField("rewardPoints", Number(event.target.value || 0))} />
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+              <div className="grid gap-2">
+                <span className="text-sm font-semibold text-zinc-700">
+                  &nbsp;
+                </span>
+
+                <label className="flex h-[42px] items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700">
+                  <input
+                    type="checkbox"
+                    checked={form.mission.allowRepeat}
+                    onChange={(event) => setMissionField("allowRepeat", event.target.checked)}
+                  />
+                  Cho phép làm lại
+                </label>
               </div>
-            ))
-          )}
+            </label>
+            </div>
+
+            {form.mission.productReceiveOption === "PRODUCT_REQUIRED" ? (
+              <div className="grid items-start gap-3 rounded-xl border border-zinc-200 bg-white p-3 md:grid-cols-2">
+                <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                  <span>Tên sản phẩm</span>
+                  <input className="dc-input" value={form.mission.productName} onChange={(event) => setMissionField("productName", event.target.value)} />
+                  {fieldErrors["mission.productName"] ? <span className="text-xs text-red-600">{fieldErrors["mission.productName"]}</span> : null}
+                </label>
+                
+                <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                  <span>Link sản phẩm</span>
+                  <input className="dc-input" value={form.mission.productLink} onChange={(event) => setMissionField("productLink", event.target.value)} placeholder="https://..." />
+                  {fieldErrors["mission.productLink"] ? <span className="text-xs text-red-600">{fieldErrors["mission.productLink"]}</span> : null}
+                </label>
+                <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                  <span>Hình ảnh sản phẩm</span>
+                  <input
+                    className="dc-input bg-white"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void uploadImage(file, "product");
+                    }}
+                  />
+                  {productImageState.source === "existing" ? (
+                    <span className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
+                      Đang dùng ảnh sản phẩm hiện tại
+                    </span>
+                  ) : null}
+                  {productImageState.source === "upload" ? (
+                    <span className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700">
+                      Đã chọn ảnh mới: {productImageState.fileName}
+                    </span>
+                  ) : null}
+                  <span className="text-xs text-zinc-500">
+                    {item.missions[0]?.productImageUrl ? (
+                      <>
+                        Đang có ảnh sản phẩm sẵn.{" "}
+                        <button
+                          type="button"
+                          className="font-semibold text-zinc-900 underline underline-offset-2"
+                          onClick={() => {
+                            setMissionField("productImageUrl", item.missions[0]?.productImageUrl ?? "");
+                            setProductImageState({ source: "existing", fileName: "" });
+                          }}
+                        >
+                          Chọn ảnh hiện tại
+                        </button>
+                      </>
+                    ) : (
+                      "Chưa có ảnh sản phẩm hiện tại. Vui lòng tải ảnh mới."
+                    )}
+                  </span>
+                  {uploadingProductImage ? <span className="text-xs text-zinc-500">Đang tải ảnh sản phẩm...</span> : null}
+                  {fieldErrors["mission.productImageUrl"] ? <span className="text-xs text-red-600">{fieldErrors["mission.productImageUrl"]}</span> : null}
+                </label>
+                <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                  <span>Mô tả sản phẩm</span>
+                  <textarea className="dc-input min-h-24" value={form.mission.productDescription} onChange={(event) => setMissionField("productDescription", event.target.value)} />
+                  {fieldErrors["mission.productDescription"] ? <span className="text-xs text-red-600">{fieldErrors["mission.productDescription"]}</span> : null}
+                </label>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="dc-card p-4">
+          <p className="text-sm font-semibold text-zinc-500">Lưu thay đổi</p>
+          <button className="dc-btn-primary mt-3 w-fit px-4 py-2" onClick={() => void saveCampaign()} disabled={saving || uploadingCover || uploadingProductImage}>
+            {saving ? "Đang lưu..." : "Lưu"}
+          </button>
+          <p className="mt-3 text-sm text-zinc-600">Những thay đổi ở đây sẽ cập nhật trực tiếp lên chiến dịch và nhiệm vụ hiện có.</p>
+        </div>
+
+        <div className="dc-card p-4">
+          <p className="text-sm font-semibold text-zinc-500">Điều khiển</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button className="dc-btn-primary" disabled={saving} onClick={() => void act("approve")}>
+              Duyệt và xuất bản
+            </button>
+            <button className="dc-btn-secondary" disabled={saving} onClick={() => setConfirmAction("request-changes")}>
+              Yêu cầu chỉnh sửa
+            </button>
+            <button className="dc-btn-secondary" disabled={saving} onClick={() => setConfirmAction("pause")}>
+              Tạm dừng
+            </button>
+            <button className="dc-btn-secondary" disabled={saving} onClick={() => setConfirmAction("reject")}>
+              Từ chối
+            </button>
+          </div>
         </div>
       </section>
 
-      <section className="mt-4 dc-card p-4">
-        <p className="font-semibold">Phần thưởng & nhiệm vụ</p>
-        <div className="mt-3 grid gap-2 md:grid-cols-2">
-          <div>
-            <p className="mb-2 text-sm font-semibold">Rewards</p>
-            {item.rewards.length === 0 ? <p className="text-sm text-zinc-600">No rewards</p> : item.rewards.map((reward) => (
-              <div key={reward.id} className="mb-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm">
-                <p className="font-semibold">{reward.title}</p>
-                <p>Points: {reward.pointsCost}</p>
-                <p>Stock: {reward.stockRemaining}/{reward.stockTotal}</p>
-              </div>
-            ))}
-          </div>
-          <div>
-            <p className="mb-2 text-sm font-semibold">Nhiệm vụ</p>
-            {item.missions.length === 0 ? <p className="text-sm text-zinc-600">Chưa có nhiệm vụ</p> : item.missions.map((mission) => (
-              <div key={mission.id} className="mb-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm">
-                <p className="font-semibold">{mission.title}</p>
-                <p>Đối tượng: {getAudienceLabel(mission.audience)}</p>
-                <p>Nhiệm vụ đã gắn cho {getAudienceLabel(mission.audience).toLowerCase()}.</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="mt-4">
-        <SectionCard title="Quyết định">
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button className="dc-btn-primary" disabled={acting} onClick={() => void act("approve")}>Approve & Publish</button>
-          <button className="dc-btn-secondary" disabled={acting} onClick={() => setConfirmAction("request-changes")}>Request changes</button>
-          <button className="dc-btn-secondary" disabled={acting} onClick={() => setConfirmAction("pause")}>Pause</button>
-          <button className="dc-btn-secondary" disabled={acting} onClick={() => setConfirmAction("reject")}>Reject</button>
-        </div>
-        </SectionCard>
-      </section>
-
-      {notice ? <ActionToast message={notice.message} tone={notice.tone} /> : null}
       <ReviewActionDialog
         open={confirmAction === "pause"}
-        title="Pause campaign?"
-        description="Campaign sẽ tạm dừng hiển thị và vận hành."
-        confirmLabel="Pause campaign"
+        title="Tạm dừng chiến dịch?"
+        description="Chiến dịch sẽ tạm dừng hiển thị và vận hành."
+        confirmLabel="Tạm dừng chiến dịch"
         requireReason
-        reasonPlaceholder="Nêu rõ lý do tạm dừng campaign..."
-        submitting={acting}
-        onCancel={() => !acting && setConfirmAction(null)}
+        reasonPlaceholder="Nêu rõ lý do tạm dừng chiến dịch..."
+        submitting={saving}
+        onCancel={() => !saving && setConfirmAction(null)}
         onConfirm={(reason) => {
           setConfirmAction(null);
           void act("pause", reason);
@@ -477,13 +791,13 @@ export default function AdminCampaignDetailPage() {
       />
       <ReviewActionDialog
         open={confirmAction === "reject"}
-        title="Reject campaign?"
-        description="Campaign sẽ bị từ chối và cần tạo/chỉnh lại theo policy."
-        confirmLabel="Reject campaign"
+        title="Từ chối chiến dịch?"
+        description="Chiến dịch sẽ bị từ chối và cần tạo hoặc chỉnh lại theo policy."
+        confirmLabel="Từ chối chiến dịch"
         requireReason
-        reasonPlaceholder="Nêu rõ lý do từ chối campaign..."
-        submitting={acting}
-        onCancel={() => !acting && setConfirmAction(null)}
+        reasonPlaceholder="Nêu rõ lý do từ chối chiến dịch..."
+        submitting={saving}
+        onCancel={() => !saving && setConfirmAction(null)}
         onConfirm={(reason) => {
           setConfirmAction(null);
           void act("reject", reason);
@@ -491,13 +805,13 @@ export default function AdminCampaignDetailPage() {
       />
       <ReviewActionDialog
         open={confirmAction === "request-changes"}
-        title="Request campaign changes?"
-        description="Campaign sẽ được trả về trạng thái cần chỉnh sửa."
+        title="Yêu cầu chỉnh sửa chiến dịch?"
+        description="Chiến dịch sẽ được trả về trạng thái cần chỉnh sửa."
         confirmLabel="Yêu cầu chỉnh sửa"
         requireReason
         reasonPlaceholder="Nêu rõ nội dung cần Brand chỉnh sửa..."
-        submitting={acting}
-        onCancel={() => !acting && setConfirmAction(null)}
+        submitting={saving}
+        onCancel={() => !saving && setConfirmAction(null)}
         onConfirm={(reason) => {
           setConfirmAction(null);
           void act("request-changes", reason);

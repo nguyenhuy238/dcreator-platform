@@ -7,30 +7,13 @@ import { createNotification } from "@/lib/services/notification.service";
 import { assertStateTransition } from "@/lib/services/admin-transition.service";
 import type { z } from "zod";
 import type { adminCampaignCreateSchema } from "@/lib/validators/admin-campaign";
+import type { adminCampaignUpdateSchema } from "@/lib/validators/admin-campaign";
 import type { campaignMissionCreateSchema } from "@/lib/validators/brand-dashboard";
 
 type AdminDecision = "APPROVE" | "REJECT" | "REQUEST_CHANGES" | "PAUSE";
 type AdminCampaignCreateInput = z.infer<typeof adminCampaignCreateSchema>;
+type AdminCampaignUpdateInput = z.infer<typeof adminCampaignUpdateSchema>;
 type CampaignMissionInput = z.infer<typeof campaignMissionCreateSchema>;
-type AdminCampaignUpdateInput = {
-  slug?: string;
-  title?: string;
-  brief?: string;
-  category?: "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
-  campaignType?: "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
-  setupSource?: "JOIN_EXISTING_DCREATOR_CAMP" | "BRAND_REQUESTED";
-  participationRoadmap?: string[];
-  benefits?: string;
-  objective?: string;
-  startsAt?: string | null;
-  endsAt?: string | null;
-  budgetVnd?: number;
-  targetAmountVnd?: number;
-  ugcVideoQuota?: number;
-  isPublic?: boolean;
-  imageUrl?: string;
-  reason?: string;
-};
 
 async function trySyncCampaignNewFields(campaignId: string, benefits: string | null, participationRoadmap: string[]) {
   try {
@@ -252,9 +235,6 @@ function validateCampaignReadiness(detail: Awaited<ReturnType<typeof getCampaign
   if (detail.productSubmissions.some((item: { reviewStatus: string }) => item.reviewStatus !== "APPROVED")) {
     errors.push("Có sản phẩm/lô hàng chưa được duyệt.");
   }
-  if (!detail.brief || detail.brief.trim().length < 10) {
-    errors.push("Brief chưa đầy đủ.");
-  }
   if (!detail.startsAt || !detail.endsAt || detail.startsAt >= detail.endsAt) {
     errors.push("Timeline không hợp lệ.");
   }
@@ -388,7 +368,7 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
 
   const startsAt = input.startsAt ? new Date(input.startsAt) : null;
   const endsAt = input.endsAt ? new Date(input.endsAt) : null;
-  const missionDeadlineAt = input.mission.deadlineAt ? new Date(input.mission.deadlineAt) : null;
+  const missionDeadlineAt = input.mission.deadlineAt ? new Date(input.mission.deadlineAt) : endsAt;
   if (missionDeadlineAt && startsAt && missionDeadlineAt < startsAt) {
     throw new AppError("Mission deadline cannot be earlier than campaign start", 422, "MISSION_DEADLINE_INVALID");
   }
@@ -402,7 +382,7 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
         brandId: brandAccount.id,
         slug: input.slug,
         title: input.title,
-        brief: input.brief,
+        brief: input.brief ?? "",
         budgetVnd: 10000000,
         targetAmountVnd: 10000000,
         category: input.category,
@@ -417,9 +397,9 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
         coverImageUrl: sanitizeCampaignImageUrl(input.imageUrl),
         startsAt,
         endsAt,
-        feasibilityStatus: input.publishNow ? "APPROVED" : "DRAFT",
-        brandApprovalStatus: input.publishNow ? "APPROVED" : "DRAFT",
-        status: input.publishNow ? "ACTIVE" : "DRAFT"
+        feasibilityStatus: "APPROVED",
+        brandApprovalStatus: "APPROVED",
+        status: "ACTIVE"
       }
     });
 
@@ -434,7 +414,7 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
         productLink: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productLink || null : null,
         rewardPoints: input.mission.rewardPoints,
         rewardCommissionVnd: input.mission.rewardCommissionVnd,
-        audience: input.mission.audience,
+        audience: "CREATOR",
         productReceiveOption: input.mission.productReceiveOption,
         allowRepeat: input.mission.allowRepeat,
         deadlineAt: missionDeadlineAt
@@ -452,16 +432,14 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
     targetType: "Campaign",
     targetId: campaign.id,
     newStatus: campaign.status,
-    metadata: { publishNow: Boolean(input.publishNow), brandAccountId: brandAccount.id, ugcVideoQuota }
+    metadata: { publishNow: true, brandAccountId: brandAccount.id, ugcVideoQuota }
   });
 
   await createNotification({
     accountId: brandAccount.id,
     event: NotificationEvent.CAMPAIGN_APPROVED,
-    title: input.publishNow ? "Admin đã tạo và publish campaign" : "Admin đã tạo campaign draft",
-    content: input.publishNow
-      ? `Campaign "${campaign.title}" đã được tạo và active.`
-      : `Campaign "${campaign.title}" đã được tạo ở trạng thái draft.`,
+    title: "Admin đã tạo và kích hoạt chiến dịch",
+    content: `Chiến dịch "${campaign.title}" đã được tạo và active.`,
     metadata: { campaignId: campaign.id }
   });
 
@@ -544,27 +522,72 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
     input.imageUrl === undefined
       ? undefined
       : sanitizeCampaignImageUrl(input.imageUrl);
+  
+  const nextRoadmap = input.participationRoadmap ? input.participationRoadmap.map((step) => step.trim()).filter(Boolean) : undefined;
+  const nextBenefits = input.benefits === undefined ? undefined : input.benefits?.trim() || null;
+  const nextMissionDeadlineAt = nextEndsAt ?? campaign.endsAt;
 
-  const updated = await prisma.campaign.update({
-    where: { id: campaignId },
-    data: {
-      slug: nextSlug,
-      title: input.title?.trim(),
-      brief: input.brief?.trim(),
-      category: input.category,
-      campaignType: input.campaignType,
-      setupSource: input.setupSource,
-      participationRoadmap: nextParticipationRoadmap,
-      benefits: input.benefits === undefined ? undefined : input.benefits.trim() || null,
-      objective: input.objective === undefined ? undefined : input.objective.trim() || null,
-      startsAt: nextStartsAt,
-      endsAt: nextEndsAt,
-      budgetVnd: input.budgetVnd,
-      targetAmountVnd: input.targetAmountVnd,
-      ugcVideoQuota: input.ugcVideoQuota,
-      isPublic: input.isPublic,
-      coverImageUrl: nextImageUrl
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const nextCampaign = await tx.campaign.update({
+      where: { id: campaignId },
+      data: {
+        slug: input.slug?.trim(),
+        title: input.title?.trim(),
+        brief: input.brief === undefined ? undefined : input.brief?.trim() || "",
+        category: input.category,
+        campaignType: input.campaignType,
+        setupSource: input.setupSource,
+        benefits: nextBenefits,
+        objective: nextBenefits,
+        participationRoadmap: nextRoadmap,
+        priorityChannels: nextRoadmap ? nextRoadmap.join("\n") : undefined,
+        startsAt: nextStartsAt,
+        endsAt: nextEndsAt,
+        budgetVnd: input.budgetVnd,
+        targetAmountVnd: input.targetAmountVnd,
+        ugcVideoQuota: input.ugcVideoQuota,
+        coverImageUrl: input.imageUrl === undefined ? undefined : input.imageUrl === "" ? null : input.imageUrl
+      }
+    });
+
+    if (input.mission) {
+      const missionData = {
+        title: input.mission.title.trim(),
+        description: input.mission.description.trim(),
+        productName: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productName?.trim() || null : null,
+        productDescription: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productDescription?.trim() || null : null,
+        productImageUrl: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productImageUrl?.trim() || null : null,
+        productLink: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productLink?.trim() || null : null,
+        rewardPoints: input.mission.rewardPoints,
+        rewardCommissionVnd: input.mission.rewardCommissionVnd,
+        productReceiveOption: input.mission.productReceiveOption,
+        allowRepeat: input.mission.allowRepeat,
+        deadlineAt: nextMissionDeadlineAt
+      };
+
+      const existingMission = await tx.mission.findFirst({
+        where: { campaignId: campaign.id },
+        orderBy: { createdAt: "asc" }
+      });
+
+      if (existingMission) {
+        await tx.mission.update({
+          where: { id: existingMission.id },
+          data: missionData
+        });
+      } else {
+        await tx.mission.create({
+          data: {
+            campaignId: campaign.id,
+            audience: "CREATOR",
+            ...missionData
+          }
+        });
+      }
     }
+
+    return nextCampaign;
   });
 
   await writeAuditLog({
