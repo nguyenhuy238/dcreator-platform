@@ -48,3 +48,10 @@ test("repairs stale Supabase hostnames using the configured project URL", () => 
     "https://example.supabase.co/storage/v1/object/public/dcreator-uploads/brand-logo/example.png"
   );
 });
+
+test("removes stray whitespace from stored Supabase URLs", () => {
+  assert.equal(
+    resolveImageUrl("https://example.supabase.co\r\n/storage/v1/object/public/dcreator-uploads\r\n/brand-logo/example.png"),
+    "https://example.supabase.co/storage/v1/object/public/dcreator-uploads/brand-logo/example.png"
+  );
+});
