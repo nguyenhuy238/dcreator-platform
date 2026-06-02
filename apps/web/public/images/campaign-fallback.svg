@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" role="img" aria-label="Campaign image placeholder">
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#18181b"/>
+      <stop offset="100%" stop-color="#52525b"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#background)"/>
+  <circle cx="600" cy="300" r="88" fill="none" stroke="#d4d4d8" stroke-width="16" opacity=".65"/>
+  <path d="M540 330l48-55 42 42 32-31 58 68H480z" fill="#e4e4e7" opacity=".75"/>
+  <text x="600" y="470" fill="#f4f4f5" font-family="Arial, sans-serif" font-size="42" font-weight="700" text-anchor="middle">dCreator Campaign</text>
+</svg>

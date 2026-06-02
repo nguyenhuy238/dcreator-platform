@@ -1,8 +1,10 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 import type { CampaignDetailDTO } from "@/lib/dto/campaign-detail";
 import { getCampaignTypeLabel } from "@/lib/constants/campaign-type";
+import { CAMPAIGN_IMAGE_FALLBACK, resolveImageUrl } from "@/lib/images/resolve-image-url";
 import { formatDateTime } from "./campaign-detail.utils";
 
 const categoryLabel: Record<CampaignDetailDTO["hero"]["category"], string> = {
@@ -40,13 +42,17 @@ function buildHeroMeta(data: CampaignDetailDTO) {
 }
 
 export function HeroSection({ data, applyCard }: { data: CampaignDetailDTO; applyCard: ReactNode }) {
+  const coverMediaUrl = resolveImageUrl(data.hero.coverMediaUrl);
+  const showVideo = data.hero.coverMediaType === "video" && coverMediaUrl !== CAMPAIGN_IMAGE_FALLBACK;
+
   return (
     <section className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-950 text-white">
-      {data.hero.coverMediaType === "video" && data.hero.coverMediaUrl ? (
-        <video className="h-[360px] w-full object-cover opacity-45 md:h-[460px]" src={data.hero.coverMediaUrl} autoPlay muted loop playsInline />
+      {showVideo ? (
+        <video className="h-[360px] w-full object-cover opacity-45 md:h-[460px]" src={coverMediaUrl} autoPlay muted loop playsInline />
       ) : (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img className="h-[360px] w-full object-cover opacity-45 md:h-[460px]" src={data.hero.coverMediaUrl ?? "/globe.svg"} alt={data.hero.title} />
+        <div className="relative h-[360px] w-full md:h-[460px]">
+          <CampaignCoverImage src={coverMediaUrl} alt={data.hero.title} className="object-cover opacity-45" sizes="100vw" priority />
+        </div>
       )}
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/50 to-black/90" />
       <div className="absolute inset-0 p-5 md:p-8">

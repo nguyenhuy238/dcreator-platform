@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 
 type CampaignType = "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
 type FilterType = "ALL" | "MASTER";
@@ -93,10 +93,9 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
           {visibleCampaigns.map((campaign) => (
             <article key={campaign.slug} className="dc-card overflow-hidden p-0">
               <div className="relative aspect-[16/9] w-full overflow-hidden bg-zinc-100">
-                <Image
-                  src={campaign.coverImageUrl ?? "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200"}
+                <CampaignCoverImage
+                  src={campaign.coverImageUrl}
                   alt={campaign.title}
-                  fill
                   className="object-cover transition duration-500 hover:scale-[1.03]"
                   sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
                 />

@@ -3,6 +3,7 @@ import { Brand, BrandInventoryBatch, BrandMemberRole, BrandProduct, CampaignStat
 import { prisma } from "@/lib/db";
 import { APPLICATION_STATUS } from "@/lib/constants/enums";
 import { AppError } from "@/lib/errors";
+import { normalizeImageUrlInput } from "@/lib/images/resolve-image-url";
 import { approveProof, rejectProof } from "@/lib/services/mission.service";
 import { getBrandKpis } from "@/lib/services/analytics.service";
 import { ensureCreatorMissionFromApprovedApplication } from "@/lib/services/creator-mission.service";
@@ -48,6 +49,11 @@ type BrandMemberRoleUpdateInput = z.infer<typeof brandMemberRoleUpdateSchema>;
 type BrandMemberRemoveInput = z.infer<typeof brandMemberRemoveSchema>;
 const COVER_MARKER = "[[COVER_IMAGE_URL]]:";
 const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
+
+function sanitizeCampaignImageUrl(input?: string | null) {
+  const value = normalizeImageUrlInput(input);
+  return value || null;
+}
 
 async function trySyncCampaignNewFields(campaignId: string, benefits: string | null, participationRoadmap: string[]) {
   try {
@@ -762,7 +768,7 @@ export async function createBrandCampaign(accountId: string, input: CampaignInpu
       creatorCommissionPercent: 0,
       userCommissionPercent: 0,
       bonusBudgetVnd: 0,
-      coverImageUrl: input.imageUrl || null,
+      coverImageUrl: sanitizeCampaignImageUrl(input.imageUrl),
       feasibilityStatus: "DRAFT",
       brandApprovalStatus: "DRAFT",
       startsAt: input.startsAt ? new Date(input.startsAt) : null,
@@ -821,7 +827,7 @@ export async function editDraftCampaign(accountId: string, campaignId: string, i
       creatorCommissionPercent: 0,
       userCommissionPercent: 0,
       bonusBudgetVnd: 0,
-      coverImageUrl: input.imageUrl || null,
+      coverImageUrl: sanitizeCampaignImageUrl(input.imageUrl),
       startsAt: input.startsAt ? new Date(input.startsAt) : null,
       endsAt: input.endsAt ? new Date(input.endsAt) : null
     }

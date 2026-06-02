@@ -1,8 +1,6 @@
 import Link from "next/link";
-import Image from "next/image";
+import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 import { CreatorCampaignApplyButton } from "./CreatorCampaignApplyButton";
-
-const FALLBACK_COVER_IMAGE = "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200";
 
 export type CampaignCardData = {
   slug: string;
@@ -26,19 +24,6 @@ export type CampaignCardData = {
   deadline: string | Date | null;
 };
 
-function resolveCoverImageSrc(url: string | null) {
-  if (!url) return FALLBACK_COVER_IMAGE;
-
-  try {
-    const parsed = new URL(url);
-    if (!parsed.hostname) return FALLBACK_COVER_IMAGE;
-    if (parsed.pathname === "/" && !parsed.search) return FALLBACK_COVER_IMAGE;
-    return parsed.toString();
-  } catch {
-    return FALLBACK_COVER_IMAGE;
-  }
-}
-
 export function CampaignCard({ campaign }: { campaign: CampaignCardData }) {
   const videoTarget = campaign.videoTarget ?? 0;
   const videoApproved = campaign.videoApproved ?? 0;
@@ -48,10 +33,9 @@ export function CampaignCard({ campaign }: { campaign: CampaignCardData }) {
   return (
     <article className="dc-card flex h-full flex-col overflow-hidden p-0">
       <div className="relative aspect-[16/9] w-full overflow-hidden bg-zinc-100">
-        <Image
-          src={resolveCoverImageSrc(campaign.coverImageUrl)}
+        <CampaignCoverImage
+          src={campaign.coverImageUrl}
           alt={campaign.title}
-          fill
           className="object-cover transition duration-500 hover:scale-[1.03]"
           sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
         />

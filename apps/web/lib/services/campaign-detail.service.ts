@@ -1,5 +1,6 @@
 import type { CampaignDetailDTO } from "@/lib/dto/campaign-detail";
 import { AppError } from "@/lib/errors";
+import { resolveImageUrl } from "@/lib/images/resolve-image-url";
 import { findPublicCampaignDetailBySlug } from "@/lib/repositories/campaign-detail.repository";
 
 function maskDisplayName(name: string) {
@@ -63,7 +64,7 @@ export async function getCampaignDetailBySlug(slug: string, viewerId?: string): 
       slug: campaign.slug,
       title: campaign.title,
       description: campaign.brief,
-      coverMediaUrl: campaign.coverImageUrl,
+      coverMediaUrl: resolveImageUrl(campaign.coverImageUrl),
       coverMediaType: isVideoUrl(campaign.coverImageUrl) ? "video" : "image",
       brand: campaign.brand.displayName,
       creator: campaign.creator?.displayName ?? null,
