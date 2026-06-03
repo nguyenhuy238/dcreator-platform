@@ -14,18 +14,21 @@ type MissionHistoryItem = {
   videoReviewStatus: string;
   submission?: { status: string } | null;
   publishStatus: string;
-  missionApplication?: { status: string } | null;
+  missionApplication?: { status: string; rejectReason?: string | null } | null;
   mission: { title: string };
   campaign: { id: string; title: string; slug: string; coverImageUrl?: string | null; brand?: { displayName?: string } | null };
 };
 
 type CampaignItem = {
   id: string;
+  missionId: string;
   slug: string;
   title: string;
   brand: string;
   coverImageUrl: string | null;
   missionStatus: string;
+  canReapply: boolean;
+  rejectReason: string | null;
 };
 
 type HistoryStatus = "IN_PROGRESS" | "COMPLETED" | "REJECTED";
@@ -69,11 +72,24 @@ function missionStatusPillClass(label: string) {
   return "border-blue-200 bg-blue-50 text-blue-700";
 }
 
+async function fetchJson<T>(url: string, init?: RequestInit) {
+  const response = await fetch(url, init);
+  const body = (await response.json()) as { success?: boolean; data?: T; error?: string };
+  if (!response.ok || !body.success) {
+    throw new Error(body.error ?? "Yêu cầu thất bại");
+  }
+  return body.data;
+}
+
 export default function CreatorJobsPage() {
   const [historyItems, setHistoryItems] = useState<CampaignItem[]>([]);
   const [participatedSlugs, setParticipatedSlugs] = useState<string[]>([]);
   const [activeStatus, setActiveStatus] = useState<HistoryStatus>("IN_PROGRESS");
   const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState("");
+  const [busyMissionId, setBusyMissionId] = useState("");
+  const [rejectedMissionId, setRejectedMissionId] = useState("");
+  const [reapplyError, setReapplyError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -97,11 +113,14 @@ export default function CreatorJobsPage() {
           const currentMissionStatus = missionStatusLabel(mission);
           rows.push({
             id: mission.campaign.id,
+            missionId: mission.id,
             slug: mission.campaign.slug,
             title: mission.campaign.title,
             brand: mission.campaign.brand?.displayName ?? "Đang cập nhật",
             coverImageUrl: mission.campaign.coverImageUrl ?? null,
-            missionStatus: currentMissionStatus
+            missionStatus: currentMissionStatus,
+            canReapply: mission.missionApplication?.status === "REJECTED",
+            rejectReason: mission.missionApplication?.rejectReason ?? null
           });
         }
         setHistoryItems(rows);
@@ -116,10 +135,59 @@ export default function CreatorJobsPage() {
   }, [activeStatus]);
 
   const historyTitle = useMemo(() => statusLabel[activeStatus], [activeStatus]);
+  const rejectedMission = useMemo(
+    () => (rejectedMissionId ? historyItems.find((item) => item.missionId === rejectedMissionId) ?? null : null),
+    [historyItems, rejectedMissionId]
+  );
+
+  async function reapplyMission(item: CampaignItem) {
+    setBusyMissionId(item.missionId);
+    setReapplyError("");
+    setNotice("");
+    try {
+      await fetchJson(`/api/campaigns/${item.slug}/creator-application`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      setRejectedMissionId("");
+      setNotice("Đã gửi lại đăng ký campaign. Vui lòng chờ Brand/Admin duyệt.");
+      const missionsRes = await fetch("/api/me/mission", { cache: "no-store" });
+      const missionsBody = await missionsRes.json();
+      const missionRows = (missionsBody?.data ?? []) as MissionHistoryItem[];
+      setParticipatedSlugs(Array.from(new Set(missionRows.map((mission) => mission.campaign.slug))));
+
+      const rows: CampaignItem[] = [];
+      const seen = new Set<string>();
+      for (const mission of missionRows) {
+        const status = toMissionHistoryStatus(mission);
+        if (status !== activeStatus) continue;
+        const key = `${status}-${mission.campaign.slug}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        rows.push({
+          id: mission.campaign.id,
+          missionId: mission.id,
+          slug: mission.campaign.slug,
+          title: mission.campaign.title,
+          brand: mission.campaign.brand?.displayName ?? "Đang cập nhật",
+          coverImageUrl: mission.campaign.coverImageUrl ?? null,
+          missionStatus: missionStatusLabel(mission),
+          canReapply: mission.missionApplication?.status === "REJECTED",
+          rejectReason: mission.missionApplication?.rejectReason ?? null
+        });
+      }
+      setHistoryItems(rows);
+    } catch (error) {
+      setReapplyError(error instanceof Error ? error.message : "Không thể gửi lại đăng ký campaign.");
+    } finally {
+      setBusyMissionId("");
+    }
+  }
 
   return (
     <>
       <PageHeader title="Campaign / Job" subtitle="Danh sách campaign đang mở để Creator tham gia và nhận nhiệm vụ phù hợp." />
+      {notice ? <p className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</p> : null}
       <section className="mb-6 rounded-2xl border border-zinc-200 bg-white p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-black text-zinc-900">{historyTitle}</h2>
@@ -166,9 +234,23 @@ export default function CreatorJobsPage() {
                     </span>
                   </div>
                   <div className="flex items-end justify-end">
-                    <Link href={`/campaigns/${campaign.slug}`} className="rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100">
-                    Xem chi tiết
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {campaign.canReapply ? (
+                        <button
+                          type="button"
+                          className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
+                          onClick={() => {
+                            setReapplyError("");
+                            setRejectedMissionId(campaign.missionId);
+                          }}
+                        >
+                          Thao tác
+                        </button>
+                      ) : null}
+                      <Link href={`/campaigns/${campaign.slug}`} className="rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100">
+                        Xem chi tiết
                     </Link>
+                    </div>
                   </div>
                 </div>
               </article>
@@ -177,6 +259,42 @@ export default function CreatorJobsPage() {
         </div>
       </section>
       <CampaignList excludeSlugs={participatedSlugs} compact />
+      {rejectedMission ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/50 p-4" onClick={() => setRejectedMissionId("")}>
+          <div className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-lg font-bold text-zinc-900">Campaign bị từ chối</p>
+                <p className="mt-1 text-sm text-zinc-600">{rejectedMission.title}</p>
+              </div>
+              <button type="button" className="rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100" onClick={() => setRejectedMissionId("")}>
+                Đóng
+              </button>
+            </div>
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              <p className="font-semibold">Lý do bị từ chối</p>
+              <p className="mt-1 whitespace-pre-line">{rejectedMission.rejectReason || "Brand/Admin chưa nhập lý do cụ thể."}</p>
+            </div>
+            <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              Hãy thực hiện đầy đủ các yêu cầu để apply lại campaign. Sau khi gửi lại, đơn sẽ quay về trạng thái chờ duyệt.
+            </p>
+            {reapplyError ? <p className="mt-3 text-sm text-red-600">{reapplyError}</p> : null}
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button type="button" className="rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100" onClick={() => setRejectedMissionId("")}>
+                Để sau
+              </button>
+              <button
+                type="button"
+                className="rounded-full bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={busyMissionId === rejectedMission.missionId}
+                onClick={() => void reapplyMission(rejectedMission)}
+              >
+                {busyMissionId === rejectedMission.missionId ? "Đang gửi lại..." : "Đăng ký campaign lại"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
