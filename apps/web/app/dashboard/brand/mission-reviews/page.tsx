@@ -498,15 +498,11 @@ function BrandMissionTranscriptReviewsTab({ apiBasePath }: { apiBasePath: string
                 const statusLabel = transcriptStatusLabel(item);
                 return (
                   <article key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
-                    <div className="grid gap-3 xl:grid-cols-[2.4fr_1fr_1fr_1.2fr_1.6fr] xl:items-start">
+                    <div className="grid gap-3 xl:grid-cols-[2.4fr_1fr_1.2fr_1.6fr] xl:items-start">
                       <div className="min-w-0">
                         <p className="font-semibold text-zinc-900">{item.mission.title}</p>
                         <p className="line-clamp-1 text-sm text-zinc-500">Chiến dịch: {item.campaign.title}</p>
                         <p className="line-clamp-1 text-sm text-zinc-500">Nhà sáng tạo: {item.account.displayName}</p>
-                      </div>
-                      <div>
-                        <p className="font-semibold text-zinc-900">{item.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
-                        <p className="text-xs text-zinc-500">Thưởng</p>
                       </div>
                       <div>
                         <p className={`font-semibold ${daysLeft(item.mission.deadlineAt) !== null && (daysLeft(item.mission.deadlineAt) ?? 0) <= 3 ? "text-red-600" : "text-zinc-900"}`}>{deadlineLabel(item.mission.deadlineAt)}</p>
@@ -516,6 +512,11 @@ function BrandMissionTranscriptReviewsTab({ apiBasePath }: { apiBasePath: string
                         <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${transcriptStatusTone(statusLabel)}`}>{transcriptStatusText(statusLabel)}</span>
                       </div>
                       <div className="flex flex-wrap gap-2 xl:justify-end">
+                        {statusLabel === "PENDING" ? (
+                          <button className="dc-btn-primary" onClick={() => void approve(item.id)}>
+                            Duyệt
+                          </button>
+                        ) : null}
                         <button className="dc-btn-secondary" onClick={() => { setDetailTab("ACTIONS"); void loadDetail(item.id); }}>
                           Xem chi tiết
                         </button>
@@ -867,15 +868,11 @@ function BrandMissionApplicationsTab({ apiBasePath }: { apiBasePath: string }) {
             ) : (
               items.map((item) => (
                 <article key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
-                  <div className="grid gap-3 xl:grid-cols-[2.4fr_1fr_1fr_1.2fr_1.7fr] xl:items-start">
+                    <div className="grid gap-3 xl:grid-cols-[2.4fr_1fr_1.2fr_1.7fr] xl:items-start">
                     <div className="min-w-0">
                       <p className="font-semibold text-zinc-900">{item.mission.title}</p>
                       <p className="line-clamp-1 text-sm text-zinc-500">Chiến dịch: {item.campaign.title}</p>
                       <p className="line-clamp-1 text-sm text-zinc-500">Nhà sáng tạo: {item.account.displayName}</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-zinc-900">{item.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
-                      <p className="text-xs text-zinc-500">Thưởng</p>
                     </div>
                     <div>
                       <p className="font-semibold text-zinc-900">{fmtDateOnly(item.createdAt)}</p>
@@ -885,6 +882,11 @@ function BrandMissionApplicationsTab({ apiBasePath }: { apiBasePath: string }) {
                       <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${missionStatusTone(item.status)}`}>{missionStatusLabel(item.status)}</span>
                     </div>
                     <div className="flex flex-wrap gap-2 xl:justify-end">
+                      {item.status === "PENDING_REVIEW" ? (
+                        <button className="dc-btn-primary" onClick={() => void approve(item.id)}>
+                          Duyệt
+                        </button>
+                      ) : null}
                       <button className="dc-btn-secondary" onClick={() => { setDetailTab("ACTIONS"); void loadDetail(item.id); }}>
                         Xem chi tiết
                       </button>
@@ -1100,6 +1102,11 @@ function BrandMissionVideoReviewsTab({ apiBasePath }: { apiBasePath: string }) {
                       <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${missionStatusTone(item.videoReviewStatus)}`}>{missionStatusLabel(item.videoReviewStatus)}</span>
                     </div>
                     <div className="flex flex-wrap gap-2 xl:justify-end">
+                      {item.videoReviewStatus === "PENDING" ? (
+                        <button className="dc-btn-primary" onClick={() => void decide(item.id, "approve")}>
+                          Duyệt
+                        </button>
+                      ) : null}
                       <button className="dc-btn-secondary" onClick={() => { setDetailTab("ACTIONS"); void loadDetail(item.id); }}>
                         Xem chi tiết
                       </button>
@@ -1323,15 +1330,11 @@ function BrandMissionFinalReviewsTab({ apiBasePath }: { apiBasePath: string }) {
             ) : (
               items.map((item) => (
                 <article key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
-                  <div className="grid gap-3 xl:grid-cols-[2.4fr_1fr_1fr_1.2fr_1.6fr] xl:items-start">
+                  <div className="grid gap-3 xl:grid-cols-[2.4fr_1fr_1.2fr_1.6fr] xl:items-start">
                     <div className="min-w-0">
                       <p className="font-semibold text-zinc-900">{item.mission.title}</p>
                       <p className="line-clamp-1 text-sm text-zinc-500">Chiến dịch: {item.campaign.title}</p>
                       <p className="line-clamp-1 text-sm text-zinc-500">Nhà sáng tạo: {item.account.displayName}</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-zinc-900">{item.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
-                      <p className="text-xs text-zinc-500">Thưởng</p>
                     </div>
                     <div>
                       <p className="font-semibold text-zinc-900">{fmtDateOnly(item.publishSubmittedAt)}</p>
@@ -1341,6 +1344,11 @@ function BrandMissionFinalReviewsTab({ apiBasePath }: { apiBasePath: string }) {
                       <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${missionStatusTone(item.publishStatus)}`}>{missionStatusLabel(item.publishStatus)}</span>
                     </div>
                     <div className="flex flex-wrap gap-2 xl:justify-end">
+                      {item.publishStatus === "PENDING" ? (
+                        <button className="dc-btn-primary" onClick={() => void approve(item)}>
+                          Duyệt
+                        </button>
+                      ) : null}
                       <button className="dc-btn-secondary" onClick={() => { setDetailTab("ACTIONS"); void loadDetail(item.id); }}>
                         Xem chi tiết
                       </button>
