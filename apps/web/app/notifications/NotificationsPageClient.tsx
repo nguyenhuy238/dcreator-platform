@@ -109,8 +109,8 @@ export function NotificationsPageClient() {
   }
 
   async function markAllAsRead() {
-    const unreadItems = items.filter((item) => !item.isRead);
-    await Promise.all(unreadItems.map((item) => fetch(`/api/me/notifications/${item.id}/read`, { method: "POST", credentials: "include" })));
+    const response = await fetch("/api/me/notifications/read-all", { method: "POST", credentials: "include" });
+    if (!response.ok) return;
     setItems((prev) => prev.map((item) => ({ ...item, isRead: true })));
     setUnreadCount(0);
   }

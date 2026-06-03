@@ -352,7 +352,7 @@ async function syncCreatorMissions(accountId: string) {
 
 export function getCreatorMissionGuidanceByOption(option: ProductReceiveOption) {
   if (option === "PRODUCT_REQUIRED") return "Bạn cần xác nhận sản phẩm theo yêu cầu trước khi nộp video và link public.";
-  return "Nhiem vu khong yeu cau san pham, co the nop video ngay.";
+  return "Nhiệm vụ không yêu cầu sản phẩm, có thể nộp video ngay.";
 }
 
 export async function ensureCreatorMissionFromApprovedApplication(
@@ -515,6 +515,7 @@ export async function confirmDepositPaid(creatorMissionId: string, accountId: st
     data: { status: "IN_PROGRESS", productStatus: "RECEIVED", depositStatus: "PAID", startedAt: current.startedAt ?? now() },
     include: creatorMissionInclude
   });
+  await notifyCreator(accountId, "PROOF_SUBMITTED", "Đã gửi xác nhận mua sản phẩm", "Bước xác nhận mua sản phẩm của bạn đã được ghi nhận.", { creatorMissionId });
   return mapMission(updated);
 }
 
@@ -1011,6 +1012,7 @@ export async function submitCreatorMissionTranscript(accountId: string, creatorM
     });
   });
 
+  await notifyCreator(accountId, "PROOF_SUBMITTED", "Đã gửi kịch bản", "Kịch bản của bạn đã được gửi để Brand/Admin duyệt.", { creatorMissionId });
   return mapMission(updated);
 }
 

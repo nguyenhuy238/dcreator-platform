@@ -9,8 +9,12 @@ import { CampaignList } from "@/app/campaigns/_components/CampaignList";
 type MissionHistoryItem = {
   id: string;
   status: string;
+  productReceiveOption: string;
+  productStatus: string;
   videoReviewStatus: string;
+  submission?: { status: string } | null;
   publishStatus: string;
+  missionApplication?: { status: string } | null;
   mission: { title: string };
   campaign: { id: string; title: string; slug: string; coverImageUrl?: string | null; brand?: { displayName?: string } | null };
 };
@@ -38,16 +42,23 @@ function toHistoryStatus(status: string): HistoryStatus {
   return "IN_PROGRESS";
 }
 
-function missionStatusLabel(status: string, videoReviewStatus: string, publishStatus: string) {
-  if (status === "COMPLETED") return "Đã hoàn thành";
-  if (status === "CANCELLED") return "Bị từ chối";
-  if (publishStatus === "PENDING") return "Chờ duyệt link public";
-  if (publishStatus === "REJECTED") return "Link public bị từ chối";
-  if (videoReviewStatus === "PENDING") return "Chờ duyệt video";
-  if (videoReviewStatus === "REJECTED") return "Video bị từ chối";
-  if (status === "PRODUCT_PENDING") return "Chờ xác nhận sản phẩm";
-  if (status === "DRAFT_PENDING") return "Chờ duyệt kịch bản";
-  return "Đang thực hiện";
+function missionStatusLabel(item: MissionHistoryItem) {
+  if (item.missionApplication?.status === "PENDING_REVIEW") return "Chờ duyệt tham gia";
+  if (item.missionApplication?.status === "REJECTED") return "Đăng ký bị từ chối";
+  if (item.status === "COMPLETED") return "Đã hoàn thành";
+  if (item.status === "CANCELLED") return "Bị từ chối";
+  if (item.publishStatus === "PENDING") return "Chờ duyệt link public";
+  if (item.publishStatus === "REJECTED") return "Link public bị từ chối";
+  if (item.videoReviewStatus === "PENDING") return "Chờ duyệt video";
+  if (item.videoReviewStatus === "REJECTED") return "Video bị từ chối";
+  if (item.videoReviewStatus === "APPROVED") return "Cần nộp link public";
+  if (item.status === "DRAFT_PENDING") {
+    if (item.submission?.status === "SUBMITTED") return "Chờ duyệt kịch bản";
+    if (item.submission?.status === "REJECTED") return "Kịch bản bị từ chối";
+    return "Cần nộp kịch bản";
+  }
+  if (item.productReceiveOption === "PRODUCT_REQUIRED" && item.productStatus !== "RECEIVED") return "Cần xác nhận mua hàng";
+  return "Cần nộp video";
 }
 
 function missionStatusPillClass(label: string) {
@@ -82,7 +93,7 @@ export default function CreatorJobsPage() {
           const key = `${status}-${mission.campaign.slug}`;
           if (seen.has(key)) continue;
           seen.add(key);
-          const currentMissionStatus = missionStatusLabel(mission.status, mission.videoReviewStatus, mission.publishStatus);
+          const currentMissionStatus = missionStatusLabel(mission);
           rows.push({
             id: mission.campaign.id,
             slug: mission.campaign.slug,
@@ -143,17 +154,17 @@ export default function CreatorJobsPage() {
                     sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
                   />
                 </div>
-                <div className="grid gap-3 p-3">
+                <div className="grid min-h-[136px] grid-rows-[auto_1fr] gap-3 p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="line-clamp-2 text-sm font-bold text-zinc-900">{campaign.title}</p>
-                      <p className="mt-1 text-sm text-zinc-500">Brand: {campaign.brand}</p>
+                      <p className="line-clamp-2 min-h-10 text-sm font-bold leading-5 text-zinc-900">{campaign.title}</p>
+                      <p className="mt-1 line-clamp-2 min-h-10 text-sm leading-5 text-zinc-500">Brand: {campaign.brand}</p>
                     </div>
                     <span className={`max-w-[92px] shrink-0 rounded-xl border px-2 py-1 text-center text-[11px] font-bold leading-tight ${missionStatusPillClass(campaign.missionStatus)}`}>
                       {campaign.missionStatus}
                     </span>
                   </div>
-                  <div className="flex justify-end">
+                  <div className="flex items-end justify-end">
                     <Link href={`/campaigns/${campaign.slug}`} className="rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100">
                     Xem chi tiết
                     </Link>

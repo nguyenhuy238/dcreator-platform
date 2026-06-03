@@ -69,12 +69,6 @@ function toPlatformBadge(platform: Channel["platform"]) {
   return "OTHER";
 }
 
-function reviewStatusLabel(status: Channel["status"]) {
-  if (status === "APPROVED") return "Đã duyệt";
-  if (status === "REJECTED") return "Đã từ chối";
-  return "Chờ duyệt";
-}
-
 function onlyDigits(raw: string) {
   return raw.replace(/\D/g, "");
 }
@@ -88,6 +82,12 @@ function parseNonNegativeInt(raw: string) {
 function formatIntForInput(value: number) {
   if (!Number.isFinite(value) || value <= 0) return "";
   return value.toLocaleString("vi-VN");
+}
+
+function toExternalUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "#";
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
 export default function CreatorProfilePage() {
@@ -406,10 +406,16 @@ export default function CreatorProfilePage() {
                         </div>
                         <StatusBadge status={item.status} />
                       </div>
-                      <p className="mt-1 break-all text-sm text-zinc-600">{item.url}</p>
+                      <a
+                        className="mt-1 block break-all text-sm font-semibold text-zinc-800 underline decoration-zinc-300 underline-offset-4 hover:text-zinc-950"
+                        href={toExternalUrl(item.url)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {item.url}
+                      </a>
                       <p className="text-sm text-zinc-600">Tên tài khoản / ID kênh: @{item.handle}</p>
                       <p className="text-sm text-zinc-600">Người theo dõi: {item.followerCount.toLocaleString("vi-VN")}</p>
-                      <p className="text-sm text-zinc-600">Trạng thái duyệt: {reviewStatusLabel(item.status)}</p>
                       {item.rejectReason ? <p className="mt-1 text-sm text-red-600">Lý do từ chối: {item.rejectReason}</p> : null}
                       <div className="mt-2 flex flex-wrap gap-2">
                         <button className="dc-btn-secondary" onClick={() => void toggleChannelActive(item.id, !item.isActive)} disabled={saving}>

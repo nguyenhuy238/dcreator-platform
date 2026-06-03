@@ -76,6 +76,13 @@ export async function markAsRead(accountId: string, notificationId: string) {
   });
 }
 
+export async function markAllAsRead(accountId: string) {
+  return prisma.notification.updateMany({
+    where: { accountId, channel: "IN_APP", isRead: false },
+    data: { isRead: true, readAt: new Date() }
+  });
+}
+
 export async function getMyNotifications(accountId: string, limit = 20) {
   const [items, unreadCount] = await prisma.$transaction([
     prisma.notification.findMany({

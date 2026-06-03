@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bell } from "@phosphor-icons/react";
+import { ActionToast } from "@/app/components/dcreator/ui/base";
 import { formatNotificationDateTime, normalizeNotificationText } from "@/lib/notifications/notification-copy";
 
 type NotificationItem = {
@@ -27,10 +28,13 @@ export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [badgeCount, setBadgeCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [realtimeToast, setRealtimeToast] = useState("");
+  const knownNotificationIdsRef = useRef<Set<string>>(new Set());
+  const hydratedRef = useRef(false);
 
   const topItems = useMemo(() => items.slice(0, 6), [items]);
 
-  const fetchNotifications = useCallback(async (options?: { resetBadge?: boolean }) => {
+  const fetchNotifications = useCallback(async (options?: { resetBadge?: boolean; showRealtimeToast?: boolean }) => {
     const response = await fetch("/api/me/notifications?limit=20", {
       method: "GET",
       credentials: "include",
@@ -42,7 +46,15 @@ export function NotificationBell() {
     }
     const payload = (await response.json()) as NotificationApiResponse;
     const nextUnreadCount = payload.data?.unreadCount ?? 0;
-    setItems(payload.data?.items ?? []);
+    const nextItems = payload.data?.items ?? [];
+    const nextNewUnread = nextItems.find((item) => !item.isRead && !knownNotificationIdsRef.current.has(item.id));
+    if (options?.showRealtimeToast && hydratedRef.current && nextNewUnread) {
+      setRealtimeToast(`${normalizeNotificationText(nextNewUnread.title)}: ${normalizeNotificationText(nextNewUnread.content)}`);
+      setTimeout(() => setRealtimeToast(""), 3200);
+    }
+    knownNotificationIdsRef.current = new Set(nextItems.map((item) => item.id));
+    hydratedRef.current = true;
+    setItems(nextItems);
     setUnreadCount(nextUnreadCount);
     setBadgeCount(options?.resetBadge ? 0 : nextUnreadCount);
     setLoading(false);
@@ -59,6 +71,17 @@ export function NotificationBell() {
     setBadgeCount((prev) => Math.max(0, prev - 1));
   }
 
+  async function onReadAll() {
+    const response = await fetch("/api/me/notifications/read-all", {
+      method: "POST",
+      credentials: "include"
+    });
+    if (!response.ok) return;
+    setItems((prev) => prev.map((item) => ({ ...item, isRead: true })));
+    setUnreadCount(0);
+    setBadgeCount(0);
+  }
+
   useEffect(() => {
     void fetchNotifications().catch(() => setLoading(false));
   }, [fetchNotifications]);
@@ -67,6 +90,25 @@ export function NotificationBell() {
     if (!open) return;
     void fetchNotifications({ resetBadge: true }).catch(() => setLoading(false));
   }, [fetchNotifications, open]);
+
+  useEffect(() => {
+    function refreshNotifications(event: Event) {
+      const detail = event instanceof CustomEvent ? (event.detail as { suppressToast?: boolean } | undefined) : undefined;
+      void fetchNotifications({ showRealtimeToast: !detail?.suppressToast }).catch(() => setLoading(false));
+    }
+
+    window.addEventListener("dcreator:notifications-refresh", refreshNotifications);
+    return () => window.removeEventListener("dcreator:notifications-refresh", refreshNotifications);
+  }, [fetchNotifications]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void fetchNotifications({ showRealtimeToast: true }).catch(() => setLoading(false));
+    }, 5000);
+
+    return () => window.clearInterval(intervalId);
+  }, [fetchNotifications]);
 
   return (
     <div className="relative">
@@ -97,9 +139,19 @@ export function NotificationBell() {
               <p className="text-sm font-semibold text-zinc-900">Thông báo</p>
               <p className="text-xs text-zinc-500">{unreadCount > 0 ? `${unreadCount} thông báo chưa đọc` : "Bạn đã xem hết thông báo mới"}</p>
             </div>
-            <Link href="/notifications" onClick={() => setOpen(false)} className="text-sm font-semibold text-zinc-700 hover:text-zinc-900">
-              Xem tất cả
-            </Link>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void onReadAll()}
+                className="rounded-full border border-zinc-200 px-2.5 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
+                disabled={unreadCount === 0}
+              >
+                Đọc tất cả
+              </button>
+              <Link href="/notifications" onClick={() => setOpen(false)} className="text-sm font-semibold text-zinc-700 hover:text-zinc-900">
+                Xem tất cả
+              </Link>
+            </div>
           </div>
 
           <div className="max-h-[28rem] overflow-y-auto p-2">
@@ -132,6 +184,7 @@ export function NotificationBell() {
           </div>
         </div>
       ) : null}
+      {realtimeToast ? <ActionToast message={realtimeToast} tone="info" /> : null}
     </div>
   );
 }

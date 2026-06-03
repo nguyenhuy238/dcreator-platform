@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle, IdentificationCard, Megaphone, Package, Scroll, VideoCamera } from "@phosphor-icons/react";
-import { EmptyState, ErrorState, LoadingSkeleton, SectionHeader } from "@/app/components/dcreator/ui/base";
+import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, SectionHeader } from "@/app/components/dcreator/ui/base";
 import type { CreatorOverview } from "@/app/dashboard/creator/_components/CreatorDashboardClient";
 
 type ApiResult<T> = { success: boolean; data?: T; error?: string };
@@ -296,6 +296,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [toast, setToast] = useState("");
   const [busyId, setBusyId] = useState("");
   const [detailMissionId, setDetailMissionId] = useState("");
   const [activeFilter, setActiveFilter] = useState<MissionFilter>("ALL");
@@ -341,6 +342,13 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
     });
   }
 
+  function pushSuccess(message: string) {
+    setNotice(message);
+    setToast(message);
+    setTimeout(() => setToast(""), 2600);
+    window.dispatchEvent(new CustomEvent("dcreator:notifications-refresh", { detail: { suppressToast: true } }));
+  }
+
   async function load() {
     setLoading(true);
     setError("");
@@ -377,7 +385,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
           purchaseProofNote: purchaseNoteMap[item.id]?.trim() || undefined
         })
       });
-      setNotice("Đã xác nhận mua hàng. Bạn có thể chọn nộp kịch bản trước hoặc nộp video trực tiếp.");
+      pushSuccess("Đã xác nhận mua hàng. Bạn có thể chọn nộp kịch bản trước hoặc nộp video trực tiếp.");
       await load();
     } catch (e) {
       setMissionFormErrors(item.id, { form: toErrorMessage(e) });
@@ -402,7 +410,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transcript })
       });
-      setNotice("Đã gửi kịch bản. Vui lòng chờ Brand/Admin duyệt trước khi nộp video review.");
+      pushSuccess("Đã gửi kịch bản. Vui lòng chờ Brand/Admin duyệt trước khi nộp video review.");
       await load();
     } catch (e) {
       setMissionFormErrors(item.id, { form: toErrorMessage(e) });
@@ -426,7 +434,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ videoUrl, note: videoNoteMap[item.id]?.trim() || undefined })
       });
-      setNotice("Đã gửi video review.");
+      pushSuccess("Đã gửi video review. Video đang chờ Brand/Admin duyệt.");
       await load();
     } catch (e) {
       setMissionFormErrors(item.id, { form: toErrorMessage(e) });
@@ -456,7 +464,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
           finalProofNote: finalNoteMap[item.id]?.trim() || undefined
         })
       });
-      setNotice("Đã gửi bước link social public.");
+      pushSuccess("Đã gửi link social public. Bước này đang chờ Brand/Admin duyệt.");
       await load();
     } catch (e) {
       setMissionFormErrors(item.id, { form: toErrorMessage(e) });
@@ -1065,6 +1073,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
   return (
     <>
       {notice ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</p> : null}
+      {toast ? <ActionToast message={toast} /> : null}
       {error ? <ErrorState title="Có lỗi" description={error} onRetry={() => void load()} /> : null}
       {loading ? <LoadingSkeleton rows={5} /> : null}
 
