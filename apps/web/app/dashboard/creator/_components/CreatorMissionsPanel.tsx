@@ -139,7 +139,9 @@ function transcriptDownloadHref(value: string | null | undefined) {
 
 function workflowStatus(item: MissionItem) {
   if (item.missionApplication?.status === "PENDING_REVIEW") return "Chờ duyệt nhiệm vụ";
+  if (item.missionApplication?.status === "REJECTED") return "Bị từ chối";
   if (item.status === "COMPLETED") return "Hoàn thành";
+  if (item.status === "CANCELLED") return "Bị từ chối";
   if (item.publishStatus === "PENDING") return "Link public đang chờ duyệt";
   if (item.publishStatus === "REJECTED") return "Link public bị từ chối";
   if (item.videoReviewStatus === "PENDING") return "Video đang chờ duyệt";

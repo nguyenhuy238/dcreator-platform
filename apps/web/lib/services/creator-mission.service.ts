@@ -1047,6 +1047,7 @@ export async function submitCreatorMissionPublish(
 }
 
 export async function createMissionApplicationForCreator(accountId: string, payload: { missionId: string; note?: string }) {
+  const CREATOR_MISSION_REAPPLY_LIMIT = 2;
   const profile = await prisma.creatorProfile.findUnique({ where: { accountId }, select: { id: true } });
   if (!profile) throw new AppError("Creator profile is required", 422, "CREATOR_PROFILE_REQUIRED");
   const approvedActiveChannels = await prisma.creatorSocialLink.findMany({
@@ -1080,6 +1081,25 @@ export async function createMissionApplicationForCreator(accountId: string, payl
 
   if (existing && existing.applicationStatus !== "REJECTED") {
     throw new AppError("Ban da xin lam nhiem vu nay", 409, "MISSION_APPLICATION_ALREADY_EXISTS");
+  }
+
+  let resubmissionCount = 0;
+  if (existing?.applicationStatus === "REJECTED") {
+    resubmissionCount = await prisma.auditLog.count({
+      where: {
+        targetType: "CreatorMission",
+        targetId: existing.id,
+        action: "CREATOR_MISSION_APPLICATION_RESUBMITTED"
+      }
+    });
+
+    if (resubmissionCount >= CREATOR_MISSION_REAPPLY_LIMIT) {
+      throw new AppError(
+        "Bạn chỉ có thể đăng ký lại campaign này tối đa 2 lần.",
+        409,
+        "MISSION_APPLICATION_REAPPLY_LIMIT_REACHED"
+      );
+    }
   }
 
   const created = existing
@@ -1123,7 +1143,9 @@ export async function createMissionApplicationForCreator(accountId: string, payl
       metadata: {
         missionId: created.missionId,
         campaignId: created.campaignId,
-        creatorSocialChannels: approvedActiveChannels
+        creatorSocialChannels: approvedActiveChannels,
+        reapplyCount: existing ? resubmissionCount + 1 : 0,
+        reapplyLimit: CREATOR_MISSION_REAPPLY_LIMIT
       }
     }
   });
