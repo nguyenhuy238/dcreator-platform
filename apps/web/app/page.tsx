@@ -19,8 +19,24 @@ const faqs = [
     a: "Không bắt buộc quá lớn, quan trọng là phù hợp tiêu chí campaign và chất lượng nội dung."
   },
   {
-    q: "Brand đo hiệu quả như thế nào?",
-    a: "Brand theo dõi được doanh thu, tỷ lệ chuyển đổi, hiệu quả từng creator và chi phí theo campaign."
+    q: "dCreator khác gì so với thuê KOL/KOC truyền thống?",
+    a: "dCreator giúp doanh nghiệp tiếp cận mạng lưới Creator đa dạng, quản lý campaign tập trung và theo dõi hiệu quả trên một nền tảng duy nhất."
+  },
+  {
+    q: "Tôi mới bắt đầu làm nội dung có tham gia được không?",
+    a: "Có. dCreator ưu tiên sự phù hợp với sản phẩm và chất lượng nội dung hơn là số lượng follower."
+  },
+  {
+    q: "Tôi có thể tham gia nhiều campaign cùng lúc không?",
+    a: "Có, miễn là bạn đáp ứng yêu cầu của từng chiến dịch và đảm bảo tiến độ thực hiện."
+  },
+  {
+    q: "Tôi có thể trở thành Creator từ người dùng thông thường không?",
+    a: "Có. dCreator khuyến khích người dùng tham gia sáng tạo nội dung và phát triển thành Micro Creator."
+  },
+  {
+    q: "Vì sao dCreator tin rằng nội dung có thể tạo ra doanh thu?",
+    a: "Vì mỗi nội dung chất lượng không chỉ tạo lượt xem, mà còn xây dựng niềm tin — yếu tố quan trọng nhất dẫn đến quyết định mua hàng."
   }
 ];
 
@@ -147,10 +163,7 @@ export default async function HomePage() {
           <h2 className="mt-3 max-w-3xl text-3xl font-black leading-[1.15] text-white md:text-4xl">Sứ mệnh của dCreator</h2>
           <div className="mt-5 max-w-3xl space-y-5 text-base leading-7 text-zinc-200 md:text-lg md:leading-8">
             <p>
-              dCreator mang sứ mệnh giúp thương hiệu tăng trưởng doanh thu thông qua sức mạnh của nội dung số và cộng đồng sáng tạo.
-            </p>
-            <p>
-              Chúng tôi xây dựng hệ sinh thái kết nối Brand - Creator - User, nơi mọi chiến dịch đều được vận hành minh bạch, tối ưu bằng dữ liệu thực tế và hướng đến hiệu quả kinh doanh thật.
+              Biến nội dung thành doanh thu thực tế và chia sẻ giá trị cho tất cả những người tạo ra giá trị trong hệ sinh thái.
             </p>
           </div>
         </section>
@@ -309,7 +322,7 @@ export default async function HomePage() {
 
         <section className="relative mt-10 overflow-hidden rounded-[2rem] border border-zinc-200 bg-white p-6 text-white shadow-none md:p-8">
           <h2 className="text-2xl font-black text-zinc-900">Câu hỏi thường gặp</h2>
-          <div className="mt-4 grid gap-4 md:grid-cols-3">
+          <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {faqs.map((item) => (
               <article
                 key={item.q}
