@@ -35,7 +35,7 @@ const creatorMissionInclude = {
       deadlineAt: true
     }
   },
-  campaign: { select: { id: true, title: true, slug: true, brandId: true, brand: { select: { displayName: true } } } },
+  campaign: { select: { id: true, title: true, slug: true, coverImageUrl: true, brandId: true, brand: { select: { displayName: true } } } },
   account: {
     select: {
       id: true,
@@ -548,6 +548,7 @@ export async function submitPurchaseProof(creatorMissionId: string, accountId: s
   });
   const updated = await getMissionById(creatorMissionId);
   if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
+  await notifyCreator(accountId, "PROOF_SUBMITTED", "Đã gửi xác nhận mua sản phẩm", "Bước xác nhận mua sản phẩm của bạn đã được ghi nhận.", { creatorMissionId });
   return mapMission(updated);
 }
 
@@ -592,6 +593,7 @@ export async function submitDraft(creatorMissionId: string, accountId: string, p
   });
   const updated = await getMissionById(creatorMissionId);
   if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
+  await notifyCreator(accountId, "PROOF_SUBMITTED", "Đã gửi video review", "Video review của bạn đã được gửi để Brand/Admin duyệt.", { creatorMissionId });
   return { creatorMission: mapMission(updated), submissionId: updated.submissionId, submissionLifecycleStatus: updated.submissionLifecycleStatus };
 }
 
@@ -611,7 +613,7 @@ export async function confirmDepositAndProductReceivedByAdmin(actorId: string, c
     },
     include: creatorMissionInclude
   });
-  await notifyCreator(updated.accountId, "MISSION_APPLICATION_APPROVED", "Da xac nhan nhan san pham", "Admin da xac nhan buoc san pham.", { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "MISSION_APPLICATION_APPROVED", "Đã xác nhận nhận sản phẩm", "Admin đã xác nhận bước nhận sản phẩm cho nhiệm vụ của bạn.", { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -631,7 +633,7 @@ export async function approvePurchaseProofByAdmin(actorId: string, creatorMissio
     },
     include: creatorMissionInclude
   });
-  await notifyCreator(updated.accountId, "MISSION_APPLICATION_APPROVED", "Da duyet bang chung mua hang", "Ban co the nop video review.", { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "MISSION_APPLICATION_APPROVED", "Đã duyệt bằng chứng mua hàng", "Bạn có thể tiếp tục nộp video review.", { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -651,7 +653,7 @@ export async function rejectPurchaseProofByAdmin(actorId: string, creatorMission
     },
     include: creatorMissionInclude
   });
-  await notifyCreator(updated.accountId, "MISSION_APPLICATION_REJECTED", "Bang chung mua hang bi tu choi", feedback, { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "MISSION_APPLICATION_REJECTED", "Bằng chứng mua hàng bị từ chối", feedback, { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -720,6 +722,7 @@ export async function submitPublishReport(
   });
   const updated = await getMissionById(creatorMissionId);
   if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
+  await notifyCreator(accountId, "PROOF_SUBMITTED", "Đã gửi link social public", "Link social public của bạn đã được gửi để Brand/Admin duyệt.", { creatorMissionId });
   return mapMission(updated);
 }
 
@@ -755,7 +758,7 @@ export async function approveVideoReviewByAdmin(actorId: string, creatorMissionI
       include: creatorMissionInclude
     });
   });
-  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_APPROVED", "Video duoc duyet", "Ban co the nop link social public.", { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_APPROVED", "Video đã được duyệt", "Bạn có thể tiếp tục nộp link social public.", { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -795,7 +798,7 @@ export async function rejectVideoReviewByAdmin(actorId: string, creatorMissionId
       include: creatorMissionInclude
     });
   });
-  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_REJECTED", "Video bi tu choi", feedback, { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_REJECTED", "Video bị từ chối", feedback, { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -849,7 +852,7 @@ export async function approvePublishReportByAdmin(actorId: string, creatorMissio
       include: creatorMissionInclude
     });
   });
-  await notifyCreator(updated.accountId, "CREATOR_MISSION_FINAL_APPROVED", "Nhiem vu da hoan thanh", "Nhiem vu da duoc duyet va cong diem.", { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_MISSION_FINAL_APPROVED", "Nhiệm vụ đã hoàn thành", "Nhiệm vụ của bạn đã được duyệt hoàn thành và cộng điểm.", { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -879,7 +882,7 @@ export async function rejectPublishReportByAdmin(actorId: string, creatorMission
       include: creatorMissionInclude
     });
   });
-  await notifyCreator(updated.accountId, "CREATOR_MISSION_FINAL_REJECTED", "Buoc hoan thanh bi tu choi", feedback, { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_MISSION_FINAL_REJECTED", "Bước hoàn thành bị từ chối", feedback, { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -1360,7 +1363,7 @@ export async function approveMissionApplicationByAdmin(actorId: string, id: stri
     });
     return mapMission(next);
   });
-  await notifyCreator(current.accountId, "MISSION_APPLICATION_APPROVED", "Don xin nhiem vu duoc duyet", `Ban da duoc duyet nhiem vu "${current.mission.title}".`, { creatorMissionId: id });
+  await notifyCreator(current.accountId, "MISSION_APPLICATION_APPROVED", "Đơn xin nhiệm vụ được duyệt", `Bạn đã được duyệt tham gia nhiệm vụ "${current.mission.title}".`, { creatorMissionId: id });
   return updated;
 }
 
@@ -1374,7 +1377,7 @@ export async function rejectMissionApplicationByAdmin(actorId: string, id: strin
     data: { applicationStatus: "REJECTED", applicationRejectReason: reason, applicationReviewedById: actorId, applicationReviewedAt: now() },
     include: creatorMissionInclude
   });
-  await notifyCreator(current.accountId, "MISSION_APPLICATION_REJECTED", "Don xin nhiem vu bi tu choi", reason, { creatorMissionId: id });
+  await notifyCreator(current.accountId, "MISSION_APPLICATION_REJECTED", "Đơn xin nhiệm vụ bị từ chối", reason, { creatorMissionId: id });
   return mapMission(updated);
 }
 
@@ -1577,7 +1580,7 @@ export async function approveMissionTranscriptReviewByAdmin(actorId: string, id:
     });
   });
 
-  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_APPROVED", "Kich ban duoc duyet", "Ban co the nop video review.", { creatorMissionId: id, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_APPROVED", "Kịch bản được duyệt", "Bạn có thể tiếp tục nộp video review.", { creatorMissionId: id, actorId });
   return mapMission(updated);
 }
 
@@ -1618,7 +1621,7 @@ export async function rejectMissionTranscriptReviewByAdmin(actorId: string, id: 
     });
   });
 
-  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_REJECTED", "Kich ban bi tu choi", reason, { creatorMissionId: id, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_REJECTED", "Kịch bản bị từ chối", reason, { creatorMissionId: id, actorId });
   return mapMission(updated);
 }
 

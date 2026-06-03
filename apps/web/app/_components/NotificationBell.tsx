@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { Bell } from "@phosphor-icons/react";
 
 type NotificationItem = {
   id: string;
@@ -19,18 +20,29 @@ type NotificationApiResponse = {
   };
 };
 
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const topItems = useMemo(() => items.slice(0, 5), [items]);
+  const topItems = useMemo(() => items.slice(0, 6), [items]);
 
   async function fetchNotifications() {
     const response = await fetch("/api/me/notifications?limit=20", {
       method: "GET",
-      credentials: "include"
+      credentials: "include",
+      cache: "no-store"
     });
     if (!response.ok) {
       setLoading(false);
@@ -53,44 +65,70 @@ export function NotificationBell() {
   }
 
   useEffect(() => {
-    fetchNotifications().catch(() => setLoading(false));
+    void fetchNotifications().catch(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    void fetchNotifications().catch(() => setLoading(false));
+  }, [open]);
+
   return (
-    <div className="notification-wrapper">
+    <div className="relative">
       <button
         type="button"
-        className="notification-bell"
+        className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 transition hover:bg-zinc-100"
         onClick={() => setOpen((prev) => !prev)}
         aria-label="Thông báo"
       >
-        🔔
-        {unreadCount > 0 ? <span className="notification-badge">{unreadCount}</span> : null}
+        <Bell size={18} weight="regular" />
+        {unreadCount > 0 ? (
+          <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold text-white">
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        ) : null}
       </button>
+
       {open ? (
-        <div className="notification-dropdown">
-          <div className="notification-header">
-            <strong>Notifications</strong>
-            <Link href="/notifications" onClick={() => setOpen(false)}>
-              View all
+        <div className="absolute right-0 z-50 mt-2 w-[min(92vw,24rem)] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl">
+          <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-zinc-900">Thông báo</p>
+              <p className="text-xs text-zinc-500">Cập nhật mới nhất cho workspace Creator</p>
+            </div>
+            <Link href="/notifications" onClick={() => setOpen(false)} className="text-sm font-semibold text-zinc-700 hover:text-zinc-900">
+              Xem tất cả
             </Link>
           </div>
-          {loading ? <p>Đang tải...</p> : null}
-          {!loading && topItems.length === 0 ? <p>No notifications.</p> : null}
-          {!loading &&
-            topItems.map((item) => (
-              <article key={item.id} className={`notification-item ${item.isRead ? "read" : "unread"}`}>
-                <p>
-                  <strong>{item.title}</strong>
-                </p>
-                <p>{item.content}</p>
-                {!item.isRead ? (
-                  <button type="button" onClick={() => onRead(item.id)}>
-                    Mark as read
-                  </button>
-                ) : null}
-              </article>
-            ))}
+
+          <div className="max-h-[28rem] overflow-y-auto p-2">
+            {loading ? <p className="px-2 py-3 text-sm text-zinc-500">Đang tải thông báo...</p> : null}
+            {!loading && topItems.length === 0 ? <p className="px-2 py-3 text-sm text-zinc-500">Chưa có thông báo mới.</p> : null}
+            {!loading &&
+              topItems.map((item) => (
+                <article
+                  key={item.id}
+                  className={`rounded-xl border px-3 py-3 ${item.isRead ? "border-zinc-100 bg-white" : "border-zinc-200 bg-zinc-50"}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-zinc-900">{item.title}</p>
+                      <p className="mt-1 text-sm text-zinc-600">{item.content}</p>
+                      <p className="mt-2 text-xs text-zinc-400">{formatDateTime(item.createdAt)}</p>
+                    </div>
+                    {!item.isRead ? (
+                      <button
+                        type="button"
+                        onClick={() => void onRead(item.id)}
+                        className="shrink-0 rounded-full border border-zinc-200 px-2.5 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
+                      >
+                        Đã đọc
+                      </button>
+                    ) : null}
+                  </div>
+                </article>
+              ))}
+          </div>
         </div>
       ) : null}
     </div>

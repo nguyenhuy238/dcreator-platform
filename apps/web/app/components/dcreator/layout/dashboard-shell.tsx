@@ -107,7 +107,8 @@ export function DashboardShell({
   user,
   workspaceTitle,
   workspaceDescription,
-  loginRedirect
+  loginRedirect,
+  headerAccessory
 }: {
   children: React.ReactNode;
   navItems: readonly DashboardNavItem[];
@@ -115,6 +116,7 @@ export function DashboardShell({
   workspaceTitle: string;
   workspaceDescription: string;
   loginRedirect: string;
+  headerAccessory?: React.ReactNode;
 }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -244,24 +246,27 @@ export function DashboardShell({
                     </nav>
                   </div>
                 </div>
-                <div className="relative">
-                  <button type="button" className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-2 py-1.5 hover:bg-zinc-100" onClick={() => setMenuOpen((prev) => !prev)}>
-                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">{userInitials}</span>
-                    <span className="hidden text-sm font-semibold text-zinc-800 sm:inline">{user.displayName}</span>
-                  </button>
-                  {menuOpen ? (
-                    <div className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-zinc-200 bg-white p-2 shadow-lg">
-                      <div className="rounded-lg bg-zinc-50 px-3 py-2">
-                        <p className="text-sm font-semibold text-zinc-900">{user.displayName}</p>
-                        <p className="truncate text-xs text-zinc-500">{user.email}</p>
-                        <p className="mt-1 text-xs text-zinc-500">Vai trò: {user.roles.join(", ")}</p>
+                <div className="flex items-center gap-2">
+                  {headerAccessory}
+                  <div className="relative">
+                    <button type="button" className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-2 py-1.5 hover:bg-zinc-100" onClick={() => setMenuOpen((prev) => !prev)}>
+                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">{userInitials}</span>
+                      <span className="hidden text-sm font-semibold text-zinc-800 sm:inline">{user.displayName}</span>
+                    </button>
+                    {menuOpen ? (
+                      <div className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-zinc-200 bg-white p-2 shadow-lg">
+                        <div className="rounded-lg bg-zinc-50 px-3 py-2">
+                          <p className="text-sm font-semibold text-zinc-900">{user.displayName}</p>
+                          <p className="truncate text-xs text-zinc-500">{user.email}</p>
+                          <p className="mt-1 text-xs text-zinc-500">Vai trò: {user.roles.join(", ")}</p>
+                        </div>
+                        <div className="mt-2 grid gap-1">
+                          <Link href={profileHref} className="rounded-lg px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100">Hồ sơ</Link>
+                          <button type="button" onClick={onLogout} className="rounded-lg px-3 py-2 text-left text-sm font-semibold text-red-700 hover:bg-red-50">Đăng xuất</button>
+                        </div>
                       </div>
-                      <div className="mt-2 grid gap-1">
-                        <Link href={profileHref} className="rounded-lg px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100">Hồ sơ</Link>
-                        <button type="button" onClick={onLogout} className="rounded-lg px-3 py-2 text-left text-sm font-semibold text-red-700 hover:bg-red-50">Đăng xuất</button>
-                      </div>
-                    </div>
-                  ) : null}
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </div>

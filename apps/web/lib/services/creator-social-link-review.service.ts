@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
+import { createNotification } from "@/lib/services/notification.service";
 
 type ReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
 
@@ -158,6 +159,17 @@ export async function reviewCreatorSocialLinkRequest(
     newStatus: status,
     reason: rejectReason ?? null,
     metadata: { reviewNote: reviewNote ?? null }
+  });
+
+  await createNotification({
+    accountId: current.creatorProfile.accountId,
+    event: status === "APPROVED" ? "CREATOR_APPLICATION_APPROVED" : "PROOF_REJECTED",
+    title: status === "APPROVED" ? "Kênh mạng xã hội đã được duyệt" : "Kênh mạng xã hội bị từ chối",
+    content:
+      status === "APPROVED"
+        ? `Kênh ${current.socialUrl} đã được Admin xác minh thành công.`
+        : rejectReason?.trim() || "Kênh mạng xã hội của bạn chưa được duyệt.",
+    metadata: { linkId, reviewNote: reviewNote ?? null }
   });
 
   return updated;

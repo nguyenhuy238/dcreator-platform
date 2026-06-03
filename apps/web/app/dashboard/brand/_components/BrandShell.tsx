@@ -3,7 +3,9 @@
 import type { Role } from "@prisma/client";
 import type { BrandNavItem } from "@/app/dashboard/brand/_components/brand-nav";
 import { BrandSwitcher } from "@/app/dashboard/brand/_components/BrandSwitcher";
+import { DashboardSwitcher } from "@/app/components/dcreator/layout/dashboard-switcher";
 import { DashboardShell } from "@/app/components/dcreator/layout/dashboard-shell";
+import type { UserCapabilities } from "@/lib/auth/capabilities";
 
 type BrandShellUser = {
   id: string;
@@ -11,6 +13,7 @@ type BrandShellUser = {
   displayName: string;
   avatarUrl: string | null;
   roles: Role[];
+  capabilities: UserCapabilities;
 };
 
 export function BrandShell({
@@ -30,6 +33,7 @@ export function BrandShell({
       workspaceDescription="Quản lý onboarding, campaign, creator"
       loginRedirect="/dashboard/brand"
     >
+      <DashboardSwitcher roles={user.roles} capabilities={user.capabilities} />
       <BrandSwitcher />
       {children}
     </DashboardShell>

@@ -24,7 +24,7 @@ export type CampaignCardData = {
   deadline: string | Date | null;
 };
 
-export function CampaignCard({ campaign }: { campaign: CampaignCardData }) {
+export function CampaignCard({ campaign, compact = false }: { campaign: CampaignCardData; compact?: boolean }) {
   const videoTarget = campaign.videoTarget ?? 0;
   const videoApproved = campaign.videoApproved ?? 0;
   const creatorJoined = campaign.creatorJoined ?? 0;
@@ -45,27 +45,31 @@ export function CampaignCard({ campaign }: { campaign: CampaignCardData }) {
         </div>
       </div>
 
-      <div className="grid h-full grid-rows-[4rem_1.5rem_92px_5.5rem_1fr] gap-y-3 p-5">
+      <div className={`grid h-full gap-y-3 p-5 ${compact ? "grid-rows-[4rem_1.5rem_1fr]" : "grid-rows-[4rem_1.5rem_92px_5.5rem_1fr]"}`}>
         <h3 className="line-clamp-2 text-2xl font-black leading-tight text-zinc-900">{campaign.title}</h3>
         <p className="text-sm font-semibold text-zinc-600">Brand: {campaign.brand}</p>
 
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="min-h-[92px] rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-            <p className="text-zinc-500">Creator đã tham gia</p>
-            <p className="font-black text-zinc-900">{creatorJoined}</p>
-          </div>
-          <div className="min-h-[92px] rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-            <p className="text-zinc-500">Video dự kiến</p>
-            <p className="font-black text-zinc-900">{videoTarget}</p>
-          </div>
-        </div>
-        <div>
-          <p className="text-xs font-semibold text-zinc-600">Video hoàn thành: {videoApproved}/{videoTarget}</p>
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-100">
-            <div className="h-full bg-zinc-900 transition-all" style={{ width: `${videoProgressPercent}%` }} />
-          </div>
-          <p className="mt-1 text-xs text-zinc-500">Tiến độ video: {videoProgressPercent}%</p>
-        </div>
+        {!compact ? (
+          <>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="min-h-[92px] rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+                <p className="text-zinc-500">Creator đã tham gia</p>
+                <p className="font-black text-zinc-900">{creatorJoined}</p>
+              </div>
+              <div className="min-h-[92px] rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+                <p className="text-zinc-500">Video dự kiến</p>
+                <p className="font-black text-zinc-900">{videoTarget}</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-zinc-600">Video hoàn thành: {videoApproved}/{videoTarget}</p>
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-100">
+                <div className="h-full bg-zinc-900 transition-all" style={{ width: `${videoProgressPercent}%` }} />
+              </div>
+              <p className="mt-1 text-xs text-zinc-500">Tiến độ video: {videoProgressPercent}%</p>
+            </div>
+          </>
+        ) : null}
 
         <div className="flex items-end pt-1">
           <div className="flex items-center gap-2">

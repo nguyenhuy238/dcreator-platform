@@ -4,23 +4,23 @@ import { normalizeCreatorLinks, resolveSelectedIndustries } from "../lib/profile
 
 test("creator upgrade rejects empty links", () => {
   assert.throws(
-    () => normalizeCreatorLinks([{ platform: "tiktok", url: "" }]),
+    () => normalizeCreatorLinks([{ platform: "tiktok", url: "", handle: "", followerCount: 0 }]),
     /Vui lòng thêm ít nhất 1 liên kết/
   );
 });
 
 test("creator upgrade accepts one TikTok link and adds https protocol", () => {
-  assert.deepEqual(normalizeCreatorLinks([{ platform: "tiktok", url: "tiktok.com/@demo" }]), [
-    { platform: "tiktok", url: "https://tiktok.com/@demo" }
+  assert.deepEqual(normalizeCreatorLinks([{ platform: "tiktok", url: "tiktok.com/@demo", handle: "@demo", followerCount: 12000 }]), [
+    { platform: "tiktok", url: "https://tiktok.com/@demo", handle: "demo", followerCount: 12000 }
   ]);
 });
 
 test("creator upgrade accepts multiple links including duplicate platforms", () => {
   assert.equal(normalizeCreatorLinks([
-    { platform: "facebook", url: "https://facebook.com/demo-one" },
-    { platform: "facebook", url: "https://facebook.com/demo-two" },
-    { platform: "instagram", url: "instagram.com/demo" },
-    { platform: "shopee", url: "shopee.vn/demo" }
+    { platform: "facebook", url: "https://facebook.com/demo-one", handle: "demo-one", followerCount: 2000 },
+    { platform: "facebook", url: "https://facebook.com/demo-two", handle: "demo-two", followerCount: 3000 },
+    { platform: "instagram", url: "instagram.com/demo", handle: "demo", followerCount: 4000 },
+    { platform: "shopee", url: "shopee.vn/demo", handle: "demo-shop", followerCount: 5000 }
   ]).length, 4);
 });
 

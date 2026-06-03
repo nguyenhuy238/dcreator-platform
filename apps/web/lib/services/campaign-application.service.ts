@@ -2,6 +2,7 @@
 import { appendCreatorCampaignApplicationTag } from "@/lib/constants/campaign-application";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
+import { createNotification } from "@/lib/services/notification.service";
 
 export type CreatorCampaignApplicationState =
   | "LOGIN_REQUIRED"
@@ -304,6 +305,14 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
       }
     });
 
+    await createNotification({
+      accountId,
+      event: "MISSION_ACCEPTED",
+      title: "Đã gửi đăng ký campaign",
+      content: `Bạn đã đăng ký lại campaign này và đang chờ Brand/Admin duyệt.`,
+      metadata: { campaignId: campaign.id, missionId: firstMission.id, creatorMissionId: reapplied.id }
+    });
+
     return {
       submissionId: reapplied.id,
       missionId: reapplied.missionId,
@@ -350,6 +359,14 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
     }
   });
 
+  await createNotification({
+    accountId,
+    event: "MISSION_ACCEPTED",
+    title: "Đăng ký campaign thành công",
+    content: "Đơn đăng ký của bạn đã được ghi nhận. Hệ thống sẽ thông báo khi Brand/Admin duyệt.",
+    metadata: { campaignId: campaign.id, missionId: firstMission.id, creatorMissionId: application.id }
+  });
+
   return {
     submissionId: application.id,
     missionId: application.missionId,
@@ -361,5 +378,4 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
     })
   };
 }
-
 

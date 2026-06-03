@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { Role } from "@prisma/client";
 import { CreatorShell } from "@/app/dashboard/creator/_components/CreatorShell";
 import { creatorNav } from "@/app/dashboard/creator/_components/creator-nav";
+import { deriveCapabilities, type UserCapabilities } from "@/lib/auth/capabilities";
 
 type WorkspaceUser = {
   id: string;
@@ -11,6 +12,9 @@ type WorkspaceUser = {
   displayName: string;
   avatarUrl: string | null;
   roles: Role[];
+  creatorProfile?: { id: string } | null;
+  brandMemberships?: Array<{ id: string; role: "OWNER" | "MANAGER" | "STAFF" }>;
+  capabilities?: UserCapabilities;
 };
 
 type AuthMePayload = {
@@ -55,6 +59,15 @@ export function CreatorWorkspaceGate({
     return <>{fallback ?? children}</>;
   }
 
-  return <CreatorShell navItems={creatorNav} user={user}>{children}</CreatorShell>;
+  return (
+    <CreatorShell
+      navItems={creatorNav}
+      user={{
+        ...user,
+        capabilities: user.capabilities ?? deriveCapabilities({ roles: user.roles, creatorProfile: user.creatorProfile, brandMemberships: user.brandMemberships })
+      }}
+    >
+      {children}
+    </CreatorShell>
+  );
 }
-

@@ -5,6 +5,8 @@ export type CreatorPlatform = (typeof CREATOR_PLATFORMS)[number];
 export type CreatorLink = {
   platform: CreatorPlatform;
   url: string;
+  handle: string;
+  followerCount: number;
 };
 
 export function normalizeCreatorUrl(input: string) {
@@ -31,7 +33,14 @@ export function normalizeCreatorLinks(links: CreatorLink[]) {
     if (!url) {
       throw new Error("Liên kết không hợp lệ. Vui lòng nhập URL TikTok, Facebook, Instagram hoặc Shopee hợp lệ.");
     }
-    return { platform: item.platform, url };
+    const handle = item.handle.trim().replace(/^@+/, "");
+    if (!handle) {
+      throw new Error("Vui lòng nhập tên tài khoản hoặc ID kênh cho từng liên kết.");
+    }
+    if (!Number.isFinite(item.followerCount) || item.followerCount < 0) {
+      throw new Error("Số lượng follower không hợp lệ.");
+    }
+    return { platform: item.platform, url, handle, followerCount: Math.trunc(item.followerCount) };
   });
 }
 

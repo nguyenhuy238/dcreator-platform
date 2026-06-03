@@ -51,7 +51,7 @@ export async function getCampaignDetailBySlug(slug: string, viewerId?: string): 
       : 0;
   const now = Date.now();
   const isEnded = Boolean(campaign.endsAt && campaign.endsAt.getTime() <= now);
-  const creatorJoined = new Set(campaign.missionApplications.map((item) => item.accountId)).size;
+  const creatorJoined = new Set(campaign.creatorMissions.map((item) => item.accountId)).size;
   const approvedVideos = Math.max(0, campaign.ugcVideoApprovedCount ?? 0);
   const targetVideos = Math.max(0, campaign.ugcVideoQuota ?? 0);
   const completionPercent = targetVideos > 0 ? Math.min(100, Math.round((approvedVideos / targetVideos) * 100)) : 0;

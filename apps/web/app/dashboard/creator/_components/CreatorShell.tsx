@@ -1,8 +1,11 @@
 "use client";
 
 import type { Role } from "@prisma/client";
+import { NotificationBell } from "@/app/_components/NotificationBell";
+import { DashboardSwitcher } from "@/app/components/dcreator/layout/dashboard-switcher";
 import type { CreatorNavItem } from "@/app/dashboard/creator/_components/creator-nav";
 import { DashboardShell } from "@/app/components/dcreator/layout/dashboard-shell";
+import type { UserCapabilities } from "@/lib/auth/capabilities";
 
 type CreatorShellUser = {
   id: string;
@@ -10,6 +13,7 @@ type CreatorShellUser = {
   displayName: string;
   avatarUrl: string | null;
   roles: Role[];
+  capabilities: UserCapabilities;
 };
 
 export function CreatorShell({
@@ -28,7 +32,9 @@ export function CreatorShell({
       workspaceTitle="Bảng điều khiển Creator"
       workspaceDescription="Quản lý nhiệm vụ, minh chứng và hoa hồng"
       loginRedirect="/dashboard/creator"
+      headerAccessory={<NotificationBell />}
     >
+      <DashboardSwitcher roles={user.roles} capabilities={user.capabilities} />
       {children}
     </DashboardShell>
   );

@@ -2,9 +2,9 @@ import { MissionLifecycleStatus, SocialPlatform } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { acceptMission, submitMissionProof } from "@/lib/services/mission.service";
+import { createNotification, createNotificationForAdminOps } from "@/lib/services/notification.service";
 import { createCreatorPayoutRequest, ensureWalletByAccountId } from "@/lib/services/wallet.service";
 import { getCreatorKpis } from "@/lib/services/analytics.service";
-import { createNotificationForAdminOps } from "@/lib/services/notification.service";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
 import type { CreatorChannelsUpdateInput, CreatorProfileUpdateInput } from "@/lib/validators/creator-dashboard";
 
@@ -322,6 +322,14 @@ export async function updateCreatorProfile(accountId: string, input: CreatorProf
     }
   });
 
+  await createNotification({
+    accountId,
+    event: "CREATOR_APPLICATION_APPROVED",
+    title: "Đã cập nhật hồ sơ Creator",
+    content: "Thông tin hồ sơ Creator của bạn đã được lưu thành công.",
+    metadata: { source: "creator-profile" }
+  });
+
   return getCreatorProfile(accountId);
 }
 
@@ -406,6 +414,14 @@ export async function createCreatorChannel(accountId: string, input: CreatorChan
     throw error;
   }
 
+  await createNotification({
+    accountId,
+    event: "PROOF_SUBMITTED",
+    title: "Đã gửi kênh mạng xã hội",
+    content: "Kênh mạng xã hội mới đã được gửi để Admin duyệt.",
+    metadata: { platform: input.platform, url: input.url }
+  });
+
   return getCreatorChannels(accountId);
 }
 
@@ -450,6 +466,14 @@ export async function updateCreatorChannel(accountId: string, linkId: string, in
       reviewedAt: null,
       reviewedById: null
     }
+  });
+
+  await createNotification({
+    accountId,
+    event: "PROOF_SUBMITTED",
+    title: "Đã cập nhật kênh mạng xã hội",
+    content: "Thông tin kênh đã được gửi lại để Admin duyệt.",
+    metadata: { linkId, platform: input.platform, url: input.url }
   });
 
   return getCreatorChannels(accountId);

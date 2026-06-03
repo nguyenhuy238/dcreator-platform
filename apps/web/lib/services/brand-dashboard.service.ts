@@ -942,11 +942,11 @@ export async function listBrandCampaigns(accountId: string, currentBrandId?: str
     campaignApplicationCountMap.set(mission.campaignId, (campaignApplicationCountMap.get(mission.campaignId) ?? 0) + item._count._all);
   }
 
-  const approvedCreatorPairs = await prisma.missionApplication.groupBy({
+  const approvedCreatorPairs = await prisma.creatorMission.groupBy({
     by: ["campaignId", "accountId"],
     where: {
       campaignId: { in: campaignIds },
-      status: "APPROVED"
+      applicationStatus: "APPROVED"
     }
   });
 

@@ -268,13 +268,13 @@ function MissionDetailModal({
                   </div>
                 </div>
               </div>
+              <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
+                <summary className="cursor-pointer font-semibold text-zinc-900">Cách thực hiện</summary>
+                <div className="mt-3 space-y-3">{actionNode}</div>
+              </details>
               {campaignNode}
               {missionNode}
               {feedbackNode}
-              <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
-                <summary className="cursor-pointer font-semibold text-zinc-900">Thực hiện nhiệm vụ</summary>
-                <div className="mt-3 space-y-3">{actionNode}</div>
-              </details>
             </>
           )}
         </div>

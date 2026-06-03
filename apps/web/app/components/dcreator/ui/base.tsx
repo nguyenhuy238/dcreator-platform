@@ -10,6 +10,8 @@ export function StatusBadge({ status }: { status: string }) {
     NEEDS_REVISION: "Cần bổ sung",
     ACTIVE: "Đang hoạt động",
     INACTIVE: "Không hoạt động",
+    VERIFIED: "Đã xác minh",
+    UNVERIFIED: "Chưa xác minh",
     LOCKED: "Đã khóa",
     COMPLETED: "Đã hoàn thành",
     CANCELLED: "Đã hủy",
