@@ -368,7 +368,7 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
 
   const startsAt = input.startsAt ? new Date(input.startsAt) : null;
   const endsAt = input.endsAt ? new Date(input.endsAt) : null;
-  const missionDeadlineAt = input.mission.deadlineAt ? new Date(input.mission.deadlineAt) : endsAt;
+  const missionDeadlineAt = input.mission?.deadlineAt ? new Date(input.mission.deadlineAt) : endsAt;
   if (missionDeadlineAt && startsAt && missionDeadlineAt < startsAt) {
     throw new AppError("Mission deadline cannot be earlier than campaign start", 422, "MISSION_DEADLINE_INVALID");
   }
@@ -403,23 +403,25 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
       }
     });
 
-    await tx.mission.create({
-      data: {
-        campaignId: createdCampaign.id,
-        title: input.mission.title,
-        description: input.mission.description,
-        productName: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productName || null : null,
-        productDescription: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productDescription || null : null,
-        productImageUrl: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productImageUrl || null : null,
-        productLink: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productLink || null : null,
-        rewardPoints: input.mission.rewardPoints,
-        rewardCommissionVnd: input.mission.rewardCommissionVnd,
-        audience: "CREATOR",
-        productReceiveOption: input.mission.productReceiveOption,
-        allowRepeat: input.mission.allowRepeat,
-        deadlineAt: missionDeadlineAt
-      }
-    });
+    if (input.mission) {
+      await tx.mission.create({
+        data: {
+          campaignId: createdCampaign.id,
+          title: input.mission.title,
+          description: input.mission.description,
+          productName: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productName || null : null,
+          productDescription: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productDescription || null : null,
+          productImageUrl: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productImageUrl || null : null,
+          productLink: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productLink || null : null,
+          rewardPoints: input.mission.rewardPoints,
+          rewardCommissionVnd: input.mission.rewardCommissionVnd,
+          audience: "CREATOR",
+          productReceiveOption: input.mission.productReceiveOption,
+          allowRepeat: input.mission.allowRepeat,
+          deadlineAt: missionDeadlineAt
+        }
+      });
+    }
 
     return createdCampaign;
   });

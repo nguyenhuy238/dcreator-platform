@@ -10,6 +10,7 @@ import { deriveCapabilities, type UserCapabilities } from "@/lib/auth/capabiliti
 import { canAccessWorkspace, getAvailableWorkspaces, getNavItemsForWorkspace, getWorkspaceConfig, getWorkspaceForPath } from "@/lib/navigation";
 
 type NavItem = { href: string; label: string };
+type AudienceLink = { href: string; label: string };
 
 type AuthUser = {
   id: string;
@@ -24,13 +25,42 @@ type AuthUser = {
 
 type PublicHeaderProps = {
   hideRoleSwitch?: boolean;
-  audienceToggle?: {
-    href: string;
-    label: string;
-  } | null;
+  audienceToggle?: AudienceLink | null;
+  audienceToggles?: AudienceLink[];
 };
 
-export function PublicHeader({ hideRoleSwitch = false, audienceToggle = null }: PublicHeaderProps = {}) {
+function AudienceIcon({ href }: { href: string }) {
+  if (href.startsWith("/brand")) {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9">
+        <path d="M4 10h16" />
+        <path d="M5 10l1-5h12l1 5" />
+        <path d="M6 10v9h12v-9" />
+        <path d="M9 19v-5h6v5" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9">
+      <circle cx="12" cy="7.5" r="3.5" />
+      <path d="M5 20c1.1-3.6 3.7-5.5 7-5.5s5.9 1.9 7 5.5" />
+      <path d="M17.5 5.5l2-1.2" />
+      <path d="M18.4 8.4l2.3.6" />
+    </svg>
+  );
+}
+
+function AudienceButton({ item }: { item: AudienceLink }) {
+  return (
+    <Link href={item.href} className="dc-btn-secondary gap-2">
+      <AudienceIcon href={item.href} />
+      <span>{item.label}</span>
+    </Link>
+  );
+}
+
+export function PublicHeader({ hideRoleSwitch = false, audienceToggle = null, audienceToggles }: PublicHeaderProps = {}) {
   const pathname = usePathname();
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -116,6 +146,7 @@ export function PublicHeader({ hideRoleSwitch = false, audienceToggle = null }: 
   const roleSwitchHref = roleSwitch.href;
   const roleSwitchLabel = roleSwitch.label;
   const shouldShowRoleSwitch = !hideRoleSwitch;
+  const audienceLinks = audienceToggles ?? (audienceToggle ? [audienceToggle] : []);
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/70 bg-white/90 backdrop-blur">
@@ -133,7 +164,9 @@ export function PublicHeader({ hideRoleSwitch = false, audienceToggle = null }: 
           ) : currentUser ? (
             <>
               {shouldShowRoleSwitch ? <Link href={roleSwitchHref} className="dc-btn-secondary">{roleSwitchLabel}</Link> : null}
-              {audienceToggle ? <Link href={audienceToggle.href} className="dc-btn-secondary">{audienceToggle.label}</Link> : null}
+              {audienceLinks.map((item) => (
+                <AudienceButton key={item.href} item={item} />
+              ))}
               {canAccessAdmin ? (
                 <>
                   <Link href="/admin" className="dc-btn-secondary hidden xl:inline-flex">Admin</Link>
@@ -171,7 +204,9 @@ export function PublicHeader({ hideRoleSwitch = false, audienceToggle = null }: 
           ) : (
             <>
               {shouldShowRoleSwitch ? <Link href={roleSwitchHref} className="dc-btn-secondary">{roleSwitchLabel}</Link> : null}
-              {audienceToggle ? <Link href={audienceToggle.href} className="dc-btn-secondary">{audienceToggle.label}</Link> : null}
+              {audienceLinks.map((item) => (
+                <AudienceButton key={item.href} item={item} />
+              ))}
               <Link href="/auth/login" className="dc-btn-secondary">Đăng nhập</Link>
               <Link href="/auth/register" className="dc-btn-primary hidden px-7 py-3 text-base sm:inline-flex">Đăng ký tài khoản</Link>
             </>
@@ -191,7 +226,7 @@ export function PublicFooter() {
             <div>
               <p className="text-4xl font-black tracking-tight text-white md:text-5xl">dCreator</p>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
-                Kết nối Creator và Brand để tăng trưởng bằng nội dung, minh bạch và hiệu quả.
+                &ldquo;Bệ phóng&rdquo; social commerce giúp Brand, Creator và User biến nội dung thành doanh thu thật.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -202,15 +237,7 @@ export function PublicFooter() {
             </div>
           </div>
 
-          <div className="mt-8 grid gap-8 md:grid-cols-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">Tổng hợp</p>
-              <div className="mt-3 grid gap-2 text-sm text-zinc-400">
-                <p>Creator tìm job</p>
-                <p>Brand tăng doanh thu</p>
-                <p>Chiến dịch minh bạch</p>
-              </div>
-            </div>
+          <div className="mt-8 grid gap-8 md:grid-cols-2">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">Liên kết nhanh</p>
               <div className="mt-3 grid gap-2 text-sm">
@@ -222,18 +249,18 @@ export function PublicFooter() {
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">Liên hệ</p>
               <div className="mt-3 grid gap-2 text-sm text-zinc-400">
-                <a href="mailto:support@dcreator.vn" className="inline-flex w-fit items-center gap-2 transition hover:text-white">
+                <a href="mailto:dcreator6688@gmail.com" className="inline-flex w-fit items-center gap-2 transition hover:text-white">
                   <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-zinc-200 ring-1 ring-zinc-300">
                     <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-current text-zinc-900">
                       <path d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm0 2v.2l8 5.3 8-5.3V7H4zm16 10V9.6l-7.4 4.9a1 1 0 0 1-1.2 0L4 9.6V17h16z" />
                     </svg>
                   </span>
-                  <span>support@dcreator.vn</span>
+                  <span>dcreator6688@gmail.com</span>
                 </a>
                 <a
-                  href="https://facebook.com/dcreator.vn"
+                  href="https://www.facebook.com/profile.php?id=61590739340712"
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   aria-label="Facebook"
                   className="inline-flex w-fit items-center gap-2 transition hover:text-white"
                 >
@@ -242,15 +269,22 @@ export function PublicFooter() {
                       <path d="M13.5 22v-8.2h2.8l.4-3.2h-3.2V8.4c0-.9.3-1.5 1.6-1.5h1.8V4c-.3 0-1.3-.1-2.5-.1-2.6 0-4.4 1.6-4.4 4.6v2.1H7v3.2h2.5V22h4z" />
                     </svg>
                   </span>
+                  <span>Facebook</span>
                 </a>
-                <div className="inline-flex items-center gap-2">
+                <a
+                  href="https://www.tiktok.com/@d.creator68"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="TikTok"
+                  className="inline-flex w-fit items-center gap-2 transition hover:text-white"
+                >
                   <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-zinc-200 ring-1 ring-zinc-300">
                     <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-current text-zinc-900">
-                      <path d="M12 2C8.1 2 5 5.1 5 9c0 5.1 7 13 7 13s7-7.9 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z" />
+                      <path d="M16.6 3c.4 2.1 1.7 3.5 3.7 3.7v3.2a7.2 7.2 0 0 1-3.7-1.1v5.5c0 3.9-2.7 6.7-6.5 6.7a6.2 6.2 0 0 1-6.4-6.2c0-3.6 2.8-6.3 6.4-6.3.5 0 1 .1 1.5.2v3.4a3 3 0 0 0-1.5-.4 2.9 2.9 0 1 0 2.9 2.9V3h3.6z" />
                     </svg>
                   </span>
-                  <span>Vietnam, Social Commerce Platform</span>
-                </div>
+                  <span>TikTok</span>
+                </a>
               </div>
             </div>
           </div>

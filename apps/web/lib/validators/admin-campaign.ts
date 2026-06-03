@@ -62,7 +62,7 @@ export const adminCampaignCreateSchema = z.object({
     if (!mission.productImageUrl?.trim()) {
       ctx.addIssue({ code: "custom", path: ["productImageUrl"], message: "Vui lòng nhập hình ảnh sản phẩm." });
     }
-  }),
+  }).optional(),
   publishNow: z.boolean().optional().default(true)
 }).superRefine((value, ctx) => {
   if (value.startsAt && value.endsAt && new Date(value.endsAt) <= new Date(value.startsAt)) {
