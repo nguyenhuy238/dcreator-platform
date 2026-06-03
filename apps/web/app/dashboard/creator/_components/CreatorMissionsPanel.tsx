@@ -785,7 +785,11 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
                 </a>
               ) : null}
               <div className="mt-2 grid gap-2">
+                <label htmlFor={`transcript-${item.id}`} className="text-sm font-medium text-zinc-700">
+                  Nội dung kịch bản
+                </label>
                 <textarea
+                  id={`transcript-${item.id}`}
                   className="dc-input min-h-32"
                   placeholder="Nhập nội dung kịch bản"
                   disabled={isTranscriptFlow && item.submission?.status === "SUBMITTED"}
@@ -810,7 +814,11 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
             <div className="rounded-xl border border-zinc-200 bg-white p-3">
               <p className="font-medium">Nộp video review</p>
               <div className="mt-2 grid gap-2">
+                <label htmlFor={`video-url-${item.id}`} className="text-sm font-medium text-zinc-700">
+                  Link video review
+                </label>
                 <input
+                  id={`video-url-${item.id}`}
                   className="dc-input"
                   placeholder="Video URL"
                   value={videoUrlMap[item.id] ?? item.submission?.videoUrl ?? ""}
@@ -820,7 +828,11 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
                   }}
                 />
                 {formError?.videoUrl ? <p className="text-sm text-red-600">{formError.videoUrl}</p> : null}
+                <label htmlFor={`video-note-${item.id}`} className="text-sm font-medium text-zinc-700">
+                  Ghi chú cho video review
+                </label>
                 <textarea
+                  id={`video-note-${item.id}`}
                   className="dc-input"
                   placeholder="Ghi chú video"
                   value={videoNoteMap[item.id] ?? ""}
@@ -842,7 +854,11 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
             <div className="rounded-xl border border-zinc-200 bg-white p-3">
               <p className="font-medium">Bước 3 - Nộp link video social public</p>
               <div className="mt-2 grid gap-2">
+                <label htmlFor={`public-url-${item.id}`} className="text-sm font-medium text-zinc-700">
+                  Link video social public
+                </label>
                 <input
+                  id={`public-url-${item.id}`}
                   className="dc-input"
                   placeholder="Link video social public"
                   value={publicUrlMap[item.id] ?? item.submission?.publicVideoUrl ?? item.submission?.socialPostUrl ?? ""}
@@ -852,12 +868,16 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
                   }}
                 />
                 {formError?.publicUrl ? <p className="text-sm text-red-600">{formError.publicUrl}</p> : null}
-                <input className="dc-input" placeholder="Mã quảng cáo (adCode)" value={adCodeMap[item.id] ?? item.submission?.adCode ?? ""} onChange={(e) => setAdCodeMap((s) => ({ ...s, [item.id]: e.target.value }))} />
+                <label htmlFor={`ad-code-${item.id}`} className="text-sm font-medium text-zinc-700">
+                  Mã quảng cáo (adCode)
+                </label>
+                <input id={`ad-code-${item.id}`} className="dc-input" placeholder="Mã quảng cáo (adCode)" value={adCodeMap[item.id] ?? item.submission?.adCode ?? ""} onChange={(e) => setAdCodeMap((s) => ({ ...s, [item.id]: e.target.value }))} />
                 {item.productReceiveOption === "PRODUCT_REQUIRED" ? (
                   <>
                     <div className="grid gap-1.5">
-                      <p className="text-sm font-medium text-zinc-700">Ảnh bill mua hàng</p>
+                      <label htmlFor={`bill-upload-${item.id}`} className="text-sm font-medium text-zinc-700">Ảnh bill mua hàng</label>
                       <input
+                        id={`bill-upload-${item.id}`}
                         className="dc-input bg-white"
                         type="file"
                         accept="image/png,image/jpeg,image/webp"
@@ -872,8 +892,9 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
                       {formError?.bill ? <p className="text-sm text-red-600">{formError.bill}</p> : null}
                     </div>
                     <div className="grid gap-1.5">
-                      <p className="text-sm font-medium text-zinc-700">Ảnh đánh giá 5 sao</p>
+                      <label htmlFor={`rating-upload-${item.id}`} className="text-sm font-medium text-zinc-700">Ảnh đánh giá 5 sao</label>
                       <input
+                        id={`rating-upload-${item.id}`}
                         className="dc-input bg-white"
                         type="file"
                         accept="image/png,image/jpeg,image/webp"
@@ -889,7 +910,11 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
                     </div>
                   </>
                 ) : null}
+                <label htmlFor={`screenshot-upload-${item.id}`} className="text-sm font-medium text-zinc-700">
+                  Ảnh screenshot minh chứng
+                </label>
                 <input
+                  id={`screenshot-upload-${item.id}`}
                   className="dc-input bg-white"
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
@@ -901,7 +926,10 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
                 />
                 {uploadingKey === `${item.id}:screenshot` ? <p className="text-xs text-zinc-500">Đang tải ảnh screenshot...</p> : null}
                 {formError?.screenshot ? <p className="text-sm text-red-600">{formError.screenshot}</p> : null}
-                <textarea className="dc-input" placeholder="Ghi chú" value={finalNoteMap[item.id] ?? item.submission?.finalProofNote ?? ""} onChange={(e) => setFinalNoteMap((s) => ({ ...s, [item.id]: e.target.value }))} />
+                <label htmlFor={`final-note-${item.id}`} className="text-sm font-medium text-zinc-700">
+                  Ghi chú bổ sung
+                </label>
+                <textarea id={`final-note-${item.id}`} className="dc-input" placeholder="Ghi chú" value={finalNoteMap[item.id] ?? item.submission?.finalProofNote ?? ""} onChange={(e) => setFinalNoteMap((s) => ({ ...s, [item.id]: e.target.value }))} />
                 {formError?.form ? <p className="text-sm text-red-600">{formError.form}</p> : null}
                 <button className="dc-btn-primary" disabled={busyId === item.id} onClick={() => void submitPublish(item)}>
                   {item.publishStatus === "REJECTED" ? "Gửi lại link social public" : "Gửi link social public"}
