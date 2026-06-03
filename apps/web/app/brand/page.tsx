@@ -78,7 +78,7 @@ export default async function BrandHomePage() {
     <>
       <PublicHeader
         hideRoleSwitch
-        audienceToggle={{ href: "/", label: "Dành cho creator" }}
+        audienceToggle={{ href: "/creator", label: "Dành cho Creator" }}
       />
       <main className="mx-auto w-full max-w-7xl overflow-x-hidden px-4 pb-24 pt-5 md:px-6">
         <section className="rounded-[2.2rem] bg-gradient-to-b from-zinc-100 via-zinc-50/50 to-white px-4 py-8 md:px-6 md:py-10">

@@ -10,6 +10,7 @@ import { deriveCapabilities, type UserCapabilities } from "@/lib/auth/capabiliti
 import { canAccessWorkspace, getAvailableWorkspaces, getNavItemsForWorkspace, getWorkspaceConfig, getWorkspaceForPath } from "@/lib/navigation";
 
 type NavItem = { href: string; label: string };
+type AudienceLink = { href: string; label: string };
 
 type AuthUser = {
   id: string;
@@ -24,13 +25,42 @@ type AuthUser = {
 
 type PublicHeaderProps = {
   hideRoleSwitch?: boolean;
-  audienceToggle?: {
-    href: string;
-    label: string;
-  } | null;
+  audienceToggle?: AudienceLink | null;
+  audienceToggles?: AudienceLink[];
 };
 
-export function PublicHeader({ hideRoleSwitch = false, audienceToggle = null }: PublicHeaderProps = {}) {
+function AudienceIcon({ href }: { href: string }) {
+  if (href.startsWith("/brand")) {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9">
+        <path d="M4 10h16" />
+        <path d="M5 10l1-5h12l1 5" />
+        <path d="M6 10v9h12v-9" />
+        <path d="M9 19v-5h6v5" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9">
+      <circle cx="12" cy="7.5" r="3.5" />
+      <path d="M5 20c1.1-3.6 3.7-5.5 7-5.5s5.9 1.9 7 5.5" />
+      <path d="M17.5 5.5l2-1.2" />
+      <path d="M18.4 8.4l2.3.6" />
+    </svg>
+  );
+}
+
+function AudienceButton({ item }: { item: AudienceLink }) {
+  return (
+    <Link href={item.href} className="dc-btn-secondary gap-2">
+      <AudienceIcon href={item.href} />
+      <span>{item.label}</span>
+    </Link>
+  );
+}
+
+export function PublicHeader({ hideRoleSwitch = false, audienceToggle = null, audienceToggles }: PublicHeaderProps = {}) {
   const pathname = usePathname();
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -116,6 +146,7 @@ export function PublicHeader({ hideRoleSwitch = false, audienceToggle = null }: 
   const roleSwitchHref = roleSwitch.href;
   const roleSwitchLabel = roleSwitch.label;
   const shouldShowRoleSwitch = !hideRoleSwitch;
+  const audienceLinks = audienceToggles ?? (audienceToggle ? [audienceToggle] : []);
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/70 bg-white/90 backdrop-blur">
@@ -133,7 +164,9 @@ export function PublicHeader({ hideRoleSwitch = false, audienceToggle = null }: 
           ) : currentUser ? (
             <>
               {shouldShowRoleSwitch ? <Link href={roleSwitchHref} className="dc-btn-secondary">{roleSwitchLabel}</Link> : null}
-              {audienceToggle ? <Link href={audienceToggle.href} className="dc-btn-secondary">{audienceToggle.label}</Link> : null}
+              {audienceLinks.map((item) => (
+                <AudienceButton key={item.href} item={item} />
+              ))}
               {canAccessAdmin ? (
                 <>
                   <Link href="/admin" className="dc-btn-secondary hidden xl:inline-flex">Admin</Link>
@@ -171,7 +204,9 @@ export function PublicHeader({ hideRoleSwitch = false, audienceToggle = null }: 
           ) : (
             <>
               {shouldShowRoleSwitch ? <Link href={roleSwitchHref} className="dc-btn-secondary">{roleSwitchLabel}</Link> : null}
-              {audienceToggle ? <Link href={audienceToggle.href} className="dc-btn-secondary">{audienceToggle.label}</Link> : null}
+              {audienceLinks.map((item) => (
+                <AudienceButton key={item.href} item={item} />
+              ))}
               <Link href="/auth/login" className="dc-btn-secondary">Đăng nhập</Link>
               <Link href="/auth/register" className="dc-btn-primary hidden px-7 py-3 text-base sm:inline-flex">Đăng ký tài khoản</Link>
             </>
