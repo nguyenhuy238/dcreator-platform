@@ -1,8 +1,9 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
+import { useCurrentBrand } from "@/app/dashboard/brand/_hooks/use-brand-context";
 
 type BrandProfile = {
   brandName: string;
@@ -48,6 +49,7 @@ function resolveLogoSrc(input: string) {
 }
 
 export default function BrandProfilePage() {
+  const { currentBrandId } = useCurrentBrand();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -56,6 +58,10 @@ export default function BrandProfilePage() {
   const [logoLoadError, setLogoLoadError] = useState(false);
   const [form, setForm] = useState<BrandProfile>(defaultForm);
   const previewLogoSrc = useMemo(() => resolveLogoSrc(form.logoUrl), [form.logoUrl]);
+  const profileApiPath = useMemo(() => {
+    if (!currentBrandId) return "/api/brand/dashboard/profile";
+    return `/api/brand/dashboard/profile?brandId=${encodeURIComponent(currentBrandId)}`;
+  }, [currentBrandId]);
 
   function normalizeLogoUrl(value: string) {
     const trimmed = value.trim();
@@ -70,11 +76,12 @@ export default function BrandProfilePage() {
     return `https://${trimmed}`;
   }
 
-  async function loadProfile() {
+  const loadProfile = useCallback(async () => {
     setLoading(true);
     setError("");
+    setSuccess("");
     try {
-      const response = await fetch("/api/brand/dashboard/profile", { cache: "no-store" });
+      const response = await fetch(profileApiPath, { cache: "no-store" });
       const payload = (await response.json()) as ApiResponse<BrandProfile>;
       if (!response.ok || !payload.success) {
         throw new Error(payload.success ? "Không thể tải hồ sơ Brand" : payload.error);
@@ -85,11 +92,11 @@ export default function BrandProfilePage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [profileApiPath]);
 
   useEffect(() => {
     void loadProfile();
-  }, []);
+  }, [loadProfile]);
 
   useEffect(() => {
     setLogoLoadError(false);
@@ -105,7 +112,7 @@ export default function BrandProfilePage() {
         ...form,
         logoUrl: normalizeLogoUrl(form.logoUrl)
       };
-      const response = await fetch("/api/brand/dashboard/profile", {
+      const response = await fetch(profileApiPath, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payloadBody)
@@ -259,7 +266,6 @@ export default function BrandProfilePage() {
     </>
   );
 }
-
 
 
 

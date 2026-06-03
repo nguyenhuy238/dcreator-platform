@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { CampaignDetailDTO } from "@/lib/dto/campaign-detail";
 import { BriefTab, HeroSection, OverviewTab } from "./CampaignDetailSections";
 import { CampaignRegisterCard } from "./CampaignRegisterCard";
@@ -15,6 +16,7 @@ type ApiResponse = {
 };
 
 export function CampaignDetailContainer({ slug }: Props) {
+  const router = useRouter();
   const [data, setData] = useState<CampaignDetailDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -94,6 +96,16 @@ export function CampaignDetailContainer({ slug }: Props) {
   return (
     <main className="py-6">
       <div className="mx-auto grid w-full max-w-[1440px] gap-5">
+        <div>
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 hover:text-zinc-900"
+          >
+            <span aria-hidden="true">←</span>
+            Quay lại
+          </button>
+        </div>
         <HeroSection
           data={data}
           applyCard={

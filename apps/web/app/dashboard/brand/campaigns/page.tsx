@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { BrandSubscriptionPanel } from "@/app/dashboard/brand/_components/BrandSubscriptionPanel";
+import { useCurrentBrand } from "@/app/dashboard/brand/_hooks/use-brand-context";
 
 type CampaignItem = {
   id: string;
@@ -31,6 +32,25 @@ type CampaignItem = {
   videoProgressPercent?: number;
 };
 
+type CampaignRequestItem = {
+  id: string;
+  requestedSlug: string;
+  title: string;
+  setupSource: "JOIN_EXISTING_DCREATOR_CAMP" | "BRAND_REQUESTED";
+  status: string;
+  budgetVnd: number;
+  targetAmountVnd: number;
+  campaignType: "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
+  startsAt: string | null;
+  endsAt: string | null;
+  adminNote: string | null;
+  brandFeedback: string | null;
+  coverImageUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdCampaign: { id: string; slug: string; title: string; status: string } | null;
+};
+
 type ApiResponse<T> = { success: boolean; data?: T; error?: string; message?: string };
 
 function formatVnd(value: number) {
@@ -48,8 +68,10 @@ function progress(current: number, target: number) {
 }
 
 export default function BrandCampaignsPage() {
+  const { currentBrandId } = useCurrentBrand();
   const [activeTab, setActiveTab] = useState<"campaigns" | "packages">("campaigns");
   const [items, setItems] = useState<CampaignItem[]>([]);
+  const [requests, setRequests] = useState<CampaignRequestItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -59,24 +81,43 @@ export default function BrandCampaignsPage() {
   const [setupSourceFilter, setSetupSourceFilter] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "funded" | "ending">("newest");
 
-  async function load() {
+  const campaignApiPath = useMemo(() => {
+    if (!currentBrandId) return "/api/brand/dashboard/campaigns";
+    return `/api/brand/dashboard/campaigns?brandId=${encodeURIComponent(currentBrandId)}`;
+  }, [currentBrandId]);
+  const campaignRequestApiPath = useMemo(() => {
+    if (!currentBrandId) return "/api/brand/dashboard/campaign-requests";
+    return `/api/brand/dashboard/campaign-requests?brandId=${encodeURIComponent(currentBrandId)}`;
+  }, [currentBrandId]);
+
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/brand/dashboard/campaigns", { cache: "no-store" });
-      const payload = (await response.json()) as ApiResponse<CampaignItem[]>;
-      if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error ?? "Không thể tải campaign");
-      setItems(payload.data);
+      const [campaignResponse, requestResponse] = await Promise.all([
+        fetch(campaignApiPath, { cache: "no-store" }),
+        fetch(campaignRequestApiPath, { cache: "no-store" })
+      ]);
+      const campaignPayload = (await campaignResponse.json()) as ApiResponse<CampaignItem[]>;
+      const requestPayload = (await requestResponse.json()) as ApiResponse<CampaignRequestItem[]>;
+      if (!campaignResponse.ok || !campaignPayload.success || !campaignPayload.data) {
+        throw new Error(campaignPayload.error ?? "Không thể tải campaign");
+      }
+      if (!requestResponse.ok || !requestPayload.success || !requestPayload.data) {
+        throw new Error(requestPayload.error ?? "Không thể tải yêu cầu campaign");
+      }
+      setItems(campaignPayload.data);
+      setRequests(requestPayload.data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không thể tải campaign");
     } finally {
       setLoading(false);
     }
-  }
+  }, [campaignApiPath, campaignRequestApiPath]);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -102,6 +143,22 @@ export default function BrandCampaignsPage() {
 
     return list;
   }, [items, query, statusFilter, typeFilter, setupSourceFilter, sortBy]);
+
+  const pendingRequests = useMemo(
+    () => requests.filter((request) => !request.createdCampaign),
+    [requests]
+  );
+  const filteredPendingRequests = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    return pendingRequests.filter((request) => {
+      if (normalized && !(`${request.title} ${request.requestedSlug}`.toLowerCase().includes(normalized))) return false;
+      if (statusFilter && request.status !== statusFilter) return false;
+      if (typeFilter && request.campaignType !== typeFilter) return false;
+      if (setupSourceFilter && request.setupSource !== setupSourceFilter) return false;
+      return true;
+    });
+  }, [pendingRequests, query, statusFilter, typeFilter, setupSourceFilter]);
+  const listCount = filteredPendingRequests.length + filtered.length;
 
   return (
     <>
@@ -165,8 +222,8 @@ export default function BrandCampaignsPage() {
 
       {!loading ? (
         <section className="mt-6">
-          <SectionHeader title="Danh sách campaign" subtitle={`${filtered.length} campaign`} />
-          {filtered.length === 0 ? (
+          <SectionHeader title="Danh sách campaign" subtitle={`${listCount} campaign`} />
+          {listCount === 0 ? (
             <EmptyState
               title="Chưa có campaign"
               description="Gửi yêu cầu để Admin tạo campaign đầu tiên cho brand của bạn."
@@ -174,6 +231,48 @@ export default function BrandCampaignsPage() {
             />
           ) : (
             <div className="grid gap-4 xl:grid-cols-2">
+              {filteredPendingRequests.map((request) => (
+                <article key={request.id} className="dc-card overflow-hidden p-0">
+                  <div className="relative flex h-40 items-end overflow-hidden bg-zinc-100">
+                    <CampaignCoverImage src={request.coverImageUrl} alt={request.title} className="object-cover" sizes="(max-width: 1280px) 100vw, 50vw" />
+                    <div className="relative w-full bg-black/50 px-4 py-3 text-white">
+                      <p className="text-lg font-bold">{request.title}</p>
+                      <p className="text-xs">/{request.requestedSlug}</p>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap gap-2">
+                      <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                        Đang chờ duyệt
+                      </span>
+                      <StatusBadge status={request.campaignType} />
+                      <StatusBadge status={request.setupSource} />
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-1 text-sm text-zinc-600 md:grid-cols-2">
+                    <p>Setup source: {request.setupSource}</p>
+                    <p>Ngân sách dự kiến: {formatVnd(request.budgetVnd)}</p>
+                    <p>Target: {formatVnd(request.targetAmountVnd)}</p>
+                    <p>Loại campaign: {request.campaignType}</p>
+                    <p>Bắt đầu: {formatDate(request.startsAt)}</p>
+                    <p>Kết thúc: {formatDate(request.endsAt)}</p>
+                    <p>Gửi lúc: {new Date(request.createdAt).toLocaleString("vi-VN")}</p>
+                    <p>Cập nhật: {new Date(request.updatedAt).toLocaleString("vi-VN")}</p>
+                  </div>
+                  {request.adminNote ? (
+                    <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                      Ghi chú admin: {request.adminNote}
+                    </p>
+                  ) : null}
+                  {request.brandFeedback ? (
+                    <p className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
+                      Phản hồi Brand: {request.brandFeedback}
+                    </p>
+                  ) : null}
+                  </div>
+                </article>
+              ))}
               {filtered.map((campaign) => {
                 const videoTarget = campaign.videoTarget ?? Math.max(0, campaign.ugcVideoQuota ?? 0);
                 const videoApproved = campaign.videoApproved ?? Math.max(0, campaign.ugcVideoApprovedCount ?? 0);

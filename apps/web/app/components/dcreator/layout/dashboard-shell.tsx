@@ -151,7 +151,7 @@ export function DashboardShell({
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <div className="mx-auto flex w-full max-w-7xl">
+      <div className="mx-auto flex w-full max-w-[96rem]">
         <aside className={`sticky top-0 hidden h-screen shrink-0 border-r border-zinc-200 bg-white transition-all duration-200 lg:block ${desktopNavOpen ? "w-80" : "w-20"}`}>
           {desktopNavOpen ? (
             <div className="border-b border-zinc-200 px-5 py-4">

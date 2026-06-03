@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   ActionToast,
@@ -13,6 +13,7 @@ import {
   StatsCard,
   StatusBadge
 } from "@/app/components/dcreator/ui/base";
+import { useCurrentBrand } from "@/app/dashboard/brand/_hooks/use-brand-context";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
 
@@ -25,35 +26,40 @@ async function load<T>(url: string) {
 
 export function BrandDashboardClient() {
   const searchParams = useSearchParams();
+  const { currentBrandId } = useCurrentBrand();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [data, setData] = useState<Record<string, unknown>>({});
   const [message, setMessage] = useState("");
 
-  async function refresh() {
+  const apiPath = useCallback((path: string) => {
+    if (!currentBrandId) return path;
+    return `${path}?brandId=${encodeURIComponent(currentBrandId)}`;
+  }, [currentBrandId]);
+
+  const refresh = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [overview, profile, campaigns, applications, proofs, budget, analytics] = await Promise.all([
-        load("/api/brand/dashboard/overview"),
-        load("/api/brand/dashboard/profile"),
-        load("/api/brand/dashboard/campaigns"),
-        load("/api/brand/dashboard/creator-applications"),
-        load("/api/brand/dashboard/proofs"),
-        load("/api/brand/dashboard/budget"),
-        load("/api/brand/dashboard/analytics")
+      const [overview, profile, campaigns, applications, proofs, analytics] = await Promise.all([
+        load(apiPath("/api/brand/dashboard/overview")),
+        load(apiPath("/api/brand/dashboard/profile")),
+        load(apiPath("/api/brand/dashboard/campaigns")),
+        load(apiPath("/api/brand/dashboard/creator-applications")),
+        load(apiPath("/api/brand/dashboard/proofs")),
+        load(apiPath("/api/brand/dashboard/analytics"))
       ]);
-      setData({ overview, profile, campaigns, applications, proofs, budget, analytics });
+      setData({ overview, profile, campaigns, applications, proofs, analytics });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Tải dữ liệu thất bại");
     } finally {
       setLoading(false);
     }
-  }
+  }, [apiPath]);
 
   useEffect(() => {
     refresh();
-  }, []);
+  }, [refresh]);
 
   async function postJson(url: string, body: unknown) {
     const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -77,7 +83,6 @@ export function BrandDashboardClient() {
     mission: { title: string };
   }>;
   const proofs = data.proofs as Array<{ id: string; account: { displayName: string }; mission: { title: string }; videoUrl: string | null }>;
-  const budget = data.budget as { prepaidFundBalance: number; transactionHistory: Array<{ id: string; type: string; pointsDelta: number }> };
   const analytics = data.analytics as {
     campaignPerformance: Array<{ id: string; title: string; fundedAmountVnd: number }>;
     topCreator: { displayName: string } | null;
@@ -156,18 +161,6 @@ export function BrandDashboardClient() {
       </section>
 
       <section>
-        <SectionHeader title="Reward / voucher" subtitle="Thiết lập reward theo campaign bằng dữ liệu thật." />
-        <div className="dc-card p-4">
-          <p className="text-sm text-zinc-600">
-            Tạo reward/voucher tại màn hình campaign setup để đồng bộ vận hành chiến dịch.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Thiết lập campaign</Link>
-          </div>
-        </div>
-      </section>
-
-      <section>
         <SectionHeader title="Đơn ứng tuyển Creator" subtitle="Duyệt Creator apply vào campaign/job." />
         {applications?.length ? (
           <div className="grid gap-3">
@@ -205,26 +198,6 @@ export function BrandDashboardClient() {
             ))}
           </div>
         ) : <EmptyState title="Không có proof cần duyệt" description="Proof pending sẽ xuất hiện ở đây." />}
-      </section>
-
-      <section>
-        <SectionHeader title="Quỹ prepaid / giao dịch" action={<Link href="/wallet" className="dc-btn-secondary">Đi tới ví</Link>} />
-        <div className="dc-card p-4">
-          <p className="text-sm text-zinc-600">
-            Số dư quỹ hiện tại: <span className="font-semibold text-zinc-900">{(budget?.prepaidFundBalance ?? 0).toLocaleString("vi-VN")} VND</span>
-          </p>
-          {budget?.transactionHistory?.length ? (
-            <div className="mt-3 grid gap-2">
-              {budget.transactionHistory.slice(0, 8).map((t) => (
-                <div key={t.id} className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700">
-                  {t.type}: {t.pointsDelta.toLocaleString("vi-VN")}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-3 text-sm text-zinc-600">Không có transaction.</p>
-          )}
-        </div>
       </section>
 
       <section>
