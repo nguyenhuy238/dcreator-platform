@@ -28,7 +28,7 @@ export const productSchema = z.object({
   sku: z.string().trim().min(1).max(80),
   name: z.string().trim().min(1).max(160),
   description: z.string().trim().max(2000).optional().or(z.literal("")),
-  imageUrl: z.url().max(400).optional().or(z.literal("")),
+  imageUrl: uploadPathOrHttpUrlSchema.optional().or(z.literal("")),
   stockQty: z.number().int().min(0),
   voucherStock: z.number().int().min(0),
   campaignEligibility: z.boolean().default(true),

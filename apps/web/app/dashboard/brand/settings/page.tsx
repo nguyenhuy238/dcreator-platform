@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Coins, IdentificationCard, Storefront } from "@phosphor-icons/react/dist/ssr";
 import { PageHeader } from "@/app/components/dcreator/ui/base";
+import { AddBrandForm } from "@/app/dashboard/brand/_components/AddBrandForm";
 
 const settingsItems = [
   {
@@ -44,8 +45,10 @@ export default function BrandSettingsPage() {
           );
         })}
       </section>
+      <div className="mt-6">
+        <AddBrandForm />
+      </div>
     </>
   );
 }
-
 

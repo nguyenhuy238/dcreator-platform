@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { setCurrentBrandInContext, useCurrentBrand, useSetCurrentBrand } from "@/app/dashboard/brand/_hooks/use-brand-context";
 
 export function BrandSwitcher() {
+  const router = useRouter();
   const { currentBrandId, brands, isLoading, error } = useCurrentBrand();
   const setCurrentBrand = useSetCurrentBrand();
   const [isSaving, setIsSaving] = useState(false);
@@ -43,6 +45,7 @@ export function BrandSwitcher() {
             try {
               await setCurrentBrand(nextBrandId);
               setCurrentBrandInContext(nextBrandId);
+              router.refresh();
             } catch (switchError) {
               setLocalError(switchError instanceof Error ? switchError.message : "Không thể chuyển Brand");
             } finally {

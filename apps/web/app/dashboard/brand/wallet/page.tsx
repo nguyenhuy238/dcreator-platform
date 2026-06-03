@@ -50,8 +50,6 @@ const INITIAL_REFUND_FORM: RefundForm = {
   refundRequestNote: ""
 };
 
-const POINT_RATE = 1;
-
 function formatVnd(value: number) {
   return `${value.toLocaleString("vi-VN")} VNĐ`;
 }
@@ -104,8 +102,10 @@ export default function BrandWalletPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
-  const [amountVnd, setAmountVnd] = useState(200000);
+  const [amountVnd, setAmountVnd] = useState(0);
   const [transferNote, setTransferNote] = useState("");
+  const [activeTab, setActiveTab] = useState<"topup" | "history">("topup");
+  const [showTransferInfo, setShowTransferInfo] = useState(false);
   const [billUrl, setBillUrl] = useState("");
   const [uploadingBill, setUploadingBill] = useState(false);
   const [submittingTopup, setSubmittingTopup] = useState(false);
@@ -135,7 +135,6 @@ export default function BrandWalletPage() {
     void load();
   }, [load]);
 
-  const pointEstimate = useMemo(() => Math.floor(amountVnd / POINT_RATE), [amountVnd]);
   const approvedTotal = useMemo(
     () => (data?.requests ?? []).filter((item) => item.status === "APPROVED").reduce((sum, item) => sum + item.requestedPoints, 0),
     [data]
@@ -144,6 +143,17 @@ export default function BrandWalletPage() {
     () => (data?.requests ?? []).filter((item) => item.status === "PENDING_ADMIN_REVIEW" || item.status === "REFUND_INFO_SUBMITTED").length,
     [data]
   );
+  const formattedTopupAmount = useMemo(() => formatVnd(amountVnd), [amountVnd]);
+
+  function revealTransferInfo() {
+    if (amountVnd < 10000) {
+      setError("Số tiền nạp tối thiểu là 10.000 VNĐ.");
+      setShowTransferInfo(false);
+      return;
+    }
+    setError("");
+    setShowTransferInfo(true);
+  }
 
   async function uploadBill(file: File) {
     setUploadingBill(true);
@@ -204,6 +214,8 @@ export default function BrandWalletPage() {
       }
 
       setBillUrl("");
+      setShowTransferInfo(false);
+      setActiveTab("history");
       setToast("Đã gửi yêu cầu nạp N-Point sang admin");
       setTimeout(() => setToast(""), 1800);
       await load();
@@ -279,67 +291,100 @@ export default function BrandWalletPage() {
         <>
           <section className="dc-grid-dashboard">
             <StatsCard title="Số dư N-Point hiện tại" value={`${data.currentPoints.toLocaleString("vi-VN")} điểm`} />
-            <StatsCard title="N-Point ước tính lượt nạp này" value={`${pointEstimate.toLocaleString("vi-VN")} điểm`} hint={`Tỷ lệ quy đổi: 1 N-Point = ${POINT_RATE.toLocaleString("vi-VN")} VNĐ`} />
             <StatsCard title="Tổng điểm đã duyệt nạp" value={`${approvedTotal.toLocaleString("vi-VN")} điểm`} />
             <StatsCard title="Yêu cầu đang xử lý" value={String(pendingCount)} />
           </section>
 
-          <section className="mt-6 grid gap-4 lg:grid-cols-2">
-            <article className="dc-card p-5">
-              <SectionHeader title="Thông tin chuyển khoản mẫu" subtitle="Brand chuyển khoản thủ công rồi gửi yêu cầu nạp cho admin." />
-              <div className="grid gap-3 text-sm text-zinc-700">
-                <p><strong>Ngân hàng:</strong> MB Bank</p>
-                <p><strong>Số tài khoản:</strong> 0344 000 496</p>
-                <p><strong>Chủ tài khoản:</strong>  Nguyễn Thị Thanh Nhàn</p>
-                <p><strong>Nội dung chuyển khoản mẫu:</strong> {transferNote || "NAP NPOINT [MÃ BRAND]"}</p>
-              </div>
-            </article>
-
-            <article className="dc-card p-5">
-              <SectionHeader title="Mã QR" subtitle="Brand có thể quét QR để thao tác nhanh." />
-              <SampleQr />
-            </article>
-          </section>
-
-          <section className="mt-6 dc-card p-5">
-            <SectionHeader title="Gửi yêu cầu nạp N-Point" subtitle="Nhập số tiền và upload ảnh biên lai chuyển khoản để gửi admin duyệt." />
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="grid gap-1 text-sm text-zinc-700">
-                <span>Số tiền nạp (VNĐ)</span>
-                <input
-                  className="dc-input"
-                  type="number"
-                  min={10000}
-                  step={1000}
-                  value={amountVnd}
-                  onChange={(event) => setAmountVnd(Number(event.target.value || 0))}
-                />
-              </label>
-              <label className="grid gap-1 text-sm text-zinc-700">
-                <span>Nội dung chuyển khoản</span>
-                <input className="dc-input" value={transferNote} onChange={(event) => setTransferNote(event.target.value)} />
-              </label>
-              <div className="grid gap-1 text-sm text-zinc-700 md:col-span-2">
-                <span>Ảnh/PDF biên lai chuyển tiền</span>
-                <input className="dc-input bg-white" type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={onBillFileChange} disabled={uploadingBill} />
-                {uploadingBill ? <p className="text-xs text-zinc-500">Đang tải biên lai...</p> : null}
-                {billUrl ? (
-                  <p className="text-xs text-zinc-600">
-                    Biên lai đã tải:{" "}
-                    <a href={billUrl} target="_blank" rel="noreferrer" className="underline">
-                      {billUrl}
-                    </a>
-                  </p>
-                ) : null}
-              </div>
-            </div>
-            <div className="mt-4">
-              <button type="button" className="dc-btn-primary" onClick={() => void submitTopupRequest()} disabled={submittingTopup || uploadingBill}>
-                {submittingTopup ? "Đang gửi..." : "Chuyển tiền & gửi yêu cầu"}
+          <section className="mt-6">
+            <div className="mb-4 flex flex-wrap gap-2">
+              <button type="button" className={activeTab === "topup" ? "dc-btn-primary" : "dc-btn-secondary"} onClick={() => setActiveTab("topup")}>
+                Nạp tiền
+              </button>
+              <button type="button" className={activeTab === "history" ? "dc-btn-primary" : "dc-btn-secondary"} onClick={() => setActiveTab("history")}>
+                Lịch sử
               </button>
             </div>
+
+            {activeTab === "topup" ? (
+              <div className="grid gap-4">
+                <section className="dc-card p-5">
+                  <SectionHeader title="Nạp tiền" subtitle="Nhập số tiền muốn nạp trước, sau đó hệ thống mới hiển thị thông tin chuyển khoản." />
+                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                    <label className="grid gap-1 text-sm text-zinc-700">
+                      <span>Số tiền muốn nạp (VNĐ)</span>
+                      <input
+                        className="dc-input"
+                        type="number"
+                        min={10000}
+                        step={1000}
+                        value={amountVnd || ""}
+                        placeholder="Nhập số tiền muốn nạp"
+                        onChange={(event) => {
+                          setAmountVnd(Number(event.target.value || 0));
+                          setShowTransferInfo(false);
+                        }}
+                      />
+                    </label>
+                    <button type="button" className="dc-btn-primary" onClick={revealTransferInfo}>
+                      Hiện thông tin chuyển khoản
+                    </button>
+                  </div>
+                </section>
+
+                {showTransferInfo ? (
+                  <>
+                    <section className="grid gap-4 lg:grid-cols-2">
+                      <article className="dc-card p-5">
+                        <SectionHeader title="Thông tin chuyển khoản" subtitle="Chuyển đúng số tiền và nội dung để admin đối soát nhanh." />
+                        <div className="grid gap-3 text-sm text-zinc-700">
+                          <p><strong>Số tiền:</strong> {formattedTopupAmount}</p>
+                          <p><strong>Ngân hàng:</strong> MB Bank</p>
+                          <p><strong>Số tài khoản:</strong> 0344 000 496</p>
+                          <p><strong>Chủ tài khoản:</strong> Nguyễn Thị Thanh Nhàn</p>
+                          <p><strong>Nội dung chuyển khoản:</strong> {transferNote || "NAP NPOINT [MÃ BRAND]"}</p>
+                        </div>
+                      </article>
+
+                      <article className="dc-card p-5">
+                        <SectionHeader title="Mã QR" subtitle="Quét QR rồi nhập đúng số tiền và nội dung chuyển khoản." />
+                        <SampleQr />
+                      </article>
+                    </section>
+
+                    <section className="dc-card p-5">
+                      <SectionHeader title="Gửi yêu cầu nạp N-Point" subtitle="Sau khi chuyển khoản, upload biên lai để gửi admin duyệt." />
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <label className="grid gap-1 text-sm text-zinc-700">
+                          <span>Nội dung chuyển khoản</span>
+                          <input className="dc-input" value={transferNote} onChange={(event) => setTransferNote(event.target.value)} />
+                        </label>
+                        <div className="grid gap-1 text-sm text-zinc-700">
+                          <span>Ảnh/PDF biên lai chuyển tiền</span>
+                          <input className="dc-input bg-white" type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={onBillFileChange} disabled={uploadingBill} />
+                          {uploadingBill ? <p className="text-xs text-zinc-500">Đang tải biên lai...</p> : null}
+                          {billUrl ? (
+                            <p className="text-xs text-zinc-600">
+                              Biên lai đã tải:{" "}
+                              <a href={billUrl} target="_blank" rel="noreferrer" className="underline">
+                                {billUrl}
+                              </a>
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <button type="button" className="dc-btn-primary" onClick={() => void submitTopupRequest()} disabled={submittingTopup || uploadingBill}>
+                          {submittingTopup ? "Đang gửi..." : "Gửi yêu cầu nạp"}
+                        </button>
+                      </div>
+                    </section>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
           </section>
 
+          {activeTab === "history" ? (
           <section className="mt-6">
             <SectionHeader title="Lịch sử yêu cầu nạp/hoàn tiền" subtitle={`${data.requests.length} yêu cầu`} />
             {data.requests.length === 0 ? (
@@ -411,6 +456,7 @@ export default function BrandWalletPage() {
               </div>
             )}
           </section>
+          ) : null}
         </>
       ) : null}
 

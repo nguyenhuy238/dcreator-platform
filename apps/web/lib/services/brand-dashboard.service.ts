@@ -55,6 +55,12 @@ function sanitizeCampaignImageUrl(input?: string | null) {
   return value || null;
 }
 
+function extractMarkerValue(text: string | null | undefined, marker: string) {
+  if (!text) return "";
+  const line = text.split("\n").find((item) => item.startsWith(marker));
+  return line?.slice(marker.length).trim() ?? "";
+}
+
 async function trySyncCampaignNewFields(campaignId: string, benefits: string | null, participationRoadmap: string[]) {
   try {
     await prisma.$executeRaw`UPDATE "Campaign" SET "benefits" = ${benefits}, "participationRoadmap" = ${participationRoadmap} WHERE "id" = ${campaignId}`;
@@ -617,12 +623,22 @@ export async function getBrandProfile(accountId: string, currentBrandId?: string
   if (!account) throw new AppError("Account not found", 404, "ACCOUNT_NOT_FOUND");
   const meta = parseBrandMeta(account.profile?.socialLinks);
   const bccSource = brand ?? latestApplication;
+  const verificationStatus =
+    brand?.status === "ACTIVE"
+      ? "VERIFIED"
+      : brand?.status === "PENDING_VERIFICATION"
+        ? "PENDING"
+        : brand?.status === "REJECTED"
+          ? "REJECTED"
+          : meta.brandProfile.verificationStatus;
   return {
     ...meta.brandProfile,
-    brandName: meta.brandProfile.brandName || brand?.name || latestApplication?.brandName || account.displayName || "",
-    contactName: meta.brandProfile.contactName || brand?.contactName || latestApplication?.contactName || account.displayName || "",
-    contactEmail: meta.brandProfile.contactEmail || brand?.contactEmail || latestApplication?.contactEmail || account.email || "",
-    logoUrl: meta.brandProfile.logoUrl || brand?.logoUrl || latestApplication?.logoUrl || "",
+    brandName: brand?.name || latestApplication?.brandName || meta.brandProfile.brandName || account.displayName || "",
+    contactName: brand?.contactName || latestApplication?.contactName || meta.brandProfile.contactName || account.displayName || "",
+    contactEmail: brand?.contactEmail || latestApplication?.contactEmail || meta.brandProfile.contactEmail || account.email || "",
+    logoUrl: brand?.logoUrl || latestApplication?.logoUrl || meta.brandProfile.logoUrl || "",
+    businessInfo: brand?.description || latestApplication?.description || meta.brandProfile.businessInfo || "",
+    verificationStatus,
     bccAgreement: bccSource
       ? {
           revenueSharePercent: bccSource.revenueSharePercent,
@@ -638,17 +654,12 @@ export async function getBrandProfile(accountId: string, currentBrandId?: string
 }
 
 export async function updateBrandProfile(accountId: string, input: BrandProfileInput, currentBrandId?: string | null) {
-  await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const current = await prisma.profile.findUnique({ where: { accountId } });
   const meta = parseBrandMeta(current?.socialLinks);
 
-  await prisma.account.update({
-    where: { id: accountId },
-    data: { displayName: input.brandName, avatarUrl: input.logoUrl || null }
-  });
-
-  await prisma.brand.updateMany({
-    where: { ownerAccountId: accountId },
+  await prisma.brand.update({
+    where: { id: ctx.brand.id },
     data: {
       name: input.brandName,
       contactName: input.contactName || input.brandName,
@@ -671,7 +682,7 @@ export async function updateBrandProfile(accountId: string, input: BrandProfileI
     }
   });
 
-  return getBrandProfile(accountId);
+  return getBrandProfile(accountId, ctx.brand.id);
 }
 
 export async function listProducts(accountId: string, currentBrandId?: string | null) {
@@ -989,7 +1000,7 @@ function parseCreatorMeta(value: unknown): CreatorMeta {
 export async function listBrandCampaignRequests(accountId: string, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const brand = ctx.brand;
-  return prisma.brandCampaignRequest.findMany({
+  const requests = await prisma.brandCampaignRequest.findMany({
     where: { brandId: brand.id },
     select: {
       id: true,
@@ -1018,6 +1029,10 @@ export async function listBrandCampaignRequests(accountId: string, currentBrandI
     },
     orderBy: { createdAt: "desc" }
   });
+  return requests.map((request) => ({
+    ...request,
+    coverImageUrl: sanitizeCampaignImageUrl(extractMarkerValue(request.brief, COVER_MARKER))
+  }));
 }
 
 export async function createBrandCampaignRequest(accountId: string, input: CampaignRequestInput, currentBrandId?: string | null) {
