@@ -31,6 +31,7 @@ export function NotificationBell() {
   const [realtimeToast, setRealtimeToast] = useState("");
   const knownNotificationIdsRef = useRef<Set<string>>(new Set());
   const hydratedRef = useRef(false);
+  const unreadCountRef = useRef(0);
 
   const topItems = useMemo(() => items.slice(0, 6), [items]);
 
@@ -48,12 +49,19 @@ export function NotificationBell() {
     const nextUnreadCount = payload.data?.unreadCount ?? 0;
     const nextItems = payload.data?.items ?? [];
     const nextNewUnread = nextItems.find((item) => !item.isRead && !knownNotificationIdsRef.current.has(item.id));
-    if (options?.showRealtimeToast && hydratedRef.current && nextNewUnread) {
-      setRealtimeToast(`${normalizeNotificationText(nextNewUnread.title)}: ${normalizeNotificationText(nextNewUnread.content)}`);
+    const shouldShowUnreadToast = Boolean(
+      options?.showRealtimeToast &&
+        hydratedRef.current &&
+        (nextUnreadCount > unreadCountRef.current || nextNewUnread)
+    );
+    const toastItem = nextNewUnread ?? nextItems.find((item) => !item.isRead);
+    if (shouldShowUnreadToast && toastItem) {
+      setRealtimeToast(`${normalizeNotificationText(toastItem.title)}: ${normalizeNotificationText(toastItem.content)}`);
       setTimeout(() => setRealtimeToast(""), 3200);
     }
     knownNotificationIdsRef.current = new Set(nextItems.map((item) => item.id));
     hydratedRef.current = true;
+    unreadCountRef.current = nextUnreadCount;
     setItems(nextItems);
     setUnreadCount(nextUnreadCount);
     setBadgeCount(options?.resetBadge ? 0 : nextUnreadCount);
@@ -68,6 +76,7 @@ export function NotificationBell() {
     if (!response.ok) return;
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, isRead: true } : item)));
     setUnreadCount((prev) => Math.max(0, prev - 1));
+    unreadCountRef.current = Math.max(0, unreadCountRef.current - 1);
     setBadgeCount((prev) => Math.max(0, prev - 1));
   }
 
@@ -79,6 +88,7 @@ export function NotificationBell() {
     if (!response.ok) return;
     setItems((prev) => prev.map((item) => ({ ...item, isRead: true })));
     setUnreadCount(0);
+    unreadCountRef.current = 0;
     setBadgeCount(0);
   }
 

@@ -678,18 +678,34 @@ export async function confirmProductPurchased(creatorMissionId: string, accountI
 export async function submitPublishReport(
   creatorMissionId: string,
   accountId: string,
-  payload: { socialPostUrl: string; adCode?: string; purchaseInvoiceUrl?: string; ratingImageUrl?: string; note?: string }
+  payload: {
+    socialPostUrl: string;
+    adCode?: string;
+    screenshotUrl?: string;
+    purchaseBillImageUrl?: string;
+    productReviewScreenshotUrl?: string;
+    purchaseInvoiceUrl?: string;
+    ratingImageUrl?: string;
+    note?: string;
+  }
 ) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
   if (current.videoReviewStatus !== "APPROVED") throw new AppError("Video must be approved first", 409, "CREATOR_MISSION_VIDEO_NOT_APPROVED");
+  const purchaseBillImageUrl = payload.purchaseBillImageUrl ?? payload.purchaseInvoiceUrl;
+  const productReviewScreenshotUrl = payload.productReviewScreenshotUrl ?? payload.ratingImageUrl;
+  if (current.productReceiveOption === "PRODUCT_REQUIRED") {
+    if (!purchaseBillImageUrl?.trim()) throw new AppError("Ảnh bill mua hàng là bắt buộc.", 422, "PURCHASE_BILL_REQUIRED");
+    if (!productReviewScreenshotUrl?.trim()) throw new AppError("Ảnh đánh giá 5 sao là bắt buộc.", 422, "PRODUCT_REVIEW_SCREENSHOT_REQUIRED");
+  }
   await prisma.$transaction(async (tx) => {
     await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
       socialPostUrl: payload.socialPostUrl,
       publicVideoUrl: payload.socialPostUrl,
       adCode: payload.adCode ?? null,
       proofTextNote: payload.adCode ?? null,
-      screenshotUrl: payload.purchaseInvoiceUrl ?? null,
-      productReviewScreenshotUrl: payload.ratingImageUrl ?? null,
+      screenshotUrl: payload.screenshotUrl ?? null,
+      purchaseBillImageUrl: purchaseBillImageUrl ?? current.submissionPurchaseBillImageUrl,
+      productReviewScreenshotUrl: productReviewScreenshotUrl ?? current.submissionProductReviewScreenshotUrl,
       finalProofNote: payload.note ?? null,
       finalSubmittedAt: now(),
       status: "SUBMITTED",
@@ -705,8 +721,9 @@ export async function submitPublishReport(
         submissionPublicVideoUrl: payload.socialPostUrl,
         submissionAdCode: payload.adCode ?? null,
         submissionProofTextNote: payload.adCode ?? null,
-        submissionScreenshotUrl: payload.purchaseInvoiceUrl ?? null,
-        submissionProductReviewScreenshotUrl: payload.ratingImageUrl ?? null,
+        submissionScreenshotUrl: payload.screenshotUrl ?? null,
+        submissionPurchaseBillImageUrl: purchaseBillImageUrl ?? current.submissionPurchaseBillImageUrl,
+        submissionProductReviewScreenshotUrl: productReviewScreenshotUrl ?? current.submissionProductReviewScreenshotUrl,
         submissionFinalProofNote: payload.note ?? null,
         submissionFinalSubmittedAt: now(),
         submissionStatus: "SUBMITTED",
@@ -926,22 +943,18 @@ export async function getCreatorMissionDetail(accountId: string, creatorMissionI
 export async function submitCreatorMissionPurchaseProof(
   accountId: string,
   creatorMissionId: string,
-  payload: { purchaseBillImageUrl: string; productReviewScreenshotUrl: string; purchaseProofNote?: string }
+  payload: { purchaseBillImageUrl?: string; productReviewScreenshotUrl?: string; purchaseProofNote?: string }
 ) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
   if (current.productReceiveOption !== "PRODUCT_REQUIRED") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
   const updated = await prisma.$transaction(async (tx) => {
     await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
-      purchaseBillImageUrl: payload.purchaseBillImageUrl,
-      productReviewScreenshotUrl: payload.productReviewScreenshotUrl,
       purchaseProofNote: payload.purchaseProofNote ?? null,
       purchaseConfirmedAt: now()
     });
     return tx.creatorMission.update({
       where: { id: creatorMissionId },
       data: {
-        submissionPurchaseBillImageUrl: payload.purchaseBillImageUrl,
-        submissionProductReviewScreenshotUrl: payload.productReviewScreenshotUrl,
         submissionPurchaseProofNote: payload.purchaseProofNote ?? null,
         submissionPurchaseConfirmedAt: now(),
         purchaseProofSubmittedAt: now(),
@@ -1019,14 +1032,16 @@ export async function submitCreatorMissionTranscript(accountId: string, creatorM
 export async function submitCreatorMissionPublish(
   accountId: string,
   creatorMissionId: string,
-  payload: { publicVideoUrl?: string; socialPostUrl?: string; adCode?: string; screenshotUrl?: string; finalProofNote?: string }
+  payload: { publicVideoUrl?: string; socialPostUrl?: string; adCode?: string; screenshotUrl?: string; purchaseBillImageUrl?: string; productReviewScreenshotUrl?: string; finalProofNote?: string }
 ) {
   const url = payload.publicVideoUrl ?? payload.socialPostUrl;
   if (!url?.trim()) throw new AppError("publicVideoUrl or socialPostUrl is required", 422, "SOCIAL_POST_URL_REQUIRED");
   return submitPublishReport(creatorMissionId, accountId, {
     socialPostUrl: url.trim(),
     adCode: payload.adCode,
-    purchaseInvoiceUrl: payload.screenshotUrl,
+    screenshotUrl: payload.screenshotUrl,
+    purchaseBillImageUrl: payload.purchaseBillImageUrl,
+    productReviewScreenshotUrl: payload.productReviewScreenshotUrl,
     note: payload.finalProofNote
   });
 }

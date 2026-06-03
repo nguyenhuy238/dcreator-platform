@@ -36,9 +36,10 @@ const statusLabel: Record<HistoryStatus, string> = {
   REJECTED: "Bị từ chối"
 };
 
-function toHistoryStatus(status: string): HistoryStatus {
-  if (status === "COMPLETED") return "COMPLETED";
-  if (status === "CANCELLED") return "REJECTED";
+function toMissionHistoryStatus(item: MissionHistoryItem): HistoryStatus {
+  if (item.missionApplication?.status === "REJECTED") return "REJECTED";
+  if (item.status === "COMPLETED") return "COMPLETED";
+  if (item.status === "CANCELLED") return "REJECTED";
   return "IN_PROGRESS";
 }
 
@@ -88,7 +89,7 @@ export default function CreatorJobsPage() {
         const rows: CampaignItem[] = [];
         const seen = new Set<string>();
         for (const mission of missionRows) {
-          const status = toHistoryStatus(mission.status);
+          const status = toMissionHistoryStatus(mission);
           if (status !== activeStatus) continue;
           const key = `${status}-${mission.campaign.slug}`;
           if (seen.has(key)) continue;
