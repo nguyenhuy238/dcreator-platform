@@ -159,7 +159,10 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
     }
 
     if (status.state === "NOT_CREATOR") {
-      window.location.assign(`/dashboard/user/upgrade?message=${encodeURIComponent("Hãy nâng cấp tài khoản để đăng ký tham gia campaign")}`);
+      setNotice({
+        type: "error",
+        text: "Bạn cần nâng cấp tài khoản lên Creator để đăng ký tham gia campaign."
+      });
       return;
     }
 

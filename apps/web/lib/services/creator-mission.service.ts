@@ -35,7 +35,7 @@ const creatorMissionInclude = {
       deadlineAt: true
     }
   },
-  campaign: { select: { id: true, title: true, slug: true, brandId: true, brand: { select: { displayName: true } } } },
+  campaign: { select: { id: true, title: true, slug: true, coverImageUrl: true, brandId: true, brand: { select: { displayName: true } } } },
   account: {
     select: {
       id: true,
@@ -352,7 +352,7 @@ async function syncCreatorMissions(accountId: string) {
 
 export function getCreatorMissionGuidanceByOption(option: ProductReceiveOption) {
   if (option === "PRODUCT_REQUIRED") return "Bạn cần xác nhận sản phẩm theo yêu cầu trước khi nộp video và link public.";
-  return "Nhiem vu khong yeu cau san pham, co the nop video ngay.";
+  return "Nhiệm vụ không yêu cầu sản phẩm, có thể nộp video ngay.";
 }
 
 export async function ensureCreatorMissionFromApprovedApplication(
@@ -515,6 +515,7 @@ export async function confirmDepositPaid(creatorMissionId: string, accountId: st
     data: { status: "IN_PROGRESS", productStatus: "RECEIVED", depositStatus: "PAID", startedAt: current.startedAt ?? now() },
     include: creatorMissionInclude
   });
+  await notifyCreator(accountId, "PROOF_SUBMITTED", "Đã gửi xác nhận mua sản phẩm", "Bước xác nhận mua sản phẩm của bạn đã được ghi nhận.", { creatorMissionId });
   return mapMission(updated);
 }
 
@@ -548,6 +549,7 @@ export async function submitPurchaseProof(creatorMissionId: string, accountId: s
   });
   const updated = await getMissionById(creatorMissionId);
   if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
+  await notifyCreator(accountId, "PROOF_SUBMITTED", "Đã gửi xác nhận mua sản phẩm", "Bước xác nhận mua sản phẩm của bạn đã được ghi nhận.", { creatorMissionId });
   return mapMission(updated);
 }
 
@@ -592,6 +594,7 @@ export async function submitDraft(creatorMissionId: string, accountId: string, p
   });
   const updated = await getMissionById(creatorMissionId);
   if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
+  await notifyCreator(accountId, "PROOF_SUBMITTED", "Đã gửi video review", "Video review của bạn đã được gửi để Brand/Admin duyệt.", { creatorMissionId });
   return { creatorMission: mapMission(updated), submissionId: updated.submissionId, submissionLifecycleStatus: updated.submissionLifecycleStatus };
 }
 
@@ -611,7 +614,7 @@ export async function confirmDepositAndProductReceivedByAdmin(actorId: string, c
     },
     include: creatorMissionInclude
   });
-  await notifyCreator(updated.accountId, "MISSION_APPLICATION_APPROVED", "Da xac nhan nhan san pham", "Admin da xac nhan buoc san pham.", { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "MISSION_APPLICATION_APPROVED", "Đã xác nhận nhận sản phẩm", "Admin đã xác nhận bước nhận sản phẩm cho nhiệm vụ của bạn.", { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -631,7 +634,7 @@ export async function approvePurchaseProofByAdmin(actorId: string, creatorMissio
     },
     include: creatorMissionInclude
   });
-  await notifyCreator(updated.accountId, "MISSION_APPLICATION_APPROVED", "Da duyet bang chung mua hang", "Ban co the nop video review.", { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "MISSION_APPLICATION_APPROVED", "Đã duyệt bằng chứng mua hàng", "Bạn có thể tiếp tục nộp video review.", { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -651,7 +654,7 @@ export async function rejectPurchaseProofByAdmin(actorId: string, creatorMission
     },
     include: creatorMissionInclude
   });
-  await notifyCreator(updated.accountId, "MISSION_APPLICATION_REJECTED", "Bang chung mua hang bi tu choi", feedback, { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "MISSION_APPLICATION_REJECTED", "Bằng chứng mua hàng bị từ chối", feedback, { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -675,18 +678,34 @@ export async function confirmProductPurchased(creatorMissionId: string, accountI
 export async function submitPublishReport(
   creatorMissionId: string,
   accountId: string,
-  payload: { socialPostUrl: string; adCode?: string; purchaseInvoiceUrl?: string; ratingImageUrl?: string; note?: string }
+  payload: {
+    socialPostUrl: string;
+    adCode?: string;
+    screenshotUrl?: string;
+    purchaseBillImageUrl?: string;
+    productReviewScreenshotUrl?: string;
+    purchaseInvoiceUrl?: string;
+    ratingImageUrl?: string;
+    note?: string;
+  }
 ) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
   if (current.videoReviewStatus !== "APPROVED") throw new AppError("Video must be approved first", 409, "CREATOR_MISSION_VIDEO_NOT_APPROVED");
+  const purchaseBillImageUrl = payload.purchaseBillImageUrl ?? payload.purchaseInvoiceUrl;
+  const productReviewScreenshotUrl = payload.productReviewScreenshotUrl ?? payload.ratingImageUrl;
+  if (current.productReceiveOption === "PRODUCT_REQUIRED") {
+    if (!purchaseBillImageUrl?.trim()) throw new AppError("Ảnh bill mua hàng là bắt buộc.", 422, "PURCHASE_BILL_REQUIRED");
+    if (!productReviewScreenshotUrl?.trim()) throw new AppError("Ảnh đánh giá 5 sao là bắt buộc.", 422, "PRODUCT_REVIEW_SCREENSHOT_REQUIRED");
+  }
   await prisma.$transaction(async (tx) => {
     await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
       socialPostUrl: payload.socialPostUrl,
       publicVideoUrl: payload.socialPostUrl,
       adCode: payload.adCode ?? null,
       proofTextNote: payload.adCode ?? null,
-      screenshotUrl: payload.purchaseInvoiceUrl ?? null,
-      productReviewScreenshotUrl: payload.ratingImageUrl ?? null,
+      screenshotUrl: payload.screenshotUrl ?? null,
+      purchaseBillImageUrl: purchaseBillImageUrl ?? current.submissionPurchaseBillImageUrl,
+      productReviewScreenshotUrl: productReviewScreenshotUrl ?? current.submissionProductReviewScreenshotUrl,
       finalProofNote: payload.note ?? null,
       finalSubmittedAt: now(),
       status: "SUBMITTED",
@@ -702,8 +721,9 @@ export async function submitPublishReport(
         submissionPublicVideoUrl: payload.socialPostUrl,
         submissionAdCode: payload.adCode ?? null,
         submissionProofTextNote: payload.adCode ?? null,
-        submissionScreenshotUrl: payload.purchaseInvoiceUrl ?? null,
-        submissionProductReviewScreenshotUrl: payload.ratingImageUrl ?? null,
+        submissionScreenshotUrl: payload.screenshotUrl ?? null,
+        submissionPurchaseBillImageUrl: purchaseBillImageUrl ?? current.submissionPurchaseBillImageUrl,
+        submissionProductReviewScreenshotUrl: productReviewScreenshotUrl ?? current.submissionProductReviewScreenshotUrl,
         submissionFinalProofNote: payload.note ?? null,
         submissionFinalSubmittedAt: now(),
         submissionStatus: "SUBMITTED",
@@ -720,6 +740,7 @@ export async function submitPublishReport(
   });
   const updated = await getMissionById(creatorMissionId);
   if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
+  await notifyCreator(accountId, "PROOF_SUBMITTED", "Đã gửi link social public", "Link social public của bạn đã được gửi để Brand/Admin duyệt.", { creatorMissionId });
   return mapMission(updated);
 }
 
@@ -755,7 +776,7 @@ export async function approveVideoReviewByAdmin(actorId: string, creatorMissionI
       include: creatorMissionInclude
     });
   });
-  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_APPROVED", "Video duoc duyet", "Ban co the nop link social public.", { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_APPROVED", "Video đã được duyệt", "Bạn có thể tiếp tục nộp link social public.", { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -795,7 +816,7 @@ export async function rejectVideoReviewByAdmin(actorId: string, creatorMissionId
       include: creatorMissionInclude
     });
   });
-  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_REJECTED", "Video bi tu choi", feedback, { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_REJECTED", "Video bị từ chối", feedback, { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -849,7 +870,7 @@ export async function approvePublishReportByAdmin(actorId: string, creatorMissio
       include: creatorMissionInclude
     });
   });
-  await notifyCreator(updated.accountId, "CREATOR_MISSION_FINAL_APPROVED", "Nhiem vu da hoan thanh", "Nhiem vu da duoc duyet va cong diem.", { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_MISSION_FINAL_APPROVED", "Nhiệm vụ đã hoàn thành", "Nhiệm vụ của bạn đã được duyệt hoàn thành và cộng điểm.", { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -879,7 +900,7 @@ export async function rejectPublishReportByAdmin(actorId: string, creatorMission
       include: creatorMissionInclude
     });
   });
-  await notifyCreator(updated.accountId, "CREATOR_MISSION_FINAL_REJECTED", "Buoc hoan thanh bi tu choi", feedback, { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_MISSION_FINAL_REJECTED", "Bước hoàn thành bị từ chối", feedback, { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -922,22 +943,18 @@ export async function getCreatorMissionDetail(accountId: string, creatorMissionI
 export async function submitCreatorMissionPurchaseProof(
   accountId: string,
   creatorMissionId: string,
-  payload: { purchaseBillImageUrl: string; productReviewScreenshotUrl: string; purchaseProofNote?: string }
+  payload: { purchaseBillImageUrl?: string; productReviewScreenshotUrl?: string; purchaseProofNote?: string }
 ) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
   if (current.productReceiveOption !== "PRODUCT_REQUIRED") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
   const updated = await prisma.$transaction(async (tx) => {
     await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
-      purchaseBillImageUrl: payload.purchaseBillImageUrl,
-      productReviewScreenshotUrl: payload.productReviewScreenshotUrl,
       purchaseProofNote: payload.purchaseProofNote ?? null,
       purchaseConfirmedAt: now()
     });
     return tx.creatorMission.update({
       where: { id: creatorMissionId },
       data: {
-        submissionPurchaseBillImageUrl: payload.purchaseBillImageUrl,
-        submissionProductReviewScreenshotUrl: payload.productReviewScreenshotUrl,
         submissionPurchaseProofNote: payload.purchaseProofNote ?? null,
         submissionPurchaseConfirmedAt: now(),
         purchaseProofSubmittedAt: now(),
@@ -1008,25 +1025,29 @@ export async function submitCreatorMissionTranscript(accountId: string, creatorM
     });
   });
 
+  await notifyCreator(accountId, "PROOF_SUBMITTED", "Đã gửi kịch bản", "Kịch bản của bạn đã được gửi để Brand/Admin duyệt.", { creatorMissionId });
   return mapMission(updated);
 }
 
 export async function submitCreatorMissionPublish(
   accountId: string,
   creatorMissionId: string,
-  payload: { publicVideoUrl?: string; socialPostUrl?: string; adCode?: string; screenshotUrl?: string; finalProofNote?: string }
+  payload: { publicVideoUrl?: string; socialPostUrl?: string; adCode?: string; screenshotUrl?: string; purchaseBillImageUrl?: string; productReviewScreenshotUrl?: string; finalProofNote?: string }
 ) {
   const url = payload.publicVideoUrl ?? payload.socialPostUrl;
   if (!url?.trim()) throw new AppError("publicVideoUrl or socialPostUrl is required", 422, "SOCIAL_POST_URL_REQUIRED");
   return submitPublishReport(creatorMissionId, accountId, {
     socialPostUrl: url.trim(),
     adCode: payload.adCode,
-    purchaseInvoiceUrl: payload.screenshotUrl,
+    screenshotUrl: payload.screenshotUrl,
+    purchaseBillImageUrl: payload.purchaseBillImageUrl,
+    productReviewScreenshotUrl: payload.productReviewScreenshotUrl,
     note: payload.finalProofNote
   });
 }
 
 export async function createMissionApplicationForCreator(accountId: string, payload: { missionId: string; note?: string }) {
+  const CREATOR_MISSION_REAPPLY_LIMIT = 2;
   const profile = await prisma.creatorProfile.findUnique({ where: { accountId }, select: { id: true } });
   if (!profile) throw new AppError("Creator profile is required", 422, "CREATOR_PROFILE_REQUIRED");
   const approvedActiveChannels = await prisma.creatorSocialLink.findMany({
@@ -1060,6 +1081,25 @@ export async function createMissionApplicationForCreator(accountId: string, payl
 
   if (existing && existing.applicationStatus !== "REJECTED") {
     throw new AppError("Ban da xin lam nhiem vu nay", 409, "MISSION_APPLICATION_ALREADY_EXISTS");
+  }
+
+  let resubmissionCount = 0;
+  if (existing?.applicationStatus === "REJECTED") {
+    resubmissionCount = await prisma.auditLog.count({
+      where: {
+        targetType: "CreatorMission",
+        targetId: existing.id,
+        action: "CREATOR_MISSION_APPLICATION_RESUBMITTED"
+      }
+    });
+
+    if (resubmissionCount >= CREATOR_MISSION_REAPPLY_LIMIT) {
+      throw new AppError(
+        "Bạn chỉ có thể đăng ký lại campaign này tối đa 2 lần.",
+        409,
+        "MISSION_APPLICATION_REAPPLY_LIMIT_REACHED"
+      );
+    }
   }
 
   const created = existing
@@ -1103,7 +1143,9 @@ export async function createMissionApplicationForCreator(accountId: string, payl
       metadata: {
         missionId: created.missionId,
         campaignId: created.campaignId,
-        creatorSocialChannels: approvedActiveChannels
+        creatorSocialChannels: approvedActiveChannels,
+        reapplyCount: existing ? resubmissionCount + 1 : 0,
+        reapplyLimit: CREATOR_MISSION_REAPPLY_LIMIT
       }
     }
   });
@@ -1360,7 +1402,7 @@ export async function approveMissionApplicationByAdmin(actorId: string, id: stri
     });
     return mapMission(next);
   });
-  await notifyCreator(current.accountId, "MISSION_APPLICATION_APPROVED", "Don xin nhiem vu duoc duyet", `Ban da duoc duyet nhiem vu "${current.mission.title}".`, { creatorMissionId: id });
+  await notifyCreator(current.accountId, "MISSION_APPLICATION_APPROVED", "Đơn xin nhiệm vụ được duyệt", `Bạn đã được duyệt tham gia nhiệm vụ "${current.mission.title}".`, { creatorMissionId: id });
   return updated;
 }
 
@@ -1374,7 +1416,7 @@ export async function rejectMissionApplicationByAdmin(actorId: string, id: strin
     data: { applicationStatus: "REJECTED", applicationRejectReason: reason, applicationReviewedById: actorId, applicationReviewedAt: now() },
     include: creatorMissionInclude
   });
-  await notifyCreator(current.accountId, "MISSION_APPLICATION_REJECTED", "Don xin nhiem vu bi tu choi", reason, { creatorMissionId: id });
+  await notifyCreator(current.accountId, "MISSION_APPLICATION_REJECTED", "Đơn xin nhiệm vụ bị từ chối", reason, { creatorMissionId: id });
   return mapMission(updated);
 }
 
@@ -1577,7 +1619,7 @@ export async function approveMissionTranscriptReviewByAdmin(actorId: string, id:
     });
   });
 
-  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_APPROVED", "Kich ban duoc duyet", "Ban co the nop video review.", { creatorMissionId: id, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_APPROVED", "Kịch bản được duyệt", "Bạn có thể tiếp tục nộp video review.", { creatorMissionId: id, actorId });
   return mapMission(updated);
 }
 
@@ -1618,7 +1660,7 @@ export async function rejectMissionTranscriptReviewByAdmin(actorId: string, id: 
     });
   });
 
-  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_REJECTED", "Kich ban bi tu choi", reason, { creatorMissionId: id, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_REJECTED", "Kịch bản bị từ chối", reason, { creatorMissionId: id, actorId });
   return mapMission(updated);
 }
 

@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActionToast,
   EmptyState,
@@ -52,14 +52,13 @@ type ChannelDraft = {
   handle: string;
   url: string;
   followerCount: number;
-  engagementRate: string;
 };
 
 type ApiResponse<T> = { success: boolean; data?: T; error?: string };
 type AvatarUploadResponse = { avatarUrl: string };
 
 const categoryOptions = ["Lifestyle", "Food", "Beauty", "Tech", "Education", "Gaming", "Affiliate", "UGC"];
-const emptyDraft: ChannelDraft = { platform: "TikTok", handle: "", url: "", followerCount: 0, engagementRate: "" };
+const emptyDraft: ChannelDraft = { platform: "TikTok", handle: "", url: "", followerCount: 0 };
 
 function toPlatformBadge(platform: Channel["platform"]) {
   if (platform === "TikTok") return "TIKTOK";
@@ -85,6 +84,12 @@ function formatIntForInput(value: number) {
   return value.toLocaleString("vi-VN");
 }
 
+function toExternalUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "#";
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 export default function CreatorProfilePage() {
   const [activeTab, setActiveTab] = useState<"profile" | "channels">("profile");
 
@@ -101,14 +106,13 @@ export default function CreatorProfilePage() {
   const [categories, setCategories] = useState<string[]>([]);
 
   const [channels, setChannels] = useState<Channel[]>([]);
-  const [creatorProfile, setCreatorProfile] = useState<CreatorProfileSnapshot | null>(null);
   const [draft, setDraft] = useState(emptyDraft);
   const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
 
   const bioCount = useMemo(() => bio.trim().length, [bio]);
   const canSubmitChannel = useMemo(() => draft.url.trim().length > 0 && draft.handle.trim().length > 0, [draft.url, draft.handle]);
 
-  async function loadProfile() {
+  const loadProfile = useCallback(async () => {
     const response = await fetch("/api/creator/dashboard/profile", { cache: "no-store" });
     const payload = (await response.json()) as ApiResponse<CreatorProfile>;
     if (!response.ok || !payload.success || !payload.data) {
@@ -118,19 +122,18 @@ export default function CreatorProfilePage() {
     setAvatarUrl(payload.data.avatarUrl ?? "");
     setBio(payload.data.bio ?? "");
     setCategories(payload.data.categories ?? []);
-  }
+  }, []);
 
-  async function loadChannels() {
+  const loadChannels = useCallback(async () => {
     const response = await fetch("/api/creator/dashboard/channels", { cache: "no-store" });
     const payload = (await response.json()) as ApiResponse<ChannelsPayload>;
     if (!response.ok || !payload.success || !payload.data) {
       throw new Error(payload.error ?? "Không thể tải danh sách kênh");
     }
     setChannels(payload.data.channels ?? []);
-    setCreatorProfile(payload.data.creatorProfile ?? null);
-  }
+  }, []);
 
-  async function loadAll() {
+  const loadAll = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -140,7 +143,7 @@ export default function CreatorProfilePage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [loadChannels, loadProfile]);
 
   useEffect(() => {
     void loadAll();
@@ -221,8 +224,7 @@ export default function CreatorProfilePage() {
         platform: draft.platform,
         handle: draft.handle.trim(),
         url: draft.url.trim(),
-        followerCount: draft.followerCount,
-        engagementRate: draft.engagementRate ? Number(draft.engagementRate) : undefined
+        followerCount: draft.followerCount
       };
       const response = await fetch(endpoint, {
         method,
@@ -232,7 +234,6 @@ export default function CreatorProfilePage() {
       const payload = (await response.json()) as ApiResponse<ChannelsPayload>;
       if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error ?? "Không thể lưu kênh");
       setChannels(payload.data.channels);
-      setCreatorProfile(payload.data.creatorProfile);
       setDraft(emptyDraft);
       setEditingChannelId(null);
       setToast(editingChannelId ? "Đã cập nhật kênh." : "Đã thêm kênh mới.");
@@ -250,8 +251,7 @@ export default function CreatorProfilePage() {
       platform: channel.platform,
       handle: channel.handle,
       url: channel.url,
-      followerCount: channel.followerCount,
-      engagementRate: channel.engagementRate === null ? "" : String(channel.engagementRate)
+      followerCount: channel.followerCount
     });
   }
 
@@ -263,7 +263,6 @@ export default function CreatorProfilePage() {
       const payload = (await response.json()) as ApiResponse<ChannelsPayload>;
       if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error ?? "Không thể xóa kênh");
       setChannels(payload.data.channels);
-      setCreatorProfile(payload.data.creatorProfile);
       setToast("Đã xóa kênh.");
       setTimeout(() => setToast(""), 2200);
     } catch (requestError) {
@@ -285,7 +284,6 @@ export default function CreatorProfilePage() {
       const payload = (await response.json()) as ApiResponse<ChannelsPayload>;
       if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error ?? "Không thể cập nhật trạng thái kênh");
       setChannels(payload.data.channels);
-      setCreatorProfile(payload.data.creatorProfile);
       setToast(isActive ? "Đã kích hoạt kênh." : "Đã tạm ngừng kênh.");
       setTimeout(() => setToast(""), 2200);
     } catch (requestError) {
@@ -408,11 +406,16 @@ export default function CreatorProfilePage() {
                         </div>
                         <StatusBadge status={item.status} />
                       </div>
-                      <p className="mt-1 break-all text-sm text-zinc-600">{item.url}</p>
-                      <p className="text-sm text-zinc-600">@{item.handle}</p>
+                      <a
+                        className="mt-1 block break-all text-sm font-semibold text-zinc-800 underline decoration-zinc-300 underline-offset-4 hover:text-zinc-950"
+                        href={toExternalUrl(item.url)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {item.url}
+                      </a>
+                      <p className="text-sm text-zinc-600">Tên tài khoản / ID kênh: @{item.handle}</p>
                       <p className="text-sm text-zinc-600">Người theo dõi: {item.followerCount.toLocaleString("vi-VN")}</p>
-                      <p className="text-sm text-zinc-600">Engagement rate: {item.engagementRate === null ? "N/A" : `${item.engagementRate}%`}</p>
-                      <p className="text-sm text-zinc-600">Verification: {item.verificationStatus}</p>
                       {item.rejectReason ? <p className="mt-1 text-sm text-red-600">Lý do từ chối: {item.rejectReason}</p> : null}
                       <div className="mt-2 flex flex-wrap gap-2">
                         <button className="dc-btn-secondary" onClick={() => void toggleChannelActive(item.id, !item.isActive)} disabled={saving}>
@@ -429,7 +432,7 @@ export default function CreatorProfilePage() {
           </article>
 
           <article className="dc-card p-4">
-            <SectionHeader title={editingChannelId ? "Chỉnh sửa kênh" : "Thêm kênh mới"} subtitle="Kênh mới/chỉnh sửa sẽ ở trạng thái PENDING để admin duyệt." />
+            <SectionHeader title={editingChannelId ? "Chỉnh sửa kênh" : "Thêm kênh mới"} subtitle="Kênh mới hoặc chỉnh sửa sẽ ở trạng thái chờ duyệt để Admin xác minh." />
             <div className="grid gap-3">
               <FormField label="Nền tảng">
                 <select className="dc-input" value={draft.platform} onChange={(event) => setDraft((current) => ({ ...current, platform: event.target.value as typeof emptyDraft.platform }))}>
@@ -438,10 +441,10 @@ export default function CreatorProfilePage() {
                   <option value="Instagram">Instagram</option>
                   <option value="YouTube">YouTube</option>
                   <option value="Shopee">Shopee</option>
-                  <option value="Other">Other</option>
+                  <option value="Other">Khác</option>
                 </select>
               </FormField>
-              <FormField label="Handle">
+              <FormField label="Tên tài khoản / ID kênh">
                 <input className="dc-input" placeholder="@creator_handle" value={draft.handle} onChange={(event) => setDraft((current) => ({ ...current, handle: event.target.value }))} />
               </FormField>
               <FormField label="URL kênh">
@@ -449,9 +452,6 @@ export default function CreatorProfilePage() {
               </FormField>
               <FormField label="Số lượng follower">
                 <input className="dc-input" type="text" inputMode="numeric" placeholder="0" value={formatIntForInput(draft.followerCount)} onChange={(event) => setDraft((current) => ({ ...current, followerCount: parseNonNegativeInt(event.target.value) }))} />
-              </FormField>
-              <FormField label="Engagement rate (%)">
-                <input className="dc-input" type="number" min={0} max={100} step="0.01" placeholder="Ví dụ 4.25" value={draft.engagementRate} onChange={(event) => setDraft((current) => ({ ...current, engagementRate: event.target.value }))} />
               </FormField>
               <button className="dc-btn-primary" disabled={saving || !canSubmitChannel} onClick={() => void saveChannel()}>{saving ? "Đang lưu..." : editingChannelId ? "Cập nhật kênh" : "Thêm kênh"}</button>
               {editingChannelId ? (

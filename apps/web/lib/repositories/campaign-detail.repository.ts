@@ -77,8 +77,8 @@ export async function findPublicCampaignDetailBySlug(slug: string, viewerId?: st
           supporter: { select: { displayName: true } }
         }
       },
-      missionApplications: {
-        where: { status: "APPROVED" },
+      creatorMissions: {
+        where: { applicationStatus: "APPROVED" },
         select: { accountId: true }
       }
     }

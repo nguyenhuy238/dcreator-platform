@@ -2,6 +2,7 @@
 import { appendCreatorCampaignApplicationTag } from "@/lib/constants/campaign-application";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
+import { createNotification } from "@/lib/services/notification.service";
 
 export type CreatorCampaignApplicationState =
   | "LOGIN_REQUIRED"
@@ -232,6 +233,7 @@ export async function getCreatorCampaignApplicationStatus(
 }
 
 export async function submitCreatorCampaignApplication(slug: string, accountId: string) {
+  const CREATOR_CAMPAIGN_REAPPLY_LIMIT = 2;
   const campaignData = await getCampaignAndCreatorMission(slug);
   if (!campaignData) {
     throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
@@ -279,6 +281,22 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
       throw new AppError("Creator has already applied to this campaign", 409, "CREATOR_CAMPAIGN_ALREADY_APPLIED");
     }
 
+    const reapplyCount = await prisma.auditLog.count({
+      where: {
+        targetType: "CreatorMission",
+        targetId: existing.id,
+        action: "CREATOR_CAMPAIGN_APPLICATION_RESUBMITTED"
+      }
+    });
+
+    if (reapplyCount >= CREATOR_CAMPAIGN_REAPPLY_LIMIT) {
+      throw new AppError(
+        "Bạn chỉ có thể đăng ký lại campaign này tối đa 2 lần.",
+        409,
+        "CREATOR_CAMPAIGN_REAPPLY_LIMIT_REACHED"
+      );
+    }
+
     const reapplied = await prisma.creatorMission.update({
       where: { id: existing.id },
       data: {
@@ -299,9 +317,19 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
         targetId: reapplied.id,
         metadata: {
           campaignId: campaign.id,
-          missionId: firstMission.id
+          missionId: firstMission.id,
+          reapplyCount: reapplyCount + 1,
+          reapplyLimit: CREATOR_CAMPAIGN_REAPPLY_LIMIT
         }
       }
+    });
+
+    await createNotification({
+      accountId,
+      event: "MISSION_ACCEPTED",
+      title: "Đã gửi đăng ký campaign",
+      content: `Bạn đã đăng ký lại campaign này và đang chờ Brand/Admin duyệt.`,
+      metadata: { campaignId: campaign.id, missionId: firstMission.id, creatorMissionId: reapplied.id }
     });
 
     return {
@@ -350,6 +378,14 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
     }
   });
 
+  await createNotification({
+    accountId,
+    event: "MISSION_ACCEPTED",
+    title: "Đăng ký campaign thành công",
+    content: "Đơn đăng ký của bạn đã được ghi nhận. Hệ thống sẽ thông báo khi Brand/Admin duyệt.",
+    metadata: { campaignId: campaign.id, missionId: firstMission.id, creatorMissionId: application.id }
+  });
+
   return {
     submissionId: application.id,
     missionId: application.missionId,
@@ -361,5 +397,3 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
     })
   };
 }
-
-

@@ -758,8 +758,8 @@ export async function reviewCreatorApplication(actorId: string, applicationId: s
   await createNotification({
     accountId: updated.accountId,
     event: status === "APPROVED" ? NotificationEvent.CREATOR_APPLICATION_APPROVED : NotificationEvent.CAMPAIGN_REJECTED,
-    title: status === "APPROVED" ? "Creator application approved" : "Creator application updated",
-    content: status === "APPROVED" ? "Yêu cầu Creator của bạn đã được duyệt." : `Yêu cầu Creator: ${status}`,
+    title: status === "APPROVED" ? "Yêu cầu Creator đã được duyệt" : "Yêu cầu Creator đã cập nhật",
+    content: status === "APPROVED" ? "Yêu cầu Creator của bạn đã được duyệt." : `Yêu cầu Creator đã chuyển sang trạng thái ${status}.`,
     metadata: { status, rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null }
   });
   return updated;
@@ -877,8 +877,8 @@ export async function reviewBrandApplication(actorId: string, applicationId: str
   await createNotification({
     accountId: updated.accountId,
     event: status === "APPROVED" ? NotificationEvent.BRAND_APPLICATION_APPROVED : NotificationEvent.CAMPAIGN_REJECTED,
-    title: status === "APPROVED" ? "Brand application approved" : "Brand application updated",
-    content: status === "APPROVED" ? "Yêu cầu Brand của bạn đã được duyệt." : `Yêu cầu Brand: ${status}`,
+    title: status === "APPROVED" ? "Yêu cầu Brand đã được duyệt" : "Yêu cầu Brand đã cập nhật",
+    content: status === "APPROVED" ? "Yêu cầu Brand của bạn đã được duyệt." : `Yêu cầu Brand đã chuyển sang trạng thái ${status}.`,
     metadata: { status, rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null }
   });
   return updated;

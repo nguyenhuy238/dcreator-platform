@@ -16,27 +16,27 @@ export const NOTIFICATION_EVENT_TEMPLATES: Record<
   NotificationEvent,
   { title: string; content: string }
 > = {
-  USER_CONTRIBUTION_SUCCESS: { title: "Dong gop thanh cong", content: "Ban da dong gop thanh cong." },
-  USER_RECEIVED_VOUCHER: { title: "Nhan voucher", content: "Ban vua nhan duoc voucher moi." },
-  MISSION_ACCEPTED: { title: "Nhan nhiem vu", content: "Ban da nhan nhiem vu thanh cong." },
-  PROOF_SUBMITTED: { title: "Da nop proof", content: "Proof cua ban da duoc gui." },
-  PROOF_APPROVED: { title: "Proof duoc duyet", content: "Proof cua ban da duoc phe duyet." },
-  PROOF_REJECTED: { title: "Proof bi tu choi", content: "Proof cua ban da bi tu choi." },
-  MISSION_APPLICATION_APPROVED: { title: "Don nhiem vu duoc duyet", content: "Don xin lam nhiem vu cua ban da duoc duyet." },
-  MISSION_APPLICATION_REJECTED: { title: "Don nhiem vu bi tu choi", content: "Don xin lam nhiem vu cua ban da bi tu choi." },
-  CREATOR_MISSION_VIDEO_APPROVED: { title: "Video duoc duyet", content: "Video review cua ban da duoc duyet." },
-  CREATOR_MISSION_VIDEO_REJECTED: { title: "Video bi tu choi", content: "Video review cua ban da bi tu choi." },
-  CREATOR_MISSION_FINAL_APPROVED: { title: "Nhiem vu hoan thanh", content: "Nhiem vu cua ban da duoc duyet hoan thanh." },
-  CREATOR_MISSION_FINAL_REJECTED: { title: "Buoc cuoi bi tu choi", content: "Buoc hoan thanh cua ban da bi tu choi." },
-  CREATOR_APPLICATION_APPROVED: { title: "Duyet creator", content: "Don dang ky creator da duoc duyet." },
-  BRAND_APPLICATION_APPROVED: { title: "Duyet brand", content: "Don dang ky brand da duoc duyet." },
-  CAMPAIGN_APPROVED: { title: "Campaign duoc duyet", content: "Campaign cua ban da duoc duyet." },
-  CAMPAIGN_REJECTED: { title: "Campaign bi tu choi", content: "Campaign cua ban da bi tu choi." },
-  PAYMENT_SUCCESS: { title: "Thanh toan thanh cong", content: "Giao dich thanh toan da thanh cong." },
-  PAYMENT_FAILED: { title: "Thanh toan that bai", content: "Giao dich thanh toan that bai." },
-  PAYOUT_REQUESTED: { title: "Yeu cau payout", content: "Yeu cau payout da duoc tao." },
-  PAYOUT_APPROVED: { title: "Payout duoc duyet", content: "Yeu cau payout da duoc phe duyet." },
-  PAYOUT_REJECTED: { title: "Payout bi tu choi", content: "Yeu cau payout da bi tu choi." }
+  USER_CONTRIBUTION_SUCCESS: { title: "Đóng góp thành công", content: "Bạn đã đóng góp thành công." },
+  USER_RECEIVED_VOUCHER: { title: "Nhận voucher", content: "Bạn vừa nhận được voucher mới." },
+  MISSION_ACCEPTED: { title: "Nhận nhiệm vụ", content: "Bạn đã nhận nhiệm vụ thành công." },
+  PROOF_SUBMITTED: { title: "Đã nộp minh chứng", content: "Minh chứng của bạn đã được gửi." },
+  PROOF_APPROVED: { title: "Minh chứng được duyệt", content: "Minh chứng của bạn đã được phê duyệt." },
+  PROOF_REJECTED: { title: "Minh chứng bị từ chối", content: "Minh chứng của bạn đã bị từ chối." },
+  MISSION_APPLICATION_APPROVED: { title: "Đơn nhiệm vụ được duyệt", content: "Đơn xin làm nhiệm vụ của bạn đã được duyệt." },
+  MISSION_APPLICATION_REJECTED: { title: "Đơn nhiệm vụ bị từ chối", content: "Đơn xin làm nhiệm vụ của bạn đã bị từ chối." },
+  CREATOR_MISSION_VIDEO_APPROVED: { title: "Video được duyệt", content: "Video review của bạn đã được duyệt." },
+  CREATOR_MISSION_VIDEO_REJECTED: { title: "Video bị từ chối", content: "Video review của bạn đã bị từ chối." },
+  CREATOR_MISSION_FINAL_APPROVED: { title: "Nhiệm vụ hoàn thành", content: "Nhiệm vụ của bạn đã được duyệt hoàn thành." },
+  CREATOR_MISSION_FINAL_REJECTED: { title: "Bước cuối bị từ chối", content: "Bước hoàn thành của bạn đã bị từ chối." },
+  CREATOR_APPLICATION_APPROVED: { title: "Duyệt Creator", content: "Đơn đăng ký Creator đã được duyệt." },
+  BRAND_APPLICATION_APPROVED: { title: "Duyệt Brand", content: "Đơn đăng ký Brand đã được duyệt." },
+  CAMPAIGN_APPROVED: { title: "Campaign được duyệt", content: "Campaign của bạn đã được duyệt." },
+  CAMPAIGN_REJECTED: { title: "Campaign bị từ chối", content: "Campaign của bạn đã bị từ chối." },
+  PAYMENT_SUCCESS: { title: "Thanh toán thành công", content: "Giao dịch thanh toán đã thành công." },
+  PAYMENT_FAILED: { title: "Thanh toán thất bại", content: "Giao dịch thanh toán thất bại." },
+  PAYOUT_REQUESTED: { title: "Yêu cầu payout", content: "Yêu cầu payout đã được tạo." },
+  PAYOUT_APPROVED: { title: "Payout được duyệt", content: "Yêu cầu payout đã được phê duyệt." },
+  PAYOUT_REJECTED: { title: "Payout bị từ chối", content: "Yêu cầu payout đã bị từ chối." }
 };
 
 export async function createNotification(input: CreateNotificationInput) {
@@ -76,6 +76,13 @@ export async function markAsRead(accountId: string, notificationId: string) {
   });
 }
 
+export async function markAllAsRead(accountId: string) {
+  return prisma.notification.updateMany({
+    where: { accountId, channel: "IN_APP", isRead: false },
+    data: { isRead: true, readAt: new Date() }
+  });
+}
+
 export async function getMyNotifications(accountId: string, limit = 20) {
   const [items, unreadCount] = await prisma.$transaction([
     prisma.notification.findMany({
@@ -105,7 +112,7 @@ export async function sendEmailNotification(notificationId?: string) {
     await getEmailNotificationProvider().send({
       to: notification.account.email,
       subject: notification.title,
-      html: `<p>Xin chao ${notification.account.displayName},</p><p>${notification.content}</p>`
+      html: `<p>Xin chào ${notification.account.displayName},</p><p>${notification.content}</p>`
     });
 
     await prisma.notification.update({

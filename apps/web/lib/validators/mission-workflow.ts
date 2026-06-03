@@ -12,8 +12,8 @@ export const creatorMissionApplicationCreateSchema = z.object({
 });
 
 export const creatorMissionPurchaseProofSubmitSchema = z.object({
-  purchaseBillImageUrl: uploadPathOrHttpUrlSchema,
-  productReviewScreenshotUrl: uploadPathOrHttpUrlSchema,
+  purchaseBillImageUrl: uploadPathOrHttpUrlSchema.optional(),
+  productReviewScreenshotUrl: uploadPathOrHttpUrlSchema.optional(),
   purchaseProofNote: z.string().trim().max(500).optional()
 });
 
@@ -32,6 +32,8 @@ export const creatorMissionPublishSubmitSchema = z
     socialPostUrl: z.string().trim().url().max(2000).optional(),
     adCode: z.string().trim().max(200).optional(),
     screenshotUrl: uploadPathOrHttpUrlSchema.optional(),
+    purchaseBillImageUrl: uploadPathOrHttpUrlSchema.optional(),
+    productReviewScreenshotUrl: uploadPathOrHttpUrlSchema.optional(),
     finalProofNote: z.string().trim().max(500).optional()
   })
   .superRefine((value, ctx) => {

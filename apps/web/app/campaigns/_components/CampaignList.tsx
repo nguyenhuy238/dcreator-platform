@@ -21,7 +21,7 @@ const defaultFilters: CampaignFilterState = {
   sort: "trending"
 };
 
-export function CampaignList({ excludeSlugs = [] }: { excludeSlugs?: string[] }) {
+export function CampaignList({ excludeSlugs = [], compact = false }: { excludeSlugs?: string[]; compact?: boolean }) {
   const [filters, setFilters] = useState<CampaignFilterState>(defaultFilters);
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<CampaignCardData[]>([]);
@@ -107,7 +107,7 @@ export function CampaignList({ excludeSlugs = [] }: { excludeSlugs?: string[] })
         <>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {visibleItems.map((campaign) => (
-              <CampaignCard key={campaign.slug} campaign={campaign} />
+              <CampaignCard key={campaign.slug} campaign={campaign} compact={compact} />
             ))}
           </div>
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-3">

@@ -108,11 +108,11 @@ export async function listCampaigns(input: ListCampaignsInput) {
   const approvedCreatorPairs =
     campaignIds.length === 0
       ? []
-      : await prisma.missionApplication.groupBy({
+      : await prisma.creatorMission.groupBy({
           by: ["campaignId", "accountId"],
           where: {
             campaignId: { in: campaignIds },
-            status: "APPROVED"
+            applicationStatus: "APPROVED"
           }
         });
 

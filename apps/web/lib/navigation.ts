@@ -39,8 +39,8 @@ const userNavItems: readonly NavItem[] = [
 const creatorNavItems: readonly NavItem[] = [
   { href: "/dashboard/creator", label: "T\u1ed5ng quan Creator", description: "Ti\u1ebfn \u0111\u1ed9 nhi\u1ec7m v\u1ee5 v\u00e0 hoa h\u1ed3ng", icon: "Gauge" },
   { href: "/dashboard/creator/jobs", label: "Campaign / Job", description: "Chi\u1ebfn d\u1ecbch c\u00f3 th\u1ec3 tham gia", icon: "Briefcase" },
-  { href: "/dashboard/creator/profile", label: "H\u1ed3 s\u01a1 Creator", description: "Portfolio v\u00e0 th\u00f4ng tin Creator", icon: "UserCircle" },
-  { href: "/dashboard/creator/wallet", label: "V\u00ed Creator", description: "Hoa h\u1ed3ng v\u00e0 payout", icon: "Wallet" }
+  { href: "/dashboard/creator/wallet", label: "V\u00ed Creator", description: "Hoa h\u1ed3ng v\u00e0 payout", icon: "Wallet" },
+  { href: "/dashboard/creator/profile", label: "H\u1ed3 s\u01a1 Creator", description: "Portfolio v\u00e0 th\u00f4ng tin Creator", icon: "UserCircle" }
 ];
 
 const brandNavItems: readonly NavItem[] = [
@@ -49,6 +49,7 @@ const brandNavItems: readonly NavItem[] = [
   { href: "/dashboard/brand/mission-reviews", label: "Duy\u1ec7t nhi\u1ec7m v\u1ee5 Creator", description: "Duy\u1ec7t k\u1ecbch b\u1ea3n, video v\u00e0 ho\u00e0n th\u00e0nh", icon: "ClipboardText" },
   { href: "/dashboard/brand/mission-history", label: "L\u1ecbch s\u1eed nhi\u1ec7m v\u1ee5", description: "To\u00e0n b\u1ed9 Creator Mission theo campaign", icon: "Scroll" },
   { href: "/dashboard/brand/products", label: "S\u1ea3n ph\u1ea9m / SKU / Variant", description: "Qu\u1ea3n l\u00fd danh m\u1ee5c s\u1ea3n ph\u1ea9m", icon: "Package" },
+  { href: "/dashboard/brand/upgrade", label: "\u0110\u0103ng k\u00fd n\u00e2ng c\u1ea5p vai tr\u00f2", description: "\u0110\u0103ng k\u00fd Creator/Brand", icon: "UserPlus" },
   {
     href: "/dashboard/brand/settings",
     label: "C\u00e0i \u0111\u1eb7t Brand",
@@ -195,6 +196,7 @@ const breadcrumbLabelMap: Record<string, string> = {
   "/dashboard/brand/analytics": "KPI / Analytics",
   "/dashboard/brand/wallet": "V\u00ed N-Point",
   "/dashboard/brand/members": "Th\u00e0nh vi\u00ean Brand",
+  "/dashboard/brand/upgrade": "\u0110\u0103ng k\u00fd n\u00e2ng c\u1ea5p vai tr\u00f2",
   "/dashboard/brand/settings": "C\u00e0i \u0111\u1eb7t Brand",
   "/admin": "Admin",
   "/admin/users": "Người dùng",

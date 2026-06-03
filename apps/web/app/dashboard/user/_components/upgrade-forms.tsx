@@ -25,6 +25,21 @@ const CREATOR_PLATFORM_LABELS: Record<CreatorLink["platform"], string> = {
   shopee: "Shopee"
 };
 
+function onlyDigits(raw: string) {
+  return raw.replace(/\D/g, "");
+}
+
+function parseFollowerCount(raw: string) {
+  const digits = onlyDigits(raw);
+  if (!digits) return 0;
+  return Number.parseInt(digits, 10);
+}
+
+function formatFollowerCount(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "";
+  return value.toLocaleString("vi-VN");
+}
+
 function statusText(value?: unknown) {
   if (value === "PENDING_REVIEW" || value === "APPROVED") return "Hồ sơ đã được tạo";
   if (value === "REJECTED") return "Đã từ chối";
@@ -35,7 +50,7 @@ function statusText(value?: unknown) {
 export function CreatorUpgradeForm({ data, onError, onSuccess }: { data: UpgradeSnapshot; onError: (message: string) => void; onSuccess: (message: string) => void }) {
   const router = useRouter();
   const [form, setForm] = useState({ displayName: "", bio: "" });
-  const [creatorLinks, setCreatorLinks] = useState<CreatorLink[]>([{ platform: "tiktok", url: "" }]);
+  const [creatorLinks, setCreatorLinks] = useState<CreatorLink[]>([{ platform: "tiktok", url: "", handle: "", followerCount: 0 }]);
   const [submitting, setSubmitting] = useState(false);
   const creatorStatus = data.creatorApplication?.status as string | undefined;
   const isCreator = Boolean(data.account.hasCreatorProfile) || data.account.roles.includes("CREATOR");
@@ -91,18 +106,28 @@ export function CreatorUpgradeForm({ data, onError, onSuccess }: { data: Upgrade
           <div className="grid gap-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-zinc-700">Liên kết mạng xã hội / kênh bán hàng</p>
-              <button type="button" className="dc-btn-secondary" onClick={() => setCreatorLinks((items) => [...items, { platform: "tiktok", url: "" }])}>Thêm liên kết</button>
+              <button type="button" className="dc-btn-secondary" onClick={() => setCreatorLinks((items) => [...items, { platform: "tiktok", url: "", handle: "", followerCount: 0 }])}>Thêm liên kết</button>
             </div>
             {creatorLinks.map((item, index) => (
-              <div key={`${index}-${item.platform}`} className="grid gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 sm:grid-cols-[8rem_minmax(0,1fr)_auto]">
+              <div key={`${index}-${item.platform}`} className="grid gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 sm:grid-cols-[8rem_minmax(0,1fr)]">
                 <select className="dc-input bg-white" value={item.platform} onChange={(event) => setCreatorLinks((items) => items.map((link, itemIndex) => itemIndex === index ? { ...link, platform: event.target.value as CreatorLink["platform"] } : link))}>
                   {CREATOR_PLATFORMS.map((platform) => <option key={platform} value={platform}>{CREATOR_PLATFORM_LABELS[platform]}</option>)}
                 </select>
                 <input className="dc-input bg-white" inputMode="url" placeholder="https://..." value={item.url} onChange={(event) => setCreatorLinks((items) => items.map((link, itemIndex) => itemIndex === index ? { ...link, url: event.target.value } : link))} />
-                <button type="button" className="dc-btn-secondary text-red-700" onClick={() => setCreatorLinks((items) => items.filter((_, itemIndex) => itemIndex !== index))}>Xóa</button>
+                <input className="dc-input bg-white" placeholder="@ten_tai_khoan" value={item.handle} onChange={(event) => setCreatorLinks((items) => items.map((link, itemIndex) => itemIndex === index ? { ...link, handle: event.target.value } : link))} />
+                <input
+                  className="dc-input bg-white"
+                  inputMode="numeric"
+                  placeholder="Số lượng follower"
+                  value={formatFollowerCount(item.followerCount)}
+                  onChange={(event) => setCreatorLinks((items) => items.map((link, itemIndex) => itemIndex === index ? { ...link, followerCount: parseFollowerCount(event.target.value) } : link))}
+                />
+                <div className="sm:col-span-2">
+                  <button type="button" className="dc-btn-secondary text-red-700" onClick={() => setCreatorLinks((items) => items.filter((_, itemIndex) => itemIndex !== index))}>Xóa</button>
+                </div>
               </div>
             ))}
-            <p className="text-xs font-medium text-zinc-500">Chỉ cần ít nhất 1 liên kết hợp lệ. Có thể thêm nhiều liên kết cho cùng nền tảng.</p>
+            <p className="text-xs font-medium text-zinc-500">Mỗi liên kết cần đủ URL, tên tài khoản hoặc ID kênh, và số lượng follower hiện tại.</p>
           </div>
           <button className="dc-btn-primary" disabled={submitting} type="submit">{submitting ? "Đang tạo..." : "Trở thành Creator"}</button>
         </form>
