@@ -69,13 +69,6 @@ function toPlatformBadge(platform: Channel["platform"]) {
   return "OTHER";
 }
 
-function verificationStatusLabel(status: Channel["verificationStatus"]) {
-  if (status === "VERIFIED") return "Đã xác minh";
-  if (status === "PENDING") return "Chờ xác minh";
-  if (status === "REJECTED") return "Từ chối xác minh";
-  return "Chưa xác minh";
-}
-
 function reviewStatusLabel(status: Channel["status"]) {
   if (status === "APPROVED") return "Đã duyệt";
   if (status === "REJECTED") return "Đã từ chối";
@@ -417,7 +410,6 @@ export default function CreatorProfilePage() {
                       <p className="text-sm text-zinc-600">Tên tài khoản / ID kênh: @{item.handle}</p>
                       <p className="text-sm text-zinc-600">Người theo dõi: {item.followerCount.toLocaleString("vi-VN")}</p>
                       <p className="text-sm text-zinc-600">Trạng thái duyệt: {reviewStatusLabel(item.status)}</p>
-                      <p className="text-sm text-zinc-600">Trạng thái xác minh: {verificationStatusLabel(item.verificationStatus)}</p>
                       {item.rejectReason ? <p className="mt-1 text-sm text-red-600">Lý do từ chối: {item.rejectReason}</p> : null}
                       <div className="mt-2 flex flex-wrap gap-2">
                         <button className="dc-btn-secondary" onClick={() => void toggleChannelActive(item.id, !item.isActive)} disabled={saving}>

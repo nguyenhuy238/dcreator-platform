@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { PageHeader } from "@/app/components/dcreator/ui/base";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 import { CampaignList } from "@/app/campaigns/_components/CampaignList";
 
@@ -50,11 +50,11 @@ function missionStatusLabel(status: string, videoReviewStatus: string, publishSt
   return "Đang thực hiện";
 }
 
-function missionStatusTone(label: string) {
-  if (label.includes("từ chối")) return "REJECTED";
-  if (label.includes("hoàn thành")) return "COMPLETED";
-  if (label.includes("Chờ")) return "PENDING";
-  return "ACTIVE";
+function missionStatusPillClass(label: string) {
+  if (label.includes("từ chối")) return "border-red-200 bg-red-50 text-red-700";
+  if (label.includes("hoàn thành")) return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (label.includes("Chờ")) return "border-amber-200 bg-amber-50 text-amber-700";
+  return "border-blue-200 bg-blue-50 text-blue-700";
 }
 
 export default function CreatorJobsPage() {
@@ -127,14 +127,14 @@ export default function CreatorJobsPage() {
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="flex gap-3 overflow-x-auto pb-2">
           {loading ? (
-            Array.from({ length: 3 }).map((_, index) => <div key={index} className="h-56 rounded-2xl bg-zinc-100" />)
+            Array.from({ length: 3 }).map((_, index) => <div key={index} className="h-48 min-w-[230px] rounded-2xl bg-zinc-100 sm:min-w-[260px]" />)
           ) : historyItems.length === 0 ? (
             <p className="text-sm text-zinc-500">Chưa có campaign trong nhóm này.</p>
           ) : (
             historyItems.map((campaign) => (
-              <article key={`${activeStatus}-${campaign.slug}`} className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+              <article key={`${activeStatus}-${campaign.slug}`} className="min-w-[230px] max-w-[230px] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm sm:min-w-[260px] sm:max-w-[260px]">
                 <div className="relative aspect-[16/9] w-full overflow-hidden bg-zinc-100">
                   <CampaignCoverImage
                     src={campaign.coverImageUrl}
@@ -143,15 +143,16 @@ export default function CreatorJobsPage() {
                     sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
                   />
                 </div>
-                <div className="grid gap-3 p-4">
+                <div className="grid gap-3 p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="line-clamp-2 text-base font-bold text-zinc-900">{campaign.title}</p>
+                      <p className="line-clamp-2 text-sm font-bold text-zinc-900">{campaign.title}</p>
                       <p className="mt-1 text-sm text-zinc-500">Brand: {campaign.brand}</p>
                     </div>
-                    <StatusBadge status={missionStatusTone(campaign.missionStatus)} />
+                    <span className={`max-w-[92px] shrink-0 rounded-xl border px-2 py-1 text-center text-[11px] font-bold leading-tight ${missionStatusPillClass(campaign.missionStatus)}`}>
+                      {campaign.missionStatus}
+                    </span>
                   </div>
-                  <p className="text-sm text-zinc-600">Trạng thái nhiệm vụ: {campaign.missionStatus}</p>
                   <div className="flex justify-end">
                     <Link href={`/campaigns/${campaign.slug}`} className="rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100">
                     Xem chi tiết

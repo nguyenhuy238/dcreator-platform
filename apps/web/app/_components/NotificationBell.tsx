@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bell } from "@phosphor-icons/react";
+import { formatNotificationDateTime, normalizeNotificationText } from "@/lib/notifications/notification-copy";
 
 type NotificationItem = {
   id: string;
@@ -20,25 +21,16 @@ type NotificationApiResponse = {
   };
 };
 
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-}
-
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [badgeCount, setBadgeCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const topItems = useMemo(() => items.slice(0, 6), [items]);
 
-  async function fetchNotifications() {
+  const fetchNotifications = useCallback(async (options?: { resetBadge?: boolean }) => {
     const response = await fetch("/api/me/notifications?limit=20", {
       method: "GET",
       credentials: "include",
@@ -49,10 +41,12 @@ export function NotificationBell() {
       return;
     }
     const payload = (await response.json()) as NotificationApiResponse;
+    const nextUnreadCount = payload.data?.unreadCount ?? 0;
     setItems(payload.data?.items ?? []);
-    setUnreadCount(payload.data?.unreadCount ?? 0);
+    setUnreadCount(nextUnreadCount);
+    setBadgeCount(options?.resetBadge ? 0 : nextUnreadCount);
     setLoading(false);
-  }
+  }, []);
 
   async function onRead(id: string) {
     const response = await fetch(`/api/me/notifications/${id}/read`, {
@@ -62,29 +56,36 @@ export function NotificationBell() {
     if (!response.ok) return;
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, isRead: true } : item)));
     setUnreadCount((prev) => Math.max(0, prev - 1));
+    setBadgeCount((prev) => Math.max(0, prev - 1));
   }
 
   useEffect(() => {
     void fetchNotifications().catch(() => setLoading(false));
-  }, []);
+  }, [fetchNotifications]);
 
   useEffect(() => {
     if (!open) return;
-    void fetchNotifications().catch(() => setLoading(false));
-  }, [open]);
+    void fetchNotifications({ resetBadge: true }).catch(() => setLoading(false));
+  }, [fetchNotifications, open]);
 
   return (
     <div className="relative">
       <button
         type="button"
         className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 transition hover:bg-zinc-100"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={() => {
+          setOpen((prev) => {
+            const nextOpen = !prev;
+            if (nextOpen) setBadgeCount(0);
+            return nextOpen;
+          });
+        }}
         aria-label="Thông báo"
       >
         <Bell size={18} weight="regular" />
-        {unreadCount > 0 ? (
+        {badgeCount > 0 ? (
           <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold text-white">
-            {unreadCount > 99 ? "99+" : unreadCount}
+            {badgeCount > 99 ? "99+" : badgeCount}
           </span>
         ) : null}
       </button>
@@ -94,7 +95,7 @@ export function NotificationBell() {
           <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
             <div>
               <p className="text-sm font-semibold text-zinc-900">Thông báo</p>
-              <p className="text-xs text-zinc-500">Cập nhật mới nhất cho workspace Creator</p>
+              <p className="text-xs text-zinc-500">{unreadCount > 0 ? `${unreadCount} thông báo chưa đọc` : "Bạn đã xem hết thông báo mới"}</p>
             </div>
             <Link href="/notifications" onClick={() => setOpen(false)} className="text-sm font-semibold text-zinc-700 hover:text-zinc-900">
               Xem tất cả
@@ -112,9 +113,9 @@ export function NotificationBell() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-zinc-900">{item.title}</p>
-                      <p className="mt-1 text-sm text-zinc-600">{item.content}</p>
-                      <p className="mt-2 text-xs text-zinc-400">{formatDateTime(item.createdAt)}</p>
+                      <p className="text-sm font-semibold text-zinc-900">{normalizeNotificationText(item.title)}</p>
+                      <p className="mt-1 text-sm text-zinc-600">{normalizeNotificationText(item.content)}</p>
+                      <p className="mt-2 text-xs text-zinc-400">{formatNotificationDateTime(item.createdAt)}</p>
                     </div>
                     {!item.isRead ? (
                       <button
