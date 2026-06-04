@@ -128,7 +128,10 @@ export const campaignCreateSchema = z.object({
 });
 
 export const campaignBrandFeedbackSchema = z.object({
-  feedback: z.string().trim().min(10).max(1200)
+  feedback: z.string().trim().min(10).max(1200),
+  title: z.string().trim().min(3).max(200).optional(),
+  imageUrl: uploadPathOrHttpUrlSchema.optional().or(z.literal("")),
+  contentFileUrl: uploadPathOrHttpUrlSchema.optional()
 });
 
 export const campaignRequestSchema = z.object({

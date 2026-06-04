@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { BrandSubscriptionPanel } from "@/app/dashboard/brand/_components/BrandSubscriptionPanel";
@@ -77,8 +77,18 @@ function getContentFileUrlFromBrief(brief: string) {
   return line ? line.trim().slice(CONTENT_FILE_MARKER.length).trim() : "";
 }
 
-function formatVnd(value: number) {
-  return `${value.toLocaleString("vi-VN")} VNĐ`;
+function getRevisionDefaultForm(request: CampaignRequestItem): RequestForm {
+  return {
+    title: request.title,
+    imageUrl: request.coverImageUrl ?? "",
+    contentFileUrl: getContentFileUrlFromBrief(request.brief)
+  };
+}
+
+function getFileNameFromUrl(value: string, fallback: string) {
+  const cleaned = value.split("?")[0] ?? "";
+  const lastSegment = cleaned.split("/").pop()?.trim();
+  return lastSegment || fallback;
 }
 
 function formatDate(value: string | null) {
@@ -106,9 +116,12 @@ export default function BrandCampaignsPage() {
   const [creatingRequest, setCreatingRequest] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingContentFile, setUploadingContentFile] = useState(false);
-  const [revisionFeedback, setRevisionFeedback] = useState<Record<string, string>>({});
+  const [revisionForms, setRevisionForms] = useState<Record<string, RequestForm>>({});
+  const [revisionTarget, setRevisionTarget] = useState<CampaignRequestItem | null>(null);
   const [submittingRevisionId, setSubmittingRevisionId] = useState("");
   const [templateUrl, setTemplateUrl] = useState("");
+  const revisionImageInputRef = useRef<HTMLInputElement | null>(null);
+  const revisionContentFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -215,11 +228,31 @@ export default function BrandCampaignsPage() {
     setRequestFieldErrors((current) => ({ ...current, [name]: undefined }));
   }
 
-  function validateRequestForm() {
+  function setRevisionField<K extends keyof RequestForm>(requestId: string, name: K, value: RequestForm[K]) {
+    setRevisionForms((current) => ({
+      ...current,
+      [requestId]: {
+        ...(current[requestId] ?? defaultRequestForm),
+        [name]: value
+      }
+    }));
+  }
+
+  function openRevisionModal(request: CampaignRequestItem) {
+    setRevisionForms((current) => ({
+      ...current,
+      [request.id]: current[request.id] ?? getRevisionDefaultForm(request)
+    }));
+    if (revisionImageInputRef.current) revisionImageInputRef.current.value = "";
+    if (revisionContentFileInputRef.current) revisionContentFileInputRef.current.value = "";
+    setRevisionTarget(request);
+  }
+
+  function validateFormValues(formValues: RequestForm) {
     const nextErrors: FieldErrors = {};
-    const imageUrl = requestForm.imageUrl.trim();
-    const contentFileUrl = requestForm.contentFileUrl.trim();
-    if (requestForm.title.trim().length < 3) nextErrors.title = "Tên campaign cần tối thiểu 3 ký tự.";
+    const imageUrl = formValues.imageUrl.trim();
+    const contentFileUrl = formValues.contentFileUrl.trim();
+    if (formValues.title.trim().length < 3) nextErrors.title = "Tên campaign cần tối thiểu 3 ký tự.";
     if (imageUrl && !imageUrl.startsWith("/uploads/") && !/^https?:\/\//.test(imageUrl)) {
       nextErrors.imageUrl = "Ảnh campaign phải bắt đầu bằng /uploads/ hoặc http(s)://";
     }
@@ -228,6 +261,10 @@ export default function BrandCampaignsPage() {
       nextErrors.contentFileUrl = "File nội dung phải bắt đầu bằng /uploads/ hoặc http(s)://";
     }
     return nextErrors;
+  }
+
+  function validateRequestForm() {
+    return validateFormValues(requestForm);
   }
 
   async function uploadCoverImage(file: File) {
@@ -264,6 +301,78 @@ export default function BrandCampaignsPage() {
     }
   }
 
+  async function uploadRevisionCoverImage(requestId: string, file: File) {
+    setUploadingCover(true);
+    setError("");
+    try {
+      const formData = new FormData();
+      formData.append("logo", file);
+      const response = await fetch("/api/uploads/brand-logo", { method: "POST", body: formData });
+      const payload = (await response.json()) as ApiResponse<{ logoUrl: string }>;
+      if (!response.ok || !payload.success || !payload.data?.logoUrl) throw new Error(payload.success ? "Không thể tải ảnh campaign" : payload.error);
+      setRevisionField(requestId, "imageUrl", payload.data.logoUrl);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Không thể tải ảnh campaign");
+    } finally {
+      setUploadingCover(false);
+    }
+  }
+
+  async function uploadRevisionCampaignContentFile(requestId: string, file: File) {
+    setUploadingContentFile(true);
+    setError("");
+    try {
+      const formData = new FormData();
+      formData.append("contractDocument", file);
+      const response = await fetch("/api/uploads/onboarding-doc", { method: "POST", body: formData });
+      const payload = (await response.json()) as ApiResponse<{ contractDocumentUrl: string }>;
+      if (!response.ok || !payload.success || !payload.data?.contractDocumentUrl) throw new Error(payload.success ? "Không thể tải file nội dung campaign" : payload.error);
+      setRevisionField(requestId, "contentFileUrl", payload.data.contractDocumentUrl);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Không thể tải file nội dung campaign");
+    } finally {
+      setUploadingContentFile(false);
+    }
+  }
+
+  async function setNativeFileInputValue(input: HTMLInputElement | null, sourceUrl: string, fallbackFileName: string) {
+    if (!input || !sourceUrl) return;
+    const response = await fetch(sourceUrl);
+    if (!response.ok) throw new Error("Không thể tải file cũ.");
+    const blob = await response.blob();
+    const file = new File([blob], getFileNameFromUrl(sourceUrl, fallbackFileName), { type: blob.type || undefined });
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    input.files = dataTransfer.files;
+  }
+
+  async function useOldRevisionImage(request: CampaignRequestItem) {
+    if (!request.coverImageUrl) return;
+    setError("");
+    try {
+      setRevisionField(request.id, "imageUrl", request.coverImageUrl);
+      await setNativeFileInputValue(revisionImageInputRef.current, request.coverImageUrl, "campaign-image");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Không thể dùng lại ảnh cũ.");
+    }
+  }
+
+  async function useOldRevisionContentFile(request: CampaignRequestItem) {
+    const contentFileUrl = getContentFileUrlFromBrief(request.brief);
+    if (!contentFileUrl) return;
+    setError("");
+    try {
+      setRevisionField(request.id, "contentFileUrl", contentFileUrl);
+      await setNativeFileInputValue(
+        revisionContentFileInputRef.current,
+        `/api/uploads/onboarding-doc-download?url=${encodeURIComponent(contentFileUrl)}`,
+        "campaign-content"
+      );
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Không thể dùng lại file cũ.");
+    }
+  }
+
   async function createCampaignRequest(event: FormEvent) {
     event.preventDefault();
     const nextErrors = validateRequestForm();
@@ -297,12 +406,14 @@ export default function BrandCampaignsPage() {
   }
 
   async function submitRevisionFeedback(requestId: string) {
-    const feedback = (revisionFeedback[requestId] ?? "").trim();
-    if (feedback.length < 10) {
-      setError("Nội dung bổ sung cần tối thiểu 10 ký tự.");
+    const formValues = revisionForms[requestId] ?? (revisionTarget ? getRevisionDefaultForm(revisionTarget) : defaultRequestForm);
+    const nextErrors = validateFormValues(formValues);
+    if (Object.values(nextErrors).some(Boolean)) {
+      setError("Vui lòng kiểm tra các trường bổ sung trước khi gửi.");
       setNotice("");
       return;
     }
+    const feedback = `Brand đã bổ sung yêu cầu tạo campaign: ${formValues.title.trim()}`;
     setSubmittingRevisionId(requestId);
     setError("");
     setNotice("");
@@ -310,15 +421,21 @@ export default function BrandCampaignsPage() {
       const response = await fetch(`/api/brand/dashboard/campaign-requests/${requestId}/feedback`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ feedback })
+        body: JSON.stringify({
+          feedback,
+          title: formValues.title.trim(),
+          imageUrl: formValues.imageUrl.trim(),
+          contentFileUrl: formValues.contentFileUrl.trim()
+        })
       });
       const payload = (await response.json()) as ApiResponse<CampaignRequestItem>;
       if (!response.ok || !payload.success) throw new Error(payload.success ? "Không thể gửi bổ sung" : payload.error);
-      setRevisionFeedback((current) => {
+      setRevisionForms((current) => {
         const next = { ...current };
         delete next[requestId];
         return next;
       });
+      setRevisionTarget(null);
       setNotice("Đã gửi nội dung bổ sung cho Admin.");
       await load();
     } catch (requestError) {
@@ -327,6 +444,10 @@ export default function BrandCampaignsPage() {
       setSubmittingRevisionId("");
     }
   }
+
+  const currentRevisionForm = revisionTarget
+    ? revisionForms[revisionTarget.id] ?? getRevisionDefaultForm(revisionTarget)
+    : defaultRequestForm;
 
   return (
     <>
@@ -572,51 +693,18 @@ export default function BrandCampaignsPage() {
                             <StatusBadge status={request.setupSource} />
                           </div>
                         </div>
-                        <div className="mt-3 grid gap-1 text-sm text-zinc-600 md:grid-cols-2">
-                          <p>Ngân sách dự kiến: {formatVnd(request.budgetVnd)}</p>
-                          <p>Target: {formatVnd(request.targetAmountVnd)}</p>
-                          <p>Loại campaign: {request.campaignType}</p>
-                          <p>Bắt đầu: {formatDate(request.startsAt)}</p>
-                          <p>Kết thúc: {formatDate(request.endsAt)}</p>
-                          <p>Gửi lúc: {new Date(request.createdAt).toLocaleString("vi-VN")}</p>
-                          <p>Cập nhật: {new Date(request.updatedAt).toLocaleString("vi-VN")}</p>
-                        </div>
-                        {getContentFileUrlFromBrief(request.brief) ? (
-                          <a className="mt-3 inline-flex rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100" href={`/api/uploads/onboarding-doc-download?url=${encodeURIComponent(getContentFileUrlFromBrief(request.brief))}`} target="_blank" rel="noreferrer">
-                            Mở file nội dung đã gửi
-                          </a>
-                        ) : null}
-                        {request.adminNote ? (
-                          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                            Ghi chú admin: {request.adminNote}
-                          </p>
-                        ) : null}
-                        {request.brandFeedback ? (
-                          <p className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
-                            Phản hồi Brand: {request.brandFeedback}
-                          </p>
-                        ) : null}
-                        {request.status === "NEEDS_REVISION" ? (
-                          <div className="mt-3 grid gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
-                            <label className="grid gap-2 text-sm font-semibold text-amber-800">
-                              Nội dung bổ sung gửi Admin
-                              <textarea
-                                className="dc-input min-h-28 bg-white"
-                                value={revisionFeedback[request.id] ?? ""}
-                                onChange={(event) => setRevisionFeedback((current) => ({ ...current, [request.id]: event.target.value }))}
-                                placeholder="Nhập phần đã bổ sung, link tài liệu mới hoặc ghi chú để Admin tiếp tục xử lý."
-                              />
-                            </label>
-                            <button
-                              type="button"
-                              className="dc-btn-primary w-fit"
-                              disabled={submittingRevisionId === request.id}
-                              onClick={() => void submitRevisionFeedback(request.id)}
-                            >
-                              {submittingRevisionId === request.id ? "Đang gửi..." : "Gửi bổ sung"}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {getContentFileUrlFromBrief(request.brief) ? (
+                            <a className="inline-flex rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100" href={`/api/uploads/onboarding-doc-download?url=${encodeURIComponent(getContentFileUrlFromBrief(request.brief))}`} target="_blank" rel="noreferrer">
+                              Mở file nội dung đã gửi
+                            </a>
+                          ) : null}
+                          {request.status === "NEEDS_REVISION" ? (
+                            <button type="button" className="dc-btn-primary" onClick={() => openRevisionModal(request)}>
+                              Bổ sung
                             </button>
-                          </div>
-                        ) : null}
+                          ) : null}
+                        </div>
                         {request.createdCampaign ? (
                           <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
                             <p>Đã tạo campaign: {request.createdCampaign.title}</p>
@@ -631,6 +719,89 @@ export default function BrandCampaignsPage() {
             </section>
           ) : null}
         </>
+      ) : null}
+
+      {revisionTarget ? (
+        <div className="fixed inset-0 z-[90] bg-zinc-900/50 p-3 md:p-6" onClick={() => setRevisionTarget(null)}>
+          <div className="mx-auto max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 md:p-6" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-semibold text-zinc-900">Bổ sung yêu cầu tạo campaign</h3>
+                <p className="text-sm text-zinc-600">{revisionTarget.title} • /{revisionTarget.requestedSlug}</p>
+              </div>
+              <button type="button" className="dc-btn-secondary" onClick={() => setRevisionTarget(null)}>Đóng</button>
+            </div>
+
+            {revisionTarget.adminNote ? (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                Ghi chú admin: {revisionTarget.adminNote}
+              </p>
+            ) : null}
+
+            <div className="mt-4 grid gap-4 rounded-xl border border-amber-200 bg-amber-50 p-3 md:grid-cols-2">
+              <label className="grid gap-2 text-sm font-semibold text-amber-800 md:col-span-2">
+                Tên campaign
+                <input
+                  className="dc-input bg-white"
+                  value={currentRevisionForm.title}
+                  onChange={(event) => setRevisionField(revisionTarget.id, "title", event.target.value)}
+                  placeholder="Nhập tên campaign"
+                  required
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-amber-800">
+                <span className="flex items-center justify-between gap-2">
+                  Ảnh campaign
+                  {revisionTarget.coverImageUrl ? (
+                    <button type="button" className="text-xs font-semibold text-amber-700 underline" onClick={() => void useOldRevisionImage(revisionTarget)}>
+                      Dùng ảnh cũ
+                    </button>
+                  ) : null}
+                </span>
+                <input
+                  ref={revisionImageInputRef}
+                  className="dc-input bg-white"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    if (file) void uploadRevisionCoverImage(revisionTarget.id, file);
+                  }}
+                  disabled={uploadingCover}
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-amber-800">
+                <span className="flex items-center justify-between gap-2">
+                  File nội dung campaign
+                  {getContentFileUrlFromBrief(revisionTarget.brief) ? (
+                    <button type="button" className="text-xs font-semibold text-amber-700 underline" onClick={() => void useOldRevisionContentFile(revisionTarget)}>
+                      Dùng file cũ
+                    </button>
+                  ) : null}
+                </span>
+                <input
+                  ref={revisionContentFileInputRef}
+                  className="dc-input bg-white"
+                  type="file"
+                  accept=".pdf,.doc,.docx,.txt,image/png,image/jpeg"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    if (file) void uploadRevisionCampaignContentFile(revisionTarget.id, file);
+                  }}
+                  disabled={uploadingContentFile}
+                />
+              </label>
+              <button
+                type="button"
+                className="dc-btn-primary w-fit md:col-span-2"
+                disabled={submittingRevisionId === revisionTarget.id}
+                onClick={() => void submitRevisionFeedback(revisionTarget.id)}
+              >
+                {submittingRevisionId === revisionTarget.id ? "Đang gửi..." : "Gửi bổ sung"}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {reviewCampaign ? (
