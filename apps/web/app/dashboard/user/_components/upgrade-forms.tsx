@@ -25,6 +25,13 @@ const CREATOR_PLATFORM_LABELS: Record<CreatorLink["platform"], string> = {
   shopee: "Shopee"
 };
 
+type UpgradeFormProps = {
+  data: UpgradeSnapshot;
+  onError: (message: string) => void;
+  onSuccess: (message: string) => void;
+  embedded?: boolean;
+};
+
 function onlyDigits(raw: string) {
   return raw.replace(/\D/g, "");
 }
@@ -47,7 +54,15 @@ function statusText(value?: unknown) {
   return "Chưa gửi";
 }
 
-export function CreatorUpgradeForm({ data, onError, onSuccess }: { data: UpgradeSnapshot; onError: (message: string) => void; onSuccess: (message: string) => void }) {
+function wrapperClassName(embedded: boolean) {
+  return embedded ? "grid gap-3" : "dc-card p-5";
+}
+
+function statusClassName(embedded: boolean) {
+  return embedded ? "text-sm" : "mt-2 text-sm";
+}
+
+export function CreatorUpgradeForm({ data, onError, onSuccess, embedded = false }: UpgradeFormProps) {
   const router = useRouter();
   const [form, setForm] = useState({ displayName: "", bio: "" });
   const [creatorLinks, setCreatorLinks] = useState<CreatorLink[]>([{ platform: "tiktok", url: "", handle: "", followerCount: 0 }]);
@@ -91,13 +106,19 @@ export function CreatorUpgradeForm({ data, onError, onSuccess }: { data: Upgrade
   }
 
   return (
-    <article className="dc-card p-5">
-      <h2 className="text-xl font-bold">Nâng cấp Creator</h2>
-      <p className="mt-2 text-sm">Trạng thái: <span className="font-semibold">{isCreator ? "Creator Profile đã được tạo" : statusText(creatorStatus)}</span></p>
+    <article className={wrapperClassName(embedded)}>
+      {!embedded ? <h2 className="text-xl font-bold">Nâng cấp Creator</h2> : null}
+      <p className={statusClassName(embedded)}>
+        Trạng thái: <span className="font-semibold">{isCreator ? "Creator Profile đã được tạo" : statusText(creatorStatus)}</span>
+      </p>
       {isCreator || creatorStatus === "APPROVED" || creatorStatus === "PENDING_REVIEW" ? (
         <div className="mt-4 grid gap-2">
-          <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">Xác minh danh tính giúp mở khóa payout.</p>
-          <Link className="dc-btn-primary inline-flex w-fit" href="/dashboard/creator">Vào Bảng điều khiển Nhà sáng tạo</Link>
+          <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+            Xác minh danh tính giúp mở khóa payout.
+          </p>
+          <Link className="dc-btn-primary inline-flex w-fit" href="/dashboard/creator">
+            Vào Bảng điều khiển Nhà sáng tạo
+          </Link>
         </div>
       ) : (
         <form className="mt-4 grid gap-3" onSubmit={submit}>
@@ -106,7 +127,9 @@ export function CreatorUpgradeForm({ data, onError, onSuccess }: { data: Upgrade
           <div className="grid gap-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-zinc-700">Liên kết mạng xã hội / kênh bán hàng</p>
-              <button type="button" className="dc-btn-secondary" onClick={() => setCreatorLinks((items) => [...items, { platform: "tiktok", url: "", handle: "", followerCount: 0 }])}>Thêm liên kết</button>
+              <button type="button" className="dc-btn-secondary" onClick={() => setCreatorLinks((items) => [...items, { platform: "tiktok", url: "", handle: "", followerCount: 0 }])}>
+                Thêm liên kết
+              </button>
             </div>
             {creatorLinks.map((item, index) => (
               <div key={`${index}-${item.platform}`} className="grid gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 sm:grid-cols-[8rem_minmax(0,1fr)]">
@@ -123,21 +146,27 @@ export function CreatorUpgradeForm({ data, onError, onSuccess }: { data: Upgrade
                   onChange={(event) => setCreatorLinks((items) => items.map((link, itemIndex) => itemIndex === index ? { ...link, followerCount: parseFollowerCount(event.target.value) } : link))}
                 />
                 <div className="sm:col-span-2">
-                  <button type="button" className="dc-btn-secondary text-red-700" onClick={() => setCreatorLinks((items) => items.filter((_, itemIndex) => itemIndex !== index))}>Xóa</button>
+                  <button type="button" className="dc-btn-secondary text-red-700" onClick={() => setCreatorLinks((items) => items.filter((_, itemIndex) => itemIndex !== index))}>
+                    Xóa
+                  </button>
                 </div>
               </div>
             ))}
             <p className="text-xs font-medium text-zinc-500">Mỗi liên kết cần đủ URL, tên tài khoản hoặc ID kênh, và số lượng follower hiện tại.</p>
           </div>
-          <button className="dc-btn-primary" disabled={submitting} type="submit">{submitting ? "Đang tạo..." : "Trở thành Creator"}</button>
+          <button className="dc-btn-primary" disabled={submitting} type="submit">
+            {submitting ? "Đang tạo..." : "Trở thành Creator"}
+          </button>
         </form>
       )}
-      {data.creatorApplication?.rejectReason ? <p className="mt-2 text-sm text-red-700">Lý do: {String(data.creatorApplication.rejectReason)}</p> : null}
+      {data.creatorApplication && "rejectReason" in data.creatorApplication && data.creatorApplication.rejectReason ? (
+        <p className="mt-2 text-sm text-red-700">Lý do: {String(data.creatorApplication.rejectReason)}</p>
+      ) : null}
     </article>
   );
 }
 
-export function BrandUpgradeForm({ data, onError, onSuccess }: { data: UpgradeSnapshot; onError: (message: string) => void; onSuccess: (message: string) => void }) {
+export function BrandUpgradeForm({ data, onError, onSuccess, embedded = false }: UpgradeFormProps) {
   const router = useRouter();
   const [form, setForm] = useState({ brandName: "", description: "", contactName: "", contactPhone: "", contactEmail: "", website: "" });
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
@@ -178,10 +207,16 @@ export function BrandUpgradeForm({ data, onError, onSuccess }: { data: UpgradeSn
   }
 
   return (
-    <article className="dc-card p-5">
-      <h2 className="text-xl font-bold">Nâng cấp Brand</h2>
-      <p className="mt-2 text-sm">Trạng thái: <span className="font-semibold">{hasBrand ? "Brand đã được tạo" : statusText(brandStatus)}</span></p>
-      {hasBrand ? <Link className="dc-btn-primary mt-4 inline-flex" href="/dashboard/brand">Vào Bảng điều khiển Nhãn hàng</Link> : (
+    <article className={wrapperClassName(embedded)}>
+      {!embedded ? <h2 className="text-xl font-bold">Nâng cấp Brand</h2> : null}
+      <p className={statusClassName(embedded)}>
+        Trạng thái: <span className="font-semibold">{hasBrand ? "Brand đã được tạo" : statusText(brandStatus)}</span>
+      </p>
+      {hasBrand ? (
+        <Link className="dc-btn-primary mt-4 inline-flex w-fit" href="/dashboard/brand">
+          Vào Bảng điều khiển Nhãn hàng
+        </Link>
+      ) : (
         <form className="mt-4 grid gap-3" onSubmit={submit}>
           <input className="dc-input" placeholder="Tên nhãn hàng" value={form.brandName} onChange={(event) => setForm((current) => ({ ...current, brandName: event.target.value }))} required />
           <div className="grid gap-2">
@@ -189,7 +224,16 @@ export function BrandUpgradeForm({ data, onError, onSuccess }: { data: UpgradeSn
             <div className="flex flex-wrap gap-2">
               {INDUSTRY_OPTIONS.map((industry) => {
                 const selected = selectedIndustries.includes(industry);
-                return <button key={industry} type="button" className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${selected ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"}`} onClick={() => setSelectedIndustries((items) => selected ? items.filter((item) => item !== industry) : [...items, industry])}>{industry}</button>;
+                return (
+                  <button
+                    key={industry}
+                    type="button"
+                    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${selected ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"}`}
+                    onClick={() => setSelectedIndustries((items) => selected ? items.filter((item) => item !== industry) : [...items, industry])}
+                  >
+                    {industry}
+                  </button>
+                );
               })}
             </div>
             {selectedIndustries.includes("Khác") ? <input className="dc-input" placeholder="Nhập ngành hàng khác" value={otherIndustry} onChange={(event) => setOtherIndustry(event.target.value)} /> : null}
@@ -199,10 +243,14 @@ export function BrandUpgradeForm({ data, onError, onSuccess }: { data: UpgradeSn
           <input className="dc-input" placeholder="Số điện thoại liên hệ" value={form.contactPhone} onChange={(event) => setForm((current) => ({ ...current, contactPhone: event.target.value }))} required />
           <input className="dc-input" placeholder="Email liên hệ" type="email" value={form.contactEmail} onChange={(event) => setForm((current) => ({ ...current, contactEmail: event.target.value }))} required />
           <input className="dc-input" placeholder="Website" type="url" value={form.website} onChange={(event) => setForm((current) => ({ ...current, website: event.target.value }))} />
-          <button className="dc-btn-primary" disabled={submitting} type="submit">{submitting ? "Đang tạo..." : "Tạo Brand mới"}</button>
+          <button className="dc-btn-primary" disabled={submitting} type="submit">
+            {submitting ? "Đang tạo..." : "Tạo Brand mới"}
+          </button>
         </form>
       )}
-      {data.brandApplication?.rejectReason ? <p className="mt-2 text-sm text-red-700">Lý do: {String(data.brandApplication.rejectReason)}</p> : null}
+      {data.brandApplication && "rejectReason" in data.brandApplication && data.brandApplication.rejectReason ? (
+        <p className="mt-2 text-sm text-red-700">Lý do: {String(data.brandApplication.rejectReason)}</p>
+      ) : null}
     </article>
   );
 }

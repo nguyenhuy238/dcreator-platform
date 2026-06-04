@@ -1,5 +1,5 @@
-import { UpgradePageContent } from "@/app/dashboard/user/_components/UpgradePageContent";
+import { redirect } from "next/navigation";
 
 export default function CreatorUpgradePage() {
-  return <UpgradePageContent />;
+  redirect("/dashboard/creator/profile");
 }

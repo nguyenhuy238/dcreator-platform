@@ -1,11 +1,14 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/app/components/dcreator/layout/shell";
 import { PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
+import { EmbeddedRoleUpgradePanels } from "../_components/EmbeddedRoleUpgradePanels";
 import { UserAccountInfoCard, type UserAccountInfo } from "../_components/user-account-info-card";
 
 export default function UserSettingsPage() {
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -109,6 +112,9 @@ export default function UserSettingsPage() {
             <p className="text-sm text-zinc-600">Đăng xuất khỏi phiên hiện tại.</p>
             <button type="button" className="dc-btn-primary mt-3" onClick={logout}>Đăng xuất</button>
           </article>
+        </section>
+        <section className="mt-4">
+          <EmbeddedRoleUpgradePanels targets={["creator", "brand"]} message={searchParams.get("message")} />
         </section>
         {error ? <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
         {message ? <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</p> : null}
