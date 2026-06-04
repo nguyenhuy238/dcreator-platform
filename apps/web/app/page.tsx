@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ExploreCampaignsButton } from "@/app/components/dcreator/home/ExploreCampaignsButton";
+import { FaqSection } from "@/app/components/dcreator/home/FaqSection";
 import { FeaturedCampaignsSection } from "@/app/components/dcreator/home/FeaturedCampaignsSection";
 import { HomepageSectionButton } from "@/app/components/dcreator/home/HomepageSectionButton";
 import { PartnerLogo } from "@/app/components/dcreator/home/PartnerLogo";
@@ -248,18 +249,20 @@ export default async function HomePage() {
         </section>
 
         <section id="creator-homepage" className="mt-10 overflow-hidden rounded-[2rem] border border-zinc-200 bg-zinc-900 text-white">
-          <div className="grid gap-0 md:grid-cols-[1.15fr_0.85fr]">
-            <div className="p-8 md:p-10">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">Creator Jobs</p>
-              <h2 className="mt-3 text-3xl font-black md:text-4xl">Creator dễ dàng tìm job phù hợp</h2>
-              <p className="mt-3 max-w-2xl text-base text-zinc-300">
-                Duyệt nhanh cơ hội hợp tác, nhận job đúng tệp và bắt đầu kiếm hoa hồng dễ hơn.
-              </p>
+          <div className="grid min-h-[300px] items-stretch gap-0 md:grid-cols-[1.15fr_0.85fr]">
+            <div className="flex h-full flex-col justify-between p-8 md:p-10">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">Creator Jobs</p>
+                <h2 className="mt-3 text-3xl font-black md:text-4xl">Creator dễ dàng tìm job phù hợp</h2>
+                <p className="mt-3 max-w-2xl text-base text-zinc-300">
+                  Duyệt nhanh cơ hội hợp tác, nhận job đúng tệp và bắt đầu kiếm hoa hồng dễ hơn.
+                </p>
+              </div>
               <div className="mt-7">
-                <HomepageSectionButton targetId="creator-homepage" />
+                <HomepageSectionButton targetId="creator-homepage" href="/creator" />
               </div>
             </div>
-            <div className="relative min-h-[300px] md:min-h-full">
+            <div className="relative h-full min-h-[300px]">
               <Image
                 src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&q=80"
                 alt="Creator làm việc trên chiến dịch"
@@ -273,18 +276,20 @@ export default async function HomePage() {
         </section>
 
         <section id="brand-homepage" className="mt-10 overflow-hidden rounded-[2rem] border border-zinc-900 bg-zinc-900 text-white shadow-2xl shadow-zinc-200/30">
-          <div className="grid gap-0 md:grid-cols-[1.15fr_0.85fr]">
-            <div className="p-8 md:p-10">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">Brand Growth</p>
-              <h2 className="mt-3 text-3xl font-black md:text-4xl">Brand bắt đầu chiến dịch nhanh hơn</h2>
-              <p className="mt-3 max-w-2xl text-base text-zinc-300">
-                Chọn gói phù hợp, để lại thông tin liên hệ và đội ngũ dCreator sẽ hỗ trợ bạn triển khai chiến dịch UGC theo mục tiêu doanh thu.
-              </p>
+          <div className="grid min-h-[300px] items-stretch gap-0 md:grid-cols-[1.15fr_0.85fr]">
+            <div className="flex h-full flex-col justify-between p-8 md:p-10">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">Brand Growth</p>
+                <h2 className="mt-3 text-3xl font-black md:text-4xl">Brand bắt đầu chiến dịch nhanh hơn</h2>
+                <p className="mt-3 max-w-2xl text-base text-zinc-300">
+                  Chọn gói phù hợp, để lại thông tin liên hệ và đội ngũ dCreator sẽ hỗ trợ bạn triển khai chiến dịch UGC theo mục tiêu doanh thu.
+                </p>
+              </div>
               <div className="mt-7">
                 <HomepageSectionButton targetId="brand-homepage" href="/brand" />
               </div>
             </div>
-            <div className="relative min-h-[300px] md:min-h-full">
+            <div className="relative h-full min-h-[300px]">
               <Image
                 src="https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&q=80"
                 alt="Brand team lên kế hoạch chiến dịch"
@@ -323,26 +328,7 @@ export default async function HomePage() {
           )}
         </section>
 
-        <section className="relative mt-10 overflow-hidden rounded-[2rem] border border-zinc-200 bg-white p-6 text-white shadow-none md:p-8">
-          <h2 className="text-2xl font-black text-zinc-900">Câu hỏi thường gặp</h2>
-          <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {faqs.map((item) => (
-              <article
-                key={item.q}
-                className={`rounded-2xl border p-5 ${
-                  item.q.includes("Creator")
-                    ? "border-sky-200 bg-sky-50"
-                    : item.q.includes("Brand")
-                      ? "border-amber-200 bg-amber-50"
-                      : "border-zinc-200 bg-white"
-                }`}
-              >
-                <p className="font-semibold text-zinc-900">{item.q}</p>
-                <p className="mt-2 text-sm text-zinc-600">{item.a}</p>
-              </article>
-            ))}
-          </div>
-        </section>
+        <FaqSection faqs={faqs} />
 
         <section className="mt-10 overflow-hidden rounded-[2rem] border border-zinc-900 bg-zinc-900 text-white shadow-2xl shadow-zinc-200/30">
           <div className="grid gap-0 md:grid-cols-[1.05fr_0.95fr]">
@@ -372,6 +358,7 @@ export default async function HomePage() {
           </div>
         </section>
       </main>
-      <PublicFooter />`r`n</>
+      <PublicFooter />
+    </>
   );
 }

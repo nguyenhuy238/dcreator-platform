@@ -33,8 +33,10 @@ export function BrandShell({
       workspaceDescription="Quản lý onboarding, campaign, creator"
       loginRedirect="/dashboard/brand"
     >
-      <DashboardSwitcher roles={user.roles} capabilities={user.capabilities} />
-      <BrandSwitcher />
+      <div className="mb-4 flex flex-wrap items-start gap-x-6 gap-y-3 rounded-xl border border-zinc-200 bg-white px-4 py-3">
+        <DashboardSwitcher roles={user.roles} capabilities={user.capabilities} className="mb-0" />
+        <BrandSwitcher className="mb-0" inline />
+      </div>
       {children}
     </DashboardShell>
   );

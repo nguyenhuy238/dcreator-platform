@@ -1041,37 +1041,45 @@ function parseCreatorMeta(value: unknown): CreatorMeta {
 export async function listBrandCampaignRequests(accountId: string, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const brand = ctx.brand;
-  const requests = await prisma.brandCampaignRequest.findMany({
-    where: { brandId: brand.id },
-    select: {
-      id: true,
-      requestedSlug: true,
-      title: true,
-      brief: true,
-      setupSource: true,
-      objective: true,
-      priorityChannels: true,
-      missionTypes: true,
-      creatorCommissionPercent: true,
-      userCommissionPercent: true,
-      bonusBudgetVnd: true,
-      budgetVnd: true,
-      targetAmountVnd: true,
-      campaignType: true,
-      category: true,
-      startsAt: true,
-      endsAt: true,
-      status: true,
-      adminNote: true,
-      brandFeedback: true,
-      createdAt: true,
-      updatedAt: true,
-      createdCampaign: { select: { id: true, slug: true, title: true, status: true } }
-    },
-    orderBy: { createdAt: "desc" }
-  });
+  const [requests, matchingCampaigns] = await Promise.all([
+    prisma.brandCampaignRequest.findMany({
+      where: { brandId: brand.id },
+      select: {
+        id: true,
+        requestedSlug: true,
+        title: true,
+        brief: true,
+        setupSource: true,
+        objective: true,
+        priorityChannels: true,
+        missionTypes: true,
+        creatorCommissionPercent: true,
+        userCommissionPercent: true,
+        bonusBudgetVnd: true,
+        budgetVnd: true,
+        targetAmountVnd: true,
+        campaignType: true,
+        category: true,
+        startsAt: true,
+        endsAt: true,
+        status: true,
+        adminNote: true,
+        brandFeedback: true,
+        createdAt: true,
+        updatedAt: true,
+        createdCampaign: { select: { id: true, slug: true, title: true, status: true } }
+      },
+      orderBy: { createdAt: "desc" }
+    }),
+    prisma.campaign.findMany({
+      where: { brandId: brand.ownerAccountId },
+      select: { id: true, slug: true, title: true, status: true }
+    })
+  ]);
+  const campaignBySlug = new Map(matchingCampaigns.map((campaign) => [campaign.slug, campaign]));
   return requests.map((request) => ({
     ...request,
+    createdCampaign: request.createdCampaign ?? campaignBySlug.get(request.requestedSlug) ?? null,
     coverImageUrl: sanitizeCampaignImageUrl(extractMarkerValue(request.brief, COVER_MARKER))
   }));
 }

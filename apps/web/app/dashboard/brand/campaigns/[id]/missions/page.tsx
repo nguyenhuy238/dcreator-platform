@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FormEvent, ReactNode, useCallback, useEffect, useState } from "react";
-import { ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
+import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatsCard } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data?: T; error?: string };
 type ProductReceiveOption = "PRODUCT_REQUIRED" | "NO_PRODUCT_REQUIRED";
@@ -33,6 +33,15 @@ type CampaignMissionPayload = {
     videoQuotaReached: boolean;
   };
   items: MissionItem[];
+};
+type AnalyticsPayload = {
+  campaignPerformance: Array<{ id: string; title: string; fundedAmountVnd: number }>;
+  kpis?: {
+    campaignViews: number;
+    ctaRate: number;
+    contributionConversion: number;
+    voucherRedemptionRate: number;
+  };
 };
 
 type MissionForm = {
@@ -108,6 +117,7 @@ export default function BrandCampaignMissionsPage() {
   const campaignId = params?.id;
   const [items, setItems] = useState<MissionItem[]>([]);
   const [campaign, setCampaign] = useState<CampaignMissionPayload["campaign"] | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsPayload | null>(null);
   const [form, setForm] = useState<MissionForm>(defaultForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -120,10 +130,17 @@ export default function BrandCampaignMissionsPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/brand/dashboard/campaigns/${campaignId}/missions`, { cache: "no-store" });
-      const body = (await res.json()) as ApiResult<MissionItem[]>;
-      if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? "Không thể tải nhiệm vụ");
-      setItems(body.data);
+      const [missionResponse, analyticsResponse] = await Promise.all([
+        fetch(`/api/brand/dashboard/campaigns/${campaignId}/missions`, { cache: "no-store" }),
+        fetch("/api/brand/dashboard/analytics", { cache: "no-store" })
+      ]);
+      const missionBody = (await missionResponse.json()) as ApiResult<CampaignMissionPayload>;
+      const analyticsBody = (await analyticsResponse.json()) as ApiResult<AnalyticsPayload>;
+      if (!missionResponse.ok || !missionBody.success || !missionBody.data) throw new Error(missionBody.error ?? "Không thể tải nhiệm vụ");
+      if (!analyticsResponse.ok || !analyticsBody.success || !analyticsBody.data) throw new Error(analyticsBody.error ?? "Không thể tải KPI / Analytics");
+      setCampaign(missionBody.data.campaign);
+      setItems(missionBody.data.items);
+      setAnalytics(analyticsBody.data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không thể tải nhiệm vụ");
     } finally {
@@ -167,11 +184,33 @@ export default function BrandCampaignMissionsPage() {
   return (
     <>
       <PageHeader
-        title="Quản lý nhiệm vụ"
+        title="KPI / Analytics"
         subtitle={`Campaign ID: ${campaignId}`}
         action={<Link href="/dashboard/brand/campaigns" className="dc-btn-secondary">Quay lại campaign</Link>}
       />
       {error ? <ErrorState title="Có lỗi" description={error} onRetry={() => void load()} /> : null}
+
+      <section className="mt-4">
+        <SectionHeader title="KPI / Analytics" />
+        {loading ? <LoadingSkeleton rows={4} /> : (
+          <>
+            <div className="dc-grid-dashboard">
+              <StatsCard title="Lượt xem campaign" value={`${analytics?.kpis?.campaignViews ?? 0}`} />
+              <StatsCard title="Tỷ lệ CTA" value={`${analytics?.kpis?.ctaRate ?? 0}%`} />
+              <StatsCard title="Tỷ lệ chuyển đổi ủng hộ" value={`${analytics?.kpis?.contributionConversion ?? 0}%`} />
+              <StatsCard title="Tỷ lệ redeem voucher" value={`${analytics?.kpis?.voucherRedemptionRate ?? 0}%`} />
+            </div>
+            <div className="mt-4 grid gap-3">
+              {analytics?.campaignPerformance?.length ? analytics.campaignPerformance.map((item) => (
+                <article key={item.id} className="dc-card p-4">
+                  <p className="font-semibold text-zinc-900">{item.title}</p>
+                  <p className="text-sm text-zinc-600">Đã huy động: {item.fundedAmountVnd.toLocaleString("vi-VN")} VND</p>
+                </article>
+              )) : <EmptyState title="Chưa có dữ liệu KPI chi tiết" description="Dữ liệu analytics sẽ tăng theo hoạt động campaign." />}
+            </div>
+          </>
+        )}
+      </section>
 
       {campaign?.videoQuotaReached ? (
         <section className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
