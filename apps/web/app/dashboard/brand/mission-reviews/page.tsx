@@ -16,6 +16,8 @@ type MissionReviewsPageProps = {
   subtitle: string;
   apiBasePath: string;
   initialTab?: MissionReviewsTabKey;
+  embedded?: boolean;
+  fixedCampaignId?: string;
 };
 
 const tabs: Array<{ key: MissionReviewsTabKey; label: string }> = [
@@ -349,17 +351,74 @@ export function MissionReviewsPage({
   pageTitle,
   subtitle,
   apiBasePath,
-  initialTab = "applications"
+  initialTab = "applications",
+  embedded = false,
+  fixedCampaignId
 }: MissionReviewsPageProps) {
   const [activeTab, setActiveTab] = useState<MissionReviewsTabKey>(initialTab);
+  const [tabCounts, setTabCounts] = useState<Record<MissionReviewsTabKey, number>>({
+    applications: 0,
+    "transcript-reviews": 0,
+    "video-reviews": 0,
+    "final-reviews": 0
+  });
 
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
 
+  async function loadTabCounts() {
+    const buildParams = (extra?: Record<string, string>) => {
+      const params = new URLSearchParams({ page: "1", limit: "1" });
+      if (fixedCampaignId) params.set("campaignId", fixedCampaignId);
+      Object.entries(extra ?? {}).forEach(([key, value]) => params.set(key, value));
+      return params.toString();
+    };
+
+    const [applicationsRes, transcriptRes, videoRes, finalRes] = await Promise.all([
+      fetch(`${apiBasePath}/mission-applications?${buildParams({ status: "PENDING_REVIEW" })}`, { cache: "no-store" }),
+      fetch(`${apiBasePath}/mission-transcript-reviews?${buildParams({ status: "PENDING" })}`, { cache: "no-store" }),
+      fetch(`${apiBasePath}/mission-video-reviews?${buildParams()}`, { cache: "no-store" }),
+      fetch(`${apiBasePath}/mission-final-reviews?${buildParams({ publishStatus: "PENDING" })}`, { cache: "no-store" })
+    ]);
+
+    const [applicationsBody, transcriptBody, videoBody, finalBody] = await Promise.all([
+      applicationsRes.json(),
+      transcriptRes.json(),
+      videoRes.json(),
+      finalRes.json()
+    ]) as Array<ApiResult<{ pagination?: { total?: number } }>>;
+
+    const applicationsTotal = applicationsBody?.data?.pagination?.total ?? 0;
+    const transcriptTotal = transcriptBody?.data?.pagination?.total ?? 0;
+    const videoTotal = videoBody?.data?.pagination?.total ?? 0;
+    const finalTotal = finalBody?.data?.pagination?.total ?? 0;
+
+    setTabCounts({
+      applications: applicationsTotal,
+      "transcript-reviews": transcriptTotal,
+      "video-reviews": videoTotal,
+      "final-reviews": finalTotal
+    });
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        await loadTabCounts();
+      } catch {
+        if (cancelled) return;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBasePath, fixedCampaignId]);
+
   return (
     <>
-      <PageHeader title={pageTitle} subtitle={subtitle} />
+      {!embedded ? <PageHeader title={pageTitle} subtitle={subtitle} /> : null}
 
       <section className="dc-card p-3">
         <div className="flex flex-wrap gap-2">
@@ -370,16 +429,16 @@ export function MissionReviewsPage({
               onClick={() => setActiveTab(tab.key)}
               className={activeTab === tab.key ? "rounded-full border border-zinc-900 bg-zinc-900 px-4 py-1.5 text-sm font-semibold text-white" : "rounded-full border border-zinc-200 px-4 py-1.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"}
             >
-              {tab.label}
+              {tab.label} ({tabCounts[tab.key] ?? 0})
             </button>
           ))}
         </div>
       </section>
 
-      {activeTab === "transcript-reviews" ? <BrandMissionTranscriptReviewsTab apiBasePath={apiBasePath} /> : null}
-      {activeTab === "applications" ? <BrandMissionApplicationsTab apiBasePath={apiBasePath} /> : null}
-      {activeTab === "video-reviews" ? <BrandMissionVideoReviewsTab apiBasePath={apiBasePath} /> : null}
-      {activeTab === "final-reviews" ? <BrandMissionFinalReviewsTab apiBasePath={apiBasePath} /> : null}
+      {activeTab === "transcript-reviews" ? <BrandMissionTranscriptReviewsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} onReviewUpdated={() => void loadTabCounts()} /> : null}
+      {activeTab === "applications" ? <BrandMissionApplicationsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} onReviewUpdated={() => void loadTabCounts()} /> : null}
+      {activeTab === "video-reviews" ? <BrandMissionVideoReviewsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} onReviewUpdated={() => void loadTabCounts()} /> : null}
+      {activeTab === "final-reviews" ? <BrandMissionFinalReviewsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} onReviewUpdated={() => void loadTabCounts()} /> : null}
     </>
   );
 }
@@ -438,7 +497,7 @@ function transcriptStatusTone(value: string) {
   return "bg-zinc-100 text-zinc-700";
 }
 
-function BrandMissionTranscriptReviewsTab({ apiBasePath }: { apiBasePath: string }) {
+function BrandMissionTranscriptReviewsTab({ apiBasePath, fixedCampaignId, hideFilters = false, onReviewUpdated }: { apiBasePath: string; fixedCampaignId?: string; hideFilters?: boolean; onReviewUpdated?: () => void }) {
   const [items, setItems] = useState<TranscriptItem[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
@@ -461,6 +520,7 @@ function BrandMissionTranscriptReviewsTab({ apiBasePath }: { apiBasePath: string
       const params = new URLSearchParams();
       if (query.trim()) params.set("query", query.trim());
       if (campaign.trim()) params.set("campaign", campaign.trim());
+      if (fixedCampaignId) params.set("campaignId", fixedCampaignId);
       params.set("page", String(targetPage));
       params.set("limit", "20");
 
@@ -501,6 +561,7 @@ function BrandMissionTranscriptReviewsTab({ apiBasePath }: { apiBasePath: string
       if (!res.ok || !body.success) throw new Error(body.error ?? "Duyệt thất bại");
       setNotice("Đã duyệt kịch bản. Creator có thể nộp video review.");
       await load();
+      onReviewUpdated?.();
       if (selectedId === id) await loadDetail(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Duyệt thất bại");
@@ -522,6 +583,7 @@ function BrandMissionTranscriptReviewsTab({ apiBasePath }: { apiBasePath: string
       if (!res.ok || !body.success) throw new Error(body.error ?? "Từ chối thất bại");
       setNotice("Đã từ chối kịch bản. Creator có thể nộp lại.");
       await load();
+      onReviewUpdated?.();
       if (selectedId === id) await loadDetail(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Từ chối thất bại");
@@ -534,17 +596,19 @@ function BrandMissionTranscriptReviewsTab({ apiBasePath }: { apiBasePath: string
 
   return (
     <section className="mt-4 grid gap-4">
-      <section className="dc-card p-4">
-        <div className="grid gap-2 md:grid-cols-2">
-          <input className="dc-input" placeholder="Tìm creator theo tên/email" value={query} onChange={(e) => setQuery(e.target.value)} />
-          <input className="dc-input" placeholder="Tên campaign" value={campaign} onChange={(e) => setCampaign(e.target.value)} />
-        </div>
-        <div className="mt-3 flex gap-2">
-          <button className="dc-btn-primary" onClick={() => { setPage(1); void load(1); }}>Lọc</button>
-          <button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>
-          <p className="text-sm text-zinc-500">Tổng {pagination.total} bản ghi</p>
-        </div>
-      </section>
+      {!hideFilters ? (
+        <section className="dc-card p-4">
+          <div className="grid gap-2 md:grid-cols-2">
+            <input className="dc-input" placeholder="Tìm creator theo tên/email" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input className="dc-input" placeholder="Tên campaign" value={campaign} onChange={(e) => setCampaign(e.target.value)} />
+          </div>
+          <div className="mt-3 flex gap-2">
+            <button className="dc-btn-primary" onClick={() => { setPage(1); void load(1); }}>Lọc</button>
+            <button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>
+            <p className="text-sm text-zinc-500">Tổng {pagination.total} bản ghi</p>
+          </div>
+        </section>
+      ) : null}
 
       {notice ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</p> : null}
       {error ? <ErrorState title="Có lỗi" description={error} onRetry={() => void load()} /> : null}
@@ -743,7 +807,7 @@ function missionStatusTone(status: string) {
   return "bg-zinc-100 text-zinc-700";
 }
 
-function BrandMissionApplicationsTab({ apiBasePath }: { apiBasePath: string }) {
+function BrandMissionApplicationsTab({ apiBasePath, fixedCampaignId, hideFilters = false, onReviewUpdated }: { apiBasePath: string; fixedCampaignId?: string; hideFilters?: boolean; onReviewUpdated?: () => void }) {
   const [items, setItems] = useState<ApplicationListItem[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
@@ -770,6 +834,7 @@ function BrandMissionApplicationsTab({ apiBasePath }: { apiBasePath: string }) {
       const params = new URLSearchParams();
       if (query.trim()) params.set("query", query.trim());
       if (campaign.trim()) params.set("campaign", campaign.trim());
+      if (fixedCampaignId) params.set("campaignId", fixedCampaignId);
       params.set("status", "PENDING_REVIEW");
       params.set("page", String(targetPage));
       params.set("limit", "20");
@@ -811,6 +876,7 @@ function BrandMissionApplicationsTab({ apiBasePath }: { apiBasePath: string }) {
       if (!res.ok || !body.success) throw new Error(body.error ?? "Duyệt thất bại");
       setNotice("Đã duyệt đơn xin nhiệm vụ.");
       await load();
+      onReviewUpdated?.();
       if (selectedId === id) await loadDetail(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Duyệt thất bại");
@@ -832,6 +898,7 @@ function BrandMissionApplicationsTab({ apiBasePath }: { apiBasePath: string }) {
       if (!res.ok || !body.success) throw new Error(body.error ?? "Từ chối thất bại");
       setNotice("Đã từ chối đơn xin nhiệm vụ.");
       await load();
+      onReviewUpdated?.();
       if (selectedId === id) await loadDetail(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Từ chối thất bại");
@@ -868,17 +935,19 @@ function BrandMissionApplicationsTab({ apiBasePath }: { apiBasePath: string }) {
 
   return (
     <section className="mt-4 grid gap-4">
-      <section className="dc-card p-4">
-        <div className="grid gap-2 md:grid-cols-2">
-          <input className="dc-input" placeholder="Tìm creator theo tên/email" value={query} onChange={(e) => setQuery(e.target.value)} />
-          <input className="dc-input" placeholder="Tên campaign" value={campaign} onChange={(e) => setCampaign(e.target.value)} />
-        </div>
-        <div className="mt-3 flex gap-2">
-          <button className="dc-btn-primary" onClick={() => { setPage(1); void load(1); }}>Lọc</button>
-          <button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>
-          <p className="text-sm text-zinc-500">{title}</p>
-        </div>
-      </section>
+      {!hideFilters ? (
+        <section className="dc-card p-4">
+          <div className="grid gap-2 md:grid-cols-2">
+            <input className="dc-input" placeholder="Tìm creator theo tên/email" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input className="dc-input" placeholder="Tên campaign" value={campaign} onChange={(e) => setCampaign(e.target.value)} />
+          </div>
+          <div className="mt-3 flex gap-2">
+            <button className="dc-btn-primary" onClick={() => { setPage(1); void load(1); }}>Lọc</button>
+            <button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>
+            <p className="text-sm text-zinc-500">{title}</p>
+          </div>
+        </section>
+      ) : null}
 
       {historyCreator ? (
         <div className="fixed inset-0 z-[70] bg-zinc-900/50 p-3 md:p-6" onClick={() => { setHistoryCreator(null); setHistoryItems([]); setHistoryError(""); }}>
@@ -1037,7 +1106,7 @@ const videoStatusOptions = [
   { value: "REJECTED", label: "Đã từ chối" }
 ];
 
-function BrandMissionVideoReviewsTab({ apiBasePath }: { apiBasePath: string }) {
+function BrandMissionVideoReviewsTab({ apiBasePath, fixedCampaignId, hideFilters = false, onReviewUpdated }: { apiBasePath: string; fixedCampaignId?: string; hideFilters?: boolean; onReviewUpdated?: () => void }) {
   const [items, setItems] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1059,6 +1128,7 @@ function BrandMissionVideoReviewsTab({ apiBasePath }: { apiBasePath: string }) {
       const params = new URLSearchParams();
       if (query.trim()) params.set("query", query.trim());
       if (campaign.trim()) params.set("campaign", campaign.trim());
+      if (fixedCampaignId) params.set("campaignId", fixedCampaignId);
       params.set("page", String(targetPage));
       params.set("limit", "20");
 
@@ -1110,6 +1180,7 @@ function BrandMissionVideoReviewsTab({ apiBasePath }: { apiBasePath: string }) {
       }
       setNotice(action === "approve" ? "Đã duyệt video." : "Đã từ chối video.");
       await load();
+      onReviewUpdated?.();
       if (selectedId === id) await loadDetail(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Thao tác thất bại");
@@ -1122,17 +1193,19 @@ function BrandMissionVideoReviewsTab({ apiBasePath }: { apiBasePath: string }) {
 
   return (
     <section className="mt-4 grid gap-4">
-      <section className="dc-card p-4">
-        <div className="grid gap-2 md:grid-cols-2">
-          <input className="dc-input" placeholder="Tìm creator theo tên/email" value={query} onChange={(e) => setQuery(e.target.value)} />
-          <input className="dc-input" placeholder="Tên campaign" value={campaign} onChange={(e) => setCampaign(e.target.value)} />
-        </div>
-        <div className="mt-3 flex gap-2">
-          <button className="dc-btn-primary" onClick={() => { setPage(1); void load(1); }}>Lọc</button>
-          <button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>
-          <p className="text-sm text-zinc-500">Tổng {pagination.total} bản ghi</p>
-        </div>
-      </section>
+      {!hideFilters ? (
+        <section className="dc-card p-4">
+          <div className="grid gap-2 md:grid-cols-2">
+            <input className="dc-input" placeholder="Tìm creator theo tên/email" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input className="dc-input" placeholder="Tên campaign" value={campaign} onChange={(e) => setCampaign(e.target.value)} />
+          </div>
+          <div className="mt-3 flex gap-2">
+            <button className="dc-btn-primary" onClick={() => { setPage(1); void load(1); }}>Lọc</button>
+            <button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>
+            <p className="text-sm text-zinc-500">Tổng {pagination.total} bản ghi</p>
+          </div>
+        </section>
+      ) : null}
 
       {notice ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</p> : null}
       {error ? <ErrorState title="Có lỗi" description={error} onRetry={() => void load()} /> : null}
@@ -1261,7 +1334,7 @@ const finalProductOptions = [
   { value: "PRODUCT_REQUIRED", label: "Yêu cầu sản phẩm" }
 ];
 
-function BrandMissionFinalReviewsTab({ apiBasePath }: { apiBasePath: string }) {
+function BrandMissionFinalReviewsTab({ apiBasePath, fixedCampaignId, hideFilters = false, onReviewUpdated }: { apiBasePath: string; fixedCampaignId?: string; hideFilters?: boolean; onReviewUpdated?: () => void }) {
   const [items, setItems] = useState<FinalItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1301,6 +1374,7 @@ function BrandMissionFinalReviewsTab({ apiBasePath }: { apiBasePath: string }) {
       const params = new URLSearchParams();
       if (query.trim()) params.set("query", query.trim());
       if (campaign.trim()) params.set("campaign", campaign.trim());
+      if (fixedCampaignId) params.set("campaignId", fixedCampaignId);
       params.set("publishStatus", "PENDING");
       params.set("page", String(targetPage));
       params.set("limit", "20");
@@ -1355,6 +1429,7 @@ function BrandMissionFinalReviewsTab({ apiBasePath }: { apiBasePath: string }) {
       if (!res.ok || !body.success) throw new Error(body.error ?? "Duyệt thất bại");
       setNotice("Đã duyệt hoàn thành nhiệm vụ và cộng điểm.");
       await load();
+      onReviewUpdated?.();
       if (selectedId === item.id) await loadDetail(item.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Duyệt thất bại");
@@ -1375,6 +1450,7 @@ function BrandMissionFinalReviewsTab({ apiBasePath }: { apiBasePath: string }) {
       setNotice("Đã từ chối bước duyệt link public.");
       setRejectTarget(null);
       await load();
+      onReviewUpdated?.();
       if (selectedId === id) await loadDetail(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Từ chối thất bại");
@@ -1442,17 +1518,19 @@ function BrandMissionFinalReviewsTab({ apiBasePath }: { apiBasePath: string }) {
   return (
     <section className="mt-4 grid gap-4">
       {rejectModal}
-      <section className="dc-card p-4">
-        <div className="grid gap-2 md:grid-cols-2">
-          <input className="dc-input" placeholder="Tìm creator theo tên/email" value={query} onChange={(e) => setQuery(e.target.value)} />
-          <input className="dc-input" placeholder="Tên campaign" value={campaign} onChange={(e) => setCampaign(e.target.value)} />
-        </div>
-        <div className="mt-3 flex gap-2">
-          <button className="dc-btn-primary" onClick={() => { setPage(1); void load(1); }}>Lọc</button>
-          <button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>
-          <p className="text-sm text-zinc-500">Tổng {pagination.total} bản ghi</p>
-        </div>
-      </section>
+      {!hideFilters ? (
+        <section className="dc-card p-4">
+          <div className="grid gap-2 md:grid-cols-2">
+            <input className="dc-input" placeholder="Tìm creator theo tên/email" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input className="dc-input" placeholder="Tên campaign" value={campaign} onChange={(e) => setCampaign(e.target.value)} />
+          </div>
+          <div className="mt-3 flex gap-2">
+            <button className="dc-btn-primary" onClick={() => { setPage(1); void load(1); }}>Lọc</button>
+            <button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>
+            <p className="text-sm text-zinc-500">Tổng {pagination.total} bản ghi</p>
+          </div>
+        </section>
+      ) : null}
 
       {notice ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</p> : null}
       {error ? <ErrorState title="Có lỗi" description={error} onRetry={() => void load()} /> : null}

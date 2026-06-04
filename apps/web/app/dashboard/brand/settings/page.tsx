@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Coins, IdentificationCard, Storefront } from "@phosphor-icons/react/dist/ssr";
 import { PageHeader } from "@/app/components/dcreator/ui/base";
 import { AddBrandForm } from "@/app/dashboard/brand/_components/AddBrandForm";
+import { EmbeddedRoleUpgradePanels } from "@/app/dashboard/user/_components/EmbeddedRoleUpgradePanels";
+import { SettingsAccordion } from "@/app/dashboard/user/_components/SettingsAccordion";
 
 const settingsItems = [
   {
@@ -45,10 +47,15 @@ export default function BrandSettingsPage() {
           );
         })}
       </section>
-      <div className="mt-6">
-        <AddBrandForm />
+      <div className="mt-6 space-y-4">
+        <SettingsAccordion
+          title="Thêm thương hiệu khác"
+          description="Tạo thêm Brand thuộc tài khoản hiện tại và chuyển nhanh giữa các workspace Brand."
+        >
+          <AddBrandForm />
+        </SettingsAccordion>
+        <EmbeddedRoleUpgradePanels targets={["creator"]} />
       </div>
     </>
   );
 }
-

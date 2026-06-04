@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { Brand, BrandInventoryBatch, BrandMemberRole, BrandProduct, CampaignStatus, MissionAudience, Role } from "@prisma/client";
+import { Brand, BrandInventoryBatch, BrandMemberRole, BrandProduct, CampaignStatus, MissionAudience, Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { APPLICATION_STATUS } from "@/lib/constants/enums";
 import { AppError } from "@/lib/errors";
@@ -923,6 +923,10 @@ export async function requestCampaignAdjustment(accountId: string, campaignId: s
 export async function listBrandCampaigns(accountId: string, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const campaignIds = await getScopedCampaignIds(ctx.brand.id, ctx.brandOwnerAccountId);
+  const reviewableMissionWhere: Prisma.CreatorMissionWhereInput = {
+    campaignId: { in: campaignIds },
+    OR: [{ mission: { deadlineAt: null } }, { mission: { deadlineAt: { gte: new Date() } } }]
+  };
   const campaigns = await prisma.campaign.findMany({
     where: { id: { in: campaignIds } },
     orderBy: { createdAt: "desc" },
@@ -966,6 +970,42 @@ export async function listBrandCampaigns(accountId: string, currentBrandId?: str
     creatorJoinedByCampaignId.set(row.campaignId, (creatorJoinedByCampaignId.get(row.campaignId) ?? 0) + 1);
   }
 
+  const [pendingApplicationCounts, pendingTranscriptCounts, pendingVideoCounts, pendingPublishCounts] = await Promise.all([
+    prisma.creatorMission.groupBy({
+      by: ["campaignId"],
+      where: { ...reviewableMissionWhere, applicationStatus: "PENDING_REVIEW" },
+      _count: { _all: true }
+    }),
+    prisma.creatorMission.groupBy({
+      by: ["campaignId"],
+      where: {
+        ...reviewableMissionWhere,
+        applicationStatus: "APPROVED",
+        status: "DRAFT_PENDING",
+        submissionStatus: "SUBMITTED",
+        submissionProofTextNote: { not: null }
+      },
+      _count: { _all: true }
+    }),
+    prisma.creatorMission.groupBy({
+      by: ["campaignId"],
+      where: { ...reviewableMissionWhere, videoReviewStatus: "PENDING" },
+      _count: { _all: true }
+    }),
+    prisma.creatorMission.groupBy({
+      by: ["campaignId"],
+      where: { ...reviewableMissionWhere, publishStatus: "PENDING" },
+      _count: { _all: true }
+    })
+  ]);
+
+  const reviewPendingCountMap = new Map<string, number>();
+  for (const group of [pendingApplicationCounts, pendingTranscriptCounts, pendingVideoCounts, pendingPublishCounts]) {
+    for (const row of group) {
+      reviewPendingCountMap.set(row.campaignId, (reviewPendingCountMap.get(row.campaignId) ?? 0) + row._count._all);
+    }
+  }
+
   return campaigns.map((campaign) => {
     const videoTarget = Math.max(0, campaign.ugcVideoQuota ?? 0);
     const videoApproved = Math.max(0, campaign.ugcVideoApprovedCount ?? 0);
@@ -974,6 +1014,7 @@ export async function listBrandCampaigns(accountId: string, currentBrandId?: str
       ...campaign,
       applicationCount: campaignApplicationCountMap.get(campaign.id) ?? 0,
       creatorJoinedCount: creatorJoinedByCampaignId.get(campaign.id) ?? 0,
+      reviewPendingCount: reviewPendingCountMap.get(campaign.id) ?? 0,
       videoTarget,
       videoApproved,
       videoProgressPercent

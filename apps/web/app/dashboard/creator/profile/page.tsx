@@ -11,6 +11,7 @@ import {
   SectionHeader,
   StatusBadge
 } from "@/app/components/dcreator/ui/base";
+import { EmbeddedRoleUpgradePanels } from "@/app/dashboard/user/_components/EmbeddedRoleUpgradePanels";
 
 type SocialLink = { label: string; url: string };
 type CreatorProfile = {
@@ -295,7 +296,7 @@ export default function CreatorProfilePage() {
 
   return (
     <>
-      <PageHeader title="Hồ sơ Creator" subtitle="Quản lý thông tin cá nhân, kênh xã hội và lĩnh vực nội dung." />
+      <PageHeader title="Cài đặt Creator" subtitle="Quản lý hồ sơ, kênh xã hội và mở rộng quyền từ cùng một nơi." />
 
       <div className="mb-4 flex gap-2 border-b border-zinc-200 pb-2">
         <button
@@ -318,40 +319,43 @@ export default function CreatorProfilePage() {
       {loading ? <LoadingSkeleton rows={4} /> : null}
 
       {!loading && activeTab === "profile" ? (
-        <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <section className="grid gap-4">
           <form className="dc-card grid gap-4 p-5" onSubmit={submitProfile}>
             <SectionHeader title="Thông tin Creator" />
+            <div className="grid gap-4 lg:grid-cols-2">
+              <FormField label="Tên hiển thị">
+                <input className="dc-input" value={displayName} onChange={(event) => setDisplayName(event.target.value)} required />
+              </FormField>
 
-            <FormField label="Tên hiển thị">
-              <input className="dc-input" value={displayName} onChange={(event) => setDisplayName(event.target.value)} required />
-            </FormField>
+              <FormField label="Ảnh đại diện">
+                <div className="grid gap-2">
+                  <input className="dc-input" type="file" accept="image/*" onChange={handleAvatarChange} disabled={uploadingAvatar} />
+                  <p className="text-xs text-zinc-500">
+                    {uploadingAvatar ? "Đang tải ảnh đại diện..." : avatarFileName ? `Đã chọn: ${avatarFileName}` : "Chọn ảnh JPG/PNG/WebP, tối đa 5MB"}
+                  </p>
+                </div>
+              </FormField>
 
-            <FormField label="Ảnh đại diện">
-              <div className="grid gap-2">
-                <input className="dc-input" type="file" accept="image/*" onChange={handleAvatarChange} disabled={uploadingAvatar} />
-                <p className="text-xs text-zinc-500">
-                  {uploadingAvatar ? "Đang tải ảnh đại diện..." : avatarFileName ? `Đã chọn: ${avatarFileName}` : "Chọn ảnh JPG/PNG/WebP, tối đa 5MB"}
-                </p>
+              <div className="lg:col-span-2">
+                <FormField label={`Bio (${bioCount}/1000)`}>
+                  <textarea className="dc-input min-h-28" maxLength={1000} value={bio} onChange={(event) => setBio(event.target.value)} placeholder="Mô tả ngắn về phong cách nội dung, thế mạnh và tệp audience..." />
+                </FormField>
               </div>
-            </FormField>
 
-            <FormField label={`Bio (${bioCount}/1000)`}>
-              <textarea className="dc-input min-h-28" maxLength={1000} value={bio} onChange={(event) => setBio(event.target.value)} placeholder="Mô tả ngắn về phong cách nội dung, thế mạnh và tệp audience..." />
-            </FormField>
-
-            <div>
-              <p className="mb-2 text-sm font-semibold text-zinc-700">Lĩnh vực nội dung</p>
-              <div className="flex flex-wrap gap-2">
-                {categoryOptions.map((category) => (
-                  <button
-                    type="button"
-                    key={category}
-                    onClick={() => toggleCategory(category)}
-                    className={categories.includes(category) ? "rounded-full border border-zinc-900 bg-zinc-900 px-3 py-1 text-xs font-semibold text-white" : "rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-700"}
-                  >
-                    {category}
-                  </button>
-                ))}
+              <div className="lg:col-span-2">
+                <p className="mb-2 text-sm font-semibold text-zinc-700">Lĩnh vực nội dung</p>
+                <div className="flex flex-wrap gap-2">
+                  {categoryOptions.map((category) => (
+                    <button
+                      type="button"
+                      key={category}
+                      onClick={() => toggleCategory(category)}
+                      className={categories.includes(category) ? "rounded-full border border-zinc-900 bg-zinc-900 px-3 py-1 text-xs font-semibold text-white" : "rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-700"}
+                    >
+                      {category}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -360,27 +364,38 @@ export default function CreatorProfilePage() {
             </button>
           </form>
 
-          <aside className="dc-card h-fit p-5">
+          <article className="dc-card p-5">
             <SectionHeader title="Xem trước hồ sơ" />
             {!displayName && !bio ? (
               <EmptyState title="Hồ sơ còn trống" description="Hãy cập nhật thông tin để Brand dễ đánh giá." />
             ) : (
-              <div className="grid gap-3">
+              <div className="grid gap-4 lg:grid-cols-[auto_1fr] lg:items-start">
                 <div className="flex items-center gap-3">
                   {avatarUrl ? (
-                    <div className="h-14 w-14 rounded-2xl border border-zinc-200 bg-cover bg-center" style={{ backgroundImage: `url(${avatarUrl})` }} />
+                    <div className="h-16 w-16 rounded-2xl border border-zinc-200 bg-cover bg-center" style={{ backgroundImage: `url(${avatarUrl})` }} />
                   ) : (
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-900 text-lg font-black text-white">{displayName.slice(0, 1).toUpperCase() || "C"}</div>
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-900 text-xl font-black text-white">{displayName.slice(0, 1).toUpperCase() || "C"}</div>
                   )}
                   <div>
                     <p className="font-bold text-zinc-900">{displayName || "Tên Creator"}</p>
                     <p className="text-sm text-zinc-600">{categories.join(", ") || "Chưa chọn lĩnh vực"}</p>
                   </div>
                 </div>
-                <p className="text-sm text-zinc-600">{bio || "Chưa có bio"}</p>
+                <div className="grid gap-2">
+                  <p className="text-sm text-zinc-600">{bio || "Chưa có bio"}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {categories.length > 0 ? categories.map((category) => (
+                      <span key={category} className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-semibold text-zinc-700">
+                        {category}
+                      </span>
+                    )) : <span className="text-sm text-zinc-500">Chưa chọn lĩnh vực</span>}
+                  </div>
+                </div>
               </div>
             )}
-          </aside>
+          </article>
+
+          <EmbeddedRoleUpgradePanels targets={["brand"]} />
         </section>
       ) : null}
 
