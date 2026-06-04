@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { setCurrentBrandInContext, useCurrentBrand, useSetCurrentBrand } from "@/app/dashboard/brand/_hooks/use-brand-context";
 
-export function BrandSwitcher() {
+export function BrandSwitcher({ className = "mb-4", inline = false }: { className?: string; inline?: boolean }) {
   const router = useRouter();
   const { currentBrandId, brands, isLoading, error } = useCurrentBrand();
   const setCurrentBrand = useSetCurrentBrand();
@@ -13,14 +13,14 @@ export function BrandSwitcher() {
   const [localError, setLocalError] = useState<string | null>(null);
 
   if (isLoading) {
-    return <div className="mb-4 h-10 w-56 animate-pulse rounded-xl bg-zinc-100" />;
+    return <div className={`${className} h-10 w-56 animate-pulse rounded-xl bg-zinc-100`} />;
   }
   if (error) {
-    return <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>;
+    return <div className={`${className} rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700`}>{error}</div>;
   }
   if (brands.length === 0) {
     return (
-      <div className="mb-4 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
+      <div className={`${className} rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700`}>
         <p>Bạn chưa thuộc Brand nào.</p>
         <Link href="/brand/register" className="mt-2 inline-flex rounded-lg bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800">
           Tạo Brand mới
@@ -30,7 +30,7 @@ export function BrandSwitcher() {
   }
 
   return (
-    <div className="mb-4 rounded-xl border border-zinc-200 bg-white px-4 py-3">
+    <div className={inline ? className : `${className} rounded-xl border border-zinc-200 bg-white px-4 py-3`}>
       <div className="flex flex-wrap items-center gap-3">
         <label htmlFor="brand-switcher" className="text-sm font-semibold text-zinc-700">Brand hiện tại</label>
         <select
