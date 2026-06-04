@@ -7,6 +7,7 @@ import { EmptyState, ErrorState, LoadingSkeleton, PageHeader } from "@/app/compo
 
 type ApiResult<T> = { success: boolean; data?: T; error?: string };
 type DetailTab = "ACTIONS" | "HISTORY";
+type FinalReviewResubmitField = "PUBLIC_URL" | "AD_CODE" | "SCREENSHOT" | "PURCHASE_BILL" | "PRODUCT_REVIEW_SCREENSHOT";
 
 export type MissionReviewsTabKey = "transcript-reviews" | "applications" | "video-reviews" | "final-reviews";
 
@@ -21,7 +22,7 @@ const tabs: Array<{ key: MissionReviewsTabKey; label: string }> = [
   { key: "applications", label: "Nhận nhiệm vụ" },
   { key: "transcript-reviews", label: "Duyệt kịch bản" },
   { key: "video-reviews", label: "Duyệt video" },
-  { key: "final-reviews", label: "Duyệt hoàn thành" }
+  { key: "final-reviews", label: "Duyệt link public" }
 ];
 
 function fmtDate(value: string | null) {
@@ -123,7 +124,7 @@ function CreatorSocialLinks({ name, profile }: { name?: string | null; profile: 
   );
 }
 
-function buildStaticReviewTimeline(activeKey: "application" | "draftReview" | "videoReview" | "publishReview", includePurchase: boolean) {
+function buildStaticReviewTimeline(activeKey: TimelineStep["key"], includePurchase: boolean) {
   const steps: Array<{ key: TimelineStep["key"]; label: string; icon: TimelineStep["icon"] }> = [
     { key: "application", label: "Duyệt tham gia", icon: "application" },
     ...(includePurchase ? [{ key: "purchase" as const, label: "Mua sản phẩm", icon: "purchase" as const }] : []),
@@ -146,6 +147,67 @@ function buildStaticReviewTimeline(activeKey: "application" | "draftReview" | "v
     failed: false
   }));
 }
+
+function buildReviewTimelineForStage(
+  stage: "application" | "transcript" | "video" | "publish",
+  includePurchase: boolean,
+  status: string | null | undefined
+) {
+  if (stage === "application") {
+    if (status === "REJECTED") return buildStaticReviewTimeline("application", includePurchase).map((step) => ({ ...step, current: step.key === "application", failed: step.key === "application", done: false }));
+    if (status === "APPROVED") return buildStaticReviewTimeline(includePurchase ? "purchase" : "draftChoice", includePurchase);
+    return buildStaticReviewTimeline("application", includePurchase);
+  }
+
+  if (stage === "transcript") {
+    if (status === "REJECTED") {
+      return buildStaticReviewTimeline("draftReview", includePurchase).map((step) => ({
+        ...step,
+        current: step.key === "draftReview",
+        failed: step.key === "draftReview"
+      }));
+    }
+    if (status === "APPROVED") return buildStaticReviewTimeline("videoSubmit", includePurchase);
+    return buildStaticReviewTimeline("draftReview", includePurchase);
+  }
+
+  if (stage === "video") {
+    if (status === "REJECTED") {
+      return buildStaticReviewTimeline("videoReview", includePurchase).map((step) => ({
+        ...step,
+        current: step.key === "videoReview",
+        failed: step.key === "videoReview"
+      }));
+    }
+    if (status === "APPROVED") return buildStaticReviewTimeline("publish", includePurchase);
+    return buildStaticReviewTimeline("videoReview", includePurchase);
+  }
+
+  if (status === "REJECTED") {
+    return buildStaticReviewTimeline("publishReview", includePurchase).map((step) => ({
+      ...step,
+      current: step.key === "publishReview",
+      failed: step.key === "publishReview"
+    }));
+  }
+  if (status === "APPROVED" || status === "COMPLETED") {
+    return buildStaticReviewTimeline("publishReview", includePurchase).map((step) => ({
+      ...step,
+      done: step.key !== "completed",
+      current: step.key === "completed",
+      failed: false
+    }));
+  }
+  return buildStaticReviewTimeline("publishReview", includePurchase);
+}
+
+const finalReviewFieldLabelMap: Record<FinalReviewResubmitField, string> = {
+  PUBLIC_URL: "Link public",
+  AD_CODE: "Mã quảng cáo",
+  SCREENSHOT: "Screenshot",
+  PURCHASE_BILL: "Ảnh bill mua hàng",
+  PRODUCT_REVIEW_SCREENSHOT: "Ảnh vote 5 sao"
+};
 
 function ProductInfoCard({
   title,
@@ -548,7 +610,7 @@ function BrandMissionTranscriptReviewsTab({ apiBasePath }: { apiBasePath: string
             onClose={() => { setSelectedId(""); setDetail(null); setDetailLoading(false); }}
             detailTab={detailTab}
             setDetailTab={setDetailTab}
-            timelineSteps={buildStaticReviewTimeline("draftReview", detail?.mission.productReceiveOption === "PRODUCT_REQUIRED")}
+            timelineSteps={buildReviewTimelineForStage("transcript", detail?.mission.productReceiveOption === "PRODUCT_REQUIRED", detail ? transcriptStatusLabel(detail) : undefined)}
             campaignNode={
               <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
                 <summary className="cursor-pointer font-semibold text-zinc-900">Thông tin campaign</summary>
@@ -909,7 +971,7 @@ function BrandMissionApplicationsTab({ apiBasePath }: { apiBasePath: string }) {
             onClose={() => { setSelectedId(""); setDetail(null); setDetailLoading(false); }}
             detailTab={detailTab}
             setDetailTab={setDetailTab}
-            timelineSteps={buildStaticReviewTimeline("application", detail?.mission.productReceiveOption === "PRODUCT_REQUIRED")}
+            timelineSteps={buildReviewTimelineForStage("application", detail?.mission.productReceiveOption === "PRODUCT_REQUIRED", detail?.status)}
             campaignNode={<details className="rounded-xl border border-zinc-200 bg-white p-3" open><summary className="cursor-pointer font-semibold text-zinc-900">Thông tin campaign</summary><div className="mt-3 grid gap-1 text-sm text-zinc-600"><p>Tên campaign: <strong className="text-zinc-900">{detail?.campaign.title ?? "-"}</strong></p><p>Đường dẫn campaign: {detail?.campaign.slug ? <Link className="font-semibold text-zinc-900 underline" href={`/campaigns/${detail.campaign.slug}`}>/campaigns/{detail.campaign.slug}</Link> : <strong className="text-zinc-900">-</strong>}</p></div></details>}
             missionNode={
               <>
@@ -1130,7 +1192,7 @@ function BrandMissionVideoReviewsTab({ apiBasePath }: { apiBasePath: string }) {
             onClose={() => { setSelectedId(""); setDetail(null); setDetailLoading(false); }}
             detailTab={detailTab}
             setDetailTab={setDetailTab}
-            timelineSteps={buildStaticReviewTimeline("videoReview", detail?.mission.productReceiveOption === "PRODUCT_REQUIRED")}
+            timelineSteps={buildReviewTimelineForStage("video", detail?.mission.productReceiveOption === "PRODUCT_REQUIRED", detail?.videoReviewStatus)}
             campaignNode={<details className="rounded-xl border border-zinc-200 bg-white p-3" open><summary className="cursor-pointer font-semibold text-zinc-900">Thông tin campaign</summary><div className="mt-3 grid gap-1 text-sm text-zinc-600"><p>Tên campaign: <strong className="text-zinc-900">{detail?.campaign.title ?? "-"}</strong></p><p>Đường dẫn campaign: {detail?.campaign.slug ? <Link className="font-semibold text-zinc-900 underline" href={`/campaigns/${detail.campaign.slug}`}>/campaigns/{detail.campaign.slug}</Link> : <strong className="text-zinc-900">-</strong>}</p></div></details>}
             missionNode={<><details className="rounded-xl border border-zinc-200 bg-white p-3" open><summary className="cursor-pointer font-semibold text-zinc-900">Thông tin nhiệm vụ</summary><div className="mt-3 grid gap-2 text-sm text-zinc-700 md:grid-cols-2"><p>Trạng thái luồng: <strong className="text-zinc-900">{detail ? missionStatusLabel(detail.videoReviewStatus) : "-"}</strong></p><p>Trạng thái nhiệm vụ: <strong className="text-zinc-900">{detail ? missionStatusLabel(detail.videoReviewStatus) : "-"}</strong></p><p>Đối tượng: <strong className="text-zinc-900">{missionAudienceLabel()}</strong></p><p>Cho phép làm lại: <strong className="text-zinc-900">Không</strong></p><p>Điểm thưởng: <strong className="text-zinc-900">{detail?.mission.rewardPoints?.toLocaleString("vi-VN") ?? "-"} N-Points</strong></p><p>Hạn hoàn thành: <strong className="text-zinc-900">{fmtDate(detail?.mission.deadlineAt ?? null)}</strong></p><p>Yêu cầu sản phẩm: <strong className="text-zinc-900">{productReceiveOptionLabel(detail?.mission.productReceiveOption)}</strong></p><p>Trạng thái sản phẩm: <strong className="text-zinc-900">Không xác định</strong></p></div><p className="mt-2 text-sm text-zinc-700 whitespace-pre-line">{detail?.mission.description ?? "-"}</p></details>{detail?.mission.productReceiveOption === "PRODUCT_REQUIRED" ? <ProductInfoCard title={detail?.mission.productName} description={detail?.mission.productDescription} imageUrl={detail?.mission.productImageUrl} link={detail?.mission.productLink} /> : null}<CreatorSocialLinks name={detail?.account.displayName} profile={detail?.account.creatorProfile} /></>}
             historyNode={<div className="space-y-3"><p className="text-sm font-semibold text-zinc-900">Lịch sử các lần đã nộp</p>{(detail?.videoSubmittedAt || detail?.submission?.videoUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp video</summary><div className="mt-2 space-y-1"><p>Thời gian nộp: {fmtDate(detail?.videoSubmittedAt ?? null)}</p><p>Video URL: <UrlValue value={detail?.submission?.videoUrl} /></p><p>Ghi chú: {detail?.submission?.note ?? "-"}</p></div></details> : null}{(detail?.submission?.publicVideoUrl || detail?.submission?.socialPostUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp link social</summary><div className="mt-2 space-y-1"><p>Link public: <UrlValue value={detail?.submission?.publicVideoUrl ?? detail?.submission?.socialPostUrl} label="Mở liên kết public" /></p></div></details> : null}</div>}
@@ -1164,6 +1226,8 @@ type FinalItem = {
   status: string;
   productReceiveOption: string;
   publishStatus: string;
+  publishFeedback?: string | null;
+  publishResubmitFields?: FinalReviewResubmitField[] | null;
   publishSubmittedAt: string | null;
   reimbursementStatus: string;
   account: { displayName: string; email: string; creatorProfile?: { socialLinks?: Array<{ id: string; platform: string; socialUrl: string; followers: number | null; handle: string | null }> } | null };
@@ -1210,6 +1274,24 @@ function BrandMissionFinalReviewsTab({ apiBasePath }: { apiBasePath: string }) {
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [query, setQuery] = useState("");
   const [campaign, setCampaign] = useState("");
+  const [rejectTarget, setRejectTarget] = useState<FinalItem | null>(null);
+  const [rejectFields, setRejectFields] = useState<FinalReviewResubmitField[]>([]);
+  const [rejectFeedback, setRejectFeedback] = useState("");
+
+  function getDefaultRejectFields(item: FinalItem): FinalReviewResubmitField[] {
+    const base: FinalReviewResubmitField[] = ["PUBLIC_URL", "AD_CODE", "SCREENSHOT"];
+    if (item.productReceiveOption === "PRODUCT_REQUIRED") {
+      base.push("PURCHASE_BILL", "PRODUCT_REVIEW_SCREENSHOT");
+    }
+    return base;
+  }
+
+  function openRejectModal(item: FinalItem) {
+    setRejectTarget(item);
+    setRejectFields(getDefaultRejectFields(item));
+    setRejectFeedback("");
+    setError("");
+  }
 
   async function load(pageOverride?: number) {
     const targetPage = pageOverride ?? page;
@@ -1279,20 +1361,19 @@ function BrandMissionFinalReviewsTab({ apiBasePath }: { apiBasePath: string }) {
     }
   }
 
-  async function reject(id: string) {
+  async function reject(id: string, feedback: string, requiredResubmitFields: FinalReviewResubmitField[]) {
     setNotice("");
     setError("");
-    const feedback = window.prompt("Nhập feedback từ chối:", "Nội dung bước cuối chưa đạt")?.trim();
-    if (!feedback) return;
     try {
       const res = await fetch(`${apiBasePath}/mission-final-reviews/${id}/reject`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ feedback })
+        body: JSON.stringify({ feedback, requiredResubmitFields })
       });
       const body = (await res.json()) as ApiResult<unknown>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Từ chối thất bại");
-      setNotice("Đã từ chối bước hoàn thành.");
+      setNotice("Đã từ chối bước duyệt link public.");
+      setRejectTarget(null);
       await load();
       if (selectedId === id) await loadDetail(id);
     } catch (e) {
@@ -1304,8 +1385,63 @@ function BrandMissionFinalReviewsTab({ apiBasePath }: { apiBasePath: string }) {
     void load();
   }, [page]);
 
+  const rejectModal = rejectTarget ? (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-zinc-900/50 p-4" onClick={() => setRejectTarget(null)}>
+      <div className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-lg font-bold text-zinc-900">Từ chối bước duyệt link public</p>
+            <p className="mt-1 text-sm text-zinc-600">{rejectTarget.mission.title} • {rejectTarget.account.displayName}</p>
+          </div>
+          <button type="button" className="dc-btn-secondary" onClick={() => setRejectTarget(null)}>Đóng</button>
+        </div>
+        <div className="mt-4 space-y-3">
+          <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+            <p className="text-sm font-semibold text-zinc-900">Chọn trường Creator cần gửi lại</p>
+            <div className="mt-3 grid gap-2">
+              {getDefaultRejectFields(rejectTarget).map((field) => (
+                <label key={field} className="flex items-center gap-2 text-sm text-zinc-700">
+                  <input
+                    type="checkbox"
+                    checked={rejectFields.includes(field)}
+                    onChange={(event) => {
+                      setRejectFields((current) => event.target.checked ? [...current, field] : current.filter((item) => item !== field));
+                    }}
+                  />
+                  <span>{finalReviewFieldLabelMap[field]}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-2">
+            <label htmlFor="final-review-reject-feedback" className="text-sm font-medium text-zinc-700">Lý do gửi lại</label>
+            <textarea
+              id="final-review-reject-feedback"
+              className="dc-input min-h-28"
+              value={rejectFeedback}
+              onChange={(event) => setRejectFeedback(event.target.value)}
+              placeholder="Nhập lý do để Creator biết cần sửa gì"
+            />
+          </div>
+        </div>
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <button type="button" className="dc-btn-secondary" onClick={() => setRejectTarget(null)}>Hủy</button>
+          <button
+            type="button"
+            className="dc-btn-primary"
+            disabled={!rejectFeedback.trim() || rejectFields.length === 0}
+            onClick={() => void reject(rejectTarget.id, rejectFeedback.trim(), rejectFields)}
+          >
+            Xác nhận từ chối
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <section className="mt-4 grid gap-4">
+      {rejectModal}
       <section className="dc-card p-4">
         <div className="grid gap-2 md:grid-cols-2">
           <input className="dc-input" placeholder="Tìm creator theo tên/email" value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -1354,7 +1490,7 @@ function BrandMissionFinalReviewsTab({ apiBasePath }: { apiBasePath: string }) {
                       </button>
                     </div>
                   </div>
-                  {item.submission?.rejectReason ? <p className="mt-2 text-sm text-red-700 line-clamp-2">Lý do từ chối gần nhất: {item.submission.rejectReason}</p> : null}
+                  {item.publishFeedback ? <p className="mt-2 text-sm text-red-700 line-clamp-2">Lý do từ chối gần nhất: {item.publishFeedback}</p> : null}
                 </article>
               ))
             )}
@@ -1372,10 +1508,10 @@ function BrandMissionFinalReviewsTab({ apiBasePath }: { apiBasePath: string }) {
             onClose={() => { setSelectedId(""); setDetail(null); setDetailLoading(false); }}
             detailTab={detailTab}
             setDetailTab={setDetailTab}
-            timelineSteps={buildStaticReviewTimeline("publishReview", detail?.productReceiveOption === "PRODUCT_REQUIRED")}
+            timelineSteps={buildReviewTimelineForStage("publish", detail?.productReceiveOption === "PRODUCT_REQUIRED", detail?.publishStatus)}
             campaignNode={<details className="rounded-xl border border-zinc-200 bg-white p-3" open><summary className="cursor-pointer font-semibold text-zinc-900">Thông tin campaign</summary><div className="mt-3 grid gap-1 text-sm text-zinc-600"><p>Tên campaign: <strong className="text-zinc-900">{detail?.campaign.title ?? "-"}</strong></p><p>Đường dẫn campaign: {detail?.campaign.slug ? <Link className="font-semibold text-zinc-900 underline" href={`/campaigns/${detail.campaign.slug}`}>/campaigns/{detail.campaign.slug}</Link> : <strong className="text-zinc-900">-</strong>}</p></div></details>}
             missionNode={<><details className="rounded-xl border border-zinc-200 bg-white p-3" open><summary className="cursor-pointer font-semibold text-zinc-900">Thông tin nhiệm vụ</summary><div className="mt-3 grid gap-2 text-sm text-zinc-700 md:grid-cols-2"><p>Trạng thái luồng: <strong className="text-zinc-900">{detail ? missionStatusLabel(detail.publishStatus) : "-"}</strong></p><p>Trạng thái nhiệm vụ: <strong className="text-zinc-900">{detail ? missionStatusLabel(detail.status) : "-"}</strong></p><p>Đối tượng: <strong className="text-zinc-900">{missionAudienceLabel()}</strong></p><p>Cho phép làm lại: <strong className="text-zinc-900">Không</strong></p><p>Điểm thưởng: <strong className="text-zinc-900">{detail?.mission.rewardPoints?.toLocaleString("vi-VN") ?? "-"} N-Points</strong></p><p>Hạn hoàn thành: <strong className="text-zinc-900">{fmtDate(detail?.mission.deadlineAt ?? null)}</strong></p><p>Yêu cầu sản phẩm: <strong className="text-zinc-900">{productReceiveOptionLabel(detail?.productReceiveOption)}</strong></p><p>Trạng thái sản phẩm: <strong className="text-zinc-900">{mapStatusVi(detail?.reimbursementStatus)}</strong></p></div><p className="mt-2 text-sm text-zinc-700 whitespace-pre-line">{detail?.mission.description ?? "-"}</p></details>{detail?.productReceiveOption === "PRODUCT_REQUIRED" ? <ProductInfoCard title={detail?.mission.productName} description={detail?.mission.productDescription} imageUrl={detail?.mission.productImageUrl} link={detail?.mission.productLink} /> : null}<CreatorSocialLinks name={detail?.account.displayName} profile={detail?.account.creatorProfile} /></>}
-            historyNode={<div className="space-y-3"><p className="text-sm font-semibold text-zinc-900">Lịch sử các lần đã nộp</p>{(detail?.submission?.purchaseBillImageUrl || detail?.submission?.productReviewScreenshotUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước mua sản phẩm</summary><div className="mt-2 space-y-1"><p>Ảnh bill: <UrlValue value={detail?.submission?.purchaseBillImageUrl} label="Tải file ảnh" /></p><p>Ảnh đánh giá: <UrlValue value={detail?.submission?.productReviewScreenshotUrl} label="Tải file ảnh" /></p></div></details> : null}{detail?.submission?.videoUrl ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp video</summary><div className="mt-2 space-y-1"><p>Video review: <UrlValue value={detail?.submission?.videoUrl} /></p></div></details> : null}{(detail?.publishSubmittedAt || detail?.submission?.publicVideoUrl || detail?.submission?.socialPostUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp link social</summary><div className="mt-2 space-y-1"><p>Thời gian nộp: {fmtDate(detail?.publishSubmittedAt ?? null)}</p><p>Link public: <UrlValue value={detail?.submission?.publicVideoUrl ?? detail?.submission?.socialPostUrl} label="Mở liên kết public" /></p><p>Screenshot: <UrlValue value={detail?.submission?.screenshotUrl} label="Tải file ảnh" /></p><p>Mã quảng cáo: {detail?.submission?.adCode ?? "-"}</p><p>Ghi chú: {detail?.submission?.finalProofNote ?? "-"}</p></div></details> : null}</div>}
+            historyNode={<div className="space-y-3"><p className="text-sm font-semibold text-zinc-900">Lịch sử các lần đã nộp</p>{(detail?.submission?.purchaseBillImageUrl || detail?.submission?.productReviewScreenshotUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước mua sản phẩm</summary><div className="mt-2 space-y-1"><p>Ảnh bill: <UrlValue value={detail?.submission?.purchaseBillImageUrl} label="Tải file ảnh" /></p><p>Ảnh đánh giá: <UrlValue value={detail?.submission?.productReviewScreenshotUrl} label="Tải file ảnh" /></p></div></details> : null}{detail?.submission?.videoUrl ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp video</summary><div className="mt-2 space-y-1"><p>Video review: <UrlValue value={detail?.submission?.videoUrl} /></p></div></details> : null}{(detail?.publishSubmittedAt || detail?.submission?.publicVideoUrl || detail?.submission?.socialPostUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp link social</summary><div className="mt-2 space-y-1"><p>Thời gian nộp: {fmtDate(detail?.publishSubmittedAt ?? null)}</p><p>Link public: <UrlValue value={detail?.submission?.publicVideoUrl ?? detail?.submission?.socialPostUrl} label="Mở liên kết public" /></p><p>Ảnh chụp màn hình minh chứng: <UrlValue value={detail?.submission?.screenshotUrl} label="Tải file ảnh" /></p><p>Mã quảng cáo: {detail?.submission?.adCode ?? "-"}</p><p>Ghi chú: {detail?.submission?.finalProofNote ?? "-"}</p></div></details> : null}</div>}
             actionNode={
               <div className="grid gap-2 text-sm">
                 {(detail?.submission?.publicVideoUrl || detail?.submission?.socialPostUrl) ? (
@@ -1384,16 +1520,21 @@ function BrandMissionFinalReviewsTab({ apiBasePath }: { apiBasePath: string }) {
                     <p className="mt-2">Link public: <UrlValue value={detail?.submission?.publicVideoUrl ?? detail?.submission?.socialPostUrl} label="Mở liên kết public" /></p>
                     <p>Mã quảng cáo: {detail?.submission?.adCode ?? "-"}</p>
                     <p>Screenshot: <UrlValue value={detail?.submission?.screenshotUrl} label="Tải file ảnh" /></p>
-                    <p>Ảnh bill mua hàng: <UrlValue value={detail?.submission?.purchaseBillImageUrl} label="Tải file ảnh" /></p>
-                    <p>Ảnh vote 5 sao: <UrlValue value={detail?.submission?.productReviewScreenshotUrl} label="Tải file ảnh" /></p>
+                    {detail?.productReceiveOption === "PRODUCT_REQUIRED" ? (
+                      <>
+                        <p>Ảnh bill mua hàng: <UrlValue value={detail?.submission?.purchaseBillImageUrl} label="Tải file ảnh" /></p>
+                        <p>Ảnh vote 5 sao: <UrlValue value={detail?.submission?.productReviewScreenshotUrl} label="Tải file ảnh" /></p>
+                      </>
+                    ) : null}
                     <p>Ghi chú: {detail?.submission?.finalProofNote ?? "-"}</p>
                   </div>
                 ) : null}
-                {detail?.submission?.rejectReason ? <p><strong>Lý do từ chối:</strong> {detail.submission.rejectReason}</p> : null}
+                {detail?.publishFeedback ? <p><strong>Lý do từ chối:</strong> {detail.publishFeedback}</p> : null}
+                {detail?.publishResubmitFields?.length ? <p><strong>Trường cần gửi lại:</strong> {detail.publishResubmitFields.map((field) => finalReviewFieldLabelMap[field]).join(", ")}</p> : null}
                 {detail?.publishStatus === "PENDING" ? (
                   <div className="flex flex-wrap gap-2">
                     <button className="dc-btn-primary" onClick={() => void approve(detail)}>Duyệt</button>
-                    <button className="dc-btn-secondary" onClick={() => void reject(detail.id)}>Từ chối</button>
+                    <button className="dc-btn-secondary" onClick={() => openRejectModal(detail)}>Từ chối</button>
                   </div>
                 ) : null}
               </div>

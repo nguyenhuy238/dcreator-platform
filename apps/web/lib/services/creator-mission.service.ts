@@ -16,6 +16,8 @@ import { saveTextUpload } from "@/lib/storage/upload";
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 type Sort = "newest" | "oldest";
+type FinalReviewResubmitField = "PUBLIC_URL" | "AD_CODE" | "SCREENSHOT" | "PURCHASE_BILL" | "PRODUCT_REVIEW_SCREENSHOT";
+const FINAL_REVIEW_REJECT_META_PREFIX = "[[FINAL_REVIEW_REJECT_META]]:";
 
 const creatorMissionInclude = {
   mission: {
@@ -64,6 +66,29 @@ function dt(value: Date | null | undefined) {
 
 function now() {
   return new Date();
+}
+
+function serializeFinalReviewRejectFeedback(reason: string, requiredResubmitFields: FinalReviewResubmitField[]) {
+  return `${FINAL_REVIEW_REJECT_META_PREFIX}${JSON.stringify({ reason, requiredResubmitFields })}`;
+}
+
+function parseStructuredFeedback(raw: string | null | undefined) {
+  if (!raw) return { reason: null as string | null, requiredResubmitFields: [] as FinalReviewResubmitField[] };
+  if (!raw.startsWith(FINAL_REVIEW_REJECT_META_PREFIX)) {
+    return { reason: raw, requiredResubmitFields: [] as FinalReviewResubmitField[] };
+  }
+  try {
+    const parsed = JSON.parse(raw.slice(FINAL_REVIEW_REJECT_META_PREFIX.length)) as {
+      reason?: string;
+      requiredResubmitFields?: FinalReviewResubmitField[];
+    };
+    return {
+      reason: parsed.reason?.trim() || null,
+      requiredResubmitFields: Array.isArray(parsed.requiredResubmitFields) ? parsed.requiredResubmitFields : []
+    };
+  } catch {
+    return { reason: raw, requiredResubmitFields: [] as FinalReviewResubmitField[] };
+  }
 }
 
 function normalizeTranscriptHtml(raw: string) {
@@ -140,6 +165,8 @@ function toCreatorMissionState(option: ProductReceiveOption) {
 }
 
 function mapMission(item: CreatorMissionEntity) {
+  const submissionRejectFeedback = parseStructuredFeedback(item.submissionRejectReason);
+  const publishRejectFeedback = parseStructuredFeedback(item.publishFeedback);
   const submission = {
     id: item.id,
     createdAt: item.createdAt,
@@ -152,7 +179,7 @@ function mapMission(item: CreatorMissionEntity) {
     fileUploadUrl: item.submissionFileUploadUrl,
     proofTextNote: item.submissionProofTextNote,
     note: item.submissionNote,
-    rejectReason: item.submissionRejectReason,
+    rejectReason: submissionRejectFeedback.reason,
     purchaseBillImageUrl: item.submissionPurchaseBillImageUrl,
     productReviewScreenshotUrl: item.submissionProductReviewScreenshotUrl,
     purchaseProofNote: item.submissionPurchaseProofNote,
@@ -200,7 +227,8 @@ function mapMission(item: CreatorMissionEntity) {
     videoSubmittedAt: dt(item.videoSubmittedAt),
     videoReviewedAt: dt(item.videoReviewedAt),
     publishStatus: item.publishStatus,
-    publishFeedback: item.publishFeedback,
+    publishFeedback: publishRejectFeedback.reason,
+    publishResubmitFields: publishRejectFeedback.requiredResubmitFields,
     publishSubmittedAt: dt(item.publishSubmittedAt),
     publishReviewedAt: dt(item.publishReviewedAt),
     publishPurchaseAmountVnd: item.publishPurchaseAmountVnd,
@@ -874,15 +902,17 @@ export async function approvePublishReportByAdmin(actorId: string, creatorMissio
   return mapMission(updated);
 }
 
-export async function rejectPublishReportByAdmin(actorId: string, creatorMissionId: string, reason: string) {
+export async function rejectPublishReportByAdmin(actorId: string, creatorMissionId: string, reason: string, requiredResubmitFields: FinalReviewResubmitField[]) {
   const current = await getMissionById(creatorMissionId);
   if (!current) throw new AppError("Creator mission/submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
   if (current.publishStatus !== "PENDING") throw new AppError("Invalid status", 409, "CREATOR_MISSION_INVALID_STATUS");
   const feedback = reason.trim();
   if (!feedback) throw new AppError("reason is required", 422, "REJECT_REASON_REQUIRED");
+  if (requiredResubmitFields.length < 1) throw new AppError("requiredResubmitFields is required", 422, "REQUIRED_RESUBMIT_FIELDS_REQUIRED");
+  const serializedFeedback = serializeFinalReviewRejectFeedback(feedback, requiredResubmitFields);
   const updated = await prisma.$transaction(async (tx) => {
     await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
-      rejectReason: feedback,
+      rejectReason: serializedFeedback,
       reviewedById: actorId,
       reviewedAt: now()
     });
@@ -890,11 +920,11 @@ export async function rejectPublishReportByAdmin(actorId: string, creatorMission
       where: { id: creatorMissionId },
       data: {
         status: "IN_PROGRESS",
-        submissionRejectReason: feedback,
+        submissionRejectReason: serializedFeedback,
         submissionReviewedById: actorId,
         submissionReviewedAt: now(),
         publishStatus: "REJECTED",
-        publishFeedback: feedback,
+        publishFeedback: serializedFeedback,
         publishReviewedAt: now()
       },
       include: creatorMissionInclude
@@ -1171,6 +1201,16 @@ function toOrder(sort?: Sort) {
   return sort === "oldest" ? "asc" : "desc";
 }
 
+function applyNotOverdueReviewFilter(where: Prisma.CreatorMissionWhereInput) {
+  const existingAnd = Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : [];
+  where.AND = [
+    ...existingAnd,
+    {
+      OR: [{ mission: { deadlineAt: null } }, { mission: { deadlineAt: { gte: now() } } }]
+    }
+  ];
+}
+
 function resolveBrandAvatar(input: { avatarUrl: string | null; ownedBrands: Array<{ logoUrl: string | null }> }) {
   const logoUrl = input.ownedBrands.find((item) => Boolean(item.logoUrl?.trim()))?.logoUrl?.trim();
   if (logoUrl) return logoUrl;
@@ -1218,6 +1258,7 @@ export async function listMissionApplicationsForAdmin(input: {
       { campaign: { title: { contains: q, mode: "insensitive" } } }
     ];
   }
+  applyNotOverdueReviewFilter(where);
   const paging = toPagination(input.page, input.limit);
   const [total, items] = await prisma.$transaction([
     prisma.creatorMission.count({ where }),
@@ -1443,6 +1484,7 @@ export async function listMissionVideoReviewsForAdmin(input: {
       { campaign: { title: { contains: q, mode: "insensitive" } } }
     ];
   }
+  applyNotOverdueReviewFilter(where);
   const paging = toPagination(input.page, input.limit);
   const [total, items] = await prisma.$transaction([
     prisma.creatorMission.count({ where }),
@@ -1496,6 +1538,7 @@ export async function listMissionFinalReviewsForAdmin(input: {
       { campaign: { title: { contains: q, mode: "insensitive" } } }
     ];
   }
+  applyNotOverdueReviewFilter(where);
   const paging = toPagination(input.page, input.limit);
   const [total, items] = await prisma.$transaction([
     prisma.creatorMission.count({ where }),
@@ -1520,8 +1563,8 @@ export async function approveMissionFinalReviewByAdmin(actorId: string, id: stri
   return approvePublishReportByAdmin(actorId, id, input?.reimbursementAmountVnd ?? 0);
 }
 
-export async function rejectMissionFinalReviewByAdmin(actorId: string, id: string, feedback: string) {
-  return rejectPublishReportByAdmin(actorId, id, feedback);
+export async function rejectMissionFinalReviewByAdmin(actorId: string, id: string, input: { feedback: string; requiredResubmitFields: FinalReviewResubmitField[] }) {
+  return rejectPublishReportByAdmin(actorId, id, input.feedback, input.requiredResubmitFields);
 }
 
 export async function listMissionTranscriptReviewsForAdmin(input: {
@@ -1564,6 +1607,7 @@ export async function listMissionTranscriptReviewsForAdmin(input: {
       { campaign: { title: { contains: q, mode: "insensitive" } } }
     ];
   }
+  applyNotOverdueReviewFilter(where);
   const paging = toPagination(input.page, input.limit);
   const [total, items] = await prisma.$transaction([
     prisma.creatorMission.count({ where }),
@@ -1697,6 +1741,7 @@ export async function listMissionApplicationsForBrand(
       { campaign: { title: { contains: q, mode: "insensitive" } } }
     ];
   }
+  applyNotOverdueReviewFilter(where);
 
   const paging = toPagination(input.page, input.limit);
   const [total, items] = await prisma.$transaction([
@@ -1817,6 +1862,7 @@ export async function listMissionVideoReviewsForBrand(
       { campaign: { title: { contains: q, mode: "insensitive" } } }
     ];
   }
+  applyNotOverdueReviewFilter(where);
   const paging = toPagination(input.page, input.limit);
   const [total, items] = await prisma.$transaction([
     prisma.creatorMission.count({ where }),
@@ -1879,6 +1925,7 @@ export async function listMissionTranscriptReviewsForBrand(
       { campaign: { title: { contains: q, mode: "insensitive" } } }
     ];
   }
+  applyNotOverdueReviewFilter(where);
   const paging = toPagination(input.page, input.limit);
   const [total, items] = await prisma.$transaction([
     prisma.creatorMission.count({ where }),
@@ -1962,6 +2009,7 @@ export async function listMissionFinalReviewsForBrand(
       { campaign: { title: { contains: q, mode: "insensitive" } } }
     ];
   }
+  applyNotOverdueReviewFilter(where);
   const paging = toPagination(input.page, input.limit);
   const [total, items] = await prisma.$transaction([
     prisma.creatorMission.count({ where }),
@@ -1988,7 +2036,7 @@ export async function approveMissionFinalReviewByBrand(accountId: string, id: st
   return approveMissionFinalReviewByAdmin(accountId, id, input);
 }
 
-export async function rejectMissionFinalReviewByBrand(accountId: string, id: string, feedback: string) {
+export async function rejectMissionFinalReviewByBrand(accountId: string, id: string, input: { feedback: string; requiredResubmitFields: FinalReviewResubmitField[] }) {
   await getMissionFinalReviewDetailForBrand(accountId, id);
-  return rejectMissionFinalReviewByAdmin(accountId, id, feedback);
+  return rejectMissionFinalReviewByAdmin(accountId, id, input);
 }

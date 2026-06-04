@@ -23,6 +23,7 @@ type MissionItem = {
   videoReviewFeedback: string | null;
   publishStatus: string;
   publishFeedback: string | null;
+  publishResubmitFields?: string[] | null;
   publishSubmittedAt: string | null;
   publishReviewedAt?: string | null;
   mission: {
@@ -64,7 +65,7 @@ type MissionItem = {
 type FormMap = Record<string, string>;
 type PreVideoChoice = "VIDEO" | "TRANSCRIPT";
 type PreVideoChoiceMap = Record<string, PreVideoChoice>;
-type MissionFilter = "ALL" | "DOING" | "PENDING" | "REVISION" | "COMPLETED";
+type MissionFilter = "ALL" | "DOING" | "PENDING" | "REVISION" | "COMPLETED" | "OVERDUE";
 type MissionSort = "APPROVED_NEWEST" | "APPROVED_OLDEST" | "EXPIRING_SOON";
 type MissionErrorField = "form" | "bill" | "rating" | "transcript" | "videoUrl" | "videoNote" | "publicUrl" | "adCode" | "screenshot" | "finalNote";
 type MissionFormErrors = Partial<Record<MissionErrorField, string>>;
@@ -72,6 +73,14 @@ type DetailTab = "ACTIONS" | "HISTORY";
 
 type CreatorMissionsPanelProps = {
   overview: CreatorOverview | null;
+};
+
+const publishResubmitFieldLabelMap: Record<string, string> = {
+  PUBLIC_URL: "Link public",
+  AD_CODE: "Mã quảng cáo",
+  SCREENSHOT: "Screenshot",
+  PURCHASE_BILL: "Ảnh bill mua hàng",
+  PRODUCT_REVIEW_SCREENSHOT: "Ảnh vote 5 sao"
 };
 
 function toPlainTranscript(value: string | null | undefined) {
@@ -138,10 +147,23 @@ function transcriptDownloadHref(value: string | null | undefined) {
 }
 
 function workflowStatus(item: MissionItem) {
+  const purchaseDone = item.productReceiveOption === "NO_PRODUCT_REQUIRED" || item.productStatus === "RECEIVED";
+  const transcriptText = Boolean(toPlainTranscript(item.submission?.proofTextNote));
+  const hasTranscriptSubmitted =
+    item.status === "DRAFT_PENDING" ||
+    item.submission?.status === "SUBMITTED" ||
+    item.submission?.status === "APPROVED" ||
+    transcriptText;
+  const transcriptPending = item.status === "DRAFT_PENDING" && item.submission?.status === "SUBMITTED";
+  const transcriptRejected = item.status === "DRAFT_PENDING" && item.submission?.status === "REJECTED";
+  const transcriptApproved = hasTranscriptSubmitted && !transcriptPending && !transcriptRejected;
+  const hasVideoSubmitted = item.videoReviewStatus !== "NOT_SUBMITTED" || Boolean(item.submission?.videoUrl?.trim());
+
   if (item.missionApplication?.status === "PENDING_REVIEW") return "Chờ duyệt nhiệm vụ";
   if (item.missionApplication?.status === "REJECTED") return "Bị từ chối";
   if (item.status === "COMPLETED") return "Hoàn thành";
   if (item.status === "CANCELLED") return "Bị từ chối";
+  if (isMissionOverdue(item)) return "Quá hạn";
   if (item.publishStatus === "PENDING") return "Link public đang chờ duyệt";
   if (item.publishStatus === "REJECTED") return "Link public bị từ chối";
   if (item.videoReviewStatus === "PENDING") return "Video đang chờ duyệt";
@@ -153,12 +175,25 @@ function workflowStatus(item: MissionItem) {
     return "Chờ nộp kịch bản";
   }
   if (item.productReceiveOption === "PRODUCT_REQUIRED" && item.productStatus !== "RECEIVED") return "Chờ mua sản phẩm";
+  if (purchaseDone && !hasVideoSubmitted && transcriptApproved) return "Nộp video";
   return "Chờ chọn kịch bản hoặc nộp video";
+}
+
+function isMissionOverdue(item: MissionItem) {
+  if (!item.mission.deadlineAt) return false;
+  if (item.status === "COMPLETED" || item.missionApplication?.status === "REJECTED" || item.status === "CANCELLED") return false;
+  return new Date(item.mission.deadlineAt).getTime() < Date.now();
+}
+
+function getRequestedPublishResubmitFields(item: MissionItem) {
+  if (item.publishStatus !== "REJECTED" || !item.publishResubmitFields?.length) return null;
+  return new Set(item.publishResubmitFields);
 }
 
 function missionGroup(item: MissionItem): Exclude<MissionFilter, "ALL"> {
   if (item.status === "COMPLETED") return "COMPLETED";
   if (item.missionApplication?.status === "REJECTED") return "REVISION";
+  if (isMissionOverdue(item)) return "OVERDUE";
   if (item.missionApplication?.status === "PENDING_REVIEW") return "PENDING";
   if (item.missionApplication?.status !== "APPROVED") return "PENDING";
   if (item.videoReviewStatus === "REJECTED" || item.publishStatus === "REJECTED" || item.submission?.status === "REJECTED") return "REVISION";
@@ -180,6 +215,7 @@ function statusTone(item: MissionItem) {
   const group = missionGroup(item);
   if (group === "COMPLETED") return "bg-emerald-50 text-emerald-700";
   if (group === "REVISION") return "bg-red-50 text-red-700";
+  if (group === "OVERDUE") return "bg-red-50 text-red-700";
   if (group === "PENDING") return "bg-amber-50 text-amber-700";
   return "bg-blue-50 text-blue-700";
 }
@@ -433,18 +469,21 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
   }
 
   async function submitPublish(item: MissionItem) {
-    const publicUrl = publicUrlMap[item.id]?.trim();
-    if (!publicUrl) {
+    const requestedFields = getRequestedPublishResubmitFields(item);
+    const shouldResubmit = (field: string) => !requestedFields || requestedFields.has(field);
+    const publicUrl = publicUrlMap[item.id]?.trim() || item.submission?.publicVideoUrl || item.submission?.socialPostUrl || "";
+    if (shouldResubmit("PUBLIC_URL") && !publicUrl.trim()) {
       setMissionFormErrors(item.id, { publicUrl: "Bạn chưa nhập link video social public." });
       return;
     }
     const normalizedPublicUrl = normalizeHttpUrl(publicUrl);
+    const screenshotUrl = screenshotMap[item.id]?.trim() || item.submission?.screenshotUrl || "";
     const bill = billUrlMap[item.id]?.trim() || item.submission?.purchaseBillImageUrl || "";
     const rating = ratingUrlMap[item.id]?.trim() || item.submission?.productReviewScreenshotUrl || "";
     const errors: MissionFormErrors = {};
-    if (item.productReceiveOption === "PRODUCT_REQUIRED" && !bill) errors.bill = "Bạn chưa tải ảnh bill mua hàng.";
-    if (item.productReceiveOption === "PRODUCT_REQUIRED" && !rating) errors.rating = "Bạn chưa tải ảnh đánh giá 5 sao.";
-    if (errors.bill || errors.rating) {
+    if (item.productReceiveOption === "PRODUCT_REQUIRED" && shouldResubmit("PURCHASE_BILL") && !bill) errors.bill = "Bạn chưa tải ảnh bill mua hàng.";
+    if (item.productReceiveOption === "PRODUCT_REQUIRED" && shouldResubmit("PRODUCT_REVIEW_SCREENSHOT") && !rating) errors.rating = "Bạn chưa tải ảnh đánh giá 5 sao.";
+    if (errors.bill || errors.rating || errors.publicUrl) {
       setMissionFormErrors(item.id, errors);
       return;
     }
@@ -457,11 +496,11 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           publicVideoUrl: normalizedPublicUrl,
-          adCode: adCodeMap[item.id]?.trim() || undefined,
-          screenshotUrl: screenshotMap[item.id]?.trim() || item.submission?.screenshotUrl || undefined,
+          adCode: adCodeMap[item.id]?.trim() || item.submission?.adCode || undefined,
+          screenshotUrl: screenshotUrl || undefined,
           purchaseBillImageUrl: bill || undefined,
           productReviewScreenshotUrl: rating || undefined,
-          finalProofNote: finalNoteMap[item.id]?.trim() || undefined
+          finalProofNote: finalNoteMap[item.id]?.trim() || item.submission?.finalProofNote || undefined
         })
       });
       pushSuccess("Đã gửi link social public. Bước này đang chờ Brand/Admin duyệt.");
@@ -504,13 +543,14 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
   }, []);
 
   const counters = useMemo(() => {
-    const result = { doing: 0, pending: 0, revision: 0, completed: 0 };
+    const result = { doing: 0, pending: 0, revision: 0, completed: 0, overdue: 0 };
     for (const item of items) {
       if (isApprovedAndUncompleted(item)) result.doing += 1;
       const group = missionGroup(item);
       if (group === "PENDING") result.pending += 1;
       if (group === "REVISION") result.revision += 1;
       if (group === "COMPLETED") result.completed += 1;
+      if (group === "OVERDUE") result.overdue += 1;
     }
     return result;
   }, [items]);
@@ -687,7 +727,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
       icon: "publish",
       done: hasPublishSubmitted || completed,
       current: !hasPublishSubmitted && videoApproved,
-      failed: item.publishStatus === "REJECTED"
+      failed: false
     });
     steps.push({
       key: "publish-review",
@@ -711,6 +751,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
 
   function renderMissionDetail(item: MissionItem) {
     const isApplicationPending = item.missionApplication?.status === "PENDING_REVIEW";
+    const isOverdue = isMissionOverdue(item);
     const canSubmitPurchase = !isApplicationPending && item.productReceiveOption === "PRODUCT_REQUIRED" && item.productStatus !== "RECEIVED";
     const canSubmitVideoCandidate =
       !isApplicationPending &&
@@ -721,34 +762,69 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
       (item.productReceiveOption === "NO_PRODUCT_REQUIRED" || item.productStatus === "RECEIVED");
     const isTranscriptFlow = item.status === "DRAFT_PENDING";
     const hasTranscript = Boolean(item.submission?.proofTextNote?.trim());
-    const needsPreVideoChoice = canSubmitVideoCandidate && !isTranscriptFlow && !hasTranscript;
-    const selectedChoice = preVideoChoiceMap[item.id];
-    const showTranscriptComposer = isTranscriptFlow || (needsPreVideoChoice && selectedChoice === "TRANSCRIPT");
-    const showVideoComposer = canSubmitVideoCandidate && !isTranscriptFlow && (!needsPreVideoChoice || selectedChoice === "VIDEO");
-    const canSubmitPublish = !isApplicationPending && item.videoReviewStatus === "APPROVED" && item.status !== "COMPLETED" && item.publishStatus !== "PENDING";
+    const hasVideoSubmission = item.videoReviewStatus !== "NOT_SUBMITTED" || Boolean(item.submission?.videoUrl?.trim());
+    const selectedChoice =
+      preVideoChoiceMap[item.id] ??
+      (hasTranscript ? "TRANSCRIPT" : hasVideoSubmission ? "VIDEO" : undefined);
+    const needsPreVideoChoice = canSubmitVideoCandidate && !isTranscriptFlow && !hasTranscript && !hasVideoSubmission;
+    const showTranscriptComposer = !isOverdue && (isTranscriptFlow || (needsPreVideoChoice && selectedChoice === "TRANSCRIPT"));
+    const showVideoComposer = !isOverdue && canSubmitVideoCandidate && !isTranscriptFlow && (!needsPreVideoChoice || selectedChoice === "VIDEO");
+    const canSubmitPublish = !isOverdue && !isApplicationPending && item.videoReviewStatus === "APPROVED" && item.status !== "COMPLETED" && item.publishStatus !== "PENDING";
     const isWaitingPublishReview = !isApplicationPending && item.videoReviewStatus === "APPROVED" && item.publishStatus === "PENDING" && item.status !== "COMPLETED";
+    const requestedPublishFields = getRequestedPublishResubmitFields(item);
+    const shouldShowPublishField = (field: string) => !requestedPublishFields || requestedPublishFields.has(field);
     const showProductSection = item.productReceiveOption === "PRODUCT_REQUIRED";
     const timelineSteps = buildMissionTimeline(item);
     const formError = missionErrors[item.id];
     const hasAnyHistory =
       Boolean(item.purchaseProofSubmittedAt || item.videoSubmittedAt || item.publishSubmittedAt) ||
       Boolean(item.submission?.purchaseBillImageUrl || item.submission?.proofTextNote || item.submission?.videoUrl || item.submission?.publicVideoUrl || item.submission?.socialPostUrl);
+    const rejectionNotices = (
+      <>
+        {item.missionApplication?.rejectReason ? (
+          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">Lý do từ chối đăng ký: {item.missionApplication.rejectReason}</p>
+        ) : null}
+        {item.status === "DRAFT_PENDING" && item.videoReviewFeedback ? (
+          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">Phản hồi kịch bản: {item.videoReviewFeedback}</p>
+        ) : null}
+        {item.videoReviewStatus !== "NOT_SUBMITTED" && item.videoReviewFeedback ? (
+          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">Phản hồi video: {item.videoReviewFeedback}</p>
+        ) : null}
+        {item.publishFeedback ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p>Phản hồi duyệt link public: {item.publishFeedback}</p>
+            {item.publishResubmitFields?.length ? (
+              <p className="mt-1">
+                Cần gửi lại: {item.publishResubmitFields.map((field) => publishResubmitFieldLabelMap[field] ?? field).join(", ")}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </>
+    );
     const actionGuide = (
       <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
         <summary className="cursor-pointer font-semibold text-zinc-900">Cách thực hiện</summary>
         <div className="mt-3 space-y-3">
-          {isApplicationPending ? (
+          {isApplicationPending && !isOverdue ? (
             <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
               Nhiệm vụ đang chờ duyệt. Bạn sẽ bắt đầu các bước thực hiện sau khi Brand/Admin duyệt đơn.
             </p>
           ) : null}
-          {isWaitingPublishReview ? (
+          {isWaitingPublishReview && !isOverdue ? (
             <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
               Bạn đã nộp link public. Vui lòng chờ Admin/Brand duyệt bước này.
             </p>
           ) : null}
+          {isOverdue ? (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              Nhiệm vụ đã quá hạn. Bạn chỉ có thể xem lại thông tin và lịch sử đã nộp.
+            </p>
+          ) : null}
 
-          {canSubmitPurchase ? (
+          {rejectionNotices}
+
+          {canSubmitPurchase && !isOverdue ? (
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
               <p className="font-medium">Bước 1 - Mua sản phẩm</p>
               <p className="text-sm text-zinc-600">Link sản phẩm: <UrlValue value={item.mission.productLink} /></p>
@@ -760,7 +836,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
             </div>
           ) : null}
 
-          {needsPreVideoChoice ? (
+          {needsPreVideoChoice && !isOverdue ? (
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
               <p className="font-medium">Chọn quy trình trước video review</p>
               <p className="text-sm text-zinc-600">Bạn có thể nộp kịch bản trước để được duyệt, hoặc nộp video review trực tiếp.</p>
@@ -852,84 +928,110 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
 
           {canSubmitPublish ? (
             <div className="rounded-xl border border-zinc-200 bg-white p-3">
-              <p className="font-medium">Bước 3 - Nộp link video social public</p>
+              <p className="font-medium">Nộp link video social public</p>
               <div className="mt-2 grid gap-2">
-                <label htmlFor={`public-url-${item.id}`} className="text-sm font-medium text-zinc-700">
-                  Link video social public
-                </label>
-                <input
-                  id={`public-url-${item.id}`}
-                  className="dc-input"
-                  placeholder="Link video social public"
-                  value={publicUrlMap[item.id] ?? item.submission?.publicVideoUrl ?? item.submission?.socialPostUrl ?? ""}
-                  onChange={(e) => {
-                    setPublicUrlMap((s) => ({ ...s, [item.id]: e.target.value }));
-                    clearMissionErrorField(item.id, "publicUrl");
-                  }}
-                />
-                {formError?.publicUrl ? <p className="text-sm text-red-600">{formError.publicUrl}</p> : null}
-                <label htmlFor={`ad-code-${item.id}`} className="text-sm font-medium text-zinc-700">
-                  Mã quảng cáo (adCode)
-                </label>
-                <input id={`ad-code-${item.id}`} className="dc-input" placeholder="Mã quảng cáo (adCode)" value={adCodeMap[item.id] ?? item.submission?.adCode ?? ""} onChange={(e) => setAdCodeMap((s) => ({ ...s, [item.id]: e.target.value }))} />
-                {item.productReceiveOption === "PRODUCT_REQUIRED" ? (
+                {shouldShowPublishField("PUBLIC_URL") ? (
                   <>
-                    <div className="grid gap-1.5">
-                      <label htmlFor={`bill-upload-${item.id}`} className="text-sm font-medium text-zinc-700">Ảnh bill mua hàng</label>
-                      <input
-                        id={`bill-upload-${item.id}`}
-                        className="dc-input bg-white"
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          if (file) void uploadMissionImage(item.id, "bill", file);
-                        }}
-                        disabled={uploadingKey === `${item.id}:bill`}
-                      />
-                      {billUrlMap[item.id] || item.submission?.purchaseBillImageUrl ? <p className="text-xs text-emerald-700">Đã có ảnh bill mua hàng.</p> : null}
-                      {uploadingKey === `${item.id}:bill` ? <p className="text-xs text-zinc-500">Đang tải ảnh bill...</p> : null}
-                      {formError?.bill ? <p className="text-sm text-red-600">{formError.bill}</p> : null}
-                    </div>
-                    <div className="grid gap-1.5">
-                      <label htmlFor={`rating-upload-${item.id}`} className="text-sm font-medium text-zinc-700">Ảnh đánh giá 5 sao</label>
-                      <input
-                        id={`rating-upload-${item.id}`}
-                        className="dc-input bg-white"
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          if (file) void uploadMissionImage(item.id, "rating", file);
-                        }}
-                        disabled={uploadingKey === `${item.id}:rating`}
-                      />
-                      {ratingUrlMap[item.id] || item.submission?.productReviewScreenshotUrl ? <p className="text-xs text-emerald-700">Đã có ảnh đánh giá 5 sao.</p> : null}
-                      {uploadingKey === `${item.id}:rating` ? <p className="text-xs text-zinc-500">Đang tải ảnh đánh giá...</p> : null}
-                      {formError?.rating ? <p className="text-sm text-red-600">{formError.rating}</p> : null}
-                    </div>
+                    <label htmlFor={`public-url-${item.id}`} className="text-sm font-medium text-zinc-700">
+                      Link video social public
+                    </label>
+                    <input
+                      id={`public-url-${item.id}`}
+                      className="dc-input"
+                      placeholder="Link video social public"
+                      value={publicUrlMap[item.id] ?? item.submission?.publicVideoUrl ?? item.submission?.socialPostUrl ?? ""}
+                      onChange={(e) => {
+                        setPublicUrlMap((s) => ({ ...s, [item.id]: e.target.value }));
+                        clearMissionErrorField(item.id, "publicUrl");
+                      }}
+                    />
+                    {formError?.publicUrl ? <p className="text-sm text-red-600">{formError.publicUrl}</p> : null}
                   </>
                 ) : null}
-                <label htmlFor={`screenshot-upload-${item.id}`} className="text-sm font-medium text-zinc-700">
-                  Ảnh screenshot minh chứng
-                </label>
-                <input
-                  id={`screenshot-upload-${item.id}`}
-                  className="dc-input bg-white"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) void uploadMissionImage(item.id, "screenshot", file);
-                  }}
-                  disabled={uploadingKey === `${item.id}:screenshot`}
-                />
-                {uploadingKey === `${item.id}:screenshot` ? <p className="text-xs text-zinc-500">Đang tải ảnh screenshot...</p> : null}
-                {formError?.screenshot ? <p className="text-sm text-red-600">{formError.screenshot}</p> : null}
-                <label htmlFor={`final-note-${item.id}`} className="text-sm font-medium text-zinc-700">
-                  Ghi chú bổ sung
-                </label>
-                <textarea id={`final-note-${item.id}`} className="dc-input" placeholder="Ghi chú" value={finalNoteMap[item.id] ?? item.submission?.finalProofNote ?? ""} onChange={(e) => setFinalNoteMap((s) => ({ ...s, [item.id]: e.target.value }))} />
+                {shouldShowPublishField("AD_CODE") ? (
+                  <>
+                    <label htmlFor={`ad-code-${item.id}`} className="text-sm font-medium text-zinc-700">
+                      Mã quảng cáo (adCode)
+                    </label>
+                    <input
+                      id={`ad-code-${item.id}`}
+                      className="dc-input"
+                      placeholder="Mã quảng cáo (adCode)"
+                      value={adCodeMap[item.id] ?? item.submission?.adCode ?? ""}
+                      onChange={(e) => setAdCodeMap((s) => ({ ...s, [item.id]: e.target.value }))}
+                    />
+                  </>
+                ) : null}
+                {item.productReceiveOption === "PRODUCT_REQUIRED" ? (
+                  <>
+                    {shouldShowPublishField("PURCHASE_BILL") ? (
+                      <div className="grid gap-1.5">
+                        <label htmlFor={`bill-upload-${item.id}`} className="text-sm font-medium text-zinc-700">Ảnh bill mua hàng</label>
+                        <input
+                          id={`bill-upload-${item.id}`}
+                          className="dc-input bg-white"
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (file) void uploadMissionImage(item.id, "bill", file);
+                          }}
+                          disabled={uploadingKey === `${item.id}:bill`}
+                        />
+                        {billUrlMap[item.id] || item.submission?.purchaseBillImageUrl ? <p className="text-xs text-emerald-700">Đã có ảnh bill mua hàng.</p> : null}
+                        {uploadingKey === `${item.id}:bill` ? <p className="text-xs text-zinc-500">Đang tải ảnh bill...</p> : null}
+                        {formError?.bill ? <p className="text-sm text-red-600">{formError.bill}</p> : null}
+                      </div>
+                    ) : null}
+                    {shouldShowPublishField("PRODUCT_REVIEW_SCREENSHOT") ? (
+                      <div className="grid gap-1.5">
+                        <label htmlFor={`rating-upload-${item.id}`} className="text-sm font-medium text-zinc-700">Ảnh đánh giá 5 sao</label>
+                        <input
+                          id={`rating-upload-${item.id}`}
+                          className="dc-input bg-white"
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (file) void uploadMissionImage(item.id, "rating", file);
+                          }}
+                          disabled={uploadingKey === `${item.id}:rating`}
+                        />
+                        {ratingUrlMap[item.id] || item.submission?.productReviewScreenshotUrl ? <p className="text-xs text-emerald-700">Đã có ảnh đánh giá 5 sao.</p> : null}
+                        {uploadingKey === `${item.id}:rating` ? <p className="text-xs text-zinc-500">Đang tải ảnh đánh giá...</p> : null}
+                        {formError?.rating ? <p className="text-sm text-red-600">{formError.rating}</p> : null}
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
+                {shouldShowPublishField("SCREENSHOT") ? (
+                  <>
+                    <label htmlFor={`screenshot-upload-${item.id}`} className="text-sm font-medium text-zinc-700">
+                      Ảnh chụp màn hình minh chứng
+                    </label>
+                    <input
+                      id={`screenshot-upload-${item.id}`}
+                      className="dc-input bg-white"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) void uploadMissionImage(item.id, "screenshot", file);
+                      }}
+                      disabled={uploadingKey === `${item.id}:screenshot`}
+                    />
+                    {uploadingKey === `${item.id}:screenshot` ? <p className="text-xs text-zinc-500">Đang tải ảnh screenshot...</p> : null}
+                    {formError?.screenshot ? <p className="text-sm text-red-600">{formError.screenshot}</p> : null}
+                  </>
+                ) : null}
+                {!requestedPublishFields ? (
+                  <>
+                    <label htmlFor={`final-note-${item.id}`} className="text-sm font-medium text-zinc-700">
+                      Ghi chú bổ sung
+                    </label>
+                    <textarea id={`final-note-${item.id}`} className="dc-input" placeholder="Ghi chú" value={finalNoteMap[item.id] ?? item.submission?.finalProofNote ?? ""} onChange={(e) => setFinalNoteMap((s) => ({ ...s, [item.id]: e.target.value }))} />
+                  </>
+                ) : null}
                 {formError?.form ? <p className="text-sm text-red-600">{formError.form}</p> : null}
                 <button className="dc-btn-primary" disabled={busyId === item.id} onClick={() => void submitPublish(item)}>
                   {item.publishStatus === "REJECTED" ? "Gửi lại link social public" : "Gửi link social public"}
@@ -1022,7 +1124,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
                 <div className="mt-2 space-y-1">
                   <p>Thời gian nộp: {fmtDate(item.publishSubmittedAt)}</p>
                   <p>Link public: <UrlValue value={item.submission?.publicVideoUrl ?? item.submission?.socialPostUrl} label="Mở liên kết public" /></p>
-                  <p>Screenshot: <UrlValue value={item.submission?.screenshotUrl} label="Tải file ảnh" /></p>
+                  <p>Ảnh chụp màn hình minh chứng: <UrlValue value={item.submission?.screenshotUrl} label="Tải file ảnh" /></p>
                   <p>Mã quảng cáo: {item.submission?.adCode || "-"}</p>
                   <p>Ghi chú: {item.submission?.finalProofNote || "-"}</p>
                 </div>
@@ -1113,19 +1215,6 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
           </details>
         ) : null}
 
-        {item.missionApplication?.rejectReason ? (
-          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">Lý do từ chối đăng ký: {item.missionApplication.rejectReason}</p>
-        ) : null}
-        {item.status === "DRAFT_PENDING" && item.videoReviewFeedback ? (
-          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">Phản hồi kịch bản: {item.videoReviewFeedback}</p>
-        ) : null}
-        {item.videoReviewStatus !== "NOT_SUBMITTED" && item.videoReviewFeedback ? (
-          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">Phản hồi video: {item.videoReviewFeedback}</p>
-        ) : null}
-        {item.publishFeedback ? (
-          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">Phản hồi duyệt link public: {item.publishFeedback}</p>
-        ) : null}
-
           </>
         )}
       </div>
@@ -1158,7 +1247,8 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
                 { key: "PENDING" as const, label: "Chờ duyệt" },
                 { key: "DOING" as const, label: "Đang làm" },
                 { key: "REVISION" as const, label: "Bị từ chối" },
-                { key: "COMPLETED" as const, label: "Hoàn thành" }
+                { key: "COMPLETED" as const, label: "Hoàn thành" },
+                { key: "OVERDUE" as const, label: "Quá hạn" }
               ].map((item) => (
                 <button
                   key={item.key}
@@ -1205,7 +1295,9 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
                         <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusTone(item)}`}>{workflowStatus(item)}</span>
                       </div>
                       <div className="flex flex-wrap gap-2 xl:justify-end">
-                        {item.missionApplication?.status === "REJECTED" ? (
+                        {missionGroup(item) === "OVERDUE" ? (
+                          <button className="dc-btn-secondary" onClick={() => openMissionDetail(item.id)}>Xem chi tiết</button>
+                        ) : item.missionApplication?.status === "REJECTED" ? (
                           <button className="dc-btn-secondary" onClick={() => setRejectedMissionId(item.id)}>Thao tác</button>
                         ) : item.status === "COMPLETED" ? (
                           <button className="dc-btn-secondary" onClick={() => openMissionDetail(item.id)}>Xem chi tiết</button>

@@ -104,7 +104,8 @@ export const missionFinalReviewApproveSchema = z.object({
 });
 
 export const missionFinalReviewRejectSchema = z.object({
-  feedback: z.string().trim().min(3).max(500)
+  feedback: z.string().trim().min(3).max(500),
+  requiredResubmitFields: z.array(z.enum(["PUBLIC_URL", "AD_CODE", "SCREENSHOT", "PURCHASE_BILL", "PRODUCT_REVIEW_SCREENSHOT"])).min(1).max(5)
 });
 
 export const missionHistoryQuerySchema = z.object({

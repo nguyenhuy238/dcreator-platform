@@ -266,7 +266,7 @@ export default function CreatorWalletPage() {
           </section>
 
           <section className="mt-6">
-            <SectionHeader title="Lịch sử hoa hồng theo nhiệm vụ" subtitle={`${commission.lines.length} bản ghi`} />
+            <SectionHeader title="Lịch sử hoa hồng trò chơi" subtitle={`${commission.lines.length} bản ghi`} />
             {commission.lines.length === 0 ? (
               <EmptyState title="Chưa có thu nhập" description="Hoa hồng campaign sẽ xuất hiện khi nhiệm vụ được duyệt và ghi nhận payout." />
             ) : (

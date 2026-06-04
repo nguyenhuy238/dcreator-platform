@@ -12,7 +12,7 @@ export async function POST(request: NextRequest, { params }: Props) {
     const actor = await requireBrandActor(request);
     const body = missionFinalReviewRejectSchema.parse(await request.json());
     const { id } = await params;
-    return ok(await rejectMissionFinalReviewByBrand(actor.id, id, body.feedback));
+    return ok(await rejectMissionFinalReviewByBrand(actor.id, id, body));
   } catch (error) {
     return toErrorResponse(error);
   }

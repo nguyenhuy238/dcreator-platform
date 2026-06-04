@@ -812,5 +812,11 @@ export async function decideCreatorMissionWorkflowByAdmin(
   if (action === "APPROVE_PUBLISH_REPORT") {
     return approvePublishReportByAdmin(actorId, creatorMissionId, purchaseAmountVnd ?? 0);
   }
-  return rejectPublishReportByAdmin(actorId, creatorMissionId, reason ?? "Publish report rejected");
+  return rejectPublishReportByAdmin(actorId, creatorMissionId, reason ?? "Publish report rejected", [
+    "PUBLIC_URL",
+    "AD_CODE",
+    "SCREENSHOT",
+    "PURCHASE_BILL",
+    "PRODUCT_REVIEW_SCREENSHOT"
+  ]);
 }
