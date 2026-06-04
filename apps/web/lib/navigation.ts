@@ -40,6 +40,7 @@ const creatorNavItems: readonly NavItem[] = [
   { href: "/dashboard/creator", label: "T\u1ed5ng quan Creator", description: "Ti\u1ebfn \u0111\u1ed9 nhi\u1ec7m v\u1ee5 v\u00e0 hoa h\u1ed3ng", icon: "Gauge" },
   { href: "/dashboard/creator/jobs", label: "Campaign / Job", description: "Chi\u1ebfn d\u1ecbch c\u00f3 th\u1ec3 tham gia", icon: "Briefcase" },
   { href: "/dashboard/creator/wallet", label: "V\u00ed Creator", description: "Hoa h\u1ed3ng v\u00e0 payout", icon: "Wallet" },
+  { href: "/dashboard/creator/upgrade", label: "\u0110\u0103ng k\u00fd n\u00e2ng c\u1ea5p vai tr\u00f2", description: "\u0110\u0103ng k\u00fd Creator/Brand", icon: "UserPlus" },
   { href: "/dashboard/creator/profile", label: "H\u1ed3 s\u01a1 Creator", description: "Portfolio v\u00e0 th\u00f4ng tin Creator", icon: "UserCircle" }
 ];
 
@@ -184,6 +185,7 @@ const breadcrumbLabelMap: Record<string, string> = {
   "/dashboard/creator/channels": "K\u00eanh m\u1ea1ng x\u00e3 h\u1ed9i",
   "/dashboard/creator/profile": "H\u1ed3 s\u01a1 Creator",
   "/dashboard/creator/wallet": "V\u00ed Creator",
+  "/dashboard/creator/upgrade": "\u0110\u0103ng k\u00fd n\u00e2ng c\u1ea5p vai tr\u00f2",
   "/dashboard/brand": "Brand Dashboard",
   "/dashboard/brand/subscriptions": "M\u1ee5c ti\u00eau g\u00f3i",
   "/dashboard/brand/onboarding": "Onboarding / BCC",

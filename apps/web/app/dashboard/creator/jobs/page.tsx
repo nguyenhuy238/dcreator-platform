@@ -15,7 +15,7 @@ type MissionHistoryItem = {
   submission?: { status: string } | null;
   publishStatus: string;
   missionApplication?: { status: string; rejectReason?: string | null } | null;
-  mission: { title: string };
+  mission: { title: string; deadlineAt?: string | null };
   campaign: { id: string; title: string; slug: string; coverImageUrl?: string | null; brand?: { displayName?: string } | null };
 };
 
@@ -31,22 +31,32 @@ type CampaignItem = {
   rejectReason: string | null;
 };
 
-type HistoryStatus = "IN_PROGRESS" | "COMPLETED" | "REJECTED";
+type HistoryStatus = "IN_PROGRESS" | "COMPLETED" | "REJECTED" | "OVERDUE";
 
 const statusLabel: Record<HistoryStatus, string> = {
   IN_PROGRESS: "Đang thực hiện",
   COMPLETED: "Đã hoàn thành",
-  REJECTED: "Bị từ chối"
+  REJECTED: "Bị từ chối",
+  OVERDUE: "Quá hạn"
 };
+
+function isOverdue(deadlineAt: string | null | undefined) {
+  if (!deadlineAt) return false;
+  return new Date(deadlineAt).getTime() < Date.now();
+}
 
 function toMissionHistoryStatus(item: MissionHistoryItem): HistoryStatus {
   if (item.missionApplication?.status === "REJECTED") return "REJECTED";
   if (item.status === "COMPLETED") return "COMPLETED";
   if (item.status === "CANCELLED") return "REJECTED";
+  if (isOverdue(item.mission.deadlineAt ?? null)) return "OVERDUE";
   return "IN_PROGRESS";
 }
 
 function missionStatusLabel(item: MissionHistoryItem) {
+  if (isOverdue(item.mission.deadlineAt ?? null) && item.status !== "COMPLETED" && item.missionApplication?.status !== "REJECTED") {
+    return "Quá hạn";
+  }
   if (item.missionApplication?.status === "PENDING_REVIEW") return "Chờ duyệt tham gia";
   if (item.missionApplication?.status === "REJECTED") return "Đăng ký bị từ chối";
   if (item.status === "COMPLETED") return "Đã hoàn thành";
@@ -66,6 +76,7 @@ function missionStatusLabel(item: MissionHistoryItem) {
 }
 
 function missionStatusPillClass(label: string) {
+  if (label.includes("Quá hạn")) return "border-red-200 bg-red-50 text-red-700";
   if (label.includes("từ chối")) return "border-red-200 bg-red-50 text-red-700";
   if (label.includes("hoàn thành")) return "border-emerald-200 bg-emerald-50 text-emerald-700";
   if (label.includes("Chờ")) return "border-amber-200 bg-amber-50 text-amber-700";
@@ -192,7 +203,7 @@ export default function CreatorJobsPage() {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-black text-zinc-900">{historyTitle}</h2>
           <div className="flex flex-wrap gap-2">
-            {(Object.keys(statusLabel) as HistoryStatus[]).map((status) => (
+            {(["IN_PROGRESS", "REJECTED", "OVERDUE", "COMPLETED"] as HistoryStatus[]).map((status) => (
               <button
                 key={status}
                 type="button"
@@ -249,7 +260,7 @@ export default function CreatorJobsPage() {
                       ) : null}
                       <Link href={`/campaigns/${campaign.slug}`} className="rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100">
                         Xem chi tiết
-                    </Link>
+                      </Link>
                     </div>
                   </div>
                 </div>
