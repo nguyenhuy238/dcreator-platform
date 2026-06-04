@@ -16,6 +16,8 @@ type MissionReviewsPageProps = {
   subtitle: string;
   apiBasePath: string;
   initialTab?: MissionReviewsTabKey;
+  embedded?: boolean;
+  fixedCampaignId?: string;
 };
 
 const tabs: Array<{ key: MissionReviewsTabKey; label: string }> = [
@@ -349,7 +351,9 @@ export function MissionReviewsPage({
   pageTitle,
   subtitle,
   apiBasePath,
-  initialTab = "applications"
+  initialTab = "applications",
+  embedded = false,
+  fixedCampaignId
 }: MissionReviewsPageProps) {
   const [activeTab, setActiveTab] = useState<MissionReviewsTabKey>(initialTab);
 
@@ -359,7 +363,7 @@ export function MissionReviewsPage({
 
   return (
     <>
-      <PageHeader title={pageTitle} subtitle={subtitle} />
+      {!embedded ? <PageHeader title={pageTitle} subtitle={subtitle} /> : null}
 
       <section className="dc-card p-3">
         <div className="flex flex-wrap gap-2">
@@ -376,10 +380,10 @@ export function MissionReviewsPage({
         </div>
       </section>
 
-      {activeTab === "transcript-reviews" ? <BrandMissionTranscriptReviewsTab apiBasePath={apiBasePath} /> : null}
-      {activeTab === "applications" ? <BrandMissionApplicationsTab apiBasePath={apiBasePath} /> : null}
-      {activeTab === "video-reviews" ? <BrandMissionVideoReviewsTab apiBasePath={apiBasePath} /> : null}
-      {activeTab === "final-reviews" ? <BrandMissionFinalReviewsTab apiBasePath={apiBasePath} /> : null}
+      {activeTab === "transcript-reviews" ? <BrandMissionTranscriptReviewsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} /> : null}
+      {activeTab === "applications" ? <BrandMissionApplicationsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} /> : null}
+      {activeTab === "video-reviews" ? <BrandMissionVideoReviewsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} /> : null}
+      {activeTab === "final-reviews" ? <BrandMissionFinalReviewsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} /> : null}
     </>
   );
 }
@@ -438,7 +442,7 @@ function transcriptStatusTone(value: string) {
   return "bg-zinc-100 text-zinc-700";
 }
 
-function BrandMissionTranscriptReviewsTab({ apiBasePath }: { apiBasePath: string }) {
+function BrandMissionTranscriptReviewsTab({ apiBasePath, fixedCampaignId }: { apiBasePath: string; fixedCampaignId?: string }) {
   const [items, setItems] = useState<TranscriptItem[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
@@ -461,6 +465,7 @@ function BrandMissionTranscriptReviewsTab({ apiBasePath }: { apiBasePath: string
       const params = new URLSearchParams();
       if (query.trim()) params.set("query", query.trim());
       if (campaign.trim()) params.set("campaign", campaign.trim());
+      if (fixedCampaignId) params.set("campaignId", fixedCampaignId);
       params.set("page", String(targetPage));
       params.set("limit", "20");
 
@@ -743,7 +748,7 @@ function missionStatusTone(status: string) {
   return "bg-zinc-100 text-zinc-700";
 }
 
-function BrandMissionApplicationsTab({ apiBasePath }: { apiBasePath: string }) {
+function BrandMissionApplicationsTab({ apiBasePath, fixedCampaignId }: { apiBasePath: string; fixedCampaignId?: string }) {
   const [items, setItems] = useState<ApplicationListItem[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
@@ -770,6 +775,7 @@ function BrandMissionApplicationsTab({ apiBasePath }: { apiBasePath: string }) {
       const params = new URLSearchParams();
       if (query.trim()) params.set("query", query.trim());
       if (campaign.trim()) params.set("campaign", campaign.trim());
+      if (fixedCampaignId) params.set("campaignId", fixedCampaignId);
       params.set("status", "PENDING_REVIEW");
       params.set("page", String(targetPage));
       params.set("limit", "20");
@@ -1037,7 +1043,7 @@ const videoStatusOptions = [
   { value: "REJECTED", label: "Đã từ chối" }
 ];
 
-function BrandMissionVideoReviewsTab({ apiBasePath }: { apiBasePath: string }) {
+function BrandMissionVideoReviewsTab({ apiBasePath, fixedCampaignId }: { apiBasePath: string; fixedCampaignId?: string }) {
   const [items, setItems] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1059,6 +1065,7 @@ function BrandMissionVideoReviewsTab({ apiBasePath }: { apiBasePath: string }) {
       const params = new URLSearchParams();
       if (query.trim()) params.set("query", query.trim());
       if (campaign.trim()) params.set("campaign", campaign.trim());
+      if (fixedCampaignId) params.set("campaignId", fixedCampaignId);
       params.set("page", String(targetPage));
       params.set("limit", "20");
 
@@ -1261,7 +1268,7 @@ const finalProductOptions = [
   { value: "PRODUCT_REQUIRED", label: "Yêu cầu sản phẩm" }
 ];
 
-function BrandMissionFinalReviewsTab({ apiBasePath }: { apiBasePath: string }) {
+function BrandMissionFinalReviewsTab({ apiBasePath, fixedCampaignId }: { apiBasePath: string; fixedCampaignId?: string }) {
   const [items, setItems] = useState<FinalItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1301,6 +1308,7 @@ function BrandMissionFinalReviewsTab({ apiBasePath }: { apiBasePath: string }) {
       const params = new URLSearchParams();
       if (query.trim()) params.set("query", query.trim());
       if (campaign.trim()) params.set("campaign", campaign.trim());
+      if (fixedCampaignId) params.set("campaignId", fixedCampaignId);
       params.set("publishStatus", "PENDING");
       params.set("page", String(targetPage));
       params.set("limit", "20");
