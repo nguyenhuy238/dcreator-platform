@@ -30,6 +30,8 @@ type ProductItem = {
   }>;
 };
 
+type ProductBatch = NonNullable<ProductItem["batches"]>[number];
+
 type ProductForm = {
   sku: string;
   name: string;
@@ -104,12 +106,20 @@ function toNumber(value: string) {
 function buildProductDescription(input: ProductForm) {
   return [
     input.description.trim() ? input.description.trim() : "",
-    input.productGroup.trim() ? `Group: ${input.productGroup.trim()}` : "",
+    input.productGroup.trim() ? `Nhóm sản phẩm: ${input.productGroup.trim()}` : "",
     input.collection.trim() ? `Bộ sưu tập: ${input.collection.trim()}` : "",
     input.material.trim() ? `Chất liệu: ${input.material.trim()}` : "",
     input.color.trim() ? `Màu sắc: ${input.color.trim()}` : "",
     input.expiryDate.trim() ? `Hạn sử dụng: ${input.expiryDate.trim()}` : ""
   ].filter(Boolean).join("\n");
+}
+
+function formatFulfillmentType(value: ProductBatch["fulfillmentType"]) {
+  const labels: Record<ProductBatch["fulfillmentType"], string> = {
+    NONE_WAREHOUSE: "Kho NONE",
+    BRAND_FULFILLMENT: "Nhãn hàng tự xử lý"
+  };
+  return labels[value] ?? value;
 }
 
 export default function BrandProductsPage() {
@@ -160,8 +170,8 @@ export default function BrandProductsPage() {
 
   function getVariantNote(input: ProductVariantForm) {
     return [
-      input.name.trim() ? `Variant: ${input.name.trim()}` : "",
-      input.sku.trim() ? `Variant SKU: ${input.sku.trim()}` : "",
+      input.name.trim() ? `Phân loại: ${input.name.trim()}` : "",
+      input.sku.trim() ? `SKU phân loại: ${input.sku.trim()}` : "",
       input.imageUrl.trim() ? `Ảnh: ${input.imageUrl.trim()}` : ""
     ].filter(Boolean).join(" | ");
   }
@@ -259,7 +269,7 @@ export default function BrandProductsPage() {
         throw new Error(payload.error ?? "Không thể lưu sản phẩm");
       }
       setForm(initialForm);
-      setSuccess("Đã lưu sản phẩm cho Brand hiện tại.");
+      setSuccess("Đã lưu sản phẩm cho nhãn hàng hiện tại.");
       await load();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Không thể lưu sản phẩm");
@@ -271,32 +281,32 @@ export default function BrandProductsPage() {
   return (
     <>
       <PageHeader
-        title="Sản phẩm / SKU / Variant"
-        subtitle={`Quản lý sản phẩm riêng cho ${currentBrand?.name ?? "Brand hiện tại"}.`}
+        title="Sản phẩm / SKU / Phân loại"
+        subtitle={`Quản lý sản phẩm riêng cho ${currentBrand?.name ?? "nhãn hàng hiện tại"}.`}
       />
 
       {error ? <ErrorState title="Không thể xử lý sản phẩm" description={error} onRetry={() => void load()} /> : null}
       {success ? <p className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p> : null}
 
       <section className="dc-card p-4 lg:p-5">
-        <SectionHeader title="Thêm / cập nhật SKU" subtitle="SKU trùng trong cùng Brand sẽ được cập nhật." />
+        <SectionHeader title="Thêm / cập nhật SKU" subtitle="SKU trùng trong cùng nhãn hàng sẽ được cập nhật." />
         <form className="grid gap-4" onSubmit={submitProduct}>
           <div className="grid gap-5 2xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)] xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
           <section className="order-2 rounded-2xl border border-zinc-200 bg-white p-4 xl:order-2">
-          <SectionHeader title="PRODUCT INFORMATION" />
+          <SectionHeader title="Thông tin sản phẩm" />
           <div className="grid gap-3">
             <label className="grid gap-1 text-sm font-semibold text-zinc-700">
-              <span>Product ID <span className="text-red-500">*</span></span>
+              <span>Mã sản phẩm <span className="text-red-500">*</span></span>
               <input className="dc-input" required value={form.sku} onChange={(event) => setField("sku", event.target.value)} />
             </label>
             <label className="grid gap-1 text-sm font-semibold text-zinc-700">
-              <span>Product name <span className="text-red-500">*</span></span>
+              <span>Tên sản phẩm <span className="text-red-500">*</span></span>
               <input className="dc-input" required value={form.name} onChange={(event) => setField("name", event.target.value)} />
             </label>
             <label className="grid gap-1 text-sm font-semibold text-zinc-700">
-              Group
+              Nhóm sản phẩm
               <select className="dc-input bg-white" value={form.productGroup} onChange={(event) => setField("productGroup", event.target.value)}>
-                <option value="">Choose</option>
+                <option value="">Chọn nhóm</option>
                 <option value="Mỹ phẩm">Mỹ phẩm</option>
                 <option value="Thời trang">Thời trang</option>
                 <option value="Thực phẩm">Thực phẩm</option>
@@ -306,10 +316,10 @@ export default function BrandProductsPage() {
             <label className="grid gap-1 text-sm font-semibold text-zinc-700">
               Bộ sưu tập
               <select className="dc-input bg-white" value={form.collection} onChange={(event) => setField("collection", event.target.value)}>
-                <option value="">Choose</option>
-                <option value="New collection">New collection</option>
-                <option value="Best seller">Best seller</option>
-                <option value="Campaign reward">Campaign reward</option>
+                <option value="">Chọn bộ sưu tập</option>
+                <option value="Bộ sưu tập mới">Bộ sưu tập mới</option>
+                <option value="Bán chạy">Bán chạy</option>
+                <option value="Quà campaign">Quà campaign</option>
               </select>
             </label>
             <label className="grid gap-1 text-sm font-semibold text-zinc-700">
@@ -329,7 +339,7 @@ export default function BrandProductsPage() {
               <textarea className="dc-input min-h-24" value={form.description} onChange={(event) => setField("description", event.target.value)} />
             </label>
             <div className="grid gap-1 text-sm font-semibold text-zinc-700">
-              Product pictures
+              Ảnh sản phẩm
               <input id="product-picture-upload" className="sr-only" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={onProductImageChange} disabled={uploadingImageKey === "product"} />
               <div className="mt-1 overflow-hidden rounded-xl border border-dashed border-zinc-300 bg-zinc-50">
                 {form.imageUrl ? (
@@ -354,16 +364,16 @@ export default function BrandProductsPage() {
 
           <section className="order-1 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 xl:order-1">
             <SectionHeader
-              title="PRODUCT ITEM"
-              action={<button type="button" className="dc-btn-secondary" onClick={addVariant}>Thêm variant</button>}
+              title="Phân loại sản phẩm"
+              action={<button type="button" className="dc-btn-secondary" onClick={addVariant}>Thêm phân loại</button>}
             />
             <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white">
               <div className="grid min-w-[680px] grid-cols-[84px_1.25fr_0.9fr_96px_120px_44px] bg-zinc-50 px-3 py-3 text-xs font-bold uppercase tracking-wide text-zinc-600">
-                <div>Picture</div>
-                <div>Variant Name</div>
+                <div>Ảnh</div>
+                <div>Tên phân loại</div>
                 <div>SKU</div>
-                <div>Stock</div>
-                <div>Price</div>
+                <div>Tồn kho</div>
+                <div>Giá</div>
                 <div />
               </div>
               {form.variants.map((variant, index) => (
@@ -374,7 +384,7 @@ export default function BrandProductsPage() {
                       {variant.imageUrl ? (
                         <>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={variant.imageUrl} alt={variant.name || `Variant ${index + 1}`} className="h-full w-full object-cover" />
+                          <img src={variant.imageUrl} alt={variant.name || `Phân loại ${index + 1}`} className="h-full w-full object-cover" />
                         </>
                       ) : uploadingImageKey === `variant:${variant.id}` ? (
                         "Đang tải"
@@ -383,9 +393,9 @@ export default function BrandProductsPage() {
                       )}
                     </span>
                   </label>
-                  <input className="dc-input" value={variant.name} onChange={(event) => setVariantField(variant.id, "name", event.target.value)} placeholder="Size / Color / ..." />
+                  <input className="dc-input" value={variant.name} onChange={(event) => setVariantField(variant.id, "name", event.target.value)} placeholder="Size / Màu sắc / ..." />
                   <input className="dc-input" value={variant.sku} onChange={(event) => setVariantField(variant.id, "sku", event.target.value)} placeholder="SKU" />
-                  <input className="dc-input" type="number" min={0} value={variant.stockQty === "0" ? "" : variant.stockQty} onChange={(event) => setVariantField(variant.id, "stockQty", event.target.value || "0")} placeholder="Stock" />
+                  <input className="dc-input" type="number" min={0} value={variant.stockQty === "0" ? "" : variant.stockQty} onChange={(event) => setVariantField(variant.id, "stockQty", event.target.value || "0")} placeholder="Tồn kho" />
                   <input
                     className="dc-input"
                     type="number"
@@ -394,22 +404,22 @@ export default function BrandProductsPage() {
                     step={1000}
                     value={variant.priceVnd === "0" ? "" : variant.priceVnd}
                     onChange={(event) => setVariantField(variant.id, "priceVnd", event.target.value || "0")}
-                    placeholder="Price"
+                    placeholder="Giá"
                   />
-                  <button type="button" className="h-10 rounded-lg text-lg font-bold text-red-500 hover:bg-red-50 disabled:opacity-30" onClick={() => removeVariant(variant.id)} disabled={form.variants.length <= 1} aria-label={`Xóa variant ${index + 1}`}>
+                  <button type="button" className="h-10 rounded-lg text-lg font-bold text-red-500 hover:bg-red-50 disabled:opacity-30" onClick={() => removeVariant(variant.id)} disabled={form.variants.length <= 1} aria-label={`Xóa phân loại ${index + 1}`}>
                     ×
                   </button>
                 </div>
               ))}
             </div>
             <button type="button" className="mt-3 text-sm font-semibold text-amber-600 hover:text-amber-700" onClick={addVariant}>
-              + Add Variant
+              + Thêm phân loại
             </button>
           </section>
           </div>
           <label className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-700">
             <input type="checkbox" checked={form.campaignEligibility} onChange={(event) => setField("campaignEligibility", event.target.checked)} />
-            Có thể dùng làm reward/campaign capital
+            Có thể dùng làm reward hoặc vốn campaign
           </label>
           <button className="dc-btn-primary w-fit" type="submit" disabled={saving || Boolean(uploadingImageKey)}>
             {saving ? "Đang lưu..." : "Lưu sản phẩm"}
@@ -421,7 +431,7 @@ export default function BrandProductsPage() {
         <SectionHeader title="Danh sách sản phẩm" subtitle={`${items.length} SKU`} />
         {loading ? <LoadingSkeleton rows={4} /> : null}
         {!loading && items.length === 0 ? (
-          <EmptyState title="Chưa có sản phẩm" description="Thêm SKU đầu tiên cho Brand hiện tại." />
+          <EmptyState title="Chưa có sản phẩm" description="Thêm SKU đầu tiên cho nhãn hàng hiện tại." />
         ) : null}
         {!loading && items.length > 0 ? (
           <div className="grid gap-4 lg:grid-cols-2">
@@ -442,8 +452,8 @@ export default function BrandProductsPage() {
                 </div>
                 <p className="mt-3 text-sm text-zinc-600">{item.description || "Chưa có mô tả."}</p>
                 <div className="mt-4 grid gap-2 text-sm text-zinc-600 sm:grid-cols-2">
-                  <p>Tổng tồn kho variant: <span className="font-semibold text-zinc-900">{item.stockQty}</span></p>
-                  <p>Voucher stock: <span className="font-semibold text-zinc-900">{item.voucherStock}</span></p>
+                  <p>Tổng tồn kho phân loại: <span className="font-semibold text-zinc-900">{item.stockQty}</span></p>
+                  <p>Tồn kho voucher: <span className="font-semibold text-zinc-900">{item.voucherStock}</span></p>
                   <p>Giá vốn: <span className="font-semibold text-zinc-900">{formatVnd(item.costPriceVnd)}</span></p>
                   <p>Giá VND: <span className="font-semibold text-zinc-900">{formatVnd(item.priceVnd)}</span></p>
                   <p>Giá N-Point: <span className="font-semibold text-zinc-900">{item.pricePoints.toLocaleString("vi-VN")}</span></p>
@@ -451,15 +461,15 @@ export default function BrandProductsPage() {
                 {item.returnPolicy ? <p className="mt-3 text-sm text-zinc-600">Đổi/trả: {item.returnPolicy}</p> : null}
                 {item.batches?.length ? (
                   <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
-                    <p className="text-sm font-bold text-zinc-900">Variant / lô hàng</p>
+                    <p className="text-sm font-bold text-zinc-900">Phân loại / lô hàng</p>
                     <div className="mt-2 grid gap-2">
                       {item.batches.map((batch) => (
                         <div key={batch.id} className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-600">
-                          <p className="font-semibold text-zinc-900">{batch.opsNote || "Variant chưa đặt tên"}</p>
-                          <p>Tồn kho variant: {batch.quantity}</p>
-                          <p>Giá variant: {formatVnd(batch.appraisedValueVnd)}</p>
-                          <p>Fulfillment: {batch.fulfillmentType}</p>
-                          <p>Trạng thái: {batch.opsStatus}</p>
+                          <p className="font-semibold text-zinc-900">{batch.opsNote || "Phân loại chưa đặt tên"}</p>
+                          <p>Tồn kho phân loại: {batch.quantity}</p>
+                          <p>Giá phân loại: {formatVnd(batch.appraisedValueVnd)}</p>
+                          <p>Xử lý đơn: {formatFulfillmentType(batch.fulfillmentType)}</p>
+                          <p>Trạng thái: <StatusBadge status={batch.opsStatus} /></p>
                           {batch.expiryDate ? <p>Hạn dùng: {batch.expiryDate}</p> : null}
                         </div>
                       ))}
