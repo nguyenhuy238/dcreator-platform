@@ -546,12 +546,15 @@ export default function BrandCampaignsPage() {
                           </div>
 
                           <div className="grid gap-1 text-sm text-zinc-600 md:grid-cols-2">
-                            <p>Creator ứng tuyển: {campaign.applicationCount ?? 0}</p>
                             <p>Bắt đầu: {formatDate(campaign.startsAt)}</p>
                             <p>Kết thúc: {formatDate(campaign.endsAt)}</p>
                           </div>
 
                           <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+                              <p className="flex min-h-12 items-start text-xs leading-4 text-zinc-500">Creator ứng tuyển</p>
+                              <p className="text-lg font-black text-zinc-900">{campaign.applicationCount ?? 0}</p>
+                            </div>
                             <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
                               <p className="flex min-h-12 items-start text-xs leading-4 text-zinc-500">Creator đã tham gia</p>
                               <p className="text-lg font-black text-zinc-900">{creatorJoined}</p>
@@ -563,10 +566,6 @@ export default function BrandCampaignsPage() {
                             <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
                               <p className="flex min-h-12 items-start text-xs leading-4 text-zinc-500">Video đã duyệt</p>
                               <p className="text-lg font-black text-zinc-900">{videoApproved}</p>
-                            </div>
-                            <div className={`rounded-xl border px-3 py-2 ${campaign.reviewPendingCount ? "border-amber-200 bg-amber-50" : "border-zinc-200 bg-zinc-50"}`}>
-                              <p className={`flex min-h-12 items-start text-xs leading-4 ${campaign.reviewPendingCount ? "text-amber-700" : "text-zinc-500"}`}>Nhiệm vụ chờ duyệt</p>
-                              <p className={`text-lg font-black ${campaign.reviewPendingCount ? "text-amber-800" : "text-zinc-900"}`}>{campaign.reviewPendingCount ?? 0}</p>
                             </div>
                           </div>
 

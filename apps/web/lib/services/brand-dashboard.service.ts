@@ -940,21 +940,14 @@ export async function listBrandCampaigns(accountId: string, currentBrandId?: str
     }
   });
 
-  const applicationsByCampaign = await prisma.missionSubmission.groupBy({
-    by: ["missionId"],
-    where: { mission: { campaignId: { in: campaignIds } } },
-    _count: { _all: true }
+  const appliedCreatorPairs = await prisma.creatorMission.groupBy({
+    by: ["campaignId", "accountId"],
+    where: { campaignId: { in: campaignIds } }
   });
-  const missionIds = applicationsByCampaign.map((item) => item.missionId);
-  const missions = missionIds.length > 0
-    ? await prisma.mission.findMany({ where: { id: { in: missionIds } }, select: { id: true, campaignId: true } })
-    : [];
 
   const campaignApplicationCountMap = new Map<string, number>();
-  for (const item of applicationsByCampaign) {
-    const mission = missions.find((x) => x.id === item.missionId);
-    if (!mission) continue;
-    campaignApplicationCountMap.set(mission.campaignId, (campaignApplicationCountMap.get(mission.campaignId) ?? 0) + item._count._all);
+  for (const row of appliedCreatorPairs) {
+    campaignApplicationCountMap.set(row.campaignId, (campaignApplicationCountMap.get(row.campaignId) ?? 0) + 1);
   }
 
   const approvedCreatorPairs = await prisma.creatorMission.groupBy({
