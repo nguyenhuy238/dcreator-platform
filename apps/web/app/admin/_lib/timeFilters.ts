@@ -1,6 +1,7 @@
 export type TimeFilter =
   | "ALL"
   | "THIS_MONTH"
+  | "THIS_QUARTER"
   | "LAST_MONTH"
   | "Q1"
   | "Q2"
@@ -16,6 +17,7 @@ export type DateRange = {
 export const timeFilterOptions: { key: TimeFilter; label: string }[] = [
   { key: "ALL", label: "Tất cả thời gian" },
   { key: "THIS_MONTH", label: "Tháng này" },
+  { key: "THIS_QUARTER", label: "Quý này" },
   { key: "LAST_MONTH", label: "Tháng trước" },
   { key: "Q1", label: "Quý 1" },
   { key: "Q2", label: "Quý 2" },
@@ -30,6 +32,10 @@ export function getDateRangeByFilter(filter: TimeFilter, now = new Date()): Date
 
   if (filter === "ALL") return { start: null, end: null };
   if (filter === "THIS_MONTH") return { start: new Date(year, month, 1), end: new Date(year, month + 1, 1) };
+  if (filter === "THIS_QUARTER") {
+    const quarterStartMonth = Math.floor(month / 3) * 3;
+    return { start: new Date(year, quarterStartMonth, 1), end: new Date(year, quarterStartMonth + 3, 1) };
+  }
   if (filter === "LAST_MONTH") return { start: new Date(year, month - 1, 1), end: new Date(year, month, 1) };
   if (filter === "THIS_YEAR") return { start: new Date(year, 0, 1), end: new Date(year + 1, 0, 1) };
 

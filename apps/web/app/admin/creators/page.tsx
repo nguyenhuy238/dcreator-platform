@@ -7,6 +7,13 @@ import { AdminTabs } from "@/app/admin/_components/AdminTabs";
 import { ManagementActionMenu } from "@/app/admin/_components/ManagementActionMenu";
 import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
+import {
+  CreatorPerformanceTable,
+  PerformanceFilters,
+  PerformanceSummaryCards,
+  creatorPerformanceSortOptions
+} from "@/features/admin/performance/components";
+import { calculateCreatorPerformance, sortCreatorPerformance, type CreatorPerformanceSortKey, type PerformanceStatus } from "@/features/admin/performance/creatorPerformance";
 
 type Item = {
   id: string;
@@ -14,12 +21,20 @@ type Item = {
   verificationStatus: string;
   riskFlag: boolean;
   displayName: string;
+  handle?: string | null;
   mainPlatform: string;
   socialUrl: string;
   contentCategory: string | null;
   campaignCount: number;
+  completedCampaigns?: number | null;
+  missionSubmitted?: number | null;
+  missionApproved?: number | null;
   payoutCount: number;
+  totalPayout?: number | null;
   transactionTotal: number;
+  totalRevenueGenerated?: number | null;
+  averageCampaignPerformanceScore?: number | null;
+  lastActivityDate?: string | null;
   channelCount: number;
   account: { email: string; displayName: string };
   createdAt: string;
@@ -34,6 +49,10 @@ const tabs = [
 ];
 
 const newestLimit = 5;
+const viewTabs = [
+  { key: "directory", label: "Danh sách Creator" },
+  { key: "performance", label: "Creator Performance" }
+];
 
 function matchesCreatorSearch(item: Item, query: string) {
   const normalized = query.trim().toLowerCase();
@@ -66,8 +85,13 @@ export default function AdminCreatorsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const [view, setView] = useState("directory");
   const [query, setQuery] = useState("");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("ALL");
+  const [performanceQuery, setPerformanceQuery] = useState("");
+  const [performanceTimeFilter, setPerformanceTimeFilter] = useState<TimeFilter>("ALL");
+  const [performanceStatus, setPerformanceStatus] = useState<PerformanceStatus | "all">("all");
+  const [performanceSort, setPerformanceSort] = useState<CreatorPerformanceSortKey>("score-desc");
   const [toast, setToast] = useState("");
   const [acting, setActing] = useState(false);
   const [action, setAction] = useState<{ type: "suspend" | "unsuspend"; id: string } | null>(null);
@@ -118,6 +142,36 @@ export default function AdminCreatorsPage() {
     return { activeCount, newThisMonthCount, pendingCount, total: searchAndTimeFiltered.length, verifiedCount };
   }, [items, query, searchAndTimeFiltered]);
 
+  const performanceDateRange = useMemo(() => getDateRangeByFilter(performanceTimeFilter), [performanceTimeFilter]);
+
+  const performanceRows = useMemo(() => {
+    const normalized = performanceQuery.trim().toLowerCase();
+    const calculated = items
+      .map(calculateCreatorPerformance)
+      .filter((item) => {
+        const matchesSearch = !normalized || [item.name, item.contact, item.socialHandle].some((value) => value.toLowerCase().includes(normalized));
+        const matchesStatus = performanceStatus === "all" || item.status === performanceStatus;
+        const matchesTime = isWithinDateRange(item.lastActivityDate, performanceDateRange);
+        return matchesSearch && matchesStatus && matchesTime;
+      });
+
+    return sortCreatorPerformance(calculated, performanceSort);
+  }, [items, performanceDateRange, performanceQuery, performanceSort, performanceStatus]);
+
+  const performanceSummary = useMemo(() => {
+    const averageScore = performanceRows.length > 0 ? Math.round(performanceRows.reduce((sum, item) => sum + item.score, 0) / performanceRows.length) : 0;
+    const totalRevenue = performanceRows.reduce((sum, item) => sum + item.totalRevenueGenerated, 0);
+    const riskyCreators = performanceRows.filter((item) => item.status === "risky").length;
+    const topCreator = performanceRows[0]?.name ?? "-";
+
+    return [
+      { title: "Top Creator", value: topCreator, hint: performanceRows[0] ? `Score ${performanceRows[0].score}` : "Chưa có dữ liệu" },
+      { title: "Average Score", value: String(averageScore), hint: `${performanceRows.length} creator trong bộ lọc` },
+      { title: "Total Revenue Generated", value: `${totalRevenue.toLocaleString("vi-VN")} VND` },
+      { title: "Risky Creators", value: String(riskyCreators), hint: "Cần theo dõi thêm" }
+    ];
+  }, [performanceRows]);
+
   return (
     <>
       <PageHeader title="Quản lý Creator" subtitle="Giám sát rủi ro, moderation và trạng thái vận hành Creator (không dùng để duyệt onboarding ban đầu)." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
@@ -153,70 +207,95 @@ export default function AdminCreatorsPage() {
       {error ? <div className="mt-4"><ErrorState title="Không tải được Creator" description={error} onRetry={() => void load()} /></div> : null}
       {!loading && !error ? (
         <>
-          <section className="mt-6">
-            <SectionHeader title="Creator mới tham gia" subtitle="Các creator được tạo gần đây trong hệ thống" />
-            {newestCreators.length === 0 ? <EmptyState title="Chưa có Creator mới" description="Hệ thống chưa ghi nhận creator mới tham gia." /> : (
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                {newestCreators.map((item) => (
-                  <article key={item.id} className="dc-card p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold text-zinc-900">{item.displayName}</p>
-                        <p className="mt-1 truncate text-xs text-zinc-500">{item.account.email}</p>
-                      </div>
-                      <StatusBadge status={item.status} />
-                    </div>
-                    <p className="mt-3 text-xs text-zinc-500">{item.mainPlatform} • {item.contentCategory ?? "-"}</p>
-                    <p className="mt-1 text-xs font-medium text-zinc-700">Tham gia {formatJoinedDate(item.createdAt)}</p>
-                  </article>
-                ))}
-              </div>
-            )}
+          <section className="mt-6 dc-card p-4">
+            <AdminTabs items={viewTabs} value={view} onChange={setView} />
           </section>
-          <section className="mt-6">
-            <SectionHeader title="Tất cả Creator" />
-            {filtered.length === 0 ? <EmptyState title="Không có dữ liệu" description="Không có Creator phù hợp bộ lọc." /> : (
-              <div className="grid gap-3">
-                {filtered.map((item) => (
-                  <article key={item.id} className="dc-card p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="font-semibold">{item.displayName}</p>
-                        <p className="text-xs text-zinc-500">{item.mainPlatform} • {item.contentCategory ?? "-"} • {item.account.email}</p>
-                        <p className="mt-1 text-xs text-zinc-500">
-                          Campaign/jobs: {item.campaignCount} • Payouts: {item.payoutCount} • Channels: {item.channelCount} • Tham gia: {formatJoinedDate(item.createdAt)}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap justify-end gap-2">
-                        <StatusBadge status={item.status} />
-                        <StatusBadge status={item.verificationStatus} />
-                        {item.riskFlag ? <StatusBadge status="risk" /> : null}
-                      </div>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Link className="dc-btn-primary" href={`/admin/creators/${item.id}`}>Chi tiết</Link>
-                      <ManagementActionMenu
-                        items={[
-                          { key: "proofs", label: "Xem proofs" },
-                          { key: "campaigns", label: "Xem campaigns" },
-                          { key: "wallet", label: "Xem ví/hoa hồng" },
-                          { key: "suspend", label: "Suspend", danger: true },
-                          { key: "unsuspend", label: "Unsuspend" }
-                        ]}
-                        onSelect={(key) => {
-                          if (key === "proofs") window.location.href = "/admin/proofs";
-                          if (key === "campaigns") window.location.href = "/admin/campaigns";
-                          if (key === "wallet") window.location.href = "/admin/finance";
-                          if (key === "suspend") setAction({ type: "suspend", id: item.id });
-                          if (key === "unsuspend") setAction({ type: "unsuspend", id: item.id });
-                        }}
-                      />
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
+          {view === "performance" ? (
+            <section className="mt-6 grid gap-4">
+              <SectionHeader title="Creator Performance" subtitle="Ranking hiệu quả Creator dựa trên campaign, mission, revenue, payout và risk flag." />
+              <PerformanceSummaryCards cards={performanceSummary} />
+              <PerformanceFilters
+                search={performanceQuery}
+                searchPlaceholder="Tìm creator/email/social"
+                sort={performanceSort}
+                sortOptions={creatorPerformanceSortOptions}
+                status={performanceStatus}
+                timeRange={performanceTimeFilter}
+                onSearchChange={setPerformanceQuery}
+                onSortChange={(value) => setPerformanceSort(value as CreatorPerformanceSortKey)}
+                onStatusChange={(value) => setPerformanceStatus(value as PerformanceStatus | "all")}
+                onTimeRangeChange={(value) => setPerformanceTimeFilter(value as TimeFilter)}
+              />
+              <CreatorPerformanceTable items={performanceRows} />
+            </section>
+          ) : (
+            <>
+              <section className="mt-6">
+                <SectionHeader title="Creator mới tham gia" subtitle="Các creator được tạo gần đây trong hệ thống" />
+                {newestCreators.length === 0 ? <EmptyState title="Chưa có Creator mới" description="Hệ thống chưa ghi nhận creator mới tham gia." /> : (
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                    {newestCreators.map((item) => (
+                      <article key={item.id} className="dc-card p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-zinc-900">{item.displayName}</p>
+                            <p className="mt-1 truncate text-xs text-zinc-500">{item.account.email}</p>
+                          </div>
+                          <StatusBadge status={item.status} />
+                        </div>
+                        <p className="mt-3 text-xs text-zinc-500">{item.mainPlatform} • {item.contentCategory ?? "-"}</p>
+                        <p className="mt-1 text-xs font-medium text-zinc-700">Tham gia {formatJoinedDate(item.createdAt)}</p>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+              <section className="mt-6">
+                <SectionHeader title="Tất cả Creator" />
+                {filtered.length === 0 ? <EmptyState title="Không có dữ liệu" description="Không có Creator phù hợp bộ lọc." /> : (
+                  <div className="grid gap-3">
+                    {filtered.map((item) => (
+                      <article key={item.id} className="dc-card p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <p className="font-semibold">{item.displayName}</p>
+                            <p className="text-xs text-zinc-500">{item.mainPlatform} • {item.contentCategory ?? "-"} • {item.account.email}</p>
+                            <p className="mt-1 text-xs text-zinc-500">
+                              Campaign/jobs: {item.campaignCount} • Payouts: {item.payoutCount} • Channels: {item.channelCount} • Tham gia: {formatJoinedDate(item.createdAt)}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <StatusBadge status={item.status} />
+                            <StatusBadge status={item.verificationStatus} />
+                            {item.riskFlag ? <StatusBadge status="risk" /> : null}
+                          </div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Link className="dc-btn-primary" href={`/admin/creators/${item.id}`}>Chi tiết</Link>
+                          <ManagementActionMenu
+                            items={[
+                              { key: "proofs", label: "Xem proofs" },
+                              { key: "campaigns", label: "Xem campaigns" },
+                              { key: "wallet", label: "Xem ví/hoa hồng" },
+                              { key: "suspend", label: "Suspend", danger: true },
+                              { key: "unsuspend", label: "Unsuspend" }
+                            ]}
+                            onSelect={(key) => {
+                              if (key === "proofs") window.location.href = "/admin/proofs";
+                              if (key === "campaigns") window.location.href = "/admin/campaigns";
+                              if (key === "wallet") window.location.href = "/admin/finance";
+                              if (key === "suspend") setAction({ type: "suspend", id: item.id });
+                              if (key === "unsuspend") setAction({ type: "unsuspend", id: item.id });
+                            }}
+                          />
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </>
+          )}
         </>
       ) : null}
       {toast ? <ActionToast message={toast} /> : null}
