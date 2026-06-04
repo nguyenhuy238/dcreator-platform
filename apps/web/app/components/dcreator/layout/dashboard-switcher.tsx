@@ -6,7 +6,15 @@ import type { Role } from "@prisma/client";
 import type { UserCapabilities } from "@/lib/auth/capabilities";
 import { getAvailableWorkspaces, getWorkspaceForPath } from "@/lib/navigation";
 
-export function DashboardSwitcher({ roles, capabilities }: { roles: Role[]; capabilities: UserCapabilities }) {
+export function DashboardSwitcher({
+  roles,
+  capabilities,
+  className = "mb-4"
+}: {
+  roles: Role[];
+  capabilities: UserCapabilities;
+  className?: string;
+}) {
   const pathname = usePathname();
   const workspaces = getAvailableWorkspaces({ roles, capabilities });
   const currentWorkspace = useMemo(() => getWorkspaceForPath(pathname), [pathname]);
@@ -14,7 +22,7 @@ export function DashboardSwitcher({ roles, capabilities }: { roles: Role[]; capa
   if (workspaces.length <= 1 || !current) return null;
 
   return (
-    <div className="mb-4 flex items-center gap-3">
+    <div className={`flex flex-wrap items-center gap-3 ${className}`}>
       <label htmlFor="workspace-switcher" className="text-sm font-semibold text-zinc-700">
         Chuyển workspace
       </label>

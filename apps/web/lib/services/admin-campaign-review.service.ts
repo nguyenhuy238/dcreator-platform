@@ -423,6 +423,21 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
       });
     }
 
+    await tx.brandCampaignRequest.updateMany({
+      where: {
+        brandId: brandProfile.id,
+        requestedSlug: input.slug,
+        createdCampaignId: null,
+        status: { in: ["PENDING_REVIEW", "NEEDS_REVISION"] }
+      },
+      data: {
+        status: "APPROVED",
+        reviewedById: actorId,
+        reviewedAt: new Date(),
+        createdCampaignId: createdCampaign.id
+      }
+    });
+
     return createdCampaign;
   });
   await trySyncCampaignNewFields(campaign.id, input.benefits || null, input.participationRoadmap);
@@ -549,7 +564,7 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         budgetVnd: input.budgetVnd,
         targetAmountVnd: input.targetAmountVnd,
         ugcVideoQuota: input.ugcVideoQuota,
-        coverImageUrl: input.imageUrl === undefined ? undefined : input.imageUrl === "" ? null : input.imageUrl
+        coverImageUrl: nextImageUrl
       }
     });
 

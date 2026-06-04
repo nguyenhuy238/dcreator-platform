@@ -145,7 +145,7 @@ export default function BrandCampaignsPage() {
   }, [items, query, statusFilter, typeFilter, setupSourceFilter, sortBy]);
 
   const pendingRequests = useMemo(
-    () => requests.filter((request) => !request.createdCampaign),
+    () => requests.filter((request) => !request.createdCampaign && (request.status === "PENDING_REVIEW" || request.status === "NEEDS_REVISION")),
     [requests]
   );
   const filteredPendingRequests = useMemo(() => {
@@ -244,7 +244,7 @@ export default function BrandCampaignsPage() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex flex-wrap gap-2">
                       <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                        Đang chờ duyệt
+                        {request.status === "NEEDS_REVISION" ? "Cần bổ sung" : "Đang chờ duyệt"}
                       </span>
                       <StatusBadge status={request.campaignType} />
                       <StatusBadge status={request.setupSource} />
@@ -330,7 +330,7 @@ export default function BrandCampaignsPage() {
 
                       <div className="mt-4 flex flex-wrap gap-2">
                         <Link href={`/campaigns/${campaign.slug}`} className="dc-btn-secondary">Xem chi tiết</Link>
-                        <Link href={`/dashboard/brand/campaigns/${campaign.id}/missions`} className="dc-btn-secondary">Quản lý mission/job</Link>
+                        <Link href={`/dashboard/brand/campaigns/${campaign.id}/missions`} className="dc-btn-secondary">KPI / Analytics</Link>
                       </div>
                     </div>
                   </article>
