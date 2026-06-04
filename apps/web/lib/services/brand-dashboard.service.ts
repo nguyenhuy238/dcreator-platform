@@ -1151,9 +1151,20 @@ export async function respondBrandCampaignRequest(accountId: string, requestId: 
   if (!request) throw new AppError("Campaign request not found", 404, "CAMPAIGN_REQUEST_NOT_FOUND");
   if (request.status !== "NEEDS_REVISION") throw new AppError("Campaign request is not waiting for Brand feedback", 409, "CAMPAIGN_REQUEST_NOT_WAITING_FEEDBACK");
 
+  const nextTitle = input.title?.trim() || request.title;
+  const nextImageUrl = input.imageUrl === undefined ? extractMarkerValue(request.brief, COVER_MARKER) : input.imageUrl;
+  const nextContentFileUrl = input.contentFileUrl ?? extractMarkerValue(request.brief, CONTENT_FILE_MARKER);
+  const nextBrief = [
+    `Yêu cầu tạo campaign từ Brand: ${nextTitle}`,
+    nextImageUrl ? `${COVER_MARKER}${nextImageUrl}` : "",
+    nextContentFileUrl ? `${CONTENT_FILE_MARKER}${nextContentFileUrl}` : ""
+  ].filter(Boolean).join("\n");
+
   return prisma.brandCampaignRequest.update({
     where: { id: requestId },
     data: {
+      title: nextTitle,
+      brief: nextBrief,
       status: "PENDING_REVIEW",
       brandFeedback: input.feedback
     }
