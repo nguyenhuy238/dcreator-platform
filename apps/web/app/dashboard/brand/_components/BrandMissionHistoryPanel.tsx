@@ -202,7 +202,7 @@ function buildTimeline(item: HistoryItem): TimelineStep[] {
     { key: "videoReview", label: "Duyệt video", icon: "videoReview", done: item.videoReviewStatus === "APPROVED" || item.status === "COMPLETED", current: false, failed: item.videoReviewStatus === "REJECTED" },
     { key: "publish", label: "Nộp link public", icon: "publish", done: Boolean(item.submission?.publicVideoUrl || item.submission?.socialPostUrl || item.publishSubmittedAt), current: false, failed: false },
     { key: "publishReview", label: "Duyệt link public", icon: "publishReview", done: item.publishStatus === "APPROVED" || item.status === "COMPLETED", current: false, failed: item.publishStatus === "REJECTED" || rejected },
-    { key: "completed", label: "Hoàn thành", icon: "completed", done: item.status === "COMPLETED", current: item.status === "COMPLETED", failed: false }
+    { key: "completed", label: "Hoàn thành", icon: "completed", done: item.status === "COMPLETED", current: false, failed: false }
   ];
 
   return steps;
