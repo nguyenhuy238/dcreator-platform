@@ -12,7 +12,6 @@ import {
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { createNotification } from "@/lib/services/notification.service";
-import { saveTextUpload } from "@/lib/storage/upload";
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 type Sort = "newest" | "oldest";
@@ -208,6 +207,9 @@ function mapMission(item: CreatorMissionEntity) {
     updatedAt: item.updatedAt,
     lifecycleStatus: item.submissionLifecycleStatus,
     status: item.submissionStatus,
+    transcriptType: item.submissionTranscriptType,
+    transcriptTextNote: item.submissionTranscriptTextNote,
+    transcriptResourceUrl: item.submissionTranscriptResourceUrl,
     videoUrl: item.submissionVideoUrl,
     socialPostUrl: item.submissionSocialPostUrl,
     screenshotUrl: item.submissionScreenshotUrl,
@@ -774,7 +776,6 @@ export async function submitPublishReport(
       socialPostUrl: payload.socialPostUrl,
       publicVideoUrl: payload.socialPostUrl,
       adCode: payload.adCode ?? null,
-      proofTextNote: payload.adCode ?? null,
       screenshotUrl: payload.screenshotUrl ?? null,
       purchaseBillImageUrl: purchaseBillImageUrl ?? current.submissionPurchaseBillImageUrl,
       productReviewScreenshotUrl: productReviewScreenshotUrl ?? current.submissionProductReviewScreenshotUrl,
@@ -792,7 +793,6 @@ export async function submitPublishReport(
         submissionSocialPostUrl: payload.socialPostUrl,
         submissionPublicVideoUrl: payload.socialPostUrl,
         submissionAdCode: payload.adCode ?? null,
-        submissionProofTextNote: payload.adCode ?? null,
         submissionScreenshotUrl: payload.screenshotUrl ?? null,
         submissionPurchaseBillImageUrl: purchaseBillImageUrl ?? current.submissionPurchaseBillImageUrl,
         submissionProductReviewScreenshotUrl: productReviewScreenshotUrl ?? current.submissionProductReviewScreenshotUrl,
@@ -1046,7 +1046,12 @@ export async function submitCreatorMissionVideo(accountId: string, creatorMissio
   return submitDraft(creatorMissionId, accountId, payload);
 }
 
-export async function submitCreatorMissionTranscript(accountId: string, creatorMissionId: string, transcript: string) {
+type TranscriptSubmissionInput =
+  | { mode: "TEXT"; transcript: string }
+  | { mode: "FILE"; fileUploadUrl: string }
+  | { mode: "URL"; fileUploadUrl: string };
+
+export async function submitCreatorMissionTranscript(accountId: string, creatorMissionId: string, payload: TranscriptSubmissionInput) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
   if (current.status === "COMPLETED") throw new AppError("Mission already completed", 409, "CREATOR_MISSION_ALREADY_COMPLETED");
   if (current.videoReviewStatus === "PENDING" || current.videoReviewStatus === "APPROVED") {
@@ -1056,32 +1061,29 @@ export async function submitCreatorMissionTranscript(accountId: string, creatorM
     throw new AppError("Purchase proof is required before transcript submission", 409, "PURCHASE_PROOF_REQUIRED");
   }
 
-  const sanitizedHtml = normalizeTranscriptHtml(transcript.trim());
-  const plainText = transcriptHtmlToPlainText(sanitizedHtml);
-  if (!plainText) throw new AppError("Transcript is required", 422, "TRANSCRIPT_REQUIRED");
-  const transcriptFileUrl = await saveTextUpload({
-    content: plainText,
-    folder: "creator-transcript",
-    suffix: `mission-transcript-${creatorMissionId}`,
-    ext: "txt"
-  });
+  let transcriptHtml: string | null = null;
+  let transcriptFileUrl: string | null = null;
+
+  if (payload.mode === "TEXT") {
+    const sanitizedHtml = normalizeTranscriptHtml(payload.transcript.trim());
+    const plainText = transcriptHtmlToPlainText(sanitizedHtml);
+    if (!plainText) throw new AppError("Transcript is required", 422, "TRANSCRIPT_REQUIRED");
+    transcriptHtml = sanitizedHtml;
+  } else {
+    const fileUrl = payload.fileUploadUrl.trim();
+    if (!fileUrl) throw new AppError("Transcript file or URL is required", 422, "TRANSCRIPT_FILE_REQUIRED");
+    transcriptFileUrl = fileUrl;
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
-    await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
-      proofTextNote: sanitizedHtml,
-      fileUploadUrl: transcriptFileUrl,
-      status: "SUBMITTED",
-      lifecycleStatus: "SUBMITTED",
-      rejectReason: null,
-      reviewedById: null,
-      reviewedAt: null,
-      approvedAt: null
-    });
     return tx.creatorMission.update({
       where: { id: creatorMissionId },
       data: {
-        submissionProofTextNote: sanitizedHtml,
-        submissionFileUploadUrl: transcriptFileUrl,
+        submissionTranscriptType: payload.mode,
+        submissionTranscriptTextNote: transcriptHtml,
+        submissionTranscriptResourceUrl: transcriptFileUrl,
+        submissionProofTextNote: null,
+        submissionFileUploadUrl: null,
         submissionStatus: "SUBMITTED",
         submissionLifecycleStatus: "SUBMITTED",
         submissionRejectReason: null,
@@ -1705,7 +1707,10 @@ export async function listMissionTranscriptReviewsForAdmin(input: {
 }) {
   const where: Prisma.CreatorMissionWhereInput = {
     applicationStatus: "APPROVED",
-    submissionProofTextNote: { not: null }
+    OR: [
+      { submissionTranscriptTextNote: { not: null } },
+      { submissionTranscriptResourceUrl: { not: null } }
+    ]
   };
 
   if (input.status === "PENDING") {
@@ -1751,13 +1756,17 @@ export async function listMissionTranscriptReviewsForAdmin(input: {
 
 export async function getMissionTranscriptReviewDetailForAdmin(id: string) {
   const item = await getMissionById(id);
-  if (!item || !item.submissionProofTextNote) throw new AppError("Creator mission transcript not found", 404, "CREATOR_MISSION_TRANSCRIPT_NOT_FOUND");
+  if (!item || (!item.submissionTranscriptTextNote && !item.submissionTranscriptResourceUrl)) {
+    throw new AppError("Creator mission transcript not found", 404, "CREATOR_MISSION_TRANSCRIPT_NOT_FOUND");
+  }
   return mapMission(item);
 }
 
 export async function approveMissionTranscriptReviewByAdmin(actorId: string, id: string) {
   const current = await getMissionById(id);
-  if (!current || !current.submissionProofTextNote) throw new AppError("Creator mission transcript not found", 404, "CREATOR_MISSION_TRANSCRIPT_NOT_FOUND");
+  if (!current || (!current.submissionTranscriptTextNote && !current.submissionTranscriptResourceUrl)) {
+    throw new AppError("Creator mission transcript not found", 404, "CREATOR_MISSION_TRANSCRIPT_NOT_FOUND");
+  }
   if (current.status !== "DRAFT_PENDING" || current.submissionStatus !== "SUBMITTED") {
     throw new AppError("Transcript is not pending review", 409, "CREATOR_MISSION_TRANSCRIPT_INVALID_STATUS");
   }
@@ -1796,7 +1805,9 @@ export async function approveMissionTranscriptReviewByAdmin(actorId: string, id:
 
 export async function rejectMissionTranscriptReviewByAdmin(actorId: string, id: string, feedback: string) {
   const current = await getMissionById(id);
-  if (!current || !current.submissionProofTextNote) throw new AppError("Creator mission transcript not found", 404, "CREATOR_MISSION_TRANSCRIPT_NOT_FOUND");
+  if (!current || (!current.submissionTranscriptTextNote && !current.submissionTranscriptResourceUrl)) {
+    throw new AppError("Creator mission transcript not found", 404, "CREATOR_MISSION_TRANSCRIPT_NOT_FOUND");
+  }
   if (current.status !== "DRAFT_PENDING" || current.submissionStatus !== "SUBMITTED") {
     throw new AppError("Transcript is not pending review", 409, "CREATOR_MISSION_TRANSCRIPT_INVALID_STATUS");
   }
@@ -2052,7 +2063,10 @@ export async function listMissionTranscriptReviewsForBrand(
   const where: Prisma.CreatorMissionWhereInput = {
     applicationStatus: "APPROVED",
     campaign: { brandId: brandOwnerAccountId },
-    submissionProofTextNote: { not: null }
+    OR: [
+      { submissionTranscriptTextNote: { not: null } },
+      { submissionTranscriptResourceUrl: { not: null } }
+    ]
   };
 
   if (input.status === "PENDING") {

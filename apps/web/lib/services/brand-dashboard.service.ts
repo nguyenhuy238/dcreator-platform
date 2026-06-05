@@ -983,7 +983,10 @@ export async function listBrandCampaigns(accountId: string, currentBrandId?: str
         applicationStatus: "APPROVED",
         status: "DRAFT_PENDING",
         submissionStatus: "SUBMITTED",
-        submissionProofTextNote: { not: null }
+        OR: [
+          { submissionTranscriptTextNote: { not: null } },
+          { submissionTranscriptResourceUrl: { not: null } }
+        ]
       },
       _count: { _all: true }
     }),

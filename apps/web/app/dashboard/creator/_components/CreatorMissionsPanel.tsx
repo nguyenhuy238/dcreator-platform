@@ -41,6 +41,9 @@ type MissionItem = {
   };
   campaign: { title: string; slug: string };
   submission: {
+    transcriptType: "TEXT" | "FILE" | "URL" | null;
+    transcriptTextNote: string | null;
+    transcriptResourceUrl: string | null;
     videoUrl: string | null;
     note: string | null;
     rejectReason: string | null;
@@ -66,9 +69,11 @@ type MissionItem = {
 type FormMap = Record<string, string>;
 type PreVideoChoice = "VIDEO" | "TRANSCRIPT";
 type PreVideoChoiceMap = Record<string, PreVideoChoice>;
+type TranscriptMode = "TEXT" | "FILE" | "URL";
+type TranscriptModeMap = Record<string, TranscriptMode>;
 type MissionFilter = "ALL" | "DOING" | "PENDING" | "REVISION" | "COMPLETED" | "OVERDUE";
 type MissionSort = "APPROVED_NEWEST" | "APPROVED_OLDEST" | "EXPIRING_SOON";
-type MissionErrorField = "form" | "bill" | "rating" | "transcript" | "videoUrl" | "videoNote" | "publicUrl" | "adCode" | "screenshot" | "finalNote";
+type MissionErrorField = "form" | "bill" | "rating" | "transcript" | "transcriptFile" | "transcriptUrl" | "videoUrl" | "videoNote" | "publicUrl" | "adCode" | "screenshot" | "finalNote";
 type MissionFormErrors = Partial<Record<MissionErrorField, string>>;
 type DetailTab = "ACTIONS" | "HISTORY";
 
@@ -150,14 +155,39 @@ function transcriptDownloadHref(value: string | null | undefined) {
   return external ?? null;
 }
 
+function isTranscriptUploadPath(value: string | null | undefined) {
+  return Boolean(value?.trim().startsWith("/uploads/creator-transcript/"));
+}
+
+function transcriptModeFromSubmission(submission: MissionItem["submission"]): TranscriptMode {
+  if (submission?.transcriptType) return submission.transcriptType;
+  if (toPlainTranscript(submission?.transcriptTextNote)) return "TEXT";
+  if (isTranscriptUploadPath(submission?.transcriptResourceUrl)) return "FILE";
+  if (submission?.transcriptResourceUrl?.trim()) return "URL";
+  return "TEXT";
+}
+
+function transcriptLinkLabel(value: string | null | undefined) {
+  return isTranscriptUploadPath(value) ? "Tải file kịch bản" : "Mở link kịch bản";
+}
+
+function transcriptModeLabel(mode: TranscriptMode | null | undefined, resourceUrl?: string | null) {
+  if (mode === "TEXT") return "Viết trực tiếp";
+  if (mode === "FILE") return "Tải file lên";
+  if (mode === "URL") return "Gửi link URL";
+  return resourceUrl ? (isTranscriptUploadPath(resourceUrl) ? "Tải file lên" : "Gửi link URL") : "Viết trực tiếp";
+}
+
 function workflowStatus(item: MissionItem) {
   const purchaseDone = item.productReceiveOption === "NO_PRODUCT_REQUIRED" || item.productStatus === "RECEIVED";
-  const transcriptText = Boolean(toPlainTranscript(item.submission?.proofTextNote));
+  const transcriptText = Boolean(toPlainTranscript(item.submission?.transcriptTextNote));
+  const transcriptFile = Boolean(item.submission?.transcriptResourceUrl?.trim());
   const hasTranscriptSubmitted =
     item.status === "DRAFT_PENDING" ||
     item.submission?.status === "SUBMITTED" ||
     item.submission?.status === "APPROVED" ||
-    transcriptText;
+    transcriptText ||
+    transcriptFile;
   const transcriptPending = item.status === "DRAFT_PENDING" && item.submission?.status === "SUBMITTED";
   const transcriptRejected = item.status === "DRAFT_PENDING" && item.submission?.status === "REJECTED";
   const transcriptApproved = hasTranscriptSubmitted && !transcriptPending && !transcriptRejected;
@@ -344,6 +374,8 @@ export function CreatorMissionsPanel({
   const [videoUrlMap, setVideoUrlMap] = useState<FormMap>({});
   const [videoNoteMap, setVideoNoteMap] = useState<FormMap>({});
   const [transcriptMap, setTranscriptMap] = useState<FormMap>({});
+  const [transcriptModeMap, setTranscriptModeMap] = useState<TranscriptModeMap>({});
+  const [transcriptUrlMap, setTranscriptUrlMap] = useState<FormMap>({});
   const [preVideoChoiceMap, setPreVideoChoiceMap] = useState<PreVideoChoiceMap>({});
   const [publicUrlMap, setPublicUrlMap] = useState<FormMap>({});
   const [adCodeMap, setAdCodeMap] = useState<FormMap>({});
@@ -414,9 +446,20 @@ export function CreatorMissionsPanel({
   }
 
   async function submitTranscript(item: MissionItem) {
-    const transcript = transcriptMap[item.id]?.trim() ?? toPlainTranscript(item.submission?.proofTextNote);
-    if (!transcript) {
+    const mode = transcriptModeMap[item.id] ?? transcriptModeFromSubmission(item.submission);
+    const transcript = transcriptMap[item.id]?.trim() ?? toPlainTranscript(item.submission?.transcriptTextNote);
+    const transcriptUrl = transcriptUrlMap[item.id]?.trim() ?? item.submission?.transcriptResourceUrl?.trim() ?? "";
+
+    if (mode === "TEXT" && !transcript) {
       setMissionFormErrors(item.id, { transcript: "Bạn chưa nhập nội dung kịch bản." });
+      return;
+    }
+    if (mode === "FILE" && !transcriptUrl) {
+      setMissionFormErrors(item.id, { transcriptFile: "Bạn chưa tải file kịch bản lên." });
+      return;
+    }
+    if (mode === "URL" && !transcriptUrl) {
+      setMissionFormErrors(item.id, { transcriptUrl: "Bạn chưa nhập link kịch bản." });
       return;
     }
 
@@ -427,7 +470,11 @@ export function CreatorMissionsPanel({
       await fetchJson(`/api/creator/missions/${item.id}/transcript-submission`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transcript })
+        body: JSON.stringify(
+          mode === "TEXT"
+            ? { mode, transcript }
+            : { mode, fileUploadUrl: mode === "URL" ? normalizeHttpUrl(transcriptUrl) : transcriptUrl }
+        )
       });
       pushSuccess("Đã gửi kịch bản. Vui lòng chờ Brand/Admin duyệt trước khi nộp video review.");
       await load();
@@ -526,6 +573,30 @@ export function CreatorMissionsPanel({
       setMissionErrors((prev) => ({
         ...prev,
         [missionId]: { ...prev[missionId], [field]: toErrorMessage(e) }
+      }));
+    } finally {
+      setUploadingKey("");
+    }
+  }
+
+  async function uploadTranscriptFile(missionId: string, file: File) {
+    const formData = new FormData();
+    formData.append("transcript", file);
+    const key = `${missionId}:transcript-file`;
+    setUploadingKey(key);
+    clearMissionErrorField(missionId, "transcriptFile");
+    try {
+      const response = await fetch("/api/uploads/creator-transcript", { method: "POST", body: formData });
+      const payload = (await response.json()) as ApiResult<{ transcriptFileUrl: string }>;
+      const uploadedTranscriptUrl = payload.data?.transcriptFileUrl;
+      if (!response.ok || !payload.success || !uploadedTranscriptUrl) {
+        throw new Error(payload.error ?? "Không thể tải file kịch bản.");
+      }
+      setTranscriptUrlMap((prev) => ({ ...prev, [missionId]: uploadedTranscriptUrl }));
+    } catch (e) {
+      setMissionErrors((prev) => ({
+        ...prev,
+        [missionId]: { ...prev[missionId], transcriptFile: toErrorMessage(e) }
       }));
     } finally {
       setUploadingKey("");
@@ -643,12 +714,14 @@ export function CreatorMissionsPanel({
 
   function buildMissionTimeline(item: MissionItem): TimelineStep[] {
     const purchaseDone = item.productReceiveOption === "NO_PRODUCT_REQUIRED" || item.productStatus === "RECEIVED";
-    const transcriptText = Boolean(toPlainTranscript(item.submission?.proofTextNote));
+    const transcriptText = Boolean(toPlainTranscript(item.submission?.transcriptTextNote));
+    const transcriptFile = Boolean(item.submission?.transcriptResourceUrl?.trim());
     const hasTranscriptSubmitted =
       item.status === "DRAFT_PENDING" ||
       item.submission?.status === "SUBMITTED" ||
       item.submission?.status === "APPROVED" ||
-      transcriptText;
+      transcriptText ||
+      transcriptFile;
     const hasVideoSubmitted = item.videoReviewStatus !== "NOT_SUBMITTED" || Boolean(item.submission?.videoUrl?.trim());
     const videoApproved = item.videoReviewStatus === "APPROVED";
     const hasPublishSubmitted = item.publishStatus !== "NOT_SUBMITTED";
@@ -770,7 +843,7 @@ export function CreatorMissionsPanel({
       item.publishStatus !== "PENDING" &&
       (item.productReceiveOption === "NO_PRODUCT_REQUIRED" || item.productStatus === "RECEIVED");
     const isTranscriptFlow = item.status === "DRAFT_PENDING";
-    const hasTranscript = Boolean(item.submission?.proofTextNote?.trim());
+    const hasTranscript = Boolean(item.submission?.transcriptTextNote?.trim() || item.submission?.transcriptResourceUrl?.trim());
     const hasVideoSubmission = item.videoReviewStatus !== "NOT_SUBMITTED" || Boolean(item.submission?.videoUrl?.trim());
     const selectedChoice =
       preVideoChoiceMap[item.id] ??
@@ -785,9 +858,11 @@ export function CreatorMissionsPanel({
     const showProductSection = item.productReceiveOption === "PRODUCT_REQUIRED";
     const timelineSteps = buildMissionTimeline(item);
     const formError = missionErrors[item.id];
+    const transcriptMode = transcriptModeMap[item.id] ?? transcriptModeFromSubmission(item.submission);
+    const transcriptFileUrl = transcriptUrlMap[item.id] ?? item.submission?.transcriptResourceUrl ?? "";
     const hasAnyHistory =
       Boolean(item.purchaseProofSubmittedAt || item.videoSubmittedAt || item.publishSubmittedAt) ||
-      Boolean(item.submission?.purchaseBillImageUrl || item.submission?.proofTextNote || item.submission?.videoUrl || item.submission?.publicVideoUrl || item.submission?.socialPostUrl);
+      Boolean(item.submission?.purchaseBillImageUrl || item.submission?.transcriptTextNote || item.submission?.transcriptResourceUrl || item.submission?.videoUrl || item.submission?.publicVideoUrl || item.submission?.socialPostUrl);
     const rejectionNotices = (
       <>
         {item.missionApplication?.rejectReason ? (
@@ -881,31 +956,98 @@ export function CreatorMissionsPanel({
             <div className="rounded-xl border border-zinc-200 bg-white p-3">
               <p className="font-medium">Nộp kịch bản</p>
               {isTranscriptFlow && item.submission?.status === "SUBMITTED" ? <p className="mt-1 text-sm text-zinc-600">Kịch bản đã gửi, đang chờ duyệt.</p> : null}
-              {item.submission?.fileUploadUrl ? (
-                <a
-                  href={transcriptDownloadHref(item.submission.fileUploadUrl) ?? "#"}
-                  download
-                  className="mt-2 inline-flex text-sm font-semibold text-zinc-900 underline"
-                >
-                  Tải file kịch bản (.txt)
-                </a>
-              ) : null}
               <div className="mt-2 grid gap-2">
-                <label htmlFor={`transcript-${item.id}`} className="text-sm font-medium text-zinc-700">
-                  Nội dung kịch bản
-                </label>
-                <textarea
-                  id={`transcript-${item.id}`}
-                  className="dc-input min-h-32"
-                  placeholder="Nhập nội dung kịch bản"
-                  disabled={isTranscriptFlow && item.submission?.status === "SUBMITTED"}
-                  value={transcriptMap[item.id] ?? toPlainTranscript(item.submission?.proofTextNote)}
-                  onChange={(event) => {
-                    setTranscriptMap((s) => ({ ...s, [item.id]: event.target.value }));
-                    clearMissionErrorField(item.id, "transcript");
-                  }}
-                />
-                {formError?.transcript ? <p className="text-sm text-red-600">{formError.transcript}</p> : null}
+                <p className="text-sm font-medium text-zinc-700">Hình thức gửi kịch bản</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { key: "TEXT" as const, label: "Viết trực tiếp" },
+                    { key: "FILE" as const, label: "Tải file lên" },
+                    { key: "URL" as const, label: "Gửi link URL" }
+                  ].map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      disabled={isTranscriptFlow && item.submission?.status === "SUBMITTED"}
+                      className={transcriptMode === option.key ? "rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-semibold text-white" : "rounded-full border border-zinc-200 px-4 py-1.5 text-sm font-semibold text-zinc-600"}
+                      onClick={() => {
+                        setTranscriptModeMap((prev) => ({ ...prev, [item.id]: option.key }));
+                        clearMissionFormErrors(item.id);
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+
+                {transcriptMode === "TEXT" ? (
+                  <>
+                    <label htmlFor={`transcript-${item.id}`} className="text-sm font-medium text-zinc-700">
+                      Nội dung kịch bản
+                    </label>
+                    <textarea
+                      id={`transcript-${item.id}`}
+                      className="dc-input min-h-32"
+                      placeholder="Nhập nội dung kịch bản"
+                      disabled={isTranscriptFlow && item.submission?.status === "SUBMITTED"}
+                      value={transcriptMap[item.id] ?? toPlainTranscript(item.submission?.transcriptTextNote)}
+                      onChange={(event) => {
+                        setTranscriptMap((s) => ({ ...s, [item.id]: event.target.value }));
+                        clearMissionErrorField(item.id, "transcript");
+                      }}
+                    />
+                    {formError?.transcript ? <p className="text-sm text-red-600">{formError.transcript}</p> : null}
+                  </>
+                ) : null}
+
+                {transcriptMode === "FILE" ? (
+                  <>
+                    <label htmlFor={`transcript-file-${item.id}`} className="text-sm font-medium text-zinc-700">
+                      File kịch bản
+                    </label>
+                    <input
+                      id={`transcript-file-${item.id}`}
+                      type="file"
+                      className="dc-input"
+                      accept=".txt,.pdf,.doc,.docx,text/plain,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) void uploadTranscriptFile(item.id, file);
+                      }}
+                      disabled={isTranscriptFlow && item.submission?.status === "SUBMITTED" || uploadingKey === `${item.id}:transcript-file`}
+                    />
+                    {uploadingKey === `${item.id}:transcript-file` ? <p className="text-xs text-zinc-500">Đang tải file kịch bản...</p> : null}
+                    {transcriptFileUrl ? (
+                      <p className="text-sm text-zinc-700">
+                        File hiện tại:{" "}
+                        <a href={transcriptDownloadHref(transcriptFileUrl) ?? "#"} className="font-semibold text-zinc-900 underline break-all" target={isTranscriptUploadPath(transcriptFileUrl) ? undefined : "_blank"} rel="noreferrer">
+                          {transcriptLinkLabel(transcriptFileUrl)}
+                        </a>
+                      </p>
+                    ) : null}
+                    {formError?.transcriptFile ? <p className="text-sm text-red-600">{formError.transcriptFile}</p> : null}
+                  </>
+                ) : null}
+
+                {transcriptMode === "URL" ? (
+                  <>
+                    <label htmlFor={`transcript-url-${item.id}`} className="text-sm font-medium text-zinc-700">
+                      Link kịch bản
+                    </label>
+                    <input
+                      id={`transcript-url-${item.id}`}
+                      className="dc-input"
+                      placeholder="https://..."
+                      disabled={isTranscriptFlow && item.submission?.status === "SUBMITTED"}
+                      value={transcriptUrlMap[item.id] ?? (!isTranscriptUploadPath(item.submission?.transcriptResourceUrl) ? item.submission?.transcriptResourceUrl ?? "" : "")}
+                      onChange={(event) => {
+                        setTranscriptUrlMap((prev) => ({ ...prev, [item.id]: event.target.value }));
+                        clearMissionErrorField(item.id, "transcriptUrl");
+                      }}
+                    />
+                    {formError?.transcriptUrl ? <p className="text-sm text-red-600">{formError.transcriptUrl}</p> : null}
+                  </>
+                ) : null}
+
                 {formError?.form ? <p className="text-sm text-red-600">{formError.form}</p> : null}
                 {!(isTranscriptFlow && item.submission?.status === "SUBMITTED") ? (
                   <button className="dc-btn-primary" disabled={busyId === item.id} onClick={() => void submitTranscript(item)}>
@@ -1116,18 +1258,29 @@ export function CreatorMissionsPanel({
               </details>
             ) : null}
 
-            {item.submission?.proofTextNote || item.submission?.fileUploadUrl ? (
+            {item.submission?.transcriptTextNote || item.submission?.transcriptResourceUrl ? (
               <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
                 <summary className="cursor-pointer font-semibold text-zinc-900">Bước kịch bản</summary>
                 <div className="mt-2 space-y-1">
-                  <p>Nội dung kịch bản:</p>
-                  <p className="whitespace-pre-line">{toPlainTranscript(item.submission?.proofTextNote) || "-"}</p>
-                  {item.submission?.fileUploadUrl ? (
+                  <p>Hình thức gửi: {transcriptModeLabel(item.submission?.transcriptType, item.submission?.transcriptResourceUrl)}</p>
+                  {toPlainTranscript(item.submission?.transcriptTextNote) ? (
+                    <>
+                      <p>Nội dung kịch bản:</p>
+                      <p className="whitespace-pre-line">{toPlainTranscript(item.submission?.transcriptTextNote)}</p>
+                    </>
+                  ) : null}
+                  {item.submission?.transcriptResourceUrl ? (
                     <p>
-                      File đính kèm:{" "}
-                      {transcriptDownloadHref(item.submission.fileUploadUrl) ? (
-                        <a href={transcriptDownloadHref(item.submission.fileUploadUrl) ?? "#"} download className="font-semibold text-zinc-900 underline break-all">
-                          Tải file kịch bản
+                      {isTranscriptUploadPath(item.submission.transcriptResourceUrl) ? "File kịch bản: " : "Link kịch bản: "}
+                      {transcriptDownloadHref(item.submission.transcriptResourceUrl) ? (
+                        <a
+                          href={transcriptDownloadHref(item.submission.transcriptResourceUrl) ?? "#"}
+                          download={isTranscriptUploadPath(item.submission.transcriptResourceUrl)}
+                          className="font-semibold text-zinc-900 underline break-all"
+                          target={isTranscriptUploadPath(item.submission.transcriptResourceUrl) ? undefined : "_blank"}
+                          rel="noreferrer"
+                        >
+                          {transcriptLinkLabel(item.submission.transcriptResourceUrl)}
                         </a>
                       ) : (
                         "-"

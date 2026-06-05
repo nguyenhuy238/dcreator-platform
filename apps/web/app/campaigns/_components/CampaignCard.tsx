@@ -45,9 +45,11 @@ export function CampaignCard({ campaign, compact = false }: { campaign: Campaign
         </div>
       </div>
 
-      <div className={`grid h-full gap-y-3 p-5 ${compact ? "grid-rows-[4rem_1.5rem_1fr]" : "grid-rows-[4rem_1.5rem_92px_5.5rem_1fr]"}`}>
-        <h3 className="line-clamp-2 text-2xl font-black leading-tight text-zinc-900">{campaign.title}</h3>
-        <p className="text-sm font-semibold text-zinc-600">Brand: {campaign.brand}</p>
+      <div className={`grid h-full ${compact ? "grid-rows-[auto_auto] gap-y-2.5 p-4" : "grid-rows-[4rem_1.5rem_92px_5.5rem_1fr] gap-y-3 p-5"}`}>
+        <div className={compact ? "grid gap-1.5" : "contents"}>
+          <h3 className={`line-clamp-2 text-2xl font-black leading-tight text-zinc-900 ${compact ? "min-h-[4rem]" : ""}`}>{campaign.title}</h3>
+          <p className={`text-sm font-semibold leading-5 text-zinc-600 ${compact ? "line-clamp-2 min-h-[2.5rem]" : ""}`}>Brand: {campaign.brand}</p>
+        </div>
 
         {!compact ? (
           <>
@@ -71,14 +73,14 @@ export function CampaignCard({ campaign, compact = false }: { campaign: Campaign
           </>
         ) : null}
 
-        <div className="flex items-end pt-1">
-          <div className="flex items-center gap-2">
+        <div className={compact ? "pt-0.5" : "pt-1"}>
+          <div className={`flex flex-wrap items-center gap-2 ${compact ? "md:flex-nowrap" : ""}`}>
             <div className="min-w-0 flex-1">
               <CreatorCampaignApplyButton slug={campaign.slug} compact inline hideStatusMessage />
             </div>
             <Link
               href={`/campaigns/${campaign.slug}`}
-              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
+              className={`inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100 ${compact ? "px-3 py-2" : "px-3 py-2"}`}
               aria-label={`Xem chi ti\u1ebft ${campaign.title}`}
             >
               {"Xem chi ti\u1ebft"}

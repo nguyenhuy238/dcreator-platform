@@ -237,6 +237,12 @@ enum CreatorMissionPublishStatus {
   REJECTED
 }
 
+enum TranscriptSubmissionType {
+  TEXT
+  FILE
+  URL
+}
+
 enum ReviewDecision {
   APPROVED
   REJECTED
@@ -1112,6 +1118,9 @@ model CreatorMission {
   submissionScreenshotUrl     String?
   submissionFileUploadUrl     String?
   submissionProofTextNote     String?
+  submissionTranscriptType    TranscriptSubmissionType?
+  submissionTranscriptTextNote String?
+  submissionTranscriptResourceUrl String?
   submissionNote              String?
   submissionRejectReason      String?
   submissionPurchaseBillImageUrl String?

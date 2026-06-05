@@ -67,6 +67,21 @@ function asLink(value: string | null | undefined) {
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
+function isTranscriptUploadPath(value: string | null | undefined) {
+  return Boolean(value?.trim().startsWith("/uploads/creator-transcript/"));
+}
+
+function transcriptLinkLabel(value: string | null | undefined) {
+  return isTranscriptUploadPath(value) ? "Tải file kịch bản" : "Mở link kịch bản";
+}
+
+function transcriptModeLabel(mode: "TEXT" | "FILE" | "URL" | null | undefined, resourceUrl?: string | null) {
+  if (mode === "TEXT") return "Viết trực tiếp";
+  if (mode === "FILE") return "Tải file lên";
+  if (mode === "URL") return "Gửi link URL";
+  return resourceUrl ? (isTranscriptUploadPath(resourceUrl) ? "Tải file lên" : "Gửi link URL") : "Viết trực tiếp";
+}
+
 function UrlValue({ value, label }: { value: string | null | undefined; label?: string }) {
   const href = asLink(value);
   if (!href) return <span>-</span>;
@@ -489,6 +504,9 @@ type TranscriptItem = {
   campaign: { id: string; title: string; slug: string; brandId: string };
   mission: { id: string; title: string; description: string; rewardPoints: number; productReceiveOption: string; productLink: string | null; deadlineAt: string | null; productName?: string | null; productDescription?: string | null; productImageUrl?: string | null };
   submission: {
+    transcriptType: "TEXT" | "FILE" | "URL" | null;
+    transcriptTextNote: string | null;
+    transcriptResourceUrl: string | null;
     proofTextNote: string | null;
     fileUploadUrl: string | null;
     status: string;
@@ -681,12 +699,15 @@ function BrandMissionTranscriptReviewsTab({ apiBasePath, fixedCampaignId, hideFi
                         </button>
                       </div>
                     </div>
-                    {item.submission?.fileUploadUrl ? (
+                    {item.submission?.transcriptResourceUrl ? (
                       <a
-                        href={`/api/uploads/transcript-download?url=${encodeURIComponent(item.submission.fileUploadUrl)}`}
+                        href={asLink(item.submission.transcriptResourceUrl) ?? "#"}
+                        download={isTranscriptUploadPath(item.submission.transcriptResourceUrl)}
+                        target={isTranscriptUploadPath(item.submission.transcriptResourceUrl) ? undefined : "_blank"}
+                        rel="noreferrer"
                         className="mt-2 inline-flex text-sm font-semibold text-zinc-900 underline"
                       >
-                        Tải file kịch bản
+                        {transcriptLinkLabel(item.submission.transcriptResourceUrl)}
                       </a>
                     ) : null}
                   </article>
@@ -718,12 +739,19 @@ function BrandMissionTranscriptReviewsTab({ apiBasePath, fixedCampaignId, hideFi
             historyNode={
               <div className="space-y-3">
                 <p className="text-sm font-semibold text-zinc-900">Lịch sử các lần đã nộp</p>
-                {(detail?.submission?.proofTextNote || detail?.submission?.fileUploadUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
+                {(detail?.submission?.transcriptTextNote || detail?.submission?.transcriptResourceUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
                   <summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp kịch bản</summary>
                   <div className="mt-2 space-y-1">
                     <p>Thời gian duyệt: {fmtDate(detail?.submission?.reviewedAt ?? null)}</p>
                     <p>Trạng thái: {mapStatusVi(detail?.submission?.status)}</p>
-                    <p>File kịch bản: <UrlValue value={detail?.submission?.fileUploadUrl} label="Tải file kịch bản (.txt)" /></p>
+                    <p>Hình thức gửi: {transcriptModeLabel(detail?.submission?.transcriptType, detail?.submission?.transcriptResourceUrl)}</p>
+                    {detail?.submission?.transcriptTextNote ? <p>Nội dung trực tiếp: Đã gửi</p> : null}
+                    {detail?.submission?.transcriptResourceUrl ? (
+                      <p>
+                        {isTranscriptUploadPath(detail.submission.transcriptResourceUrl) ? "File kịch bản: " : "Link kịch bản: "}
+                        <UrlValue value={detail.submission.transcriptResourceUrl} label={transcriptLinkLabel(detail.submission.transcriptResourceUrl)} />
+                      </p>
+                    ) : null}
                   </div>
                 </details> : null}
               </div>
@@ -731,14 +759,22 @@ function BrandMissionTranscriptReviewsTab({ apiBasePath, fixedCampaignId, hideFi
             actionNode={
               <div className="grid gap-2 text-sm">
                 <p><strong>Trạng thái:</strong> {detail ? transcriptStatusText(transcriptStatusLabel(detail)) : "-"}</p>
-                {detail?.submission?.proofTextNote ? (
+                <p><strong>Hình thức gửi:</strong> {transcriptModeLabel(detail?.submission?.transcriptType, detail?.submission?.transcriptResourceUrl)}</p>
+                {detail?.submission?.transcriptTextNote ? (
                   <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
                     <p className="font-semibold text-zinc-900">Nội dung kịch bản:</p>
                     <div
                       className="mt-2 prose prose-zinc max-w-none text-sm"
-                      dangerouslySetInnerHTML={{ __html: detail.submission.proofTextNote }}
+                      dangerouslySetInnerHTML={{ __html: detail.submission.transcriptTextNote }}
                     />
-                    <p className="mt-2">File đính kèm: <UrlValue value={detail.submission.fileUploadUrl} label="Tải file kịch bản" /></p>
+                  </div>
+                ) : null}
+                {detail?.submission?.transcriptResourceUrl ? (
+                  <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                    <p className="font-semibold text-zinc-900">{isTranscriptUploadPath(detail.submission.transcriptResourceUrl) ? "File kịch bản:" : "Link kịch bản:"}</p>
+                    <p className="mt-2">
+                      <UrlValue value={detail.submission.transcriptResourceUrl} label={transcriptLinkLabel(detail.submission.transcriptResourceUrl)} />
+                    </p>
                   </div>
                 ) : null}
                 {(detail?.submission?.rejectReason ?? detail?.videoReviewFeedback) ? <p><strong>Lý do từ chối:</strong> {detail?.submission?.rejectReason ?? detail?.videoReviewFeedback}</p> : null}
