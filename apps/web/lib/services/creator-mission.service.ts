@@ -1080,13 +1080,13 @@ export async function createMissionApplicationForCreator(accountId: string, payl
   const CREATOR_MISSION_REAPPLY_LIMIT = 2;
   const profile = await prisma.creatorProfile.findUnique({ where: { accountId }, select: { id: true } });
   if (!profile) throw new AppError("Creator profile is required", 422, "CREATOR_PROFILE_REQUIRED");
-  const approvedActiveChannels = await prisma.creatorSocialLink.findMany({
-    where: { creatorProfileId: profile.id, status: "APPROVED", isActive: true },
+  const activeChannels = await prisma.creatorSocialLink.findMany({
+    where: { creatorProfileId: profile.id, isActive: true },
     select: { id: true, platform: true, socialUrl: true, followers: true, handle: true }
   });
-  if (approvedActiveChannels.length < 1) {
+  if (activeChannels.length < 1) {
     throw new AppError(
-      "Bạn cần có ít nhất 1 kênh mạng xã hội đã duyệt và đang kích hoạt trước khi xin làm nhiệm vụ.",
+      "Bạn cần thêm ít nhất 1 kênh mạng xã hội đang sử dụng trước khi xin làm nhiệm vụ.",
       422,
       "CREATOR_SOCIAL_CHANNEL_REQUIRED"
     );
@@ -1173,7 +1173,7 @@ export async function createMissionApplicationForCreator(accountId: string, payl
       metadata: {
         missionId: created.missionId,
         campaignId: created.campaignId,
-        creatorSocialChannels: approvedActiveChannels,
+        creatorSocialChannels: activeChannels,
         reapplyCount: existing ? resubmissionCount + 1 : 0,
         reapplyLimit: CREATOR_MISSION_REAPPLY_LIMIT
       }

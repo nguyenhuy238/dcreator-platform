@@ -45,7 +45,7 @@ export const adminCampaignCreateSchema = z.object({
     rewardPoints: z.number().int().min(0).default(0),
     rewardCommissionVnd: z.number().int().min(0).default(0),
     audience: z.enum(["USER", "CREATOR"]).default("CREATOR"),
-    productReceiveOption: z.enum(["PRODUCT_REQUIRED", "NO_PRODUCT_REQUIRED"]).default("PRODUCT_REQUIRED"),
+    productReceiveOption: z.enum(["PRODUCT_REQUIRED", "NO_PRODUCT_REQUIRED"]).default("NO_PRODUCT_REQUIRED"),
     allowRepeat: z.boolean().default(false),
     deadlineAt: z.string().datetime().optional()
   }).superRefine((mission, ctx) => {

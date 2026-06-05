@@ -67,7 +67,7 @@ function toSnapshot(
     SOCIAL_CHANNEL_REQUIRED: {
       label: "Bổ sung kênh mạng xã hội",
       disabled: true,
-      message: "Bạn cần có ít nhất 1 kênh mạng xã hội đã duyệt và đang kích hoạt để tham gia campaign.",
+      message: "Bạn cần thêm ít nhất 1 kênh mạng xã hội đang sử dụng để tham gia campaign.",
       rejectReason: null,
       submissionId: null,
       missionId: null,
@@ -207,10 +207,10 @@ export async function getCreatorCampaignApplicationStatus(
 
   const creatorProfile = await prisma.creatorProfile.findUnique({ where: { accountId: viewer.id }, select: { id: true } });
   if (!creatorProfile) return toSnapshot("PROFILE_REQUIRED");
-  const approvedActiveChannelCount = await prisma.creatorSocialLink.count({
-    where: { creatorProfileId: creatorProfile.id, status: "APPROVED", isActive: true }
+  const activeChannelCount = await prisma.creatorSocialLink.count({
+    where: { creatorProfileId: creatorProfile.id, isActive: true }
   });
-  if (approvedActiveChannelCount < 1) return toSnapshot("SOCIAL_CHANNEL_REQUIRED");
+  if (activeChannelCount < 1) return toSnapshot("SOCIAL_CHANNEL_REQUIRED");
 
   const existing = await prisma.creatorMission.findFirst({
     where: { accountId: viewer.id, campaignId: campaign.id },
@@ -255,13 +255,13 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
 
   const creatorProfile = await prisma.creatorProfile.findUnique({ where: { accountId }, select: { id: true } });
   if (!creatorProfile) throw new AppError("Creator profile is required", 422, "CREATOR_PROFILE_REQUIRED");
-  const approvedActiveChannels = await prisma.creatorSocialLink.findMany({
-    where: { creatorProfileId: creatorProfile.id, status: "APPROVED", isActive: true },
+  const activeChannels = await prisma.creatorSocialLink.findMany({
+    where: { creatorProfileId: creatorProfile.id, isActive: true },
     select: { platform: true, socialUrl: true, followers: true, handle: true }
   });
-  if (approvedActiveChannels.length < 1) {
+  if (activeChannels.length < 1) {
     throw new AppError(
-      "Bạn cần có ít nhất 1 kênh mạng xã hội đã duyệt và đang kích hoạt trước khi xin làm nhiệm vụ.",
+      "Bạn cần thêm ít nhất 1 kênh mạng xã hội đang sử dụng trước khi xin làm nhiệm vụ.",
       422,
       "CREATOR_SOCIAL_CHANNEL_REQUIRED"
     );
@@ -373,7 +373,7 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
         metadata: {
           campaignId: campaign.id,
         missionId: firstMission.id,
-        creatorSocialChannels: approvedActiveChannels
+        creatorSocialChannels: activeChannels
       }
     }
   });

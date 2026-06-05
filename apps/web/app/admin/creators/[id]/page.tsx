@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AdminAvatar } from "@/app/admin/_components/AdminAvatar";
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
 import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { ClickableUrl } from "@/app/components/dcreator/ui/clickable-url";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
 type CreatorApplicationDetail = {
@@ -48,6 +49,11 @@ type CreatorApplicationDetail = {
     } | null;
   };
 };
+
+function getSocialChannelLabel(channel: { isPrimary: boolean; verificationStatus?: string }) {
+  if (channel.isPrimary) return "Kênh chính";
+  return channel.verificationStatus === "UNVERIFIED" ? "Đã thêm" : "Đang sử dụng";
+}
 
 export default function AdminCreatorDetailPage() {
   const params = useParams<{ id: string }>();
@@ -157,16 +163,25 @@ export default function AdminCreatorDetailPage() {
       </section>
 
       <section className="mt-4 dc-card p-4">
-        <p className="font-semibold">Social channels</p>
+        <p className="font-semibold text-zinc-900">Kênh mạng xã hội</p>
+        <p className="mt-1 text-sm text-zinc-500">Danh sách kênh Creator đã thêm để Admin tham khảo. Không cần duyệt từng kênh.</p>
         <div className="mt-3 grid gap-2">
-          {channels.map((channel, index) => (
-            <div key={`${channel.url}-${index}`} className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm">
-              <p className="font-semibold">{channel.platform}</p>
-              <p className="break-all text-zinc-700">{channel.url}</p>
-              <p className="text-zinc-500">Followers: {(channel.followers ?? 0).toLocaleString("vi-VN")}</p>
-              <p className="text-zinc-500">{channel.isPrimary ? "Kênh chính" : "Kênh phụ"} • {channel.verificationStatus}</p>
-            </div>
-          ))}
+          {channels.map((channel, index) => {
+            return (
+              <div key={`${channel.url}-${index}`} className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="font-semibold text-zinc-900">{channel.platform}</p>
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                    {getSocialChannelLabel(channel)}
+                  </span>
+                </div>
+                <div className="mt-2">
+                  <ClickableUrl url={channel.url} label={channel.url} className="break-all text-zinc-700 underline decoration-zinc-300 underline-offset-4 hover:text-zinc-900" />
+                </div>
+                <p className="mt-2 text-zinc-500">Followers: {(channel.followers ?? 0).toLocaleString("vi-VN")}</p>
+              </div>
+            );
+          })}
           {item.account.creatorProfile ? (
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
               Existing CreatorProfile: {item.account.creatorProfile.mainPlatform} • {item.account.creatorProfile.socialUrl}
