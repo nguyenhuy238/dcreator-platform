@@ -159,7 +159,7 @@ function workflowStatus(item: MissionItem) {
   const transcriptApproved = hasTranscriptSubmitted && !transcriptPending && !transcriptRejected;
   const hasVideoSubmitted = item.videoReviewStatus !== "NOT_SUBMITTED" || Boolean(item.submission?.videoUrl?.trim());
 
-  if (item.missionApplication?.status === "PENDING_REVIEW") return "Chờ duyệt nhiệm vụ";
+  if (item.missionApplication?.status === "PENDING_REVIEW") return "Chờ duyệt campaign";
   if (item.missionApplication?.status === "REJECTED") return "Bị từ chối";
   if (item.status === "COMPLETED") return "Hoàn thành";
   if (item.status === "CANCELLED") return "Bị từ chối";
@@ -242,26 +242,6 @@ function missionStatusLabel(status: string) {
   if (status === "IN_PROGRESS") return "Đang thực hiện";
   if (status === "COMPLETED") return "Đã hoàn thành";
   if (status === "CANCELLED") return "Đã hủy";
-  return "Không xác định";
-}
-
-function productReceiveOptionLabel(value: string) {
-  if (value === "PRODUCT_REQUIRED") return "Có yêu cầu sản phẩm";
-  if (value === "NO_PRODUCT_REQUIRED") return "Không yêu cầu sản phẩm";
-  return "Không xác định";
-}
-
-function productStatusLabel(value: string) {
-  if (value === "NOT_REQUIRED") return "Không yêu cầu";
-  if (value === "WAITING_DEPOSIT") return "Đang chờ đặt cọc";
-  if (value === "WAITING_PURCHASE") return "Đang chờ mua hàng";
-  if (value === "RECEIVED") return "Đã nhận sản phẩm";
-  return "Không xác định";
-}
-
-function missionAudienceLabel(value: string) {
-  if (value === "CREATOR") return "Creator";
-  if (value === "USER") return "Người dùng";
   return "Không xác định";
 }
 
@@ -802,13 +782,35 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
         ) : null}
       </>
     );
+    function renderProductInfoSection() {
+      if (!showProductSection) return null;
+      return (
+        <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
+          <summary className="cursor-pointer font-semibold text-zinc-900">Thông tin sản phẩm</summary>
+          <div className="mt-3 grid gap-3 md:grid-cols-[180px_1fr]">
+            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100">
+              {item.mission.productImageUrl ? (
+                <img src={item.mission.productImageUrl} alt={item.mission.productName ?? "Ảnh sản phẩm"} className="h-full max-h-48 w-full object-cover" />
+              ) : (
+                <div className="flex h-40 items-center justify-center px-3 text-sm text-zinc-500">Chưa có hình ảnh sản phẩm</div>
+              )}
+            </div>
+            <div className="grid gap-1 text-sm text-zinc-700">
+              <p>Tên sản phẩm: <strong className="text-zinc-900">{item.mission.productName || "-"}</strong></p>
+              <p>Mô tả sản phẩm: <span className="whitespace-pre-line">{item.mission.productDescription || "-"}</span></p>
+              <p>Link sản phẩm: <UrlValue value={item.mission.productLink} /></p>
+            </div>
+          </div>
+        </details>
+      );
+    }
     const actionGuide = (
       <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
         <summary className="cursor-pointer font-semibold text-zinc-900">Cách thực hiện</summary>
         <div className="mt-3 space-y-3">
           {isApplicationPending && !isOverdue ? (
             <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-              Nhiệm vụ đang chờ duyệt. Bạn sẽ bắt đầu các bước thực hiện sau khi Brand/Admin duyệt đơn.
+              Campaign đang chờ duyệt. Bạn sẽ bắt đầu các bước thực hiện sau khi Brand/Admin duyệt đơn.
             </p>
           ) : null}
           {isWaitingPublishReview && !isOverdue ? (
@@ -818,11 +820,12 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
           ) : null}
           {isOverdue ? (
             <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              Nhiệm vụ đã quá hạn. Bạn chỉ có thể xem lại thông tin và lịch sử đã nộp.
+              Campaign đã quá hạn. Bạn chỉ có thể xem lại thông tin và lịch sử đã nộp.
             </p>
           ) : null}
 
           {rejectionNotices}
+          {renderProductInfoSection()}
 
           {canSubmitPurchase && !isOverdue ? (
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
@@ -1042,7 +1045,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
 
           {item.status === "COMPLETED" ? (
             <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-              Nhiệm vụ đã hoàn thành. N-Points đã được cộng theo kết quả duyệt.
+              Campaign đã hoàn thành. Hệ thống đã hoàn N-Points mua sản phẩm theo kết quả duyệt.
             </p>
           ) : null}
         </div>
@@ -1058,7 +1061,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
               className={detailTab === "ACTIONS" ? "rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-semibold text-white" : "rounded-full border border-zinc-200 px-4 py-1.5 text-sm font-semibold text-zinc-600"}
               onClick={() => setDetailTab("ACTIONS")}
             >
-              Thực hiện nhiệm vụ
+              Thực hiện campaign
             </button>
             <button
               type="button"
@@ -1134,7 +1137,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
         ) : (
           <>
         <div className="rounded-xl border border-zinc-200 bg-white p-3">
-          <p className="text-sm font-semibold text-zinc-900">Tiến độ nhiệm vụ</p>
+          <p className="text-sm font-semibold text-zinc-900">Tiến độ campaign</p>
           <div className="mt-3 overflow-x-auto pb-2">
             <div className="flex min-w-max items-start">
               {timelineSteps.map((step, index) => {
@@ -1174,46 +1177,16 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
 
         <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
           <summary className="cursor-pointer font-semibold text-zinc-900">Thông tin campaign</summary>
-          <div className="mt-3 grid gap-1 text-sm text-zinc-600">
+          <div className="mt-3 grid gap-2 text-sm text-zinc-700 md:grid-cols-2">
             <p>Tên campaign: <strong className="text-zinc-900">{item.campaign.title}</strong></p>
             <p>Đường dẫn campaign: <Link className="font-semibold text-zinc-900 underline" href={`/campaigns/${item.campaign.slug}`}>/campaigns/{item.campaign.slug}</Link></p>
-          </div>
-        </details>
-
-        <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
-          <summary className="cursor-pointer font-semibold text-zinc-900">Thông tin nhiệm vụ</summary>
-          <div className="mt-3 grid gap-2 text-sm text-zinc-700 md:grid-cols-2">
-            <p>Trạng thái luồng: <strong className="text-zinc-900">{workflowStatus(item)}</strong></p>
-            <p>Trạng thái nhiệm vụ: <strong className="text-zinc-900">{missionStatusLabel(item.status)}</strong></p>
-            <p>Đối tượng: <strong className="text-zinc-900">{missionAudienceLabel(item.mission.audience)}</strong></p>
-            <p>Cho phép làm lại: <strong className="text-zinc-900">{item.mission.allowRepeat ? "Có" : "Không"}</strong></p>
-            <p>Điểm thưởng: <strong className="text-zinc-900">{item.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</strong></p>
+            <p>Tiêu đề tham gia: <strong className="text-zinc-900">{item.mission.title}</strong></p>
             <p>Hạn hoàn thành: <strong className="text-zinc-900">{fmtDate(item.mission.deadlineAt)}</strong></p>
-            <p>Yêu cầu sản phẩm: <strong className="text-zinc-900">{productReceiveOptionLabel(item.productReceiveOption)}</strong></p>
-            <p>Trạng thái sản phẩm: <strong className="text-zinc-900">{productStatusLabel(item.productStatus)}</strong></p>
           </div>
           <p className="mt-2 text-sm text-zinc-700 whitespace-pre-line">{item.mission.description}</p>
         </details>
 
-        {showProductSection ? (
-          <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
-            <summary className="cursor-pointer font-semibold text-zinc-900">Thông tin sản phẩm</summary>
-            <div className="mt-3 grid gap-3 md:grid-cols-[180px_1fr]">
-              <div className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100">
-                {item.mission.productImageUrl ? (
-                  <img src={item.mission.productImageUrl} alt={item.mission.productName ?? "Ảnh sản phẩm"} className="h-full max-h-48 w-full object-cover" />
-                ) : (
-                  <div className="flex h-40 items-center justify-center px-3 text-sm text-zinc-500">Chưa có hình ảnh sản phẩm</div>
-                )}
-              </div>
-              <div className="grid gap-1 text-sm text-zinc-700">
-                <p>Tên sản phẩm: <strong className="text-zinc-900">{item.mission.productName || "-"}</strong></p>
-                <p>Mô tả sản phẩm: <span className="whitespace-pre-line">{item.mission.productDescription || "-"}</span></p>
-                <p>Link sản phẩm: <UrlValue value={item.mission.productLink} /></p>
-              </div>
-            </div>
-          </details>
-        ) : null}
+        {renderProductInfoSection()}
 
           </>
         )}
@@ -1273,7 +1246,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
             </div>
 
             {filteredItems.length === 0 ? (
-              <EmptyState title="Không có nhiệm vụ phù hợp bộ lọc" description="Thử chuyển sang trạng thái khác hoặc nhận thêm nhiệm vụ mới." />
+              <EmptyState title="Không có campaign phù hợp bộ lọc" description="Thử chuyển sang trạng thái khác hoặc tham gia campaign mới." />
             ) : (
               <div className="space-y-2">
                 {pagedItems.map((item) => (
@@ -1284,8 +1257,8 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
                         <p className="line-clamp-2 text-sm text-zinc-500">{item.campaign.title}</p>
                       </div>
                       <div>
-                        <p className="font-semibold text-zinc-900">{item.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
-                        <p className="text-xs text-zinc-500">Thưởng</p>
+                        <p className="font-semibold text-zinc-900">Hoàn theo bill</p>
+                        <p className="text-xs text-zinc-500">N-Points</p>
                       </div>
                       <div>
                         <p className={`font-semibold ${daysLeft(item.mission.deadlineAt) !== null && (daysLeft(item.mission.deadlineAt) ?? 0) <= 3 ? "text-red-600" : "text-zinc-900"}`}>{deadlineLabel(item.mission.deadlineAt)}</p>
@@ -1302,7 +1275,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
                         ) : item.status === "COMPLETED" ? (
                           <button className="dc-btn-secondary" onClick={() => openMissionDetail(item.id)}>Xem chi tiết</button>
                         ) : (
-                          <button className="dc-btn-primary" onClick={() => openMissionDetail(item.id)}>Tiếp tục làm</button>
+                          <button className="dc-btn-primary" onClick={() => openMissionDetail(item.id)}>Tiếp tục</button>
                         )}
                       </div>
                     </div>

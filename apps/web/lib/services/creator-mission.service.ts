@@ -37,7 +37,24 @@ const creatorMissionInclude = {
       deadlineAt: true
     }
   },
-  campaign: { select: { id: true, title: true, slug: true, coverImageUrl: true, brandId: true, brand: { select: { displayName: true } } } },
+  campaign: {
+    select: {
+      id: true,
+      title: true,
+      brief: true,
+      slug: true,
+      coverImageUrl: true,
+      brandId: true,
+      creatorBriefTitle: true,
+      creatorBriefDescription: true,
+      productName: true,
+      productDescription: true,
+      productImageUrl: true,
+      productLink: true,
+      endsAt: true,
+      brand: { select: { displayName: true } }
+    }
+  },
   account: {
     select: {
       id: true,
@@ -164,6 +181,24 @@ function toCreatorMissionState(option: ProductReceiveOption) {
   };
 }
 
+function buildMissionView(item: CreatorMissionEntity) {
+  return {
+    id: item.mission?.id ?? item.campaignId,
+    title: item.campaign.creatorBriefTitle ?? item.mission?.title ?? item.campaign.title,
+    description: item.campaign.creatorBriefDescription ?? item.mission?.description ?? item.campaign.brief,
+    rewardPoints: 0,
+    rewardCommissionVnd: 0,
+    audience: item.mission?.audience ?? "CREATOR",
+    productReceiveOption: item.productReceiveOption,
+    allowRepeat: item.mission?.allowRepeat ?? false,
+    deadlineAt: dt(item.campaign.endsAt ?? item.mission?.deadlineAt),
+    productName: item.campaign.productName ?? item.mission?.productName ?? null,
+    productDescription: item.campaign.productDescription ?? item.mission?.productDescription ?? null,
+    productImageUrl: item.campaign.productImageUrl ?? item.mission?.productImageUrl ?? null,
+    productLink: item.campaign.productLink ?? item.mission?.productLink ?? null
+  };
+}
+
 function mapMission(item: CreatorMissionEntity) {
   const submissionRejectFeedback = parseStructuredFeedback(item.submissionRejectReason);
   const publishRejectFeedback = parseStructuredFeedback(item.publishFeedback);
@@ -238,7 +273,7 @@ function mapMission(item: CreatorMissionEntity) {
     completedAt: dt(item.completedAt),
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
-    mission: { ...item.mission, deadlineAt: dt(item.mission.deadlineAt) },
+    mission: buildMissionView(item),
     campaign: item.campaign,
     account: item.account,
     submission: {
@@ -272,7 +307,7 @@ async function getMissionByIdForAccount(id: string, accountId: string) {
 
 async function syncLegacySubmission(
   tx: Prisma.TransactionClient,
-  missionId: string,
+  missionId: string | null | undefined,
   accountId: string,
   submissionId: string | null | undefined,
   data: Prisma.MissionSubmissionUpdateManyMutationInput
@@ -284,6 +319,8 @@ async function syncLegacySubmission(
     });
     return;
   }
+
+  if (!missionId) return;
 
   await tx.missionSubmission.updateMany({
     where: { missionId, accountId },
@@ -386,7 +423,7 @@ export function getCreatorMissionGuidanceByOption(option: ProductReceiveOption) 
 export async function ensureCreatorMissionFromApprovedApplication(
   db: DbClient,
   input: {
-    missionId: string;
+    missionId?: string | null;
     campaignId: string;
     accountId: string;
     applicationId?: string;
@@ -394,20 +431,28 @@ export async function ensureCreatorMissionFromApprovedApplication(
     submissionId?: string;
   }
 ) {
-  const mission = await db.mission.findUnique({
-    where: { id: input.missionId },
-    select: { id: true, productReceiveOption: true }
+  const campaign = await db.campaign.findUnique({
+    where: { id: input.campaignId },
+    select: { id: true, productName: true }
   });
-  if (!mission) throw new AppError("Mission not found", 404, "MISSION_NOT_FOUND");
+  if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
 
-  const existing = await db.creatorMission.findUnique({
-    where: { missionId_accountId: { missionId: input.missionId, accountId: input.accountId } }
+  const mission = input.missionId
+    ? await db.mission.findUnique({
+        where: { id: input.missionId },
+        select: { id: true, productReceiveOption: true }
+      })
+    : null;
+
+  const existing = await db.creatorMission.findFirst({
+    where: { campaignId: input.campaignId, accountId: input.accountId }
   });
 
   if (existing) {
     return db.creatorMission.update({
       where: { id: existing.id },
       data: {
+        missionId: existing.missionId ?? input.missionId ?? null,
         submissionId: existing.submissionId ?? input.submissionId ?? input.applicationId ?? null,
         missionApplicationId: existing.missionApplicationId ?? input.missionApplicationId ?? null,
         applicationStatus: existing.applicationStatus ?? "PENDING_REVIEW",
@@ -417,10 +462,10 @@ export async function ensureCreatorMissionFromApprovedApplication(
     });
   }
 
-  const initial = toCreatorMissionState(mission.productReceiveOption);
+  const initial = toCreatorMissionState(mission?.productReceiveOption ?? "PRODUCT_REQUIRED");
   return db.creatorMission.create({
     data: {
-      missionId: input.missionId,
+      missionId: input.missionId ?? null,
       campaignId: input.campaignId,
       accountId: input.accountId,
       submissionId: input.submissionId ?? input.applicationId ?? null,
@@ -434,7 +479,7 @@ export async function ensureCreatorMissionFromApprovedApplication(
       submissionLifecycleStatus: "ACCEPTED",
       submissionStatus: "OPEN",
       status: initial.status,
-      productReceiveOption: mission.productReceiveOption,
+      productReceiveOption: mission?.productReceiveOption ?? "PRODUCT_REQUIRED",
       productStatus: initial.productStatus,
       depositStatus: initial.depositStatus,
       reimbursementStatus: initial.reimbursementStatus,
@@ -499,7 +544,7 @@ function applyMissionHistoryFilters(
     where.OR = [
       { account: { displayName: { contains: q, mode: "insensitive" } } },
       { account: { email: { contains: q, mode: "insensitive" } } },
-      { mission: { title: { contains: q, mode: "insensitive" } } },
+      { campaign: { creatorBriefTitle: { contains: q, mode: "insensitive" } } },
       { campaign: { title: { contains: q, mode: "insensitive" } } }
     ];
   }
@@ -858,7 +903,7 @@ export async function approvePublishReportByAdmin(actorId: string, creatorMissio
     throw new AppError("Reimbursement amount is required", 422, "REIMBURSEMENT_AMOUNT_REQUIRED");
   }
   const reimbursementVnd = current.productReceiveOption === "PRODUCT_REQUIRED" ? Math.floor(purchaseAmountVnd) : 0;
-  const reimbursementPoints = reimbursementVnd > 0 ? Math.floor(reimbursementVnd / 100) : 0;
+  const reimbursementPoints = reimbursementVnd > 0 ? reimbursementVnd : 0;
   const updated = await prisma.$transaction(async (tx) => {
     await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
       status: "APPROVED",
@@ -870,7 +915,6 @@ export async function approvePublishReportByAdmin(actorId: string, creatorMissio
       rewardGrantedAt: now()
     });
 
-    await creditPointsOnce(tx, current.accountId, current.mission.rewardPoints, "CREATOR_MISSION_REWARD", creatorMissionId, `creator_mission_reward_${creatorMissionId}`);
     if (reimbursementPoints > 0) {
       await creditPointsOnce(tx, current.accountId, reimbursementPoints, "PRODUCT_REIMBURSEMENT", creatorMissionId, `creator_mission_reimbursement_${creatorMissionId}`);
     }
@@ -898,7 +942,7 @@ export async function approvePublishReportByAdmin(actorId: string, creatorMissio
       include: creatorMissionInclude
     });
   });
-  await notifyCreator(updated.accountId, "CREATOR_MISSION_FINAL_APPROVED", "Nhiệm vụ đã hoàn thành", "Nhiệm vụ của bạn đã được duyệt hoàn thành và cộng điểm.", { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_MISSION_FINAL_APPROVED", "Campaign đã hoàn thành", "Campaign của bạn đã được duyệt hoàn thành và hoàn N-Points mua sản phẩm.", { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -1206,9 +1250,55 @@ function applyNotOverdueReviewFilter(where: Prisma.CreatorMissionWhereInput) {
   where.AND = [
     ...existingAnd,
     {
-      OR: [{ mission: { deadlineAt: null } }, { mission: { deadlineAt: { gte: now() } } }]
+      OR: [
+        { missionId: null, campaign: { endsAt: null } },
+        { missionId: null, campaign: { endsAt: { gte: now() } } },
+        { mission: { deadlineAt: null } },
+        { mission: { deadlineAt: { gte: now() } } }
+      ]
     }
   ];
+}
+
+function buildApplicationMissionSummary(input: {
+  mission: {
+    id: string;
+    title: string;
+    description?: string | null;
+    rewardPoints?: number | null;
+    productReceiveOption?: ProductReceiveOption | null;
+    productLink?: string | null;
+    deadlineAt?: Date | null;
+    productName?: string | null;
+    productDescription?: string | null;
+    productImageUrl?: string | null;
+  } | null;
+  campaign: {
+    id: string;
+    title: string;
+    brief?: string | null;
+    creatorBriefTitle?: string | null;
+    creatorBriefDescription?: string | null;
+    productName?: string | null;
+    productDescription?: string | null;
+    productImageUrl?: string | null;
+    productLink?: string | null;
+    endsAt?: Date | null;
+  };
+  productReceiveOption?: ProductReceiveOption;
+}) {
+  return {
+    id: input.mission?.id ?? input.campaign.id,
+    title: input.campaign.creatorBriefTitle ?? input.mission?.title ?? input.campaign.title,
+    description: input.campaign.creatorBriefDescription ?? input.mission?.description ?? input.campaign.brief ?? "",
+    rewardPoints: input.mission?.rewardPoints ?? 0,
+    productReceiveOption: input.productReceiveOption ?? input.mission?.productReceiveOption ?? "PRODUCT_REQUIRED",
+    productLink: input.campaign.productLink ?? input.mission?.productLink ?? null,
+    deadlineAt: dt(input.campaign.endsAt ?? input.mission?.deadlineAt),
+    productName: input.campaign.productName ?? input.mission?.productName ?? null,
+    productDescription: input.campaign.productDescription ?? input.mission?.productDescription ?? null,
+    productImageUrl: input.campaign.productImageUrl ?? input.mission?.productImageUrl ?? null
+  };
 }
 
 function resolveBrandAvatar(input: { avatarUrl: string | null; ownedBrands: Array<{ logoUrl: string | null }> }) {
@@ -1255,6 +1345,7 @@ export async function listMissionApplicationsForAdmin(input: {
       { account: { displayName: { contains: q, mode: "insensitive" } } },
       { account: { email: { contains: q, mode: "insensitive" } } },
       { mission: { title: { contains: q, mode: "insensitive" } } },
+      { campaign: { creatorBriefTitle: { contains: q, mode: "insensitive" } } },
       { campaign: { title: { contains: q, mode: "insensitive" } } }
     ];
   }
@@ -1281,6 +1372,14 @@ export async function listMissionApplicationsForAdmin(input: {
             id: true,
             title: true,
             slug: true,
+            brief: true,
+            creatorBriefTitle: true,
+            creatorBriefDescription: true,
+            productName: true,
+            productDescription: true,
+            productImageUrl: true,
+            productLink: true,
+            endsAt: true,
             brand: {
               select: {
                 id: true,
@@ -1295,7 +1394,21 @@ export async function listMissionApplicationsForAdmin(input: {
             }
           }
         },
-        mission: { select: { id: true, title: true, rewardPoints: true, productReceiveOption: true, productLink: true } }
+        mission: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            rewardPoints: true,
+            productReceiveOption: true,
+            productLink: true,
+            deadlineAt: true,
+            productName: true,
+            productDescription: true,
+            productImageUrl: true
+          }
+        },
+        productReceiveOption: true
       },
       orderBy: { appliedAt: toOrder(input.sort) },
       skip: paging.skip,
@@ -1323,7 +1436,11 @@ export async function listMissionApplicationsForAdmin(input: {
         avatarUrl: resolveBrandAvatar(item.campaign.brand)
       }
     },
-    mission: item.mission
+    mission: buildApplicationMissionSummary({
+      mission: item.mission,
+      campaign: item.campaign,
+      productReceiveOption: item.productReceiveOption
+    })
   }));
   return { items: normalizedItems, pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) } };
 }
@@ -1343,6 +1460,7 @@ export async function getMissionApplicationDetailForAdmin(id: string) {
       applicationReviewedById: true,
       applicationReviewedAt: true,
       appliedAt: true,
+      productReceiveOption: true,
       account: { select: { id: true, displayName: true, email: true, creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true, bio: true, socialLinks: { where: { isActive: true }, select: { id: true, platform: true, socialUrl: true, followers: true, handle: true, isActive: true, status: true } } } } } },
       campaign: {
         select: {
@@ -1350,6 +1468,13 @@ export async function getMissionApplicationDetailForAdmin(id: string) {
           title: true,
           slug: true,
           brandId: true,
+          creatorBriefTitle: true,
+          creatorBriefDescription: true,
+          productName: true,
+          productDescription: true,
+          productImageUrl: true,
+          productLink: true,
+          endsAt: true,
           brand: {
             select: {
               id: true,
@@ -1395,7 +1520,11 @@ export async function getMissionApplicationDetailForAdmin(id: string) {
     createdAt: item.appliedAt,
     reviewedBy: item.applicationReviewedById ? { id: item.applicationReviewedById, displayName: "N/A", email: "N/A" } : null,
     account: item.account,
-    mission: item.mission,
+    mission: buildApplicationMissionSummary({
+      mission: item.mission,
+      campaign: item.campaign,
+      productReceiveOption: item.productReceiveOption
+    }),
     campaign: {
       ...item.campaign,
       brand: {
@@ -1443,7 +1572,7 @@ export async function approveMissionApplicationByAdmin(actorId: string, id: stri
     });
     return mapMission(next);
   });
-  await notifyCreator(current.accountId, "MISSION_APPLICATION_APPROVED", "Đơn xin nhiệm vụ được duyệt", `Bạn đã được duyệt tham gia nhiệm vụ "${current.mission.title}".`, { creatorMissionId: id });
+  await notifyCreator(current.accountId, "MISSION_APPLICATION_APPROVED", "Đơn tham gia campaign được duyệt", `Bạn đã được duyệt tham gia campaign "${current.campaign.title}".`, { creatorMissionId: id });
   return updated;
 }
 
@@ -1759,8 +1888,36 @@ export async function listMissionApplicationsForBrand(
         applicationReviewedAt: true,
         appliedAt: true,
         account: { select: { id: true, displayName: true, email: true, creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true } } } },
-        campaign: { select: { id: true, title: true, slug: true } },
-        mission: { select: { id: true, title: true, rewardPoints: true, productReceiveOption: true, productLink: true } }
+        campaign: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            brief: true,
+            creatorBriefTitle: true,
+            creatorBriefDescription: true,
+            productName: true,
+            productDescription: true,
+            productImageUrl: true,
+            productLink: true,
+            endsAt: true
+          }
+        },
+        mission: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            rewardPoints: true,
+            productReceiveOption: true,
+            productLink: true,
+            deadlineAt: true,
+            productName: true,
+            productDescription: true,
+            productImageUrl: true
+          }
+        },
+        productReceiveOption: true
       },
       orderBy: { appliedAt: toOrder(input.sort) },
       skip: paging.skip,
@@ -1780,7 +1937,11 @@ export async function listMissionApplicationsForBrand(
       reviewedAt: item.applicationReviewedAt,
       account: item.account,
       campaign: item.campaign,
-      mission: item.mission
+      mission: buildApplicationMissionSummary({
+        mission: item.mission,
+        campaign: item.campaign,
+        productReceiveOption: item.productReceiveOption
+      })
     })),
     pagination: { page: paging.page, limit: paging.limit, total, totalPages: Math.max(1, Math.ceil(total / paging.limit)) }
   };

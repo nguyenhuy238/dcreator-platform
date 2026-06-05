@@ -925,7 +925,14 @@ export async function listBrandCampaigns(accountId: string, currentBrandId?: str
   const campaignIds = await getScopedCampaignIds(ctx.brand.id, ctx.brandOwnerAccountId);
   const reviewableMissionWhere: Prisma.CreatorMissionWhereInput = {
     campaignId: { in: campaignIds },
-    OR: [{ mission: { deadlineAt: null } }, { mission: { deadlineAt: { gte: new Date() } } }]
+    OR: [
+      {
+        missionId: null,
+        OR: [{ campaign: { endsAt: null } }, { campaign: { endsAt: { gte: new Date() } } }]
+      },
+      { mission: { deadlineAt: null } },
+      { mission: { deadlineAt: { gte: new Date() } } }
+    ]
   };
   const campaigns = await prisma.campaign.findMany({
     where: { id: { in: campaignIds } },

@@ -872,6 +872,12 @@ model Campaign {
   slug                     String                      @unique
   title                    String
   brief                    String
+  creatorBriefTitle        String?
+  creatorBriefDescription  String?
+  productName              String?
+  productLink              String?
+  productImageUrl          String?
+  productDescription       String?
   coverImageUrl            String?
   campaignType             CampaignType                @default(COMMUNITY)
   setupSource              CampaignSetupSource         @default(BRAND_REQUESTED)
@@ -1089,7 +1095,7 @@ model MissionSubmission {
 
 model CreatorMission {
   id                          String                          @id @default(cuid())
-  missionId                   String
+  missionId                   String?
   campaignId                  String
   accountId                   String
   applicationStatus           ApplicationStatus               @default(PENDING_REVIEW)
@@ -1151,7 +1157,7 @@ model CreatorMission {
   createdAt                   DateTime                        @default(now())
   updatedAt                   DateTime                        @updatedAt
 
-  mission            Mission             @relation(fields: [missionId], references: [id], onDelete: Restrict)
+  mission            Mission?            @relation(fields: [missionId], references: [id], onDelete: Restrict)
   campaign           Campaign            @relation(fields: [campaignId], references: [id], onDelete: Restrict)
   account            Account             @relation(fields: [accountId], references: [id], onDelete: Restrict)
   submission         MissionSubmission?  @relation(fields: [submissionId], references: [id], onDelete: SetNull)

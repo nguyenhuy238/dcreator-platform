@@ -151,6 +151,12 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
       campaignType: true,
       setupSource: true,
       benefits: true,
+      creatorBriefTitle: true,
+      creatorBriefDescription: true,
+      productName: true,
+      productDescription: true,
+      productImageUrl: true,
+      productLink: true,
       participationRoadmap: true,
       objective: true,
       category: true,
@@ -166,7 +172,6 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
       brand: { select: { id: true, displayName: true, email: true } },
       creator: { select: { id: true, displayName: true, email: true } },
       rewards: true,
-      missions: true,
       contributions: { select: { id: true, amountVnd: true, status: true } }
     }
   });
@@ -202,9 +207,6 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
     reviewTag: latestReviewLog?.action === "CAMPAIGN_SUBMITTED_FOR_REVIEW" ? "SUBMITTED_FOR_REVIEW" : latestReviewLog ? "PAUSED_BY_ADMIN" : null
   });
 
-  const quotaCreator = campaign.missions.filter((mission) => mission.audience === "CREATOR").length;
-  const quotaUser = campaign.missions.filter((mission) => mission.audience === "USER").length;
-
   return {
     ...campaign,
     statusView,
@@ -220,7 +222,7 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
       commissionRatePercent: brandProfile?.commissionRatePercent ?? null,
       revenueSharePercent: brandProfile?.revenueSharePercent ?? null
     },
-    quota: { creator: quotaCreator, user: quotaUser }
+    quota: { creator: 0, user: 0 }
   };
 }
 
@@ -244,11 +246,14 @@ function validateCampaignReadiness(detail: Awaited<ReturnType<typeof getCampaign
   if (detail.commission.commissionRatePercent === null || detail.commission.commissionRatePercent < 0 || detail.commission.commissionRatePercent > 100) {
     errors.push("Commission không hợp lệ.");
   }
-  if (!detail.missions.length) {
-    errors.push("Campaign chưa có mission/KPI.");
-  }
   if (!detail.budgetVnd || detail.budgetVnd <= 0) {
     errors.push("Budget campaign không hợp lệ.");
+  }
+  if (!detail.creatorBriefTitle?.trim() || !detail.creatorBriefDescription?.trim()) {
+    errors.push("Campaign chưa có hướng dẫn creator.");
+  }
+  if (!detail.productName?.trim() || !detail.productDescription?.trim() || !detail.productLink?.trim() || !detail.productImageUrl?.trim()) {
+    errors.push("Campaign chưa có đủ thông tin sản phẩm.");
   }
   return errors;
 }
@@ -368,14 +373,6 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
 
   const startsAt = input.startsAt ? new Date(input.startsAt) : null;
   const endsAt = input.endsAt ? new Date(input.endsAt) : null;
-  const missionDeadlineAt = input.mission?.deadlineAt ? new Date(input.mission.deadlineAt) : endsAt;
-  if (missionDeadlineAt && startsAt && missionDeadlineAt < startsAt) {
-    throw new AppError("Mission deadline cannot be earlier than campaign start", 422, "MISSION_DEADLINE_INVALID");
-  }
-  if (missionDeadlineAt && endsAt && missionDeadlineAt > endsAt) {
-    throw new AppError("Mission deadline cannot be later than campaign end", 422, "MISSION_DEADLINE_INVALID");
-  }
-
   const campaign = await prisma.$transaction(async (tx) => {
     const createdCampaign = await tx.campaign.create({
       data: {
@@ -389,6 +386,14 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
         campaignType: input.campaignType,
         setupSource: input.setupSource,
         objective: input.benefits || null,
+        benefits: input.benefits || null,
+        creatorBriefTitle: input.creatorBriefTitle,
+        creatorBriefDescription: input.creatorBriefDescription,
+        productName: input.productName,
+        productDescription: input.productDescription,
+        productImageUrl: input.productImageUrl,
+        productLink: input.productLink,
+        participationRoadmap: input.participationRoadmap,
         priorityChannels: input.participationRoadmap.join("\n"),
         missionTypes: null,
         creatorCommissionPercent: 0,
@@ -402,26 +407,6 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
         status: "ACTIVE"
       }
     });
-
-    if (input.mission) {
-      await tx.mission.create({
-        data: {
-          campaignId: createdCampaign.id,
-          title: input.mission.title,
-          description: input.mission.description,
-          productName: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productName || null : null,
-          productDescription: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productDescription || null : null,
-          productImageUrl: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productImageUrl || null : null,
-          productLink: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productLink || null : null,
-          rewardPoints: input.mission.rewardPoints,
-          rewardCommissionVnd: input.mission.rewardCommissionVnd,
-          audience: "CREATOR",
-          productReceiveOption: input.mission.productReceiveOption,
-          allowRepeat: input.mission.allowRepeat,
-          deadlineAt: missionDeadlineAt
-        }
-      });
-    }
 
     await tx.brandCampaignRequest.updateMany({
       where: {
@@ -542,8 +527,6 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
   
   const nextRoadmap = input.participationRoadmap ? input.participationRoadmap.map((step) => step.trim()).filter(Boolean) : undefined;
   const nextBenefits = input.benefits === undefined ? undefined : input.benefits?.trim() || null;
-  const nextMissionDeadlineAt = nextEndsAt ?? campaign.endsAt;
-
 
   const updated = await prisma.$transaction(async (tx) => {
     const nextCampaign = await tx.campaign.update({
@@ -556,6 +539,12 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         campaignType: input.campaignType,
         setupSource: input.setupSource,
         benefits: nextBenefits,
+        creatorBriefTitle: input.creatorBriefTitle?.trim(),
+        creatorBriefDescription: input.creatorBriefDescription?.trim(),
+        productName: input.productName?.trim(),
+        productDescription: input.productDescription?.trim(),
+        productImageUrl: input.productImageUrl?.trim(),
+        productLink: input.productLink?.trim(),
         objective: nextBenefits,
         participationRoadmap: nextRoadmap,
         priorityChannels: nextRoadmap ? nextRoadmap.join("\n") : undefined,
@@ -567,42 +556,6 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         coverImageUrl: nextImageUrl
       }
     });
-
-    if (input.mission) {
-      const missionData = {
-        title: input.mission.title.trim(),
-        description: input.mission.description.trim(),
-        productName: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productName?.trim() || null : null,
-        productDescription: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productDescription?.trim() || null : null,
-        productImageUrl: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productImageUrl?.trim() || null : null,
-        productLink: input.mission.productReceiveOption === "PRODUCT_REQUIRED" ? input.mission.productLink?.trim() || null : null,
-        rewardPoints: input.mission.rewardPoints,
-        rewardCommissionVnd: input.mission.rewardCommissionVnd,
-        productReceiveOption: input.mission.productReceiveOption,
-        allowRepeat: input.mission.allowRepeat,
-        deadlineAt: nextMissionDeadlineAt
-      };
-
-      const existingMission = await tx.mission.findFirst({
-        where: { campaignId: campaign.id },
-        orderBy: { createdAt: "asc" }
-      });
-
-      if (existingMission) {
-        await tx.mission.update({
-          where: { id: existingMission.id },
-          data: missionData
-        });
-      } else {
-        await tx.mission.create({
-          data: {
-            campaignId: campaign.id,
-            audience: "CREATOR",
-            ...missionData
-          }
-        });
-      }
-    }
 
     return nextCampaign;
   });
@@ -625,6 +578,12 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         setupSource: campaign.setupSource,
         participationRoadmap: campaign.participationRoadmap,
         benefits: campaign.benefits ?? null,
+        creatorBriefTitle: campaign.creatorBriefTitle ?? null,
+        creatorBriefDescription: campaign.creatorBriefDescription ?? null,
+        productName: campaign.productName ?? null,
+        productDescription: campaign.productDescription ?? null,
+        productImageUrl: campaign.productImageUrl ?? null,
+        productLink: campaign.productLink ?? null,
         objective: campaign.objective ?? null,
         startsAt: campaign.startsAt?.toISOString() ?? null,
         endsAt: campaign.endsAt?.toISOString() ?? null,
@@ -643,6 +602,12 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         setupSource: updated.setupSource,
         participationRoadmap: updated.participationRoadmap,
         benefits: updated.benefits ?? null,
+        creatorBriefTitle: updated.creatorBriefTitle ?? null,
+        creatorBriefDescription: updated.creatorBriefDescription ?? null,
+        productName: updated.productName ?? null,
+        productDescription: updated.productDescription ?? null,
+        productImageUrl: updated.productImageUrl ?? null,
+        productLink: updated.productLink ?? null,
         objective: updated.objective ?? null,
         startsAt: updated.startsAt?.toISOString() ?? null,
         endsAt: updated.endsAt?.toISOString() ?? null,
