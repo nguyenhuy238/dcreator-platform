@@ -45,8 +45,19 @@ export const creatorMarketplaceQuerySchema = z.object({
 
 export const creatorPayoutRequestSchema = z.object({
   amountVnd: z.number().int().positive(),
+  creatorBankAccountId: z.string().trim().min(1).max(191),
   note: z.string().trim().max(500).optional(),
   idempotencyKey: z.string().trim().min(6).max(120)
+});
+
+export const creatorBankAccountSchema = z.object({
+  bankName: z.string().trim().min(2).max(120),
+  accountNumber: z.string().trim().min(6).max(60),
+  accountHolderName: z.string().trim().min(2).max(120)
+});
+
+export const creatorBankAccountDefaultSchema = z.object({
+  isDefault: z.literal(true)
 });
 
 export const creatorProfileUpdateSchema = z.object({
@@ -78,5 +89,6 @@ export const creatorChannelStatusUpdateSchema = z.object({
 });
 
 export type CreatorJobStatus = z.infer<typeof creatorJobStatusSchema>;
+export type CreatorBankAccountInput = z.infer<typeof creatorBankAccountSchema>;
 export type CreatorChannelsUpdateInput = z.infer<typeof creatorChannelsUpdateSchema>;
 export type CreatorProfileUpdateInput = z.infer<typeof creatorProfileUpdateSchema>;

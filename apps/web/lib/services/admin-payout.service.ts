@@ -53,7 +53,7 @@ export async function listPayoutRequestsForAdmin(input: { status?: PayoutRequest
     orderBy: { createdAt: "desc" },
     include: {
       account: { select: { id: true, displayName: true, email: true, role: true } },
-      wallet: { select: { id: true, cashBalanceVnd: true, pointsBalance: true } }
+      wallet: { select: { id: true, cashBalanceVnd: true, pointsBalance: true, pendingPayoutVnd: true, withdrawnPayoutVnd: true } }
     }
   });
 }
@@ -68,10 +68,11 @@ export async function getPayoutRequestDetailForAdmin(payoutId: string) {
           displayName: true,
           email: true,
           role: true,
-          creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true, bankName: true, bankAccountName: true, bankAccountNumber: true } }
+          creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true } }
         }
       },
-      wallet: { select: { id: true, cashBalanceVnd: true, pointsBalance: true } }
+      wallet: { select: { id: true, cashBalanceVnd: true, pointsBalance: true, pendingPayoutVnd: true, withdrawnPayoutVnd: true } },
+      creatorBankAccount: { select: { id: true, bankName: true, accountHolderName: true, accountNumber: true, isDefault: true } }
     }
   });
   if (!payout) throw new AppError("Payout request not found", 404, "PAYOUT_NOT_FOUND");
@@ -138,10 +139,13 @@ export async function rejectPayoutRequestByAdmin(actorId: string, payoutId: stri
 
   const updated = await prisma.$transaction(async (tx) => {
     const currentWallet = await tx.wallet.findUniqueOrThrow({ where: { id: payout.walletId } });
-    const nextCash = currentWallet.cashBalanceVnd + payout.amountVnd;
+    const nextPoints = currentWallet.pointsBalance + payout.amountVnd;
     const wallet = await tx.wallet.update({
       where: { id: currentWallet.id },
-      data: { cashBalanceVnd: nextCash }
+      data: {
+        pointsBalance: nextPoints,
+        pendingPayoutVnd: Math.max(0, currentWallet.pendingPayoutVnd - payout.amountVnd)
+      }
     });
 
     await tx.walletTransaction.create({
@@ -149,8 +153,8 @@ export async function rejectPayoutRequestByAdmin(actorId: string, payoutId: stri
         walletId: wallet.id,
         accountId: payout.accountId,
         type: "ADJUSTMENT",
-        pointsDelta: 0,
-        cashDeltaVnd: payout.amountVnd,
+        pointsDelta: payout.amountVnd,
+        cashDeltaVnd: 0,
         balanceAfterPoints: wallet.pointsBalance,
         balanceAfterCashVnd: wallet.cashBalanceVnd,
         referenceType: "PAYOUT_REQUEST_REJECT_REFUND",
@@ -178,14 +182,14 @@ export async function rejectPayoutRequestByAdmin(actorId: string, payoutId: stri
     oldStatus: payout.status,
     newStatus: "REJECTED",
     reason,
-    metadata: { reason, refundedAmountVnd: payout.amountVnd }
+    metadata: { reason, refundedAmountVnd: payout.amountVnd, pendingPayoutDeltaVnd: -payout.amountVnd }
   });
 
   await createNotification({
     accountId: payout.accountId,
     event: NotificationEvent.PAYOUT_REJECTED,
     title: "Yêu cầu payout bị từ chối",
-    content: `Yêu cầu payout bị từ chối: ${reason}. Số tiền đã được hoàn lại ví commission.`,
+    content: `Yêu cầu payout bị từ chối: ${reason}. N-Point đã được hoàn lại vào ví của bạn.`,
     metadata: { payoutId, reason }
   });
   await createNotificationForAdminOps({
@@ -203,9 +207,20 @@ export async function markPayoutAsPaidByAdmin(actorId: string, payoutId: string)
   const payout = await getPayoutRequestDetailForAdmin(payoutId);
   assertStateTransition(payout.status, "PAID", payoutTransitionMap, { message: "Only approved payout can be marked paid" });
 
-  const updated = await prisma.payoutRequest.update({
-    where: { id: payout.id },
-    data: { status: "PAID", paidAt: new Date(), reviewedById: actorId, reviewedAt: payout.reviewedAt ?? new Date() }
+  const updated = await prisma.$transaction(async (tx) => {
+    const currentWallet = await tx.wallet.findUniqueOrThrow({ where: { id: payout.walletId } });
+    await tx.wallet.update({
+      where: { id: currentWallet.id },
+      data: {
+        pendingPayoutVnd: Math.max(0, currentWallet.pendingPayoutVnd - payout.amountVnd),
+        withdrawnPayoutVnd: currentWallet.withdrawnPayoutVnd + payout.amountVnd
+      }
+    });
+
+    return tx.payoutRequest.update({
+      where: { id: payout.id },
+      data: { status: "PAID", paidAt: new Date(), reviewedById: actorId, reviewedAt: payout.reviewedAt ?? new Date() }
+    });
   });
 
   await writeAuditLog({
@@ -221,7 +236,7 @@ export async function markPayoutAsPaidByAdmin(actorId: string, payoutId: string)
     accountId: payout.accountId,
     event: NotificationEvent.PAYOUT_APPROVED,
     title: "Payout đã thanh toán",
-    content: `Khoản payout ${payout.amountVnd.toLocaleString("vi-VN")} VND đã được chuyển khoản.`,
+    content: `Khoản rút ${payout.amountVnd.toLocaleString("vi-VN")} N-Point đã được chuyển khoản.`,
     metadata: { payoutId }
   });
 

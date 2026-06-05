@@ -18,8 +18,10 @@ type Detail = {
     id: string;
     displayName: string;
     email: string;
-    creatorProfile: { bankName: string | null; bankAccountName: string | null; bankAccountNumber: string | null } | null;
   };
+  bankName: string;
+  bankAccountName: string;
+  bankAccountNumber: string;
   evidenceSubmissions: Array<{
     id: string;
     rewardGrantedAt: string | null;
@@ -102,7 +104,7 @@ export default function AdminPayoutDetailPage() {
         </div>
         <div className="mt-2 grid gap-2 text-sm text-zinc-700">
           <p>Creator: {item.account.displayName} • {item.account.email}</p>
-          <p>Bank: {item.account.creatorProfile?.bankName ?? "Không có"} • {item.account.creatorProfile?.bankAccountName ?? "Không có"} • {item.account.creatorProfile?.bankAccountNumber ?? "Không có"}</p>
+          <p>Bank: {item.bankName} • {item.bankAccountName} • {item.bankAccountNumber}</p>
           <p>Note: {item.note ?? "Không có"}</p>
         </div>
       </SectionCard>
@@ -174,4 +176,3 @@ export default function AdminPayoutDetailPage() {
     </>
   );
 }
-

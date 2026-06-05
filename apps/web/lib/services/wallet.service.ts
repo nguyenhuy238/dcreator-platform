@@ -63,6 +63,16 @@ export async function getWalletMe(accountId: string) {
   return { wallet, transactions, pendingPayments, payouts };
 }
 
+async function ensureCreatorBankAccountOwned(accountId: string, creatorBankAccountId: string) {
+  const bankAccount = await prisma.creatorBankAccount.findUnique({
+    where: { id: creatorBankAccountId }
+  });
+  if (!bankAccount || bankAccount.accountId !== accountId) {
+    throw new AppError("Bank account not found", 404, "BANK_ACCOUNT_NOT_FOUND");
+  }
+  return bankAccount;
+}
+
 export async function getWalletTransactions(accountId: string, page: number, limit: number) {
   const wallet = await ensureWalletByAccountId(accountId);
   const [total, items] = await prisma.$transaction([
@@ -172,10 +182,17 @@ export async function confirmTopupPayment(payload: ConfirmPayload, rawPayload: u
   });
 }
 
-export async function createCreatorPayoutRequest(accountId: string, amountVnd: number, note: string | undefined, idempotencyKey: string) {
+export async function createCreatorPayoutRequest(
+  accountId: string,
+  amountVnd: number,
+  creatorBankAccountId: string,
+  note: string | undefined,
+  idempotencyKey: string
+) {
   const wallet = await ensureWalletByAccountId(accountId);
-  if (wallet.cashBalanceVnd < amountVnd) {
-    throw new AppError("Insufficient commission balance", 409, "INSUFFICIENT_COMMISSION_BALANCE");
+  const bankAccount = await ensureCreatorBankAccountOwned(accountId, creatorBankAccountId);
+  if (wallet.pointsBalance < amountVnd) {
+    throw new AppError("Insufficient N-Point balance", 409, "INSUFFICIENT_NPOINT_BALANCE");
   }
 
   const existing = await prisma.payoutRequest.findUnique({
@@ -185,20 +202,27 @@ export async function createCreatorPayoutRequest(accountId: string, amountVnd: n
 
   return prisma.$transaction(async (tx) => {
     const currentWallet = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
-    const nextCash = currentWallet.cashBalanceVnd - amountVnd;
-    assertNonNegativeBalance(currentWallet.pointsBalance, nextCash);
+    const nextPoints = currentWallet.pointsBalance - amountVnd;
+    assertNonNegativeBalance(nextPoints, currentWallet.cashBalanceVnd);
 
     const updatedWallet = await tx.wallet.update({
       where: { id: wallet.id },
-      data: { cashBalanceVnd: nextCash }
+      data: {
+        pointsBalance: nextPoints,
+        pendingPayoutVnd: currentWallet.pendingPayoutVnd + amountVnd
+      }
     });
 
     const payoutRequest = await tx.payoutRequest.create({
       data: {
         accountId,
         walletId: wallet.id,
+        creatorBankAccountId: bankAccount.id,
         amountVnd,
         note,
+        bankName: bankAccount.bankName,
+        bankAccountName: bankAccount.accountHolderName,
+        bankAccountNumber: bankAccount.accountNumber,
         idempotencyKey,
         status: "PENDING"
       }
@@ -209,8 +233,8 @@ export async function createCreatorPayoutRequest(accountId: string, amountVnd: n
         walletId: wallet.id,
         accountId,
         type: "COMMISSION_PAYOUT",
-        pointsDelta: 0,
-        cashDeltaVnd: -amountVnd,
+        pointsDelta: -amountVnd,
+        cashDeltaVnd: 0,
         balanceAfterPoints: updatedWallet.pointsBalance,
         balanceAfterCashVnd: updatedWallet.cashBalanceVnd,
         referenceType: "PAYOUT_REQUEST",
@@ -225,7 +249,13 @@ export async function createCreatorPayoutRequest(accountId: string, amountVnd: n
         action: "WALLET_BALANCE_CHANGED",
         targetType: "Wallet",
         targetId: wallet.id,
-        metadata: { pointsDelta: 0, cashDeltaVnd: -amountVnd, source: "PAYOUT_REQUEST_CREATE" }
+        metadata: {
+          pointsDelta: -amountVnd,
+          cashDeltaVnd: 0,
+          pendingPayoutDeltaVnd: amountVnd,
+          source: "PAYOUT_REQUEST_CREATE",
+          creatorBankAccountId: bankAccount.id
+        }
       }
     });
 

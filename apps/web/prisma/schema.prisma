@@ -455,6 +455,7 @@ model Account {
   walletTransactions            WalletTransaction[]
   paymentTransactions           PaymentTransaction[]
   payoutRequests                PayoutRequest[]
+  creatorBankAccounts           CreatorBankAccount[]
   rewardClaims                  RewardClaim[]
   analyticsEvents               AnalyticsEvent[]
   roleAssignments               AccountRole[]
@@ -572,22 +573,22 @@ model CreatorProfile {
 }
 
 model CreatorSocialLink {
-  id               String                  @id @default(cuid())
-  creatorProfileId String
-  platform         SocialPlatform
-  handle           String?
-  socialUrl        String
-  followers        Int                     @default(0)
-  engagementRate   Float?
-  isActive         Boolean                 @default(true)
+  id                 String                           @id @default(cuid())
+  creatorProfileId   String
+  platform           SocialPlatform
+  handle             String?
+  socialUrl          String
+  followers          Int                              @default(0)
+  engagementRate     Float?
+  isActive           Boolean                          @default(true)
   verificationStatus CreatorChannelVerificationStatus @default(UNVERIFIED)
-  status           CreatorSocialLinkStatus @default(PENDING)
-  rejectReason     String?
-  reviewNote       String?
-  reviewedById     String?
-  reviewedAt       DateTime?
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
+  status             CreatorSocialLinkStatus          @default(PENDING)
+  rejectReason       String?
+  reviewNote         String?
+  reviewedById       String?
+  reviewedAt         DateTime?
+  createdAt          DateTime                         @default(now())
+  updatedAt          DateTime                         @updatedAt
 
   creatorProfile CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
   reviewedBy     Account?       @relation("CreatorSocialLinkReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
@@ -797,13 +798,13 @@ model BrandInventoryBatch {
 }
 
 model BrandMember {
-  id        String          @id @default(cuid())
+  id        String            @id @default(cuid())
   brandId   String
   accountId String
-  role      BrandMemberRole @default(STAFF)
+  role      BrandMemberRole   @default(STAFF)
   status    BrandMemberStatus @default(ACTIVE)
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 
   brand   Brand   @relation(fields: [brandId], references: [id], onDelete: Cascade)
   account Account @relation("BrandMemberAccount", fields: [accountId], references: [id], onDelete: Cascade)
@@ -1077,13 +1078,13 @@ model MissionSubmission {
   finalSubmittedAt           DateTime?
   approvedAt                 DateTime?
   rewardGrantedAt            DateTime?
-  rewardHold                Boolean                @default(false)
-  rewardHoldReason          String?
-  rewardHeldAt              DateTime?
-  rewardHeldById            String?
-  rewardReleasedAt          DateTime?
-  rewardReleasedById        String?
-  disputeStatus             String?
+  rewardHold                 Boolean                @default(false)
+  rewardHoldReason           String?
+  rewardHeldAt               DateTime?
+  rewardHeldById             String?
+  rewardReleasedAt           DateTime?
+  rewardReleasedById         String?
+  disputeStatus              String?
   status                     MissionStatus          @default(SUBMITTED)
   reviewedById               String?
   reviewedAt                 DateTime?
@@ -1100,71 +1101,71 @@ model MissionSubmission {
 }
 
 model CreatorMission {
-  id                          String                          @id @default(cuid())
-  missionId                   String?
-  campaignId                  String
-  accountId                   String
-  applicationStatus           ApplicationStatus               @default(PENDING_REVIEW)
-  applicationNote             String?
-  applicationRejectReason     String?
-  applicationReviewedById     String?
-  applicationReviewedAt       DateTime?
-  appliedAt                   DateTime                        @default(now())
-  submissionLifecycleStatus   MissionLifecycleStatus          @default(ACCEPTED)
-  submissionStatus            MissionStatus                   @default(SUBMITTED)
-  submissionVideoUrl          String?
-  submissionImageUrl          String?
-  submissionSocialPostUrl     String?
-  submissionScreenshotUrl     String?
-  submissionFileUploadUrl     String?
-  submissionProofTextNote     String?
-  submissionTranscriptType    TranscriptSubmissionType?
-  submissionTranscriptTextNote String?
-  submissionTranscriptResourceUrl String?
-  submissionNote              String?
-  submissionRejectReason      String?
-  submissionPurchaseBillImageUrl String?
+  id                                   String                          @id @default(cuid())
+  missionId                            String?
+  campaignId                           String
+  accountId                            String
+  applicationStatus                    ApplicationStatus               @default(PENDING_REVIEW)
+  applicationNote                      String?
+  applicationRejectReason              String?
+  applicationReviewedById              String?
+  applicationReviewedAt                DateTime?
+  appliedAt                            DateTime                        @default(now())
+  submissionLifecycleStatus            MissionLifecycleStatus          @default(ACCEPTED)
+  submissionStatus                     MissionStatus                   @default(SUBMITTED)
+  submissionVideoUrl                   String?
+  submissionImageUrl                   String?
+  submissionSocialPostUrl              String?
+  submissionScreenshotUrl              String?
+  submissionFileUploadUrl              String?
+  submissionProofTextNote              String?
+  submissionTranscriptType             TranscriptSubmissionType?
+  submissionTranscriptTextNote         String?
+  submissionTranscriptResourceUrl      String?
+  submissionNote                       String?
+  submissionRejectReason               String?
+  submissionPurchaseBillImageUrl       String?
   submissionProductReviewScreenshotUrl String?
-  submissionPurchaseProofNote String?
-  submissionPurchaseConfirmedAt DateTime?
-  submissionPublicVideoUrl    String?
-  submissionAdCode            String?
-  submissionFinalProofNote    String?
-  submissionFinalSubmittedAt  DateTime?
-  submissionApprovedAt        DateTime?
-  submissionRewardGrantedAt   DateTime?
-  submissionReviewedById      String?
-  submissionReviewedAt        DateTime?
-  submissionId                String?                         @unique
-  missionApplicationId        String?                         @unique
-  status                      CreatorMissionStatus
-  productReceiveOption        ProductReceiveOption
-  productStatus               ProductStatus
-  depositStatus               DepositStatus
-  reimbursementStatus         ReimbursementStatus
-  purchaseProofTextNote       String?
-  purchaseProofScreenshotUrl  String?
-  purchaseProofNote           String?
-  purchaseProofSubmittedAt    DateTime?
-  purchaseProofReviewedAt     DateTime?
-  purchaseProofRejectReason   String?
-  productPurchasedConfirmedAt DateTime?
-  videoReviewStatus           CreatorMissionVideoReviewStatus @default(NOT_SUBMITTED)
-  videoReviewFeedback         String?
-  videoSubmittedAt            DateTime?
-  videoReviewedAt             DateTime?
-  publishStatus               CreatorMissionPublishStatus     @default(NOT_SUBMITTED)
-  publishFeedback             String?
-  publishSubmittedAt          DateTime?
-  publishReviewedAt           DateTime?
-  publishPurchaseAmountVnd    Int?
-  reimbursementAmountVnd      Int?
-  rewardCreditedAt            DateTime?
-  assignedAt                  DateTime                        @default(now())
-  startedAt                   DateTime?
-  completedAt                 DateTime?
-  createdAt                   DateTime                        @default(now())
-  updatedAt                   DateTime                        @updatedAt
+  submissionPurchaseProofNote          String?
+  submissionPurchaseConfirmedAt        DateTime?
+  submissionPublicVideoUrl             String?
+  submissionAdCode                     String?
+  submissionFinalProofNote             String?
+  submissionFinalSubmittedAt           DateTime?
+  submissionApprovedAt                 DateTime?
+  submissionRewardGrantedAt            DateTime?
+  submissionReviewedById               String?
+  submissionReviewedAt                 DateTime?
+  submissionId                         String?                         @unique
+  missionApplicationId                 String?                         @unique
+  status                               CreatorMissionStatus
+  productReceiveOption                 ProductReceiveOption
+  productStatus                        ProductStatus
+  depositStatus                        DepositStatus
+  reimbursementStatus                  ReimbursementStatus
+  purchaseProofTextNote                String?
+  purchaseProofScreenshotUrl           String?
+  purchaseProofNote                    String?
+  purchaseProofSubmittedAt             DateTime?
+  purchaseProofReviewedAt              DateTime?
+  purchaseProofRejectReason            String?
+  productPurchasedConfirmedAt          DateTime?
+  videoReviewStatus                    CreatorMissionVideoReviewStatus @default(NOT_SUBMITTED)
+  videoReviewFeedback                  String?
+  videoSubmittedAt                     DateTime?
+  videoReviewedAt                      DateTime?
+  publishStatus                        CreatorMissionPublishStatus     @default(NOT_SUBMITTED)
+  publishFeedback                      String?
+  publishSubmittedAt                   DateTime?
+  publishReviewedAt                    DateTime?
+  publishPurchaseAmountVnd             Int?
+  reimbursementAmountVnd               Int?
+  rewardCreditedAt                     DateTime?
+  assignedAt                           DateTime                        @default(now())
+  startedAt                            DateTime?
+  completedAt                          DateTime?
+  createdAt                            DateTime                        @default(now())
+  updatedAt                            DateTime                        @updatedAt
 
   mission            Mission?            @relation(fields: [missionId], references: [id], onDelete: Restrict)
   campaign           Campaign            @relation(fields: [campaignId], references: [id], onDelete: Restrict)
@@ -1260,17 +1261,37 @@ model RewardClaim {
 }
 
 model Wallet {
-  id             String   @id @default(cuid())
-  userId         String   @unique
-  pointsBalance  Int      @default(0)
-  cashBalanceVnd Int      @default(0)
-  updatedAt      DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  pointsBalance      Int      @default(0)
+  cashBalanceVnd     Int      @default(0)
+  pendingPayoutVnd   Int      @default(0)
+  withdrawnPayoutVnd Int      @default(0)
+  updatedAt          DateTime @updatedAt
 
   user                Account              @relation(fields: [userId], references: [id])
   ledgerEntries       WalletLedger[]
   transactions        WalletTransaction[]
   paymentTransactions PaymentTransaction[]
   payoutRequests      PayoutRequest[]
+}
+
+model CreatorBankAccount {
+  id                String   @id @default(cuid())
+  accountId         String
+  bankName          String
+  accountNumber     String
+  accountHolderName String
+  isDefault         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  account        Account         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  payoutRequests PayoutRequest[]
+
+  @@unique([accountId, accountNumber])
+  @@index([accountId, isDefault])
+  @@index([accountId, createdAt])
 }
 
 model WalletTransaction {
@@ -1357,24 +1378,30 @@ model PaymentTransaction {
 }
 
 model PayoutRequest {
-  id             String              @id @default(cuid())
-  accountId      String
-  walletId       String
-  amountVnd      Int
-  status         PayoutRequestStatus @default(PENDING)
-  note           String?
-  reviewedById   String?
-  reviewedAt     DateTime?
-  paidAt         DateTime?
-  idempotencyKey String
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  id                   String              @id @default(cuid())
+  accountId            String
+  walletId             String
+  creatorBankAccountId String
+  amountVnd            Int
+  status               PayoutRequestStatus @default(PENDING)
+  note                 String?
+  bankName             String
+  bankAccountName      String
+  bankAccountNumber    String
+  reviewedById         String?
+  reviewedAt           DateTime?
+  paidAt               DateTime?
+  idempotencyKey       String
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
 
-  account Account @relation(fields: [accountId], references: [id])
-  wallet  Wallet  @relation(fields: [walletId], references: [id])
+  account            Account            @relation(fields: [accountId], references: [id])
+  wallet             Wallet             @relation(fields: [walletId], references: [id])
+  creatorBankAccount CreatorBankAccount @relation(fields: [creatorBankAccountId], references: [id])
 
   @@unique([accountId, idempotencyKey])
   @@index([accountId, status, createdAt])
+  @@index([creatorBankAccountId, createdAt])
 }
 
 model WalletLedger {
@@ -1454,21 +1481,21 @@ model AuditLog {
 }
 
 model RiskFlag {
-  id         String   @id @default(cuid())
-  accountId  String?
-  targetType String
-  targetId   String
-  reason     String
-  flagType   String?
-  severity   RiskSeverity   @default(MEDIUM)
-  status     RiskFlagStatus @default(OPEN)
-  note       String?
-  resolvedAt DateTime?
+  id           String         @id @default(cuid())
+  accountId    String?
+  targetType   String
+  targetId     String
+  reason       String
+  flagType     String?
+  severity     RiskSeverity   @default(MEDIUM)
+  status       RiskFlagStatus @default(OPEN)
+  note         String?
+  resolvedAt   DateTime?
   resolvedById String?
-  score      Int      @default(0)
-  metadata   Json?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  score        Int            @default(0)
+  metadata     Json?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
   account    Account? @relation("RiskFlagAccount", fields: [accountId], references: [id])
   resolvedBy Account? @relation("RiskFlagResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
