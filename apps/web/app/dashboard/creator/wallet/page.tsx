@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { PayoutDetailModal, type PayoutModalCreator } from "@/app/components/dcreator/ui/PayoutDetailModal";
 import {
   ActionToast,
   ConfirmDialog,
@@ -20,6 +21,7 @@ type PayoutHistory = {
   status: "PENDING" | "APPROVED" | "PAID" | "REJECTED";
   note: string | null;
   createdAt: string;
+  reviewedAt: string | null;
   paidAt: string | null;
   bankName: string;
   bankCode: string | null;
@@ -51,6 +53,7 @@ type VietQrBank = {
 };
 
 type PayoutData = {
+  creator: PayoutModalCreator;
   availableBalanceVnd: number;
   pendingPayoutVnd: number;
   withdrawnPayoutVnd: number;
@@ -121,6 +124,7 @@ export default function CreatorWalletPage() {
   const [bankForm, setBankForm] = useState<BankForm>(emptyBankForm);
   const [editingBankId, setEditingBankId] = useState<string | null>(null);
   const [deleteBankId, setDeleteBankId] = useState<string | null>(null);
+  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -162,6 +166,11 @@ export default function CreatorWalletPage() {
   const selectedBankOption = useMemo(
     () => vietQrBanks.find((item) => item.code === bankForm.bankCode) ?? null,
     [bankForm.bankCode, vietQrBanks]
+  );
+
+  const selectedHistory = useMemo(
+    () => payout?.history.find((item) => item.id === selectedHistoryId) ?? null,
+    [payout?.history, selectedHistoryId]
   );
 
   const payoutReason = buildPayoutReason(payout?.availableBalanceVnd ?? 0, Boolean(selectedBank));
@@ -300,7 +309,10 @@ export default function CreatorWalletPage() {
 
   return (
     <>
-      <PageHeader title="Ví Creator" subtitle="Quản lý số dư N-Point, tài khoản ngân hàng và các yêu cầu rút tiền của bạn." />
+      <PageHeader
+        title="Ví Creator"
+        subtitle="Quản lý số dư N-Point, tài khoản ngân hàng và các yêu cầu rút tiền của bạn."
+      />
 
       {error ? <ErrorState title="Không thể tải ví" description={error} onRetry={() => void load()} /> : null}
       {loading ? <LoadingSkeleton rows={4} /> : null}
@@ -315,8 +327,15 @@ export default function CreatorWalletPage() {
 
           <section className="mt-6 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
             <article className="dc-card p-4">
-              <SectionHeader title="Yêu cầu rút tiền" subtitle="Chọn tài khoản nhận tiền và gửi yêu cầu rút N-Point khi đủ điều kiện." />
-              {!canRequestPayout ? <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">{payoutReason}</p> : null}
+              <SectionHeader
+                title="Yêu cầu rút tiền"
+                subtitle="Chọn tài khoản nhận tiền và gửi yêu cầu rút N-Point khi đủ điều kiện."
+              />
+              {!canRequestPayout ? (
+                <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                  {payoutReason}
+                </p>
+              ) : null}
 
               <form className="grid gap-3" onSubmit={onRequestPayout}>
                 <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
@@ -342,7 +361,9 @@ export default function CreatorWalletPage() {
                       value={formatIntForInput(amountVnd)}
                       onChange={(event) => setAmountVnd(parseNonNegativeInt(event.target.value))}
                     />
-                    <p className="text-xs font-medium text-zinc-500">Tỷ lệ quy đổi: 1 N-Point = 1 VNĐ. Tối thiểu 100.000 N-Point mỗi lần rút.</p>
+                    <p className="text-xs font-medium text-zinc-500">
+                      Tỷ lệ quy đổi: 1 N-Point = 1 VNĐ. Tối thiểu 100.000 N-Point mỗi lần rút.
+                    </p>
                   </>
                 </FormField>
 
@@ -385,7 +406,6 @@ export default function CreatorWalletPage() {
                 {selectedBankOption ? (
                   <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
                     <div className="flex items-center gap-3">
-                      {/* Using a plain img here avoids Next remote image host config for VietQR logos. */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={selectedBankOption.logo}
@@ -443,7 +463,7 @@ export default function CreatorWalletPage() {
                         setBankForm(emptyBankForm);
                       }}
                     >
-                      Hủy chỉnh sửa
+                      Huỷ chỉnh sửa
                     </button>
                   ) : null}
                 </div>
@@ -451,7 +471,10 @@ export default function CreatorWalletPage() {
 
               {payout.bankAccounts.length === 0 ? (
                 <div className="mt-4">
-                  <EmptyState title="Chưa có tài khoản ngân hàng" description="Thêm ít nhất một tài khoản để có thể nhận tiền rút." />
+                  <EmptyState
+                    title="Chưa có tài khoản ngân hàng"
+                    description="Thêm ít nhất một tài khoản để có thể nhận tiền rút."
+                  />
                 </div>
               ) : (
                 <div className="mt-4 grid gap-3">
@@ -462,9 +485,15 @@ export default function CreatorWalletPage() {
                           <p className="font-semibold text-zinc-900">{bankAccount.bankName}</p>
                           <p className="text-sm text-zinc-600">{bankAccount.accountHolderName}</p>
                           <p className="text-sm text-zinc-500">{maskAccountNumber(bankAccount.accountNumber)}</p>
-                          {bankAccount.bankBin ? <p className="text-xs text-zinc-500">BIN / acqId: {bankAccount.bankBin}</p> : null}
+                          {bankAccount.bankBin ? (
+                            <p className="text-xs text-zinc-500">BIN / acqId: {bankAccount.bankBin}</p>
+                          ) : null}
                         </div>
-                        {bankAccount.isDefault ? <span className="rounded-full bg-zinc-900 px-3 py-1 text-xs font-semibold text-white">Đang chọn</span> : null}
+                        {bankAccount.isDefault ? (
+                          <span className="rounded-full bg-zinc-900 px-3 py-1 text-xs font-semibold text-white">
+                            Đang chọn
+                          </span>
+                        ) : null}
                       </div>
 
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -506,7 +535,10 @@ export default function CreatorWalletPage() {
             <article className="dc-card p-4">
               <SectionHeader title="Lịch sử rút tiền" subtitle={`${payout.history.length} giao dịch`} />
               {payout.history.length === 0 ? (
-                <EmptyState title="Chưa có giao dịch rút tiền" description="Các yêu cầu rút tiền sẽ xuất hiện tại đây." />
+                <EmptyState
+                  title="Chưa có giao dịch rút tiền"
+                  description="Các yêu cầu rút tiền sẽ xuất hiện tại đây."
+                />
               ) : (
                 <>
                   <div className="grid gap-2 md:hidden">
@@ -518,10 +550,21 @@ export default function CreatorWalletPage() {
                         </div>
                         <p className="mt-1 text-xs text-zinc-500">Ngày tạo: {formatDate(tx.createdAt)}</p>
                         <p className="text-xs text-zinc-500">Ngân hàng: {tx.bankName}</p>
-                        <p className="text-xs text-zinc-500">Tài khoản: {tx.bankAccountName} • {maskAccountNumber(tx.bankAccountNumber)}</p>
+                        <p className="text-xs text-zinc-500">
+                          Tài khoản: {tx.bankAccountName} • {maskAccountNumber(tx.bankAccountNumber)}
+                        </p>
                         {tx.bankBin ? <p className="text-xs text-zinc-500">BIN / acqId: {tx.bankBin}</p> : null}
                         <p className="text-xs text-zinc-500">Ngày chi trả: {formatDate(tx.paidAt)}</p>
                         {tx.note ? <p className="mt-1 text-sm text-zinc-600">{tx.note}</p> : null}
+                        <div className="mt-3 flex justify-end">
+                          <button
+                            type="button"
+                            className="dc-btn-secondary"
+                            onClick={() => setSelectedHistoryId(tx.id)}
+                          >
+                            Xem chi tiết
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -535,6 +578,7 @@ export default function CreatorWalletPage() {
                           <th className="px-3 py-2 text-left">Ngân hàng nhận</th>
                           <th className="px-3 py-2 text-left">Trạng thái</th>
                           <th className="px-3 py-2 text-left">Ghi chú</th>
+                          <th className="px-3 py-2 text-right">Chi tiết</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -544,13 +588,24 @@ export default function CreatorWalletPage() {
                             <td className="px-3 py-2 font-semibold text-zinc-900">{formatPoints(tx.amountVnd)}</td>
                             <td className="px-3 py-2 text-zinc-600">
                               <p>{tx.bankName}</p>
-                              <p className="text-xs text-zinc-500">{tx.bankAccountName} • {maskAccountNumber(tx.bankAccountNumber)}</p>
+                              <p className="text-xs text-zinc-500">
+                                {tx.bankAccountName} • {maskAccountNumber(tx.bankAccountNumber)}
+                              </p>
                               {tx.bankBin ? <p className="text-xs text-zinc-500">BIN / acqId: {tx.bankBin}</p> : null}
                             </td>
                             <td className="px-3 py-2">
                               <StatusBadge status={tx.status} />
                             </td>
                             <td className="px-3 py-2 text-zinc-600">{tx.note ?? "-"}</td>
+                            <td className="px-3 py-2 text-right">
+                              <button
+                                type="button"
+                                className="dc-btn-secondary"
+                                onClick={() => setSelectedHistoryId(tx.id)}
+                              >
+                                Xem chi tiết
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -571,6 +626,17 @@ export default function CreatorWalletPage() {
         cancelLabel="Huỷ"
         onCancel={() => setDeleteBankId(null)}
         onConfirm={() => void deleteBankAccount()}
+      />
+
+      <PayoutDetailModal
+        open={Boolean(selectedHistoryId)}
+        title="Chi tiết yêu cầu rút tiền"
+        subtitle={
+          selectedHistory ? `Số tiền: ${selectedHistory.amountVnd.toLocaleString("vi-VN")} VND` : "Đang tải chi tiết."
+        }
+        payout={selectedHistory}
+        creator={payout?.creator ?? null}
+        onClose={() => setSelectedHistoryId(null)}
       />
 
       {toast ? <ActionToast message={toast} onClose={() => setToast("")} /> : null}

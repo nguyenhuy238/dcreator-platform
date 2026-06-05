@@ -522,12 +522,28 @@ export async function getCreatorPortfolio(accountId: string) {
 
 export async function getCreatorPayoutData(accountId: string) {
   const wallet = await ensureWalletByAccountId(accountId);
-  const [history, bankAccounts] = await Promise.all([
+  const [account, history, bankAccounts] = await Promise.all([
+    prisma.account.findUniqueOrThrow({
+      where: { id: accountId },
+      select: {
+        id: true,
+        displayName: true,
+        email: true,
+        creatorProfile: {
+          select: {
+            mainPlatform: true,
+            socialUrl: true,
+            followerCount: true
+          }
+        }
+      }
+    }),
     prisma.payoutRequest.findMany({ where: { accountId }, orderBy: { createdAt: "desc" } }),
     prisma.creatorBankAccount.findMany({ where: { accountId }, orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }] })
   ]);
 
   return {
+    creator: account,
     availableBalanceVnd: wallet.pointsBalance,
     pendingPayoutVnd: wallet.pendingPayoutVnd,
     withdrawnPayoutVnd: wallet.withdrawnPayoutVnd,

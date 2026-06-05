@@ -6,10 +6,10 @@ import { createNotification, createNotificationForAdminOps } from "@/lib/service
 import { assertStateTransition } from "@/lib/services/admin-transition.service";
 
 const payoutTransitionMap: Record<PayoutRequestStatus, readonly PayoutRequestStatus[]> = {
-  PENDING: ["APPROVED", "REJECTED"],
-  APPROVED: ["PAID"],
-  REJECTED: [],
-  PAID: []
+  PENDING: [],
+  APPROVED: ["PENDING"],
+  REJECTED: ["PENDING", "APPROVED"],
+  PAID: ["PENDING", "APPROVED"]
 };
 
 export async function getFinanceOverviewForAdmin() {
@@ -39,7 +39,11 @@ export async function getFinanceOverviewForAdmin() {
 export async function listPayoutRequestsForAdmin(input: { status?: PayoutRequestStatus; query?: string }) {
   return prisma.payoutRequest.findMany({
     where: {
-      ...(input.status ? { status: input.status } : {}),
+      ...(input.status
+        ? input.status === "PENDING"
+          ? { status: { in: ["PENDING", "APPROVED"] } }
+          : { status: input.status }
+        : {}),
       ...(input.query
         ? {
             OR: [
@@ -72,7 +76,7 @@ export async function getPayoutRequestDetailForAdmin(payoutId: string) {
         }
       },
       wallet: { select: { id: true, cashBalanceVnd: true, pointsBalance: true, pendingPayoutVnd: true, withdrawnPayoutVnd: true } },
-      creatorBankAccount: { select: { id: true, bankName: true, accountHolderName: true, accountNumber: true, isDefault: true } }
+      creatorBankAccount: { select: { id: true, bankName: true, bankCode: true, bankBin: true, accountHolderName: true, accountNumber: true, isDefault: true } }
     }
   });
   if (!payout) throw new AppError("Payout request not found", 404, "PAYOUT_NOT_FOUND");
@@ -106,7 +110,9 @@ export async function getPayoutRequestDetailForAdmin(payoutId: string) {
 
 export async function approvePayoutRequestByAdmin(actorId: string, payoutId: string) {
   const payout = await getPayoutRequestDetailForAdmin(payoutId);
-  assertStateTransition(payout.status, "APPROVED", payoutTransitionMap, { message: "Only pending payout can be approved" });
+  assertStateTransition(payout.status, "APPROVED", payoutTransitionMap, {
+    message: "Chỉ có thể duyệt yêu cầu đang chờ xử lý."
+  });
 
   const updated = await prisma.payoutRequest.update({
     where: { id: payoutId },
@@ -135,7 +141,9 @@ export async function approvePayoutRequestByAdmin(actorId: string, payoutId: str
 
 export async function rejectPayoutRequestByAdmin(actorId: string, payoutId: string, reason: string) {
   const payout = await getPayoutRequestDetailForAdmin(payoutId);
-  assertStateTransition(payout.status, "REJECTED", payoutTransitionMap, { message: "Only pending payout can be rejected" });
+  assertStateTransition(payout.status, "REJECTED", payoutTransitionMap, {
+    message: "Chỉ có thể từ chối yêu cầu đang chờ hoặc đã duyệt."
+  });
 
   const updated = await prisma.$transaction(async (tx) => {
     const currentWallet = await tx.wallet.findUniqueOrThrow({ where: { id: payout.walletId } });
@@ -205,7 +213,9 @@ export async function rejectPayoutRequestByAdmin(actorId: string, payoutId: stri
 
 export async function markPayoutAsPaidByAdmin(actorId: string, payoutId: string) {
   const payout = await getPayoutRequestDetailForAdmin(payoutId);
-  assertStateTransition(payout.status, "PAID", payoutTransitionMap, { message: "Only approved payout can be marked paid" });
+  assertStateTransition(payout.status, "PAID", payoutTransitionMap, {
+    message: "Chỉ có thể đánh dấu đã thanh toán cho yêu cầu đang chờ hoặc đã duyệt."
+  });
 
   const updated = await prisma.$transaction(async (tx) => {
     const currentWallet = await tx.wallet.findUniqueOrThrow({ where: { id: payout.walletId } });
