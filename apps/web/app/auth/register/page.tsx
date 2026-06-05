@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { FormField } from "@/app/components/dcreator/ui/base";
 import { PasswordInput } from "@/app/components/dcreator/ui/PasswordInput";
+import { trackEvent } from "@/lib/analytics";
+import { AnalyticsEvents } from "@/lib/analytics-events";
 import { canAccessPath, resolveWorkspaceLanding } from "@/lib/auth/workspace-choice";
 import type { Role } from "@prisma/client";
 
@@ -29,6 +31,9 @@ export default function RegisterPage() {
   const [fieldErrors, setFieldErrors] = useState<{ displayName?: string; email?: string; password?: string }>({});
 
   useEffect(() => {
+    trackEvent(AnalyticsEvents.REGISTER_PAGE_VIEW, {
+      role: typeof window === "undefined" ? undefined : new URLSearchParams(window.location.search).get("role") ?? undefined
+    });
     let alive = true;
     async function checkAuth() {
       const response = await fetch("/api/auth/me", { cache: "no-store" });
@@ -63,12 +68,17 @@ export default function RegisterPage() {
     if (Object.keys(nextFieldErrors).length > 0) {
       setFieldErrors(nextFieldErrors);
       setLoading(false);
+      trackEvent(AnalyticsEvents.REGISTER_FAILED, { method: "email" });
       return;
     }
     const response = await fetch("/api/auth/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ displayName, email, password }) });
     const payload = await response.json();
     setLoading(false);
-    if (!response.ok || !payload.success) return setError(payload.error ?? "Đăng ký thất bại");
+    if (!response.ok || !payload.success) {
+      trackEvent(AnalyticsEvents.REGISTER_FAILED, { method: "email" });
+      return setError(payload.error ?? "Đăng ký thất bại");
+    }
+    trackEvent(AnalyticsEvents.REGISTER_SUCCESS, { method: "email" });
     const meResponse = await fetch("/api/auth/me", { cache: "no-store" });
     const mePayload = await meResponse.json();
     const roles = (mePayload?.data?.user?.roles ?? payload?.data?.roles ?? [payload?.data?.role].filter(Boolean)) as Role[];

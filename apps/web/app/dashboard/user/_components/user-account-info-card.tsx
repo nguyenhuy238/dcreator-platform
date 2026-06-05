@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { trackEvent } from "@/lib/analytics";
+import { AnalyticsEvents } from "@/lib/analytics-events";
 import { resolveImageUrl } from "@/lib/images/resolve-image-url";
 
 export type UserAccountInfo = {
@@ -69,7 +71,13 @@ export function UserAccountInfoCard({
   }, [account.profile?.phone]);
 
   async function uploadAvatar(file: File) {
+    trackEvent(AnalyticsEvents.AVATAR_UPLOAD_SUBMIT, {
+      page_source: "user_settings"
+    });
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      trackEvent(AnalyticsEvents.AVATAR_UPLOAD_FAILED, {
+        page_source: "user_settings"
+      });
       onFeedback({
         tone: "error",
         title: "Ảnh không hợp lệ",
@@ -78,6 +86,9 @@ export function UserAccountInfoCard({
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
+      trackEvent(AnalyticsEvents.AVATAR_UPLOAD_FAILED, {
+        page_source: "user_settings"
+      });
       onFeedback({
         tone: "error",
         title: "Ảnh không hợp lệ",
@@ -114,12 +125,18 @@ export function UserAccountInfoCard({
       const nextAccount = { ...account, avatarUrl: patchPayload.data.avatarUrl, profile: patchPayload.data.profile ?? account.profile };
       onAccountUpdate(nextAccount);
       window.dispatchEvent(new CustomEvent("dc:user-updated", { detail: { avatarUrl: nextAccount.avatarUrl } }));
+      trackEvent(AnalyticsEvents.AVATAR_UPLOAD_SUCCESS, {
+        page_source: "user_settings"
+      });
       onFeedback({
         tone: "success",
         title: "Cập nhật ảnh đại diện thành công",
         description: "Ảnh đại diện của bạn đã được thay đổi."
       });
     } catch (requestError) {
+      trackEvent(AnalyticsEvents.AVATAR_UPLOAD_FAILED, {
+        page_source: "user_settings"
+      });
       onFeedback({
         tone: "error",
         title: "Không thể cập nhật ảnh đại diện",
@@ -163,6 +180,9 @@ export function UserAccountInfoCard({
       const nextAccount = { ...account, avatarUrl: patchPayload.data.avatarUrl ?? account.avatarUrl, profile: { phone: patchPayload.data.profile?.phone ?? null } };
       onAccountUpdate(nextAccount);
       setPhoneDialogOpen(false);
+      trackEvent(AnalyticsEvents.PHONE_UPDATE_SUCCESS, {
+        page_source: "user_settings"
+      });
       onFeedback({
         tone: "success",
         title: "Cập nhật số điện thoại thành công",

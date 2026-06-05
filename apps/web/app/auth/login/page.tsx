@@ -7,6 +7,8 @@ import type { Role } from "@prisma/client";
 import { PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { FormField } from "@/app/components/dcreator/ui/base";
 import { PasswordInput } from "@/app/components/dcreator/ui/PasswordInput";
+import { trackEvent } from "@/lib/analytics";
+import { AnalyticsEvents } from "@/lib/analytics-events";
 import { canAccessPath, resolveWorkspaceLanding } from "@/lib/auth/workspace-choice";
 
 type LoginContext = { creatorProfile?: { id: string } | null; brandMemberships?: Array<{ id: string; name: string; role: "OWNER" | "MANAGER" | "STAFF" }> };
@@ -35,6 +37,7 @@ function LoginPageContent() {
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
 
   useEffect(() => {
+    trackEvent(AnalyticsEvents.LOGIN_PAGE_VIEW);
     let alive = true;
     async function checkAuth() {
       const response = await fetch("/api/auth/me", { cache: "no-store" });
@@ -68,6 +71,7 @@ function LoginPageContent() {
     if (Object.keys(nextFieldErrors).length > 0) {
       setFieldErrors(nextFieldErrors);
       setLoading(false);
+      trackEvent(AnalyticsEvents.LOGIN_FAILED, { method: "email" });
       return;
     }
     const response = await fetch("/api/auth/login", {
@@ -77,7 +81,11 @@ function LoginPageContent() {
     });
     const payload = await response.json();
     setLoading(false);
-    if (!response.ok || !payload.success) return setError(payload.error ?? "Đăng nhập thất bại");
+    if (!response.ok || !payload.success) {
+      trackEvent(AnalyticsEvents.LOGIN_FAILED, { method: "email" });
+      return setError(payload.error ?? "Đăng nhập thất bại");
+    }
+    trackEvent(AnalyticsEvents.LOGIN_SUCCESS, { method: "email" });
     const meResponse = await fetch("/api/auth/me", { cache: "no-store" });
     const mePayload = await meResponse.json();
     const roles = (mePayload?.data?.user?.roles ?? payload?.data?.roles ?? [payload?.data?.role].filter(Boolean)) as Role[];

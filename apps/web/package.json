@@ -27,6 +27,7 @@
     "verify": "npm run db:generate && tsc --noEmit && npm run test && npm run lint"
   },
   "dependencies": {
+    "@next/third-parties": "^16.2.7",
     "@phosphor-icons/react": "^2.1.10",
     "@prisma/client": "^6.8.2",
     "@repo/ui": "*",

@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { trackEvent } from "@/lib/analytics";
+import { AnalyticsEvents } from "@/lib/analytics-events";
 
 type StatusState =
   | "LOGIN_REQUIRED"
@@ -127,6 +129,11 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
 
   async function applyCampaign() {
     if (!status) return;
+    trackEvent(AnalyticsEvents.CAMPAIGN_REGISTER_CLICK, {
+      campaign_id: slug,
+      campaign_status: status.lifecycleStatus ?? status.state,
+      page_source: inline ? "campaign_card" : "campaign_detail"
+    });
 
     if (status.state === "LOGIN_REQUIRED") {
       redirectToRegister();
@@ -191,7 +198,15 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
 
       setStatus(payload.data.status);
       setNotice({ type: "success", text: "Đăng kí thành công" });
+      trackEvent(AnalyticsEvents.CAMPAIGN_REGISTER_SUCCESS, {
+        campaign_id: slug,
+        campaign_status: payload.data.status.lifecycleStatus ?? payload.data.status.state
+      });
     } catch (error) {
+      trackEvent(AnalyticsEvents.CAMPAIGN_REGISTER_FAILED, {
+        campaign_id: slug,
+        campaign_status: status.lifecycleStatus ?? status.state
+      });
       setNotice({
         type: "error",
         text: error instanceof Error ? error.message : "Nộp đơn thất bại"

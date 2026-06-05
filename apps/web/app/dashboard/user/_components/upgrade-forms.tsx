@@ -4,6 +4,8 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Role } from "@prisma/client";
+import { trackEvent } from "@/lib/analytics";
+import { AnalyticsEvents } from "@/lib/analytics-events";
 import {
   BRAND_LINK_PLATFORMS,
   CREATOR_PLATFORMS,
@@ -133,10 +135,12 @@ export function CreatorUpgradeForm({ data, onError, onSuccess, embedded = false 
     event.preventDefault();
     onError("");
     onSuccess("");
+    trackEvent(AnalyticsEvents.CREATOR_UPGRADE_SUBMIT, { role: "creator" });
     let normalizedLinks: CreatorLink[];
     try {
       normalizedLinks = normalizeCreatorLinks(creatorLinks);
     } catch (validationError) {
+      trackEvent(AnalyticsEvents.CREATOR_UPGRADE_FAILED, { role: "creator" });
       onError(validationError instanceof Error ? validationError.message : "Liên kết không hợp lệ.");
       return;
     }
@@ -156,9 +160,11 @@ export function CreatorUpgradeForm({ data, onError, onSuccess, embedded = false 
       if (!response.ok || !payload.success) throw new Error(payload.error ?? "Gửi đơn Creator thất bại");
       await waitForRoleAccess("creator");
       router.refresh();
+      trackEvent(AnalyticsEvents.CREATOR_UPGRADE_SUCCESS, { role: "creator" });
       onSuccess("Creator Profile đã được tạo cùng các liên kết mạng xã hội.");
       router.replace("/dashboard/creator?created=1");
     } catch (requestError) {
+      trackEvent(AnalyticsEvents.CREATOR_UPGRADE_FAILED, { role: "creator" });
       onError(requestError instanceof Error ? requestError.message : "Gửi đơn Creator thất bại");
     } finally {
       setSubmitting(false);
@@ -272,6 +278,7 @@ export function BrandUpgradeForm({ data, onError, onSuccess, embedded = false }:
     event.preventDefault();
     onError("");
     onSuccess("");
+    trackEvent(AnalyticsEvents.BRAND_UPGRADE_SUBMIT, { role: "brand" });
     let industries: string[];
     let normalizedLinks: BrandLink[];
     try {
@@ -280,6 +287,7 @@ export function BrandUpgradeForm({ data, onError, onSuccess, embedded = false }:
       if (Object.values(nextLinkErrors).some(Boolean)) return;
       normalizedLinks = normalizeBrandLinks(brandLinks);
     } catch (validationError) {
+      trackEvent(AnalyticsEvents.BRAND_UPGRADE_FAILED, { role: "brand" });
       onError(validationError instanceof Error ? validationError.message : "Vui lòng kiểm tra ngành hàng và liên kết.");
       return;
     }
@@ -295,9 +303,14 @@ export function BrandUpgradeForm({ data, onError, onSuccess, embedded = false }:
       if (!response.ok || !payload.success) throw new Error(payload.error ?? "Tạo Brand thất bại");
       await waitForRoleAccess("brand", payload.data?.id);
       router.refresh();
+      trackEvent(AnalyticsEvents.BRAND_UPGRADE_SUCCESS, {
+        role: "brand",
+        brand_id: payload.data?.id
+      });
       onSuccess("Brand đã được tạo. Bạn có thể bắt đầu thiết lập sản phẩm/campaign.");
       router.replace("/dashboard/brand?created=1");
     } catch (requestError) {
+      trackEvent(AnalyticsEvents.BRAND_UPGRADE_FAILED, { role: "brand" });
       onError(requestError instanceof Error ? requestError.message : "Tạo Brand thất bại");
     } finally {
       setSubmitting(false);

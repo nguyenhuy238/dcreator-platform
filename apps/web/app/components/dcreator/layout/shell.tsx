@@ -6,6 +6,8 @@ import { usePathname, useSearchParams } from "next/navigation";
 import type { Role } from "@prisma/client";
 import { DashboardSwitcher } from "@/app/components/dcreator/layout/dashboard-switcher";
 import { DashboardShell } from "@/app/components/dcreator/layout/dashboard-shell";
+import { trackEvent } from "@/lib/analytics";
+import { AnalyticsEvents } from "@/lib/analytics-events";
 import { deriveCapabilities, type UserCapabilities } from "@/lib/auth/capabilities";
 import { canAccessWorkspace, getAvailableWorkspaces, getNavItemsForWorkspace, getWorkspaceConfig, getWorkspaceForPath } from "@/lib/navigation";
 
@@ -207,8 +209,8 @@ export function PublicHeader({ hideRoleSwitch = false, audienceToggle = null, au
               {audienceLinks.map((item) => (
                 <AudienceButton key={item.href} item={item} />
               ))}
-              <Link href="/auth/login" className="dc-btn-secondary">Đăng nhập</Link>
-              <Link href="/auth/register" className="dc-btn-primary hidden px-7 py-3 text-base sm:inline-flex">Đăng ký tài khoản</Link>
+              <Link href="/auth/login" className="dc-btn-secondary" onClick={() => trackEvent(AnalyticsEvents.LOGIN_BUTTON_CLICK, { page_source: "public_header" })}>Đăng nhập</Link>
+              <Link href="/auth/register" className="dc-btn-primary hidden px-7 py-3 text-base sm:inline-flex" onClick={() => trackEvent(AnalyticsEvents.REGISTER_BUTTON_CLICK, { page_source: "public_header" })}>Đăng ký tài khoản</Link>
             </>
           )}
         </div>

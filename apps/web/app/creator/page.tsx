@@ -1,7 +1,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { CampaignStatus } from "@prisma/client";
+import { AnalyticsLink } from "@/app/components/analytics/AnalyticsLink";
+import { TrackPageEvent } from "@/app/components/analytics/TrackPageEvent";
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
+import { AnalyticsEvents } from "@/lib/analytics-events";
 import { getCurrentUserFromServer } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/db";
 import { listCampaigns } from "@/lib/services/campaign.service";
@@ -130,6 +133,7 @@ export default async function CreatorLandingPage() {
 
   return (
     <>
+      <TrackPageEvent eventName={AnalyticsEvents.CREATOR_LANDING_VIEW} />
       <PublicHeader
         hideRoleSwitch
         audienceToggle={{ href: "/brand", label: "Dành cho Brand" }}
@@ -151,9 +155,14 @@ export default async function CreatorLandingPage() {
               </p>
 
               <div className="mt-7 flex flex-wrap items-center gap-3">
-                <Link href={primaryCtaHref} className="dc-btn-primary min-w-[220px] rounded-xl px-6 text-base font-bold">
+                <AnalyticsLink
+                  href={primaryCtaHref}
+                  eventName={AnalyticsEvents.CREATOR_UPGRADE_CLICK}
+                  eventParams={{ role: "creator", page_source: "creator_landing_hero" }}
+                  className="dc-btn-primary min-w-[220px] rounded-xl px-6 text-base font-bold"
+                >
                   Bắt Đầu Nhận Job UGC
-                </Link>
+                </AnalyticsLink>
                 <Link href="#creator-how-it-works" className="dc-btn-secondary min-w-[220px] rounded-xl px-6 text-base font-semibold">
                   Xem Cách dCreator Hoạt Động
                 </Link>
@@ -365,9 +374,14 @@ export default async function CreatorLandingPage() {
               Tham gia cộng đồng Creator dCreator để nhận job UGC, kết nối brand thật và xây profile nội dung của riêng mình.
             </p>
             <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-              <Link href="/auth/register" className="inline-flex min-w-[190px] items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-black !text-zinc-950 transition-colors hover:bg-zinc-200">
+              <AnalyticsLink
+                href="/auth/register"
+                eventName={AnalyticsEvents.CREATOR_UPGRADE_CLICK}
+                eventParams={{ role: "creator", page_source: "creator_landing_bottom" }}
+                className="inline-flex min-w-[190px] items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-black !text-zinc-950 transition-colors hover:bg-zinc-200"
+              >
                 Trở Thành Creator
-              </Link>
+              </AnalyticsLink>
               <Link href="#creator-how-it-works" className="rounded-xl border border-white/20 px-6 py-3 text-sm font-black text-white transition-colors hover:bg-white hover:text-zinc-950">
                 Khám Phá Cộng Đồng
               </Link>
