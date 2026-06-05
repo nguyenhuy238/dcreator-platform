@@ -221,6 +221,8 @@ export async function createCreatorPayoutRequest(
         amountVnd,
         note,
         bankName: bankAccount.bankName,
+        bankCode: bankAccount.bankCode,
+        bankBin: bankAccount.bankBin,
         bankAccountName: bankAccount.accountHolderName,
         bankAccountNumber: bankAccount.accountNumber,
         idempotencyKey,

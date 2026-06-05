@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { AdminTabs } from "@/app/admin/_components/AdminTabs";
+import { ActionToast, ConfirmDialog, EmptyState, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
+type PayoutStatus = "" | "PENDING" | "APPROVED" | "REJECTED" | "PAID";
 type Item = {
   id: string;
   amountVnd: number;
@@ -18,8 +20,19 @@ export default function AdminPayoutsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [items, setItems] = useState<Item[]>([]);
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState<PayoutStatus>("PENDING");
   const [query, setQuery] = useState("");
+  const [toast, setToast] = useState("");
+  const [actingId, setActingId] = useState("");
+  const [confirmPaidId, setConfirmPaidId] = useState<string | null>(null);
+
+  const tabs = [
+    { key: "PENDING", label: "Chờ duyệt" },
+    { key: "APPROVED", label: "Đã duyệt, chờ chuyển tiền" },
+    { key: "PAID", label: "Đã chuyển tiền" },
+    { key: "REJECTED", label: "Bị từ chối" },
+    { key: "", label: "Tất cả" }
+  ];
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,12 +56,35 @@ export default function AdminPayoutsPage() {
     void load();
   }, [load]);
 
+  async function markAsPaid(id: string) {
+    setActingId(id);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/payouts/${id}/mark-paid`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+      });
+      const body = (await res.json()) as ApiResult<unknown>;
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Không thể xác nhận đã chuyển tiền");
+      setToast("Đã xác nhận chuyển tiền thành công.");
+      setTimeout(() => setToast(""), 2200);
+      setConfirmPaidId(null);
+      await load();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Không thể xác nhận đã chuyển tiền");
+    } finally {
+      setActingId("");
+    }
+  }
+
   return (
     <>
       <PageHeader title="Payout Requests" subtitle="Admin/OPS review payout queue." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
       <section className="dc-card p-4">
+        <AdminTabs items={tabs} value={status} onChange={(key) => setStatus(key as PayoutStatus)} />
         <div className="grid gap-2 md:grid-cols-3">
-          <select className="dc-input" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <select className="dc-input" value={status} onChange={(e) => setStatus(e.target.value as PayoutStatus)}>
             <option value="">Tất cả trạng thái</option>
             <option value="PENDING">PENDING</option>
             <option value="APPROVED">APPROVED</option>
@@ -78,15 +114,37 @@ export default function AdminPayoutsPage() {
                   <StatusBadge status={item.status.toLowerCase()} />
                 </div>
                 <div className="mt-3">
-                  <Link className="dc-btn-primary" href={`/admin/payouts/${item.id}`}>Xem chi tiết</Link>
+                  <div className="flex flex-wrap gap-2">
+                    <Link className="dc-btn-primary" href={`/admin/payouts/${item.id}`}>Xem chi tiết</Link>
+                    {item.status === "APPROVED" ? (
+                      <button
+                        type="button"
+                        className="dc-btn-secondary"
+                        disabled={actingId === item.id}
+                        onClick={() => setConfirmPaidId(item.id)}
+                      >
+                        {actingId === item.id ? "Đang xác nhận..." : "Xác nhận đã chuyển tiền"}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </article>
             ))}
           </div>
         )
       ) : null}
+      <ConfirmDialog
+        open={Boolean(confirmPaidId)}
+        title="Xác nhận đã chuyển tiền?"
+        message="Thao tác này sẽ đánh dấu yêu cầu rút tiền là đã chuyển khoản thành công."
+        confirmLabel="Đã chuyển tiền"
+        cancelLabel="Huỷ"
+        onCancel={() => setConfirmPaidId(null)}
+        onConfirm={() => {
+          if (confirmPaidId) void markAsPaid(confirmPaidId);
+        }}
+      />
+      {toast ? <ActionToast message={toast} onClose={() => setToast("")} /> : null}
     </>
   );
 }
-
-

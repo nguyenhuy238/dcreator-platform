@@ -1280,6 +1280,8 @@ model CreatorBankAccount {
   id                String   @id @default(cuid())
   accountId         String
   bankName          String
+  bankCode          String?
+  bankBin           String?
   accountNumber     String
   accountHolderName String
   isDefault         Boolean  @default(false)
@@ -1289,7 +1291,7 @@ model CreatorBankAccount {
   account        Account         @relation(fields: [accountId], references: [id], onDelete: Cascade)
   payoutRequests PayoutRequest[]
 
-  @@unique([accountId, accountNumber])
+  @@unique([accountId, bankCode, accountNumber])
   @@index([accountId, isDefault])
   @@index([accountId, createdAt])
 }
@@ -1386,6 +1388,8 @@ model PayoutRequest {
   status               PayoutRequestStatus @default(PENDING)
   note                 String?
   bankName             String
+  bankCode             String?
+  bankBin              String?
   bankAccountName      String
   bankAccountNumber    String
   reviewedById         String?

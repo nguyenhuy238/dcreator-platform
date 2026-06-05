@@ -563,10 +563,12 @@ export async function listCreatorBankAccounts(accountId: string) {
 }
 
 export async function createCreatorBankAccount(accountId: string, input: CreatorBankAccountInput) {
+  const normalizedBankCode = input.bankCode.trim();
   const normalizedAccountNumber = input.accountNumber.replace(/\s+/g, "");
   const duplicate = await prisma.creatorBankAccount.findFirst({
     where: {
       accountId,
+      bankCode: normalizedBankCode,
       accountNumber: normalizedAccountNumber
     },
     select: { id: true }
@@ -581,6 +583,8 @@ export async function createCreatorBankAccount(accountId: string, input: Creator
     data: {
       accountId,
       bankName: input.bankName.trim(),
+      bankCode: normalizedBankCode,
+      bankBin: input.bankBin.trim(),
       accountNumber: normalizedAccountNumber,
       accountHolderName: input.accountHolderName.trim(),
       isDefault: existingCount === 0
@@ -596,10 +600,12 @@ export async function updateCreatorBankAccount(accountId: string, bankAccountId:
     throw new AppError("Không tìm thấy tài khoản ngân hàng", 404, "BANK_ACCOUNT_NOT_FOUND");
   }
 
+  const normalizedBankCode = input.bankCode.trim();
   const normalizedAccountNumber = input.accountNumber.replace(/\s+/g, "");
   const duplicate = await prisma.creatorBankAccount.findFirst({
     where: {
       accountId,
+      bankCode: normalizedBankCode,
       accountNumber: normalizedAccountNumber,
       id: { not: bankAccountId }
     },
@@ -613,6 +619,8 @@ export async function updateCreatorBankAccount(accountId: string, bankAccountId:
     where: { id: bankAccountId },
     data: {
       bankName: input.bankName.trim(),
+      bankCode: normalizedBankCode,
+      bankBin: input.bankBin.trim(),
       accountNumber: normalizedAccountNumber,
       accountHolderName: input.accountHolderName.trim()
     }

@@ -52,6 +52,8 @@ export const creatorPayoutRequestSchema = z.object({
 
 export const creatorBankAccountSchema = z.object({
   bankName: z.string().trim().min(2).max(120),
+  bankCode: z.string().trim().min(2).max(40),
+  bankBin: z.string().trim().min(3).max(20),
   accountNumber: z.string().trim().min(6).max(60),
   accountHolderName: z.string().trim().min(2).max(120)
 });

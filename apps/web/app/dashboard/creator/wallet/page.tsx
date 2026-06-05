@@ -22,6 +22,8 @@ type PayoutHistory = {
   createdAt: string;
   paidAt: string | null;
   bankName: string;
+  bankCode: string | null;
+  bankBin: string | null;
   bankAccountName: string;
   bankAccountNumber: string;
 };
@@ -29,11 +31,23 @@ type PayoutHistory = {
 type CreatorBankAccount = {
   id: string;
   bankName: string;
+  bankCode: string | null;
+  bankBin: string | null;
   accountNumber: string;
   accountHolderName: string;
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
+};
+
+type VietQrBank = {
+  id: number;
+  name: string;
+  code: string;
+  bin: string;
+  shortName: string;
+  logo: string;
+  lookupSupported: boolean;
 };
 
 type PayoutData = {
@@ -47,13 +61,13 @@ type PayoutData = {
 type ApiResponse<T> = { success: boolean; data?: T; error?: string };
 
 type BankForm = {
-  bankName: string;
+  bankCode: string;
   accountNumber: string;
   accountHolderName: string;
 };
 
 const emptyBankForm: BankForm = {
-  bankName: "",
+  bankCode: "",
   accountNumber: "",
   accountHolderName: ""
 };
@@ -96,6 +110,7 @@ function maskAccountNumber(value: string) {
 
 export default function CreatorWalletPage() {
   const [payout, setPayout] = useState<PayoutData | null>(null);
+  const [vietQrBanks, setVietQrBanks] = useState<VietQrBank[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [savingBank, setSavingBank] = useState(false);
@@ -111,14 +126,23 @@ export default function CreatorWalletPage() {
     setLoading(true);
     setError("");
     try {
-      const payoutResponse = await fetch("/api/creator/dashboard/payouts", { cache: "no-store" });
+      const [payoutResponse, banksResponse] = await Promise.all([
+        fetch("/api/creator/dashboard/payouts", { cache: "no-store" }),
+        fetch("/api/vietqr/banks", { cache: "no-store" })
+      ]);
+
       const payoutPayload = (await payoutResponse.json()) as ApiResponse<PayoutData>;
+      const banksPayload = (await banksResponse.json()) as ApiResponse<VietQrBank[]>;
 
       if (!payoutResponse.ok || !payoutPayload.success || !payoutPayload.data) {
         throw new Error(payoutPayload.error ?? "Không thể tải ví Creator");
       }
+      if (!banksResponse.ok || !banksPayload.success || !banksPayload.data) {
+        throw new Error(banksPayload.error ?? "Không thể tải danh sách ngân hàng Việt Nam");
+      }
 
       setPayout(payoutPayload.data);
+      setVietQrBanks(banksPayload.data);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Không thể tải ví Creator");
     } finally {
@@ -133,6 +157,11 @@ export default function CreatorWalletPage() {
   const selectedBank = useMemo(
     () => payout?.bankAccounts.find((item) => item.isDefault) ?? null,
     [payout?.bankAccounts]
+  );
+
+  const selectedBankOption = useMemo(
+    () => vietQrBanks.find((item) => item.code === bankForm.bankCode) ?? null,
+    [bankForm.bankCode, vietQrBanks]
   );
 
   const payoutReason = buildPayoutReason(payout?.availableBalanceVnd ?? 0, Boolean(selectedBank));
@@ -172,6 +201,8 @@ export default function CreatorWalletPage() {
 
   async function saveBankAccount(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!selectedBankOption) return;
+
     setSavingBank(true);
     setError("");
     try {
@@ -184,7 +215,9 @@ export default function CreatorWalletPage() {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          bankName: bankForm.bankName.trim(),
+          bankName: selectedBankOption.name,
+          bankCode: selectedBankOption.code,
+          bankBin: selectedBankOption.bin,
           accountNumber: bankForm.accountNumber.trim(),
           accountHolderName: bankForm.accountHolderName.trim()
         })
@@ -209,7 +242,7 @@ export default function CreatorWalletPage() {
   function startEditBankAccount(bankAccount: CreatorBankAccount) {
     setEditingBankId(bankAccount.id);
     setBankForm({
-      bankName: bankAccount.bankName,
+      bankCode: bankAccount.bankCode ?? "",
       accountNumber: bankAccount.accountNumber,
       accountHolderName: bankAccount.accountHolderName
     });
@@ -280,7 +313,7 @@ export default function CreatorWalletPage() {
             <StatsCard title="Tổng đã rút" value={formatPoints(payout.withdrawnPayoutVnd)} />
           </section>
 
-          <section className="mt-6 grid gap-4 xl:grid-cols-2">
+          <section className="mt-6 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
             <article className="dc-card p-4">
               <SectionHeader title="Yêu cầu rút tiền" subtitle="Chọn tài khoản nhận tiền và gửi yêu cầu rút N-Point khi đủ điều kiện." />
               {!canRequestPayout ? <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">{payoutReason}</p> : null}
@@ -328,119 +361,148 @@ export default function CreatorWalletPage() {
                   </button>
                 </div>
               </form>
+            </article>
 
-              <div className="mt-5 border-t border-zinc-100 pt-5">
-                <SectionHeader title="Tài khoản ngân hàng" subtitle={`${payout.bankAccounts.length} tài khoản`} />
+            <article className="dc-card p-4">
+              <SectionHeader title="Tài khoản ngân hàng" subtitle={`${payout.bankAccounts.length} tài khoản`} />
 
-                <form className="grid gap-3" onSubmit={saveBankAccount}>
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <FormField label="Ngân hàng">
-                      <input
-                        className="dc-input"
-                        value={bankForm.bankName}
-                        onChange={(event) => setBankForm((current) => ({ ...current, bankName: event.target.value }))}
-                        placeholder="Ví dụ: Vietcombank"
+              <form className="grid gap-3" onSubmit={saveBankAccount}>
+                <FormField label="Ngân hàng">
+                  <select
+                    className="dc-input"
+                    value={bankForm.bankCode}
+                    onChange={(event) => setBankForm((current) => ({ ...current, bankCode: event.target.value }))}
+                  >
+                    <option value="">Chọn ngân hàng từ VietQR</option>
+                    {vietQrBanks.map((bank) => (
+                      <option key={bank.code} value={bank.code}>
+                        {bank.shortName} - {bank.name}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+
+                {selectedBankOption ? (
+                  <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+                    <div className="flex items-center gap-3">
+                      {/* Using a plain img here avoids Next remote image host config for VietQR logos. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={selectedBankOption.logo}
+                        alt={selectedBankOption.shortName}
+                        className="h-10 w-10 rounded-xl border border-zinc-200 bg-white object-contain p-1"
                       />
-                    </FormField>
-                    <FormField label="Số tài khoản">
-                      <input
-                        className="dc-input"
-                        value={bankForm.accountNumber}
-                        onChange={(event) => setBankForm((current) => ({ ...current, accountNumber: event.target.value }))}
-                        placeholder="Nhập số tài khoản"
-                      />
-                    </FormField>
-                    <FormField label="Tên chủ tài khoản">
-                      <input
-                        className="dc-input"
-                        value={bankForm.accountHolderName}
-                        onChange={(event) => setBankForm((current) => ({ ...current, accountHolderName: event.target.value }))}
-                        placeholder="Nguyen Van A"
-                      />
-                    </FormField>
+                      <div>
+                        <p className="font-semibold text-zinc-900">{selectedBankOption.shortName}</p>
+                        <p className="text-sm text-zinc-600">{selectedBankOption.name}</p>
+                        <p className="text-xs text-zinc-500">BIN / acqId: {selectedBankOption.bin}</p>
+                      </div>
+                    </div>
                   </div>
+                ) : null}
 
-                  <div className="flex flex-wrap gap-2">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <FormField label="Số tài khoản">
+                    <input
+                      className="dc-input"
+                      value={bankForm.accountNumber}
+                      onChange={(event) => setBankForm((current) => ({ ...current, accountNumber: event.target.value }))}
+                      placeholder="Nhập số tài khoản"
+                    />
+                  </FormField>
+                  <FormField label="Tên chủ tài khoản">
+                    <input
+                      className="dc-input"
+                      value={bankForm.accountHolderName}
+                      onChange={(event) => setBankForm((current) => ({ ...current, accountHolderName: event.target.value }))}
+                      placeholder="Nguyen Van A"
+                    />
+                  </FormField>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="submit"
+                    className="dc-btn-primary"
+                    disabled={
+                      savingBank ||
+                      bankForm.bankCode.trim().length === 0 ||
+                      bankForm.accountNumber.trim().length === 0 ||
+                      bankForm.accountHolderName.trim().length === 0
+                    }
+                  >
+                    {savingBank ? "Đang lưu..." : editingBankId ? "Cập nhật tài khoản" : "Thêm tài khoản"}
+                  </button>
+                  {editingBankId ? (
                     <button
-                      type="submit"
-                      className="dc-btn-primary"
-                      disabled={
-                        savingBank ||
-                        bankForm.bankName.trim().length === 0 ||
-                        bankForm.accountNumber.trim().length === 0 ||
-                        bankForm.accountHolderName.trim().length === 0
-                      }
+                      type="button"
+                      className="dc-btn-secondary"
+                      disabled={savingBank}
+                      onClick={() => {
+                        setEditingBankId(null);
+                        setBankForm(emptyBankForm);
+                      }}
                     >
-                      {savingBank ? "Đang lưu..." : editingBankId ? "Cập nhật tài khoản" : "Thêm tài khoản"}
+                      Hủy chỉnh sửa
                     </button>
-                    {editingBankId ? (
-                      <button
-                        type="button"
-                        className="dc-btn-secondary"
-                        disabled={savingBank}
-                        onClick={() => {
-                          setEditingBankId(null);
-                          setBankForm(emptyBankForm);
-                        }}
-                      >
-                        Hủy chỉnh sửa
-                      </button>
-                    ) : null}
-                  </div>
-                </form>
+                  ) : null}
+                </div>
+              </form>
 
-                {payout.bankAccounts.length === 0 ? (
-                  <div className="mt-4">
-                    <EmptyState title="Chưa có tài khoản ngân hàng" description="Thêm ít nhất một tài khoản để có thể nhận tiền rút." />
-                  </div>
-                ) : (
-                  <div className="mt-4 grid gap-3">
-                    {payout.bankAccounts.map((bankAccount) => (
-                      <article key={bankAccount.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <div>
+              {payout.bankAccounts.length === 0 ? (
+                <div className="mt-4">
+                  <EmptyState title="Chưa có tài khoản ngân hàng" description="Thêm ít nhất một tài khoản để có thể nhận tiền rút." />
+                </div>
+              ) : (
+                <div className="mt-4 grid gap-3">
+                  {payout.bankAccounts.map((bankAccount) => (
+                    <article key={bankAccount.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
                           <p className="font-semibold text-zinc-900">{bankAccount.bankName}</p>
                           <p className="text-sm text-zinc-600">{bankAccount.accountHolderName}</p>
                           <p className="text-sm text-zinc-500">{maskAccountNumber(bankAccount.accountNumber)}</p>
-                          </div>
-                          {bankAccount.isDefault ? <span className="rounded-full bg-zinc-900 px-3 py-1 text-xs font-semibold text-white">Đang chọn</span> : null}
+                          {bankAccount.bankBin ? <p className="text-xs text-zinc-500">BIN / acqId: {bankAccount.bankBin}</p> : null}
                         </div>
+                        {bankAccount.isDefault ? <span className="rounded-full bg-zinc-900 px-3 py-1 text-xs font-semibold text-white">Đang chọn</span> : null}
+                      </div>
 
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {!bankAccount.isDefault ? (
-                            <button
-                              type="button"
-                              className="dc-btn-primary"
-                              disabled={savingBank}
-                              onClick={() => void setDefaultBankAccount(bankAccount.id)}
-                            >
-                              Chọn nhận tiền
-                            </button>
-                          ) : null}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {!bankAccount.isDefault ? (
                           <button
                             type="button"
-                            className="dc-btn-secondary"
+                            className="dc-btn-primary"
                             disabled={savingBank}
-                            onClick={() => startEditBankAccount(bankAccount)}
+                            onClick={() => void setDefaultBankAccount(bankAccount.id)}
                           >
-                            Sửa
+                            Chọn nhận tiền
                           </button>
-                          <button
-                            type="button"
-                            className="dc-btn-secondary"
-                            disabled={savingBank}
-                            onClick={() => setDeleteBankId(bankAccount.id)}
-                          >
-                            Xoá
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                )}
-              </div>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="dc-btn-secondary"
+                          disabled={savingBank}
+                          onClick={() => startEditBankAccount(bankAccount)}
+                        >
+                          Sửa
+                        </button>
+                        <button
+                          type="button"
+                          className="dc-btn-secondary"
+                          disabled={savingBank}
+                          onClick={() => setDeleteBankId(bankAccount.id)}
+                        >
+                          Xoá
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </article>
+          </section>
 
+          <section className="mt-6">
             <article className="dc-card p-4">
               <SectionHeader title="Lịch sử rút tiền" subtitle={`${payout.history.length} giao dịch`} />
               {payout.history.length === 0 ? (
@@ -457,6 +519,7 @@ export default function CreatorWalletPage() {
                         <p className="mt-1 text-xs text-zinc-500">Ngày tạo: {formatDate(tx.createdAt)}</p>
                         <p className="text-xs text-zinc-500">Ngân hàng: {tx.bankName}</p>
                         <p className="text-xs text-zinc-500">Tài khoản: {tx.bankAccountName} • {maskAccountNumber(tx.bankAccountNumber)}</p>
+                        {tx.bankBin ? <p className="text-xs text-zinc-500">BIN / acqId: {tx.bankBin}</p> : null}
                         <p className="text-xs text-zinc-500">Ngày chi trả: {formatDate(tx.paidAt)}</p>
                         {tx.note ? <p className="mt-1 text-sm text-zinc-600">{tx.note}</p> : null}
                       </div>
@@ -482,6 +545,7 @@ export default function CreatorWalletPage() {
                             <td className="px-3 py-2 text-zinc-600">
                               <p>{tx.bankName}</p>
                               <p className="text-xs text-zinc-500">{tx.bankAccountName} • {maskAccountNumber(tx.bankAccountNumber)}</p>
+                              {tx.bankBin ? <p className="text-xs text-zinc-500">BIN / acqId: {tx.bankBin}</p> : null}
                             </td>
                             <td className="px-3 py-2">
                               <StatusBadge status={tx.status} />
