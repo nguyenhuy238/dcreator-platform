@@ -75,7 +75,7 @@ const WORKSPACES: readonly WorkspaceConfig[] = [
     id: "user",
     label: "T\u00e0i kho\u1ea3n c\u00e1 nh\u00e2n",
     title: "T\u00e0i kho\u1ea3n c\u00e1 nh\u00e2n",
-    description: "Qu\u1ea3n l\u00fd h\u1ed3 s\u01a1 c\u00e1 nh\u00e2n, v\u00ed, voucher v\u00e0 nhi\u1ec7m v\u1ee5 c\u1ee7a b\u1ea1n",
+    description: "Qu\u1ea3n l\u00fd h\u1ed3 s\u01a1 c\u00e1 nh\u00e2n, nâng cấp vai trò",
     defaultHref: "/dashboard/user",
     routePrefixes: ["/dashboard/user"],
     requiredCapability: "user",

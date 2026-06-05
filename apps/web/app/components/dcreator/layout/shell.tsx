@@ -410,7 +410,7 @@ export function AppShell({ children, sidebarItems }: { children: React.ReactNode
     return () => {
       active = false;
     };
-  }, [pathname]);
+  }, []);
 
   useEffect(() => {
     function handleUserUpdated(event: Event) {

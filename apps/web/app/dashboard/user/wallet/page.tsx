@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AppShell } from "@/app/components/dcreator/layout/shell";
 import { EmptyState, ErrorState, PageHeader, SectionHeader, StatsCard, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type WalletData = {
@@ -32,7 +31,6 @@ export default function UserWalletPage() {
 
   return (
     <>
-      <AppShell>
         <PageHeader title="Ví / N-Points" subtitle="Số dư, giao dịch và thanh toán đang chờ xác nhận." />
         {error ? <ErrorState title="Không thể tải ví" description={error} /> : null}
         {loading ? <div className="h-56 animate-pulse rounded-3xl bg-zinc-100" /> : null}
@@ -83,7 +81,6 @@ export default function UserWalletPage() {
             </section>
           </>
         ) : null}
-      </AppShell>
     </>
   );
 }

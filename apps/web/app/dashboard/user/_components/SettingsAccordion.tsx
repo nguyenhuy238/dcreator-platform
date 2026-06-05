@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 type SettingsAccordionProps = {
@@ -10,8 +11,18 @@ type SettingsAccordionProps = {
 };
 
 export function SettingsAccordion({ title, description, defaultOpen = false, children }: SettingsAccordionProps) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  useEffect(() => {
+    setOpen(defaultOpen);
+  }, [defaultOpen]);
+
   return (
-    <details className="overflow-hidden rounded-3xl border border-zinc-200 bg-white" open={defaultOpen}>
+    <details
+      className="overflow-hidden rounded-3xl border border-zinc-200 bg-white"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
       <summary className="cursor-pointer list-none px-5 py-4">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -19,7 +30,7 @@ export function SettingsAccordion({ title, description, defaultOpen = false, chi
             {description ? <p className="mt-1 text-sm text-zinc-600">{description}</p> : null}
           </div>
           <span className="shrink-0 rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-600">
-            Mở
+            {open ? "Đóng" : "Mở"}
           </span>
         </div>
       </summary>

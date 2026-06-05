@@ -218,8 +218,8 @@ export function DashboardShell({
         <div className="min-w-0 flex-1">
           <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 backdrop-blur">
             <div className="px-4 py-3 md:px-6">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                <div className="min-w-0 flex flex-1 items-center gap-2">
                   <button
                     type="button"
                     className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-zinc-700 lg:hidden"
@@ -236,8 +236,8 @@ export function DashboardShell({
                   >
                     {desktopNavOpen ? <X size={18} weight="bold" /> : <List size={18} weight="bold" />}
                   </button>
-                  <div>
-                    <p className="text-sm font-bold text-zinc-900">{activeTitle}</p>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-zinc-900">{activeTitle}</p>
                     <nav className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-zinc-500">
                       {crumbs.map((crumb, index) => (
                         <span key={crumb.href} className="inline-flex items-center gap-1">
@@ -248,7 +248,7 @@ export function DashboardShell({
                     </nav>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="shrink-0 flex items-center gap-2">
                   {headerAccessory}
                   <div className="relative">
                     <button type="button" className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-2 py-1.5 hover:bg-zinc-100" onClick={() => setMenuOpen((prev) => !prev)}>
