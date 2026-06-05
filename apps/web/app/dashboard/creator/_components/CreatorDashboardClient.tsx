@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ErrorState, LoadingSkeleton, PageHeader } from "@/app/components/dcreator/ui/base";
 import { CreatorMissionsPanel } from "@/app/dashboard/creator/_components/CreatorMissionsPanel";
 
@@ -25,6 +26,7 @@ async function fetcher<T>(url: string) {
 }
 
 export function CreatorDashboardClient() {
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [overview, setOverview] = useState<CreatorOverview | null>(null);
@@ -66,7 +68,7 @@ export function CreatorDashboardClient() {
       {error ? <ErrorState title="Không thể tải bảng điều khiển" description={error} onRetry={() => void loadOverview()} /> : null}
       {loading ? <LoadingSkeleton rows={3} /> : null}
 
-      {!loading ? <CreatorMissionsPanel overview={overview} /> : null}
+      {!loading ? <CreatorMissionsPanel overview={overview} initialDetailMissionId={searchParams.get("missionId")?.trim() ?? ""} /> : null}
     </div>
   );
 }

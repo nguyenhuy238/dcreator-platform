@@ -925,7 +925,14 @@ export async function listBrandCampaigns(accountId: string, currentBrandId?: str
   const campaignIds = await getScopedCampaignIds(ctx.brand.id, ctx.brandOwnerAccountId);
   const reviewableMissionWhere: Prisma.CreatorMissionWhereInput = {
     campaignId: { in: campaignIds },
-    OR: [{ mission: { deadlineAt: null } }, { mission: { deadlineAt: { gte: new Date() } } }]
+    OR: [
+      {
+        missionId: null,
+        OR: [{ campaign: { endsAt: null } }, { campaign: { endsAt: { gte: new Date() } } }]
+      },
+      { mission: { deadlineAt: null } },
+      { mission: { deadlineAt: { gte: new Date() } } }
+    ]
   };
   const campaigns = await prisma.campaign.findMany({
     where: { id: { in: campaignIds } },
@@ -940,21 +947,14 @@ export async function listBrandCampaigns(accountId: string, currentBrandId?: str
     }
   });
 
-  const applicationsByCampaign = await prisma.missionSubmission.groupBy({
-    by: ["missionId"],
-    where: { mission: { campaignId: { in: campaignIds } } },
-    _count: { _all: true }
+  const appliedCreatorPairs = await prisma.creatorMission.groupBy({
+    by: ["campaignId", "accountId"],
+    where: { campaignId: { in: campaignIds } }
   });
-  const missionIds = applicationsByCampaign.map((item) => item.missionId);
-  const missions = missionIds.length > 0
-    ? await prisma.mission.findMany({ where: { id: { in: missionIds } }, select: { id: true, campaignId: true } })
-    : [];
 
   const campaignApplicationCountMap = new Map<string, number>();
-  for (const item of applicationsByCampaign) {
-    const mission = missions.find((x) => x.id === item.missionId);
-    if (!mission) continue;
-    campaignApplicationCountMap.set(mission.campaignId, (campaignApplicationCountMap.get(mission.campaignId) ?? 0) + item._count._all);
+  for (const row of appliedCreatorPairs) {
+    campaignApplicationCountMap.set(row.campaignId, (campaignApplicationCountMap.get(row.campaignId) ?? 0) + 1);
   }
 
   const approvedCreatorPairs = await prisma.creatorMission.groupBy({
@@ -970,7 +970,7 @@ export async function listBrandCampaigns(accountId: string, currentBrandId?: str
     creatorJoinedByCampaignId.set(row.campaignId, (creatorJoinedByCampaignId.get(row.campaignId) ?? 0) + 1);
   }
 
-  const [pendingApplicationCounts, pendingTranscriptCounts, pendingVideoCounts, pendingPublishCounts] = await Promise.all([
+  const [pendingApplicationCounts, pendingTranscriptCounts, pendingVideoCounts, pendingPublishCounts, completedCounts] = await Promise.all([
     prisma.creatorMission.groupBy({
       by: ["campaignId"],
       where: { ...reviewableMissionWhere, applicationStatus: "PENDING_REVIEW" },
@@ -983,7 +983,10 @@ export async function listBrandCampaigns(accountId: string, currentBrandId?: str
         applicationStatus: "APPROVED",
         status: "DRAFT_PENDING",
         submissionStatus: "SUBMITTED",
-        submissionProofTextNote: { not: null }
+        OR: [
+          { submissionTranscriptTextNote: { not: null } },
+          { submissionTranscriptResourceUrl: { not: null } }
+        ]
       },
       _count: { _all: true }
     }),
@@ -996,6 +999,15 @@ export async function listBrandCampaigns(accountId: string, currentBrandId?: str
       by: ["campaignId"],
       where: { ...reviewableMissionWhere, publishStatus: "PENDING" },
       _count: { _all: true }
+    }),
+    prisma.creatorMission.groupBy({
+      by: ["campaignId"],
+      where: {
+        ...reviewableMissionWhere,
+        applicationStatus: "APPROVED",
+        status: "COMPLETED"
+      },
+      _count: { _all: true }
     })
   ]);
 
@@ -1006,9 +1018,14 @@ export async function listBrandCampaigns(accountId: string, currentBrandId?: str
     }
   }
 
+  const completedCountMap = new Map<string, number>();
+  for (const row of completedCounts) {
+    completedCountMap.set(row.campaignId, row._count._all);
+  }
+
   return campaigns.map((campaign) => {
     const videoTarget = Math.max(0, campaign.ugcVideoQuota ?? 0);
-    const videoApproved = Math.max(0, campaign.ugcVideoApprovedCount ?? 0);
+    const videoApproved = completedCountMap.get(campaign.id) ?? 0;
     const videoProgressPercent = videoTarget > 0 ? Math.min(100, Math.round((videoApproved / videoTarget) * 100)) : 0;
     return {
       ...campaign,

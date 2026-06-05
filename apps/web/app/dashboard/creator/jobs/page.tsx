@@ -1,10 +1,11 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/app/components/dcreator/ui/base";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 import { CampaignList } from "@/app/campaigns/_components/CampaignList";
+import { CreatorMissionsPanel } from "@/app/dashboard/creator/_components/CreatorMissionsPanel";
 
 type MissionHistoryItem = {
   id: string;
@@ -93,6 +94,7 @@ async function fetchJson<T>(url: string, init?: RequestInit) {
 }
 
 export default function CreatorJobsPage() {
+  const router = useRouter();
   const [historyItems, setHistoryItems] = useState<CampaignItem[]>([]);
   const [participatedSlugs, setParticipatedSlugs] = useState<string[]>([]);
   const [activeStatus, setActiveStatus] = useState<HistoryStatus>("IN_PROGRESS");
@@ -101,6 +103,7 @@ export default function CreatorJobsPage() {
   const [busyMissionId, setBusyMissionId] = useState("");
   const [rejectedMissionId, setRejectedMissionId] = useState("");
   const [reapplyError, setReapplyError] = useState("");
+  const [detailMissionId, setDetailMissionId] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -225,7 +228,11 @@ export default function CreatorJobsPage() {
             <p className="text-sm text-zinc-500">Chưa có campaign trong nhóm này.</p>
           ) : (
             historyItems.map((campaign) => (
-              <article key={`${activeStatus}-${campaign.slug}`} className="min-w-[230px] max-w-[230px] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm sm:min-w-[260px] sm:max-w-[260px]">
+              <article
+                key={`${activeStatus}-${campaign.slug}`}
+                className="min-w-[230px] max-w-[230px] cursor-pointer overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm sm:min-w-[260px] sm:max-w-[260px]"
+                onClick={() => router.push(`/campaigns/${campaign.slug}`)}
+              >
                 <div className="relative aspect-[16/9] w-full overflow-hidden bg-zinc-100">
                   <CampaignCoverImage
                     src={campaign.coverImageUrl}
@@ -250,17 +257,37 @@ export default function CreatorJobsPage() {
                         <button
                           type="button"
                           className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
-                          onClick={() => {
+                          onClick={(event) => {
+                            event.stopPropagation();
                             setReapplyError("");
                             setRejectedMissionId(campaign.missionId);
                           }}
                         >
                           Thao tác
                         </button>
+                      ) : activeStatus === "OVERDUE" || activeStatus === "COMPLETED" ? (
+                        <button
+                          type="button"
+                          className="rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setDetailMissionId(campaign.missionId);
+                          }}
+                        >
+                          Xem chi tiết
+                        </button>
+                      ) : activeStatus === "IN_PROGRESS" ? (
+                        <button
+                          type="button"
+                          className="rounded-full bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setDetailMissionId(campaign.missionId);
+                          }}
+                        >
+                          Tiếp tục
+                        </button>
                       ) : null}
-                      <Link href={`/campaigns/${campaign.slug}`} className="rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100">
-                        Xem chi tiết
-                      </Link>
                     </div>
                   </div>
                 </div>
@@ -270,6 +297,14 @@ export default function CreatorJobsPage() {
         </div>
       </section>
       <CampaignList excludeSlugs={participatedSlugs} compact />
+      {detailMissionId ? (
+        <CreatorMissionsPanel
+          overview={null}
+          initialDetailMissionId={detailMissionId}
+          detailOnly
+          onDetailClose={() => setDetailMissionId("")}
+        />
+      ) : null}
       {rejectedMission ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/50 p-4" onClick={() => setRejectedMissionId("")}>
           <div className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>

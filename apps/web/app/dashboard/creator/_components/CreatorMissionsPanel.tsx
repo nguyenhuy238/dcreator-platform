@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle, IdentificationCard, Megaphone, Package, Scroll, VideoCamera } from "@phosphor-icons/react";
 import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, SectionHeader } from "@/app/components/dcreator/ui/base";
 import type { CreatorOverview } from "@/app/dashboard/creator/_components/CreatorDashboardClient";
@@ -42,6 +43,9 @@ type MissionItem = {
   };
   campaign: { title: string; slug: string };
   submission: {
+    transcriptType: "TEXT" | "FILE" | "URL" | null;
+    transcriptTextNote: string | null;
+    transcriptResourceUrl: string | null;
     videoUrl: string | null;
     note: string | null;
     rejectReason: string | null;
@@ -67,14 +71,19 @@ type MissionItem = {
 type FormMap = Record<string, string>;
 type PreVideoChoice = "VIDEO" | "TRANSCRIPT";
 type PreVideoChoiceMap = Record<string, PreVideoChoice>;
+type TranscriptMode = "TEXT" | "FILE" | "URL";
+type TranscriptModeMap = Record<string, TranscriptMode>;
 type MissionFilter = "ALL" | "DOING" | "PENDING" | "REVISION" | "COMPLETED" | "OVERDUE";
 type MissionSort = "APPROVED_NEWEST" | "APPROVED_OLDEST" | "EXPIRING_SOON";
-type MissionErrorField = "form" | "bill" | "rating" | "transcript" | "videoUrl" | "videoNote" | "publicUrl" | "adCode" | "screenshot" | "finalNote";
+type MissionErrorField = "form" | "bill" | "rating" | "transcript" | "transcriptFile" | "transcriptUrl" | "videoUrl" | "videoNote" | "publicUrl" | "adCode" | "screenshot" | "finalNote";
 type MissionFormErrors = Partial<Record<MissionErrorField, string>>;
 type DetailTab = "ACTIONS" | "HISTORY";
 
 type CreatorMissionsPanelProps = {
   overview: CreatorOverview | null;
+  initialDetailMissionId?: string;
+  detailOnly?: boolean;
+  onDetailClose?: () => void;
 };
 
 function missionAnalyticsParams(item: MissionItem, proofType: string) {
@@ -157,20 +166,45 @@ function transcriptDownloadHref(value: string | null | undefined) {
   return external ?? null;
 }
 
+function isTranscriptUploadPath(value: string | null | undefined) {
+  return Boolean(value?.trim().startsWith("/uploads/creator-transcript/"));
+}
+
+function transcriptModeFromSubmission(submission: MissionItem["submission"]): TranscriptMode {
+  if (submission?.transcriptType) return submission.transcriptType;
+  if (toPlainTranscript(submission?.transcriptTextNote)) return "TEXT";
+  if (isTranscriptUploadPath(submission?.transcriptResourceUrl)) return "FILE";
+  if (submission?.transcriptResourceUrl?.trim()) return "URL";
+  return "TEXT";
+}
+
+function transcriptLinkLabel(value: string | null | undefined) {
+  return isTranscriptUploadPath(value) ? "Tải file kịch bản" : "Mở link kịch bản";
+}
+
+function transcriptModeLabel(mode: TranscriptMode | null | undefined, resourceUrl?: string | null) {
+  if (mode === "TEXT") return "Viết trực tiếp";
+  if (mode === "FILE") return "Tải file lên";
+  if (mode === "URL") return "Gửi link URL";
+  return resourceUrl ? (isTranscriptUploadPath(resourceUrl) ? "Tải file lên" : "Gửi link URL") : "Viết trực tiếp";
+}
+
 function workflowStatus(item: MissionItem) {
   const purchaseDone = item.productReceiveOption === "NO_PRODUCT_REQUIRED" || item.productStatus === "RECEIVED";
-  const transcriptText = Boolean(toPlainTranscript(item.submission?.proofTextNote));
+  const transcriptText = Boolean(toPlainTranscript(item.submission?.transcriptTextNote));
+  const transcriptFile = Boolean(item.submission?.transcriptResourceUrl?.trim());
   const hasTranscriptSubmitted =
     item.status === "DRAFT_PENDING" ||
     item.submission?.status === "SUBMITTED" ||
     item.submission?.status === "APPROVED" ||
-    transcriptText;
+    transcriptText ||
+    transcriptFile;
   const transcriptPending = item.status === "DRAFT_PENDING" && item.submission?.status === "SUBMITTED";
   const transcriptRejected = item.status === "DRAFT_PENDING" && item.submission?.status === "REJECTED";
   const transcriptApproved = hasTranscriptSubmitted && !transcriptPending && !transcriptRejected;
   const hasVideoSubmitted = item.videoReviewStatus !== "NOT_SUBMITTED" || Boolean(item.submission?.videoUrl?.trim());
 
-  if (item.missionApplication?.status === "PENDING_REVIEW") return "Chờ duyệt nhiệm vụ";
+  if (item.missionApplication?.status === "PENDING_REVIEW") return "Chờ duyệt campaign";
   if (item.missionApplication?.status === "REJECTED") return "Bị từ chối";
   if (item.status === "COMPLETED") return "Hoàn thành";
   if (item.status === "CANCELLED") return "Bị từ chối";
@@ -256,26 +290,6 @@ function missionStatusLabel(status: string) {
   return "Không xác định";
 }
 
-function productReceiveOptionLabel(value: string) {
-  if (value === "PRODUCT_REQUIRED") return "Có yêu cầu sản phẩm";
-  if (value === "NO_PRODUCT_REQUIRED") return "Không yêu cầu sản phẩm";
-  return "Không xác định";
-}
-
-function productStatusLabel(value: string) {
-  if (value === "NOT_REQUIRED") return "Không yêu cầu";
-  if (value === "WAITING_DEPOSIT") return "Đang chờ đặt cọc";
-  if (value === "WAITING_PURCHASE") return "Đang chờ mua hàng";
-  if (value === "RECEIVED") return "Đã nhận sản phẩm";
-  return "Không xác định";
-}
-
-function missionAudienceLabel(value: string) {
-  if (value === "CREATOR") return "Creator";
-  if (value === "USER") return "Người dùng";
-  return "Không xác định";
-}
-
 type TimelineStep = {
   key: string;
   label: string;
@@ -339,7 +353,17 @@ function toErrorMessage(error: unknown) {
   }
 }
 
-export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
+function hasText(value: string | null | undefined) {
+  return Boolean(value?.trim());
+}
+
+export function CreatorMissionsPanel({
+  overview,
+  initialDetailMissionId = "",
+  detailOnly = false,
+  onDetailClose
+}: CreatorMissionsPanelProps) {
+  const router = useRouter();
   const PAGE_SIZE = 8;
   const [items, setItems] = useState<MissionItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -361,6 +385,8 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
   const [videoUrlMap, setVideoUrlMap] = useState<FormMap>({});
   const [videoNoteMap, setVideoNoteMap] = useState<FormMap>({});
   const [transcriptMap, setTranscriptMap] = useState<FormMap>({});
+  const [transcriptModeMap, setTranscriptModeMap] = useState<TranscriptModeMap>({});
+  const [transcriptUrlMap, setTranscriptUrlMap] = useState<FormMap>({});
   const [preVideoChoiceMap, setPreVideoChoiceMap] = useState<PreVideoChoiceMap>({});
   const [publicUrlMap, setPublicUrlMap] = useState<FormMap>({});
   const [adCodeMap, setAdCodeMap] = useState<FormMap>({});
@@ -434,10 +460,21 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
   }
 
   async function submitTranscript(item: MissionItem) {
-    const transcript = transcriptMap[item.id]?.trim() ?? toPlainTranscript(item.submission?.proofTextNote);
-    if (!transcript) {
+    const mode = transcriptModeMap[item.id] ?? transcriptModeFromSubmission(item.submission);
+    const transcript = transcriptMap[item.id]?.trim() ?? toPlainTranscript(item.submission?.transcriptTextNote);
+    const transcriptUrl = transcriptUrlMap[item.id]?.trim() ?? item.submission?.transcriptResourceUrl?.trim() ?? "";
+
+    if (mode === "TEXT" && !transcript) {
       setMissionFormErrors(item.id, { transcript: "Bạn chưa nhập nội dung kịch bản." });
       trackEvent(AnalyticsEvents.MISSION_SUBMIT_FAILED, missionAnalyticsParams(item, "transcript"));
+      return;
+    }
+    if (mode === "FILE" && !transcriptUrl) {
+      setMissionFormErrors(item.id, { transcriptFile: "Bạn chưa tải file kịch bản lên." });
+      return;
+    }
+    if (mode === "URL" && !transcriptUrl) {
+      setMissionFormErrors(item.id, { transcriptUrl: "Bạn chưa nhập link kịch bản." });
       return;
     }
 
@@ -449,7 +486,11 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
       await fetchJson(`/api/creator/missions/${item.id}/transcript-submission`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transcript })
+        body: JSON.stringify(
+          mode === "TEXT"
+            ? { mode, transcript }
+            : { mode, fileUploadUrl: mode === "URL" ? normalizeHttpUrl(transcriptUrl) : transcriptUrl }
+        )
       });
       trackEvent(AnalyticsEvents.MISSION_SUBMIT_SUCCESS, missionAnalyticsParams(item, "transcript"));
       pushSuccess("Đã gửi kịch bản. Vui lòng chờ Brand/Admin duyệt trước khi nộp video review.");
@@ -565,9 +606,42 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
     }
   }
 
+  async function uploadTranscriptFile(missionId: string, file: File) {
+    const formData = new FormData();
+    formData.append("transcript", file);
+    const key = `${missionId}:transcript-file`;
+    setUploadingKey(key);
+    clearMissionErrorField(missionId, "transcriptFile");
+    try {
+      const response = await fetch("/api/uploads/creator-transcript", { method: "POST", body: formData });
+      const payload = (await response.json()) as ApiResult<{ transcriptFileUrl: string }>;
+      const uploadedTranscriptUrl = payload.data?.transcriptFileUrl;
+      if (!response.ok || !payload.success || !uploadedTranscriptUrl) {
+        throw new Error(payload.error ?? "Không thể tải file kịch bản.");
+      }
+      setTranscriptUrlMap((prev) => ({ ...prev, [missionId]: uploadedTranscriptUrl }));
+    } catch (e) {
+      setMissionErrors((prev) => ({
+        ...prev,
+        [missionId]: { ...prev[missionId], transcriptFile: toErrorMessage(e) }
+      }));
+    } finally {
+      setUploadingKey("");
+    }
+  }
+
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    if (!initialDetailMissionId || items.length === 0) return;
+    if (items.some((item) => item.id === initialDetailMissionId)) {
+      setActiveFilter("ALL");
+      setDetailMissionId(initialDetailMissionId);
+      setDetailTab("ACTIONS");
+    }
+  }, [initialDetailMissionId, items]);
 
   const counters = useMemo(() => {
     const result = { doing: 0, pending: 0, revision: 0, completed: 0, overdue: 0 };
@@ -613,6 +687,12 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
 
   function closeMissionDetail() {
     setDetailMissionId("");
+    onDetailClose?.();
+    if (!onDetailClose && initialDetailMissionId) {
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.delete("missionId");
+      router.replace(`${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`, { scroll: false });
+    }
   }
 
   async function reapplyMission(item: MissionItem) {
@@ -661,12 +741,14 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
 
   function buildMissionTimeline(item: MissionItem): TimelineStep[] {
     const purchaseDone = item.productReceiveOption === "NO_PRODUCT_REQUIRED" || item.productStatus === "RECEIVED";
-    const transcriptText = Boolean(toPlainTranscript(item.submission?.proofTextNote));
+    const transcriptText = Boolean(toPlainTranscript(item.submission?.transcriptTextNote));
+    const transcriptFile = Boolean(item.submission?.transcriptResourceUrl?.trim());
     const hasTranscriptSubmitted =
       item.status === "DRAFT_PENDING" ||
       item.submission?.status === "SUBMITTED" ||
       item.submission?.status === "APPROVED" ||
-      transcriptText;
+      transcriptText ||
+      transcriptFile;
     const hasVideoSubmitted = item.videoReviewStatus !== "NOT_SUBMITTED" || Boolean(item.submission?.videoUrl?.trim());
     const videoApproved = item.videoReviewStatus === "APPROVED";
     const hasPublishSubmitted = item.publishStatus !== "NOT_SUBMITTED";
@@ -788,7 +870,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
       item.publishStatus !== "PENDING" &&
       (item.productReceiveOption === "NO_PRODUCT_REQUIRED" || item.productStatus === "RECEIVED");
     const isTranscriptFlow = item.status === "DRAFT_PENDING";
-    const hasTranscript = Boolean(item.submission?.proofTextNote?.trim());
+    const hasTranscript = Boolean(item.submission?.transcriptTextNote?.trim() || item.submission?.transcriptResourceUrl?.trim());
     const hasVideoSubmission = item.videoReviewStatus !== "NOT_SUBMITTED" || Boolean(item.submission?.videoUrl?.trim());
     const selectedChoice =
       preVideoChoiceMap[item.id] ??
@@ -803,9 +885,11 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
     const showProductSection = item.productReceiveOption === "PRODUCT_REQUIRED";
     const timelineSteps = buildMissionTimeline(item);
     const formError = missionErrors[item.id];
+    const transcriptMode = transcriptModeMap[item.id] ?? transcriptModeFromSubmission(item.submission);
+    const transcriptFileUrl = transcriptUrlMap[item.id] ?? item.submission?.transcriptResourceUrl ?? "";
     const hasAnyHistory =
       Boolean(item.purchaseProofSubmittedAt || item.videoSubmittedAt || item.publishSubmittedAt) ||
-      Boolean(item.submission?.purchaseBillImageUrl || item.submission?.proofTextNote || item.submission?.videoUrl || item.submission?.publicVideoUrl || item.submission?.socialPostUrl);
+      Boolean(item.submission?.purchaseBillImageUrl || item.submission?.transcriptTextNote || item.submission?.transcriptResourceUrl || item.submission?.videoUrl || item.submission?.publicVideoUrl || item.submission?.socialPostUrl);
     const rejectionNotices = (
       <>
         {item.missionApplication?.rejectReason ? (
@@ -829,13 +913,35 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
         ) : null}
       </>
     );
+    function renderProductInfoSection() {
+      if (!showProductSection) return null;
+      return (
+        <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
+          <summary className="cursor-pointer font-semibold text-zinc-900">Thông tin sản phẩm</summary>
+          <div className="mt-3 grid gap-3 md:grid-cols-[180px_1fr]">
+            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100">
+              {item.mission.productImageUrl ? (
+                <img src={item.mission.productImageUrl} alt={item.mission.productName ?? "Ảnh sản phẩm"} className="h-full max-h-48 w-full object-cover" />
+              ) : (
+                <div className="flex h-40 items-center justify-center px-3 text-sm text-zinc-500">Chưa có hình ảnh sản phẩm</div>
+              )}
+            </div>
+            <div className="grid gap-1 text-sm text-zinc-700">
+              <p>Tên sản phẩm: <strong className="text-zinc-900">{item.mission.productName || "-"}</strong></p>
+              <p>Mô tả sản phẩm: <span className="whitespace-pre-line">{item.mission.productDescription || "-"}</span></p>
+              <p>Link sản phẩm: <UrlValue value={item.mission.productLink} /></p>
+            </div>
+          </div>
+        </details>
+      );
+    }
     const actionGuide = (
       <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
         <summary className="cursor-pointer font-semibold text-zinc-900">Cách thực hiện</summary>
         <div className="mt-3 space-y-3">
           {isApplicationPending && !isOverdue ? (
             <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-              Nhiệm vụ đang chờ duyệt. Bạn sẽ bắt đầu các bước thực hiện sau khi Brand/Admin duyệt đơn.
+              Campaign đang chờ duyệt. Bạn sẽ bắt đầu các bước thực hiện sau khi Brand/Admin duyệt đơn.
             </p>
           ) : null}
           {isWaitingPublishReview && !isOverdue ? (
@@ -845,7 +951,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
           ) : null}
           {isOverdue ? (
             <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              Nhiệm vụ đã quá hạn. Bạn chỉ có thể xem lại thông tin và lịch sử đã nộp.
+              Campaign đã quá hạn. Bạn chỉ có thể xem lại thông tin và lịch sử đã nộp.
             </p>
           ) : null}
 
@@ -854,8 +960,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
           {canSubmitPurchase && !isOverdue ? (
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
               <p className="font-medium">Bước 1 - Mua sản phẩm</p>
-              <p className="text-sm text-zinc-600">Link sản phẩm: <UrlValue value={item.mission.productLink} /></p>
-              <p className="text-sm text-zinc-600">Hướng dẫn: Đặt hàng đúng link và bấm xác nhận sau khi đã mua. Ảnh bill và ảnh đánh giá 5 sao sẽ nộp ở bước link public.</p>
+              <p className="text-sm text-zinc-600">Đặt hàng đúng sản phẩm của campaign rồi bấm xác nhận đã mua để mở các bước tiếp theo. Ảnh bill và ảnh đánh giá 5 sao sẽ nộp ở bước link public.</p>
               <div className="mt-2 grid gap-2">
                 {formError?.form ? <p className="text-sm text-red-600">{formError.form}</p> : null}
                 <button className="dc-btn-primary" disabled={busyId === item.id} onClick={() => void submitPurchaseProof(item)}>Xác nhận đã mua hàng</button>
@@ -878,31 +983,98 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
             <div className="rounded-xl border border-zinc-200 bg-white p-3">
               <p className="font-medium">Nộp kịch bản</p>
               {isTranscriptFlow && item.submission?.status === "SUBMITTED" ? <p className="mt-1 text-sm text-zinc-600">Kịch bản đã gửi, đang chờ duyệt.</p> : null}
-              {item.submission?.fileUploadUrl ? (
-                <a
-                  href={transcriptDownloadHref(item.submission.fileUploadUrl) ?? "#"}
-                  download
-                  className="mt-2 inline-flex text-sm font-semibold text-zinc-900 underline"
-                >
-                  Tải file kịch bản (.txt)
-                </a>
-              ) : null}
               <div className="mt-2 grid gap-2">
-                <label htmlFor={`transcript-${item.id}`} className="text-sm font-medium text-zinc-700">
-                  Nội dung kịch bản
-                </label>
-                <textarea
-                  id={`transcript-${item.id}`}
-                  className="dc-input min-h-32"
-                  placeholder="Nhập nội dung kịch bản"
-                  disabled={isTranscriptFlow && item.submission?.status === "SUBMITTED"}
-                  value={transcriptMap[item.id] ?? toPlainTranscript(item.submission?.proofTextNote)}
-                  onChange={(event) => {
-                    setTranscriptMap((s) => ({ ...s, [item.id]: event.target.value }));
-                    clearMissionErrorField(item.id, "transcript");
-                  }}
-                />
-                {formError?.transcript ? <p className="text-sm text-red-600">{formError.transcript}</p> : null}
+                <p className="text-sm font-medium text-zinc-700">Hình thức gửi kịch bản</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { key: "TEXT" as const, label: "Viết trực tiếp" },
+                    { key: "FILE" as const, label: "Tải file lên" },
+                    { key: "URL" as const, label: "Gửi link URL" }
+                  ].map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      disabled={isTranscriptFlow && item.submission?.status === "SUBMITTED"}
+                      className={transcriptMode === option.key ? "rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-semibold text-white" : "rounded-full border border-zinc-200 px-4 py-1.5 text-sm font-semibold text-zinc-600"}
+                      onClick={() => {
+                        setTranscriptModeMap((prev) => ({ ...prev, [item.id]: option.key }));
+                        clearMissionFormErrors(item.id);
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+
+                {transcriptMode === "TEXT" ? (
+                  <>
+                    <label htmlFor={`transcript-${item.id}`} className="text-sm font-medium text-zinc-700">
+                      Nội dung kịch bản
+                    </label>
+                    <textarea
+                      id={`transcript-${item.id}`}
+                      className="dc-input min-h-32"
+                      placeholder="Nhập nội dung kịch bản"
+                      disabled={isTranscriptFlow && item.submission?.status === "SUBMITTED"}
+                      value={transcriptMap[item.id] ?? toPlainTranscript(item.submission?.transcriptTextNote)}
+                      onChange={(event) => {
+                        setTranscriptMap((s) => ({ ...s, [item.id]: event.target.value }));
+                        clearMissionErrorField(item.id, "transcript");
+                      }}
+                    />
+                    {formError?.transcript ? <p className="text-sm text-red-600">{formError.transcript}</p> : null}
+                  </>
+                ) : null}
+
+                {transcriptMode === "FILE" ? (
+                  <>
+                    <label htmlFor={`transcript-file-${item.id}`} className="text-sm font-medium text-zinc-700">
+                      File kịch bản
+                    </label>
+                    <input
+                      id={`transcript-file-${item.id}`}
+                      type="file"
+                      className="dc-input"
+                      accept=".txt,.pdf,.doc,.docx,text/plain,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) void uploadTranscriptFile(item.id, file);
+                      }}
+                      disabled={isTranscriptFlow && item.submission?.status === "SUBMITTED" || uploadingKey === `${item.id}:transcript-file`}
+                    />
+                    {uploadingKey === `${item.id}:transcript-file` ? <p className="text-xs text-zinc-500">Đang tải file kịch bản...</p> : null}
+                    {transcriptFileUrl ? (
+                      <p className="text-sm text-zinc-700">
+                        File hiện tại:{" "}
+                        <a href={transcriptDownloadHref(transcriptFileUrl) ?? "#"} className="font-semibold text-zinc-900 underline break-all" target={isTranscriptUploadPath(transcriptFileUrl) ? undefined : "_blank"} rel="noreferrer">
+                          {transcriptLinkLabel(transcriptFileUrl)}
+                        </a>
+                      </p>
+                    ) : null}
+                    {formError?.transcriptFile ? <p className="text-sm text-red-600">{formError.transcriptFile}</p> : null}
+                  </>
+                ) : null}
+
+                {transcriptMode === "URL" ? (
+                  <>
+                    <label htmlFor={`transcript-url-${item.id}`} className="text-sm font-medium text-zinc-700">
+                      Link kịch bản
+                    </label>
+                    <input
+                      id={`transcript-url-${item.id}`}
+                      className="dc-input"
+                      placeholder="https://..."
+                      disabled={isTranscriptFlow && item.submission?.status === "SUBMITTED"}
+                      value={transcriptUrlMap[item.id] ?? (!isTranscriptUploadPath(item.submission?.transcriptResourceUrl) ? item.submission?.transcriptResourceUrl ?? "" : "")}
+                      onChange={(event) => {
+                        setTranscriptUrlMap((prev) => ({ ...prev, [item.id]: event.target.value }));
+                        clearMissionErrorField(item.id, "transcriptUrl");
+                      }}
+                    />
+                    {formError?.transcriptUrl ? <p className="text-sm text-red-600">{formError.transcriptUrl}</p> : null}
+                  </>
+                ) : null}
+
                 {formError?.form ? <p className="text-sm text-red-600">{formError.form}</p> : null}
                 {!(isTranscriptFlow && item.submission?.status === "SUBMITTED") ? (
                   <button className="dc-btn-primary" disabled={busyId === item.id} onClick={() => void submitTranscript(item)}>
@@ -1069,7 +1241,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
 
           {item.status === "COMPLETED" ? (
             <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-              Nhiệm vụ đã hoàn thành. N-Points đã được cộng theo kết quả duyệt.
+              Campaign đã hoàn thành. Hệ thống đã hoàn N-Points mua sản phẩm theo kết quả duyệt.
             </p>
           ) : null}
         </div>
@@ -1085,7 +1257,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
               className={detailTab === "ACTIONS" ? "rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-semibold text-white" : "rounded-full border border-zinc-200 px-4 py-1.5 text-sm font-semibold text-zinc-600"}
               onClick={() => setDetailTab("ACTIONS")}
             >
-              Thực hiện nhiệm vụ
+              Thực hiện campaign
             </button>
             <button
               type="button"
@@ -1113,18 +1285,29 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
               </details>
             ) : null}
 
-            {item.submission?.proofTextNote || item.submission?.fileUploadUrl ? (
+            {item.submission?.transcriptTextNote || item.submission?.transcriptResourceUrl ? (
               <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
                 <summary className="cursor-pointer font-semibold text-zinc-900">Bước kịch bản</summary>
                 <div className="mt-2 space-y-1">
-                  <p>Nội dung kịch bản:</p>
-                  <p className="whitespace-pre-line">{toPlainTranscript(item.submission?.proofTextNote) || "-"}</p>
-                  {item.submission?.fileUploadUrl ? (
+                  <p>Hình thức gửi: {transcriptModeLabel(item.submission?.transcriptType, item.submission?.transcriptResourceUrl)}</p>
+                  {toPlainTranscript(item.submission?.transcriptTextNote) ? (
+                    <>
+                      <p>Nội dung kịch bản:</p>
+                      <p className="whitespace-pre-line">{toPlainTranscript(item.submission?.transcriptTextNote)}</p>
+                    </>
+                  ) : null}
+                  {item.submission?.transcriptResourceUrl ? (
                     <p>
-                      File đính kèm:{" "}
-                      {transcriptDownloadHref(item.submission.fileUploadUrl) ? (
-                        <a href={transcriptDownloadHref(item.submission.fileUploadUrl) ?? "#"} download className="font-semibold text-zinc-900 underline break-all">
-                          Tải file kịch bản
+                      {isTranscriptUploadPath(item.submission.transcriptResourceUrl) ? "File kịch bản: " : "Link kịch bản: "}
+                      {transcriptDownloadHref(item.submission.transcriptResourceUrl) ? (
+                        <a
+                          href={transcriptDownloadHref(item.submission.transcriptResourceUrl) ?? "#"}
+                          download={isTranscriptUploadPath(item.submission.transcriptResourceUrl)}
+                          className="font-semibold text-zinc-900 underline break-all"
+                          target={isTranscriptUploadPath(item.submission.transcriptResourceUrl) ? undefined : "_blank"}
+                          rel="noreferrer"
+                        >
+                          {transcriptLinkLabel(item.submission.transcriptResourceUrl)}
                         </a>
                       ) : (
                         "-"
@@ -1153,7 +1336,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
                   <p>Link public: <UrlValue value={item.submission?.publicVideoUrl ?? item.submission?.socialPostUrl} label="Mở liên kết public" /></p>
                   <p>Ảnh chụp màn hình minh chứng: <UrlValue value={item.submission?.screenshotUrl} label="Tải file ảnh" /></p>
                   <p>Mã quảng cáo: {item.submission?.adCode || "-"}</p>
-                  <p>Ghi chú: {item.submission?.finalProofNote || "-"}</p>
+                  {hasText(item.submission?.finalProofNote) ? <p>Ghi chú: {item.submission?.finalProofNote}</p> : null}
                 </div>
               </details>
             ) : null}
@@ -1161,7 +1344,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
         ) : (
           <>
         <div className="rounded-xl border border-zinc-200 bg-white p-3">
-          <p className="text-sm font-semibold text-zinc-900">Tiến độ nhiệm vụ</p>
+          <p className="text-sm font-semibold text-zinc-900">Tiến độ campaign</p>
           <div className="mt-3 overflow-x-auto pb-2">
             <div className="flex min-w-max items-start">
               {timelineSteps.map((step, index) => {
@@ -1199,48 +1382,19 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
 
         {actionGuide}
 
+        {canSubmitPurchase ? renderProductInfoSection() : null}
+
         <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
           <summary className="cursor-pointer font-semibold text-zinc-900">Thông tin campaign</summary>
-          <div className="mt-3 grid gap-1 text-sm text-zinc-600">
+          <div className="mt-3 grid gap-2 text-sm text-zinc-700 md:grid-cols-2">
             <p>Tên campaign: <strong className="text-zinc-900">{item.campaign.title}</strong></p>
             <p>Đường dẫn campaign: <Link className="font-semibold text-zinc-900 underline" href={`/campaigns/${item.campaign.slug}`}>/campaigns/{item.campaign.slug}</Link></p>
-          </div>
-        </details>
-
-        <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
-          <summary className="cursor-pointer font-semibold text-zinc-900">Thông tin nhiệm vụ</summary>
-          <div className="mt-3 grid gap-2 text-sm text-zinc-700 md:grid-cols-2">
-            <p>Trạng thái luồng: <strong className="text-zinc-900">{workflowStatus(item)}</strong></p>
-            <p>Trạng thái nhiệm vụ: <strong className="text-zinc-900">{missionStatusLabel(item.status)}</strong></p>
-            <p>Đối tượng: <strong className="text-zinc-900">{missionAudienceLabel(item.mission.audience)}</strong></p>
-            <p>Cho phép làm lại: <strong className="text-zinc-900">{item.mission.allowRepeat ? "Có" : "Không"}</strong></p>
-            <p>Điểm thưởng: <strong className="text-zinc-900">{item.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</strong></p>
             <p>Hạn hoàn thành: <strong className="text-zinc-900">{fmtDate(item.mission.deadlineAt)}</strong></p>
-            <p>Yêu cầu sản phẩm: <strong className="text-zinc-900">{productReceiveOptionLabel(item.productReceiveOption)}</strong></p>
-            <p>Trạng thái sản phẩm: <strong className="text-zinc-900">{productStatusLabel(item.productStatus)}</strong></p>
           </div>
-          <p className="mt-2 text-sm text-zinc-700 whitespace-pre-line">{item.mission.description}</p>
+          {item.mission.description?.trim() ? <p className="mt-2 text-sm text-zinc-700 whitespace-pre-line">{item.mission.description}</p> : null}
         </details>
 
-        {showProductSection ? (
-          <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
-            <summary className="cursor-pointer font-semibold text-zinc-900">Thông tin sản phẩm</summary>
-            <div className="mt-3 grid gap-3 md:grid-cols-[180px_1fr]">
-              <div className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100">
-                {item.mission.productImageUrl ? (
-                  <img src={item.mission.productImageUrl} alt={item.mission.productName ?? "Ảnh sản phẩm"} className="h-full max-h-48 w-full object-cover" />
-                ) : (
-                  <div className="flex h-40 items-center justify-center px-3 text-sm text-zinc-500">Chưa có hình ảnh sản phẩm</div>
-                )}
-              </div>
-              <div className="grid gap-1 text-sm text-zinc-700">
-                <p>Tên sản phẩm: <strong className="text-zinc-900">{item.mission.productName || "-"}</strong></p>
-                <p>Mô tả sản phẩm: <span className="whitespace-pre-line">{item.mission.productDescription || "-"}</span></p>
-                <p>Link sản phẩm: <UrlValue value={item.mission.productLink} /></p>
-              </div>
-            </div>
-          </details>
-        ) : null}
+        {!canSubmitPurchase ? renderProductInfoSection() : null}
 
           </>
         )}
@@ -1257,100 +1411,104 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
 
       {!loading ? (
         <>
-          <section className="dc-grid-dashboard">
-            <article className="dc-card p-4"><p className="text-sm text-zinc-600">Yêu cầu đang chờ duyệt</p><p className="text-2xl font-bold">{counters.pending}</p></article>
-            <article className="dc-card p-4"><p className="text-sm text-zinc-600">Campaign đang thực hiện</p><p className="text-2xl font-bold">{counters.doing}</p></article>
-            <article className="dc-card p-4"><p className="text-sm text-zinc-600">Campaign bị từ chối</p><p className="text-2xl font-bold">{counters.revision}</p></article>
-            <article className="dc-card p-4"><p className="text-sm text-zinc-600">Campaign đã hoàn thành</p><p className="text-2xl font-bold">{counters.completed}</p></article>
-            <article className="dc-card p-4"><p className="text-sm text-zinc-600">Số N-Points</p><p className="text-2xl font-bold">{(overview?.nPointsBalance ?? 0).toLocaleString("vi-VN")} N-Points</p></article>
-          </section>
+          {!detailOnly ? (
+            <section className="dc-grid-dashboard">
+              <article className="dc-card p-4"><p className="text-sm text-zinc-600">Yêu cầu đang chờ duyệt</p><p className="text-2xl font-bold">{counters.pending}</p></article>
+              <article className="dc-card p-4"><p className="text-sm text-zinc-600">Campaign đang thực hiện</p><p className="text-2xl font-bold">{counters.doing}</p></article>
+              <article className="dc-card p-4"><p className="text-sm text-zinc-600">Campaign bị từ chối</p><p className="text-2xl font-bold">{counters.revision}</p></article>
+              <article className="dc-card p-4"><p className="text-sm text-zinc-600">Campaign đã hoàn thành</p><p className="text-2xl font-bold">{counters.completed}</p></article>
+              <article className="dc-card p-4"><p className="text-sm text-zinc-600">Số N-Points</p><p className="text-2xl font-bold">{(overview?.nPointsBalance ?? 0).toLocaleString("vi-VN")} N-Points</p></article>
+            </section>
+          ) : null}
 
-          <section id="nhiem-vu-cua-toi" className="space-y-3">
-            <SectionHeader title="Campaign của tôi" subtitle={`${items.length} campaign`} />
+          {!detailOnly ? (
+            <section id="nhiem-vu-cua-toi" className="space-y-3">
+              <SectionHeader title="Campaign của tôi" subtitle={`${items.length} campaign`} />
 
-            <div className="flex flex-wrap items-center gap-2">
-              {[
-                { key: "ALL" as const, label: "Tất cả" },
-                { key: "PENDING" as const, label: "Chờ duyệt" },
-                { key: "DOING" as const, label: "Đang làm" },
-                { key: "REVISION" as const, label: "Bị từ chối" },
-                { key: "COMPLETED" as const, label: "Hoàn thành" },
-                { key: "OVERDUE" as const, label: "Quá hạn" }
-              ].map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => setActiveFilter(item.key)}
-                  className={activeFilter === item.key ? "rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-semibold text-white" : "rounded-full border border-zinc-200 px-4 py-1.5 text-sm font-semibold text-zinc-600"}
-                >
-                  {item.label}
-                </button>
-              ))}
-              <select
-                id="creator-mission-sort"
-                className="ml-auto h-8 w-28 shrink-0 rounded-full border border-zinc-200 bg-white px-2 text-xs font-medium text-zinc-700"
-                value={missionSort}
-                onChange={(event) => setMissionSort(event.target.value as MissionSort)}
-                aria-label="Sắp xếp nhiệm vụ"
-              >
-                <option value="APPROVED_NEWEST">Mới nhất</option>
-                <option value="APPROVED_OLDEST">Cũ nhất</option>
-                <option value="EXPIRING_SOON">Sắp hết hạn</option>
-              </select>
-            </div>
-
-            {filteredItems.length === 0 ? (
-              <EmptyState title="Không có nhiệm vụ phù hợp bộ lọc" description="Thử chuyển sang trạng thái khác hoặc nhận thêm nhiệm vụ mới." />
-            ) : (
-              <div className="space-y-2">
-                {pagedItems.map((item) => (
-                  <article key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
-                    <div className="grid gap-3 xl:grid-cols-[2.4fr_1fr_1fr_1.2fr_1.4fr] xl:items-start">
-                      <div className="min-w-0">
-                        <p className="font-semibold text-zinc-900">{item.mission.title}</p>
-                        <p className="line-clamp-2 text-sm text-zinc-500">{item.campaign.title}</p>
-                      </div>
-                      <div>
-                        <p className="font-semibold text-zinc-900">{item.mission.rewardPoints.toLocaleString("vi-VN")} N-Points</p>
-                        <p className="text-xs text-zinc-500">Thưởng</p>
-                      </div>
-                      <div>
-                        <p className={`font-semibold ${daysLeft(item.mission.deadlineAt) !== null && (daysLeft(item.mission.deadlineAt) ?? 0) <= 3 ? "text-red-600" : "text-zinc-900"}`}>{deadlineLabel(item.mission.deadlineAt)}</p>
-                        <p className="text-xs text-zinc-500">Deadline</p>
-                      </div>
-                      <div>
-                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusTone(item)}`}>{workflowStatus(item)}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2 xl:justify-end">
-                        {missionGroup(item) === "OVERDUE" ? (
-                          <button className="dc-btn-secondary" onClick={() => openMissionDetail(item.id)}>Xem chi tiết</button>
-                        ) : item.missionApplication?.status === "REJECTED" ? (
-                          <button className="dc-btn-secondary" onClick={() => setRejectedMissionId(item.id)}>Thao tác</button>
-                        ) : item.status === "COMPLETED" ? (
-                          <button className="dc-btn-secondary" onClick={() => openMissionDetail(item.id)}>Xem chi tiết</button>
-                        ) : (
-                          <button className="dc-btn-primary" onClick={() => openMissionDetail(item.id)}>Tiếp tục làm</button>
-                        )}
-                      </div>
-                    </div>
-                  </article>
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { key: "ALL" as const, label: "Tất cả" },
+                  { key: "PENDING" as const, label: "Chờ duyệt" },
+                  { key: "DOING" as const, label: "Đang làm" },
+                  { key: "REVISION" as const, label: "Bị từ chối" },
+                  { key: "COMPLETED" as const, label: "Hoàn thành" },
+                  { key: "OVERDUE" as const, label: "Quá hạn" }
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => setActiveFilter(item.key)}
+                    className={activeFilter === item.key ? "rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-semibold text-white" : "rounded-full border border-zinc-200 px-4 py-1.5 text-sm font-semibold text-zinc-600"}
+                  >
+                    {item.label}
+                  </button>
                 ))}
+                <select
+                  id="creator-mission-sort"
+                  className="ml-auto h-8 w-28 shrink-0 rounded-full border border-zinc-200 bg-white px-2 text-xs font-medium text-zinc-700"
+                  value={missionSort}
+                  onChange={(event) => setMissionSort(event.target.value as MissionSort)}
+                  aria-label="Sắp xếp nhiệm vụ"
+                >
+                  <option value="APPROVED_NEWEST">Mới nhất</option>
+                  <option value="APPROVED_OLDEST">Cũ nhất</option>
+                  <option value="EXPIRING_SOON">Sắp hết hạn</option>
+                </select>
               </div>
-            )}
-            {filteredItems.length > PAGE_SIZE ? (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-zinc-200 bg-white px-3 py-2">
-                <p className="text-sm text-zinc-600">Trang {currentPage}/{totalPages}</p>
-                <div className="flex items-center gap-2">
-                  <button type="button" className="dc-btn-secondary" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>
-                    Trang trước
-                  </button>
-                  <button type="button" className="dc-btn-secondary" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>
-                    Trang sau
-                  </button>
+
+              {filteredItems.length === 0 ? (
+                <EmptyState title="Không có campaign phù hợp bộ lọc" description="Thử chuyển sang trạng thái khác hoặc tham gia campaign mới." />
+              ) : (
+                <div className="space-y-2">
+                  {pagedItems.map((item) => (
+                    <article key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
+                      <div className="grid gap-3 xl:grid-cols-[2.4fr_1fr_1fr_1.2fr_1.4fr] xl:items-start">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-zinc-900">{item.mission.title}</p>
+                          <p className="line-clamp-2 text-sm text-zinc-500">{item.campaign.title}</p>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-zinc-900">Hoàn theo bill</p>
+                          <p className="text-xs text-zinc-500">N-Points</p>
+                        </div>
+                        <div>
+                          <p className={`font-semibold ${daysLeft(item.mission.deadlineAt) !== null && (daysLeft(item.mission.deadlineAt) ?? 0) <= 3 ? "text-red-600" : "text-zinc-900"}`}>{deadlineLabel(item.mission.deadlineAt)}</p>
+                          <p className="text-xs text-zinc-500">Deadline</p>
+                        </div>
+                        <div>
+                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusTone(item)}`}>{workflowStatus(item)}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2 xl:justify-end">
+                          {missionGroup(item) === "OVERDUE" ? (
+                            <button className="dc-btn-secondary" onClick={() => openMissionDetail(item.id)}>Xem chi tiết</button>
+                          ) : item.missionApplication?.status === "REJECTED" ? (
+                            <button className="dc-btn-secondary" onClick={() => setRejectedMissionId(item.id)}>Thao tác</button>
+                          ) : item.status === "COMPLETED" ? (
+                            <button className="dc-btn-secondary" onClick={() => openMissionDetail(item.id)}>Xem chi tiết</button>
+                          ) : (
+                            <button className="dc-btn-primary" onClick={() => openMissionDetail(item.id)}>Tiếp tục</button>
+                          )}
+                        </div>
+                      </div>
+                    </article>
+                  ))}
                 </div>
-              </div>
-            ) : null}
-          </section>
+              )}
+              {filteredItems.length > PAGE_SIZE ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-zinc-200 bg-white px-3 py-2">
+                  <p className="text-sm text-zinc-600">Trang {currentPage}/{totalPages}</p>
+                  <div className="flex items-center gap-2">
+                    <button type="button" className="dc-btn-secondary" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>
+                      Trang trước
+                    </button>
+                    <button type="button" className="dc-btn-secondary" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>
+                      Trang sau
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
 
           {activeMission ? (
             <div className="fixed inset-0 z-50 bg-zinc-900/50 p-3 md:p-6" onClick={closeMissionDetail}>

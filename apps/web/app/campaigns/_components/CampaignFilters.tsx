@@ -24,7 +24,7 @@ export function CampaignFilters({
               checked={value.rewardAvailable}
               onChange={(e) => onChange({ ...value, rewardAvailable: e.target.checked })}
             />{" "}
-            Chỉ hiển thị campaign còn reward
+            Chỉ hiển thị campaign đang thực hiện
           </label>
         </div>
         <input

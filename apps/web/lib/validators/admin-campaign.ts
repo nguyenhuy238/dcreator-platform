@@ -25,6 +25,10 @@ export const adminCampaignCreateSchema = z.object({
   setupSource: z.enum(["JOIN_EXISTING_DCREATOR_CAMP", "BRAND_REQUESTED"]).default("BRAND_REQUESTED"),
   participationRoadmap: z.array(z.string().trim().min(1).max(300)).min(1),
   benefits: z.string().trim().min(3).max(2000),
+  productName: z.string().trim().min(1).max(160),
+  productDescription: z.string().trim().min(1).max(2000),
+  productImageUrl: z.string().trim().min(1).max(400),
+  productLink: z.string().trim().min(1).max(400),
   imageUrl: z
     .string()
     .trim()
@@ -35,34 +39,6 @@ export const adminCampaignCreateSchema = z.object({
   ugcVideoQuota: z.number().int().min(1).max(100000),
   startsAt: z.string().datetime().optional(),
   endsAt: z.string().datetime().optional(),
-  mission: z.object({
-    title: z.string().trim().min(3).max(160),
-    description: z.string().trim().min(10).max(3000),
-    productName: z.string().trim().max(160).optional().or(z.literal("")),
-    productDescription: z.string().trim().max(2000).optional().or(z.literal("")),
-    productImageUrl: z.string().trim().max(400).optional().or(z.literal("")),
-    productLink: z.string().trim().max(400).optional().or(z.literal("")),
-    rewardPoints: z.number().int().min(0).default(0),
-    rewardCommissionVnd: z.number().int().min(0).default(0),
-    audience: z.enum(["USER", "CREATOR"]).default("CREATOR"),
-    productReceiveOption: z.enum(["PRODUCT_REQUIRED", "NO_PRODUCT_REQUIRED"]).default("NO_PRODUCT_REQUIRED"),
-    allowRepeat: z.boolean().default(false),
-    deadlineAt: z.string().datetime().optional()
-  }).superRefine((mission, ctx) => {
-    if (mission.productReceiveOption !== "PRODUCT_REQUIRED") return;
-    if (!mission.productName?.trim()) {
-      ctx.addIssue({ code: "custom", path: ["productName"], message: "Vui lòng nhập tên sản phẩm." });
-    }
-    if (!mission.productDescription?.trim()) {
-      ctx.addIssue({ code: "custom", path: ["productDescription"], message: "Vui lòng nhập mô tả sản phẩm." });
-    }
-    if (!mission.productLink?.trim()) {
-      ctx.addIssue({ code: "custom", path: ["productLink"], message: "Vui lòng nhập link sản phẩm." });
-    }
-    if (!mission.productImageUrl?.trim()) {
-      ctx.addIssue({ code: "custom", path: ["productImageUrl"], message: "Vui lòng nhập hình ảnh sản phẩm." });
-    }
-  }).optional(),
   publishNow: z.boolean().optional().default(true)
 }).superRefine((value, ctx) => {
   if (value.startsAt && value.endsAt && new Date(value.endsAt) <= new Date(value.startsAt)) {
@@ -84,6 +60,10 @@ export const adminCampaignUpdateSchema = z.object({
   campaignType: z.enum(["DONATION", "PREORDER", "SPONSORSHIP", "COMMUNITY"]).optional(),
   setupSource: z.enum(["JOIN_EXISTING_DCREATOR_CAMP", "BRAND_REQUESTED"]).optional(),
   benefits: z.string().trim().min(3).max(2000).nullable().optional(),
+  productName: z.string().trim().min(1).max(160).optional(),
+  productDescription: z.string().trim().min(1).max(2000).optional(),
+  productImageUrl: z.string().trim().min(1).max(400).optional(),
+  productLink: z.string().trim().min(1).max(400).optional(),
   participationRoadmap: z.array(z.string().trim().min(1).max(300)).min(1).optional(),
   startsAt: z.string().datetime().nullable().optional(),
   endsAt: z.string().datetime().nullable().optional(),
@@ -97,32 +77,6 @@ export const adminCampaignUpdateSchema = z.object({
     .refine((value) => value.startsWith("/uploads/") || /^https?:\/\//.test(value), "File URL không hợp lệ.")
     .optional()
     .or(z.literal("")),
-  mission: z.object({
-    title: z.string().trim().min(3).max(160),
-    description: z.string().trim().min(10).max(3000),
-    productName: z.string().trim().max(160).optional().or(z.literal("")),
-    productDescription: z.string().trim().max(2000).optional().or(z.literal("")),
-    productImageUrl: z.string().trim().max(400).optional().or(z.literal("")),
-    productLink: z.string().trim().max(400).optional().or(z.literal("")),
-    rewardPoints: z.number().int().min(0).default(0),
-    rewardCommissionVnd: z.number().int().min(0).default(0),
-    productReceiveOption: z.enum(["PRODUCT_REQUIRED", "NO_PRODUCT_REQUIRED"]).default("PRODUCT_REQUIRED"),
-    allowRepeat: z.boolean().default(false)
-  }).superRefine((mission, ctx) => {
-    if (mission.productReceiveOption !== "PRODUCT_REQUIRED") return;
-    if (!mission.productName?.trim()) {
-      ctx.addIssue({ code: "custom", path: ["productName"], message: "Vui lòng nhập tên sản phẩm." });
-    }
-    if (!mission.productDescription?.trim()) {
-      ctx.addIssue({ code: "custom", path: ["productDescription"], message: "Vui lòng nhập mô tả sản phẩm." });
-    }
-    if (!mission.productLink?.trim()) {
-      ctx.addIssue({ code: "custom", path: ["productLink"], message: "Vui lòng nhập link sản phẩm." });
-    }
-    if (!mission.productImageUrl?.trim()) {
-      ctx.addIssue({ code: "custom", path: ["productImageUrl"], message: "Vui lòng nhập hình ảnh sản phẩm." });
-    }
-  }).optional(),
   reason: z.string().trim().min(5).max(1000).optional()
 }).superRefine((value, ctx) => {
   if (value.startsAt && value.endsAt && new Date(value.endsAt) <= new Date(value.startsAt)) {

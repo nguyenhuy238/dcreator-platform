@@ -1,4 +1,4 @@
-﻿import { ApplicationStatus, CampaignStatus, MissionAudience, MissionLifecycleStatus, ProductReceiveOption, Role } from "@prisma/client";
+import { ApplicationStatus, CampaignStatus, MissionLifecycleStatus, ProductReceiveOption, Role } from "@prisma/client";
 import { appendCreatorCampaignApplicationTag } from "@/lib/constants/campaign-application";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
@@ -10,7 +10,6 @@ export type CreatorCampaignApplicationState =
   | "PROFILE_REQUIRED"
   | "SOCIAL_CHANNEL_REQUIRED"
   | "CAMPAIGN_UNAVAILABLE"
-  | "MISSION_UNAVAILABLE"
   | "CAN_APPLY"
   | "PENDING_REVIEW"
   | "ASSIGNED"
@@ -58,7 +57,7 @@ function toSnapshot(
     PROFILE_REQUIRED: {
       label: "Hoàn thiện thông tin mạng xã hội",
       disabled: true,
-      message: "Bạn cần hoàn thiện hồ sơ Creator trước khi xin làm nhiệm vụ.",
+      message: "Bạn cần hoàn thiện hồ sơ Creator trước khi tham gia campaign.",
       rejectReason: null,
       submissionId: null,
       missionId: null,
@@ -77,15 +76,6 @@ function toSnapshot(
       label: "Chiến dịch không khả dụng",
       disabled: true,
       message: "Chiến dịch không tồn tại hoặc chưa mở đăng ký.",
-      rejectReason: null,
-      submissionId: null,
-      missionId: null,
-      lifecycleStatus: null
-    },
-    MISSION_UNAVAILABLE: {
-      label: "Chưa có nhiệm vụ mở",
-      disabled: true,
-      message: "Chiến dịch chưa có nhiệm vụ đang mở.",
       rejectReason: null,
       submissionId: null,
       missionId: null,
@@ -110,9 +100,9 @@ function toSnapshot(
       lifecycleStatus: "ACCEPTED"
     },
     ASSIGNED: {
-      label: "Đã nhận nhiệm vụ",
+      label: "Đã được duyệt",
       disabled: true,
-      message: "Đơn đã được duyệt và bạn đã được nhận nhiệm vụ.",
+      message: "Đơn đã được duyệt và bạn có thể bắt đầu quay video cho campaign.",
       rejectReason: null,
       submissionId: null,
       missionId: null,
@@ -158,45 +148,31 @@ function toInitialMissionState(option: ProductReceiveOption) {
   };
 }
 
-async function getCampaignAndCreatorMission(slug: string) {
-  const campaign = await prisma.campaign.findUnique({
+async function getCampaignForApplication(slug: string) {
+  return prisma.campaign.findUnique({
     where: { slug },
     select: {
       id: true,
       status: true,
       isPublic: true,
       ugcVideoQuota: true,
-      ugcVideoApprovedCount: true,
-      missions: {
-        where: {
-          status: "OPEN",
-          audience: { in: [MissionAudience.CREATOR, MissionAudience.USER] }
-        },
-        orderBy: { createdAt: "asc" },
-        select: { id: true, audience: true, productReceiveOption: true }
-      }
+      ugcVideoApprovedCount: true
     }
   });
-
-  if (!campaign) return null;
-  const firstCreatorMission = campaign.missions.find((mission) => mission.audience === MissionAudience.CREATOR);
-  const firstMission = firstCreatorMission ?? campaign.missions[0] ?? null;
-  return { campaign, firstMission };
 }
 
 export async function getCreatorCampaignApplicationStatus(
   slug: string,
   viewer: Viewer
 ): Promise<CreatorCampaignApplicationSnapshot> {
-  const campaignData = await getCampaignAndCreatorMission(slug);
-  if (!campaignData) return toSnapshot("CAMPAIGN_UNAVAILABLE");
+  const campaign = await getCampaignForApplication(slug);
+  if (!campaign) return toSnapshot("CAMPAIGN_UNAVAILABLE");
 
-  const { campaign, firstMission } = campaignData;
   if (!campaign.isPublic || campaign.status !== CampaignStatus.ACTIVE) return toSnapshot("CAMPAIGN_UNAVAILABLE");
   const videoTarget = campaign.ugcVideoQuota ?? 0;
   const approvedVideos = campaign.ugcVideoApprovedCount ?? 0;
   if (videoTarget > 0 && approvedVideos >= videoTarget) {
-    return toSnapshot("MISSION_UNAVAILABLE", {
+    return toSnapshot("CAMPAIGN_UNAVAILABLE", {
       label: "Hết lượt video",
       message: `Campaign đã đủ ${videoTarget}/${videoTarget} video được duyệt.`
     });
@@ -215,31 +191,29 @@ export async function getCreatorCampaignApplicationStatus(
   const existing = await prisma.creatorMission.findFirst({
     where: { accountId: viewer.id, campaignId: campaign.id },
     orderBy: { appliedAt: "desc" },
-    select: { id: true, missionId: true, applicationStatus: true, applicationRejectReason: true }
+    select: { id: true, applicationStatus: true, applicationRejectReason: true }
   });
 
   if (existing) {
     const state = toStateFromApplicationStatus(existing.applicationStatus);
     return toSnapshot(state, {
       submissionId: existing.id,
-      missionId: existing.missionId,
+      missionId: null,
       lifecycleStatus: state === "ASSIGNED" ? "DOING" : state === "REJECTED" ? "REJECTED" : "ACCEPTED",
       rejectReason: existing.applicationRejectReason
     });
   }
 
-  if (!firstMission) return toSnapshot("MISSION_UNAVAILABLE");
-  return toSnapshot("CAN_APPLY", { missionId: firstMission.id });
+  return toSnapshot("CAN_APPLY", { missionId: null });
 }
 
 export async function submitCreatorCampaignApplication(slug: string, accountId: string) {
   const CREATOR_CAMPAIGN_REAPPLY_LIMIT = 2;
-  const campaignData = await getCampaignAndCreatorMission(slug);
-  if (!campaignData) {
+  const campaign = await getCampaignForApplication(slug);
+  if (!campaign) {
     throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
   }
 
-  const { campaign, firstMission } = campaignData;
   if (!campaign.isPublic || campaign.status !== CampaignStatus.ACTIVE) {
     throw new AppError("Campaign is not open for creator application", 409, "CAMPAIGN_NOT_OPEN");
   }
@@ -247,10 +221,6 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
   const approvedVideos = campaign.ugcVideoApprovedCount ?? 0;
   if (videoTarget > 0 && approvedVideos >= videoTarget) {
     throw new AppError("Campaign đã hết lượt video được phê duyệt", 409, "CAMPAIGN_UGC_VIDEO_QUOTA_REACHED");
-  }
-
-  if (!firstMission) {
-    throw new AppError("Campaign has no creator mission", 409, "CREATOR_MISSION_NOT_AVAILABLE");
   }
 
   const creatorProfile = await prisma.creatorProfile.findUnique({ where: { accountId }, select: { id: true } });
@@ -261,19 +231,14 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
   });
   if (activeChannels.length < 1) {
     throw new AppError(
-      "Bạn cần thêm ít nhất 1 kênh mạng xã hội đang sử dụng trước khi xin làm nhiệm vụ.",
+      "Bạn cần thêm ít nhất 1 kênh mạng xã hội đang sử dụng trước khi tham gia campaign.",
       422,
       "CREATOR_SOCIAL_CHANNEL_REQUIRED"
     );
   }
 
-  const existing = await prisma.creatorMission.findUnique({
-    where: {
-      missionId_accountId: {
-        missionId: firstMission.id,
-        accountId
-      }
-    },
+  const existing = await prisma.creatorMission.findFirst({
+    where: { campaignId: campaign.id, accountId },
     select: { id: true, applicationStatus: true }
   });
   if (existing) {
@@ -317,7 +282,7 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
         targetId: reapplied.id,
         metadata: {
           campaignId: campaign.id,
-          missionId: firstMission.id,
+          missionId: null,
           reapplyCount: reapplyCount + 1,
           reapplyLimit: CREATOR_CAMPAIGN_REAPPLY_LIMIT
         }
@@ -328,30 +293,30 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
       accountId,
       event: "MISSION_ACCEPTED",
       title: "Đã gửi đăng ký campaign",
-      content: `Bạn đã đăng ký lại campaign này và đang chờ Brand/Admin duyệt.`,
-      metadata: { campaignId: campaign.id, missionId: firstMission.id, creatorMissionId: reapplied.id }
+      content: "Bạn đã đăng ký lại campaign này và đang chờ Brand/Admin duyệt.",
+      metadata: { campaignId: campaign.id, creatorMissionId: reapplied.id }
     });
 
     return {
       submissionId: reapplied.id,
-      missionId: reapplied.missionId,
+      missionId: null,
       lifecycleStatus: "ACCEPTED" as const,
       status: toSnapshot("PENDING_REVIEW", {
         submissionId: reapplied.id,
-        missionId: reapplied.missionId,
+        missionId: null,
         lifecycleStatus: "ACCEPTED"
       })
     };
   }
 
-  const initial = toInitialMissionState(firstMission.productReceiveOption);
+  const initial = toInitialMissionState(ProductReceiveOption.PRODUCT_REQUIRED);
   const application = await prisma.creatorMission.create({
     data: {
-      missionId: firstMission.id,
+      missionId: null,
       campaignId: campaign.id,
       accountId,
       status: initial.status,
-      productReceiveOption: firstMission.productReceiveOption,
+      productReceiveOption: ProductReceiveOption.PRODUCT_REQUIRED,
       productStatus: initial.productStatus,
       depositStatus: initial.depositStatus,
       reimbursementStatus: initial.reimbursementStatus,
@@ -365,14 +330,14 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
   });
 
   await prisma.auditLog.create({
-      data: {
-        actorId: accountId,
-        action: "CREATOR_CAMPAIGN_APPLICATION_SUBMITTED",
-        targetType: "CreatorMission",
-        targetId: application.id,
-        metadata: {
-          campaignId: campaign.id,
-        missionId: firstMission.id,
+    data: {
+      actorId: accountId,
+      action: "CREATOR_CAMPAIGN_APPLICATION_SUBMITTED",
+      targetType: "CreatorMission",
+      targetId: application.id,
+      metadata: {
+        campaignId: campaign.id,
+        missionId: null,
         creatorSocialChannels: activeChannels
       }
     }
@@ -383,16 +348,16 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
     event: "MISSION_ACCEPTED",
     title: "Đăng ký campaign thành công",
     content: "Đơn đăng ký của bạn đã được ghi nhận. Hệ thống sẽ thông báo khi Brand/Admin duyệt.",
-    metadata: { campaignId: campaign.id, missionId: firstMission.id, creatorMissionId: application.id }
+    metadata: { campaignId: campaign.id, creatorMissionId: application.id }
   });
 
   return {
     submissionId: application.id,
-    missionId: application.missionId,
+    missionId: null,
     lifecycleStatus: "ACCEPTED" as const,
     status: toSnapshot("PENDING_REVIEW", {
       submissionId: application.id,
-      missionId: application.missionId,
+      missionId: null,
       lifecycleStatus: "ACCEPTED"
     })
   };

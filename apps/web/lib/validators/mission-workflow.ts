@@ -22,9 +22,20 @@ export const creatorMissionVideoSubmitSchema = z.object({
   note: z.string().trim().max(500).optional()
 });
 
-export const creatorMissionTranscriptSubmitSchema = z.object({
-  transcript: z.string().trim().min(10).max(5000)
-});
+export const creatorMissionTranscriptSubmitSchema = z.discriminatedUnion("mode", [
+  z.object({
+    mode: z.literal("TEXT"),
+    transcript: z.string().trim().min(10).max(5000)
+  }),
+  z.object({
+    mode: z.literal("FILE"),
+    fileUploadUrl: uploadPathOrHttpUrlSchema
+  }),
+  z.object({
+    mode: z.literal("URL"),
+    fileUploadUrl: z.string().trim().url().max(2000)
+  })
+]);
 
 export const creatorMissionPublishSubmitSchema = z
   .object({
@@ -110,6 +121,7 @@ export const missionFinalReviewRejectSchema = z.object({
 
 export const missionHistoryQuerySchema = z.object({
   accountId: z.string().trim().min(3).optional(),
+  campaignId: z.string().trim().min(3).optional(),
   query: z.string().trim().min(1).max(120).optional(),
   campaign: z.string().trim().min(1).max(120).optional(),
   status: z.enum(["PRODUCT_PENDING", "DRAFT_PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),

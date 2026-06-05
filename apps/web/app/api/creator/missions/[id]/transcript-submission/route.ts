@@ -11,7 +11,7 @@ async function handle(request: NextRequest, params: Props["params"]) {
   const account = await requireApprovedCreator(request);
   const payload = creatorMissionTranscriptSubmitSchema.parse(await request.json());
   const { id } = await params;
-  return ok(await submitCreatorMissionTranscript(account.id, id, payload.transcript));
+  return ok(await submitCreatorMissionTranscript(account.id, id, payload));
 }
 
 export async function POST(request: NextRequest, { params }: Props) {
