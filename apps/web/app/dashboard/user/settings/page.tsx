@@ -78,6 +78,9 @@ export default function UserSettingsPage() {
         {!loading ? (
           <>
             {account ? <UserAccountInfoCard account={account} onAccountUpdate={setAccount} onError={setError} onSuccess={setMessage} /> : null}
+            <section className="mt-4">
+              <EmbeddedRoleUpgradePanels targets={["creator", "brand"]} message={searchParams.get("message")} />
+            </section>
             <form className="mt-4 grid gap-4 md:grid-cols-2" onSubmit={onSave}>
               <article className="dc-card p-5">
                 <SectionHeader title="Bảo mật" />
@@ -104,18 +107,15 @@ export default function UserSettingsPage() {
                 <button type="submit" className="dc-btn-secondary" disabled={saving}>{saving ? "Đang lưu..." : "Lưu cài đặt"}</button>
               </div>
             </form>
+            <section className="mt-4">
+              <article className="dc-card p-5">
+                <SectionHeader title="Phiên đăng nhập" />
+                <p className="text-sm text-zinc-600">Đăng xuất khỏi phiên hiện tại.</p>
+                <button type="button" className="dc-btn-primary mt-3" onClick={logout}>Đăng xuất</button>
+              </article>
+            </section>
           </>
         ) : null}
-        <section className="mt-4">
-          <article className="dc-card p-5">
-            <SectionHeader title="Phiên đăng nhập" />
-            <p className="text-sm text-zinc-600">Đăng xuất khỏi phiên hiện tại.</p>
-            <button type="button" className="dc-btn-primary mt-3" onClick={logout}>Đăng xuất</button>
-          </article>
-        </section>
-        <section className="mt-4">
-          <EmbeddedRoleUpgradePanels targets={["creator", "brand"]} message={searchParams.get("message")} />
-        </section>
         {error ? <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
         {message ? <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</p> : null}
       </AppShell>

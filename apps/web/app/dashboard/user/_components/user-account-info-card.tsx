@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { resolveImageUrl } from "@/lib/images/resolve-image-url";
 
 export type UserAccountInfo = {
   email: string;
@@ -24,6 +25,7 @@ export function UserAccountInfoCard({
   const displayName = account.displayName?.trim() || "User Demo";
   const email = account.email?.trim() || "user@dcreator.local";
   const phone = account.profile?.phone?.trim() || "Chưa có";
+  const avatarSrc = resolveImageUrl(account.avatarUrl, "");
 
   async function uploadAvatar(file: File) {
     setUploadingAvatar(true);
@@ -48,8 +50,10 @@ export function UserAccountInfoCard({
         throw new Error(patchPayload.error ?? "Không thể cập nhật ảnh đại diện");
       }
 
-      onAccountUpdate({ ...account, avatarUrl: patchPayload.data.avatarUrl });
-      onSuccess("Đã cập nhật ảnh đại diện.");
+      const nextAccount = { ...account, avatarUrl: patchPayload.data.avatarUrl };
+      onAccountUpdate(nextAccount);
+      window.dispatchEvent(new CustomEvent("dc:user-updated", { detail: { avatarUrl: nextAccount.avatarUrl } }));
+      onSuccess("Đã cập nhật ảnh đại diện thành công.");
     } catch (requestError) {
       onError(requestError instanceof Error ? requestError.message : "Không thể tải ảnh đại diện");
     } finally {
@@ -62,9 +66,14 @@ export function UserAccountInfoCard({
       <h2 className="text-xl font-bold">Thông tin cá nhân</h2>
       <div className="mt-4 flex flex-col gap-5 md:flex-row md:items-center md:gap-8">
         <div className="flex shrink-0 flex-col items-start gap-3 sm:flex-row sm:items-center md:flex-col md:items-start">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-900 text-xl font-bold text-white shadow-sm">
-            {displayName.slice(0, 1).toUpperCase() || "U"}
-          </div>
+          {avatarSrc ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatarSrc} alt={displayName} className="h-16 w-16 rounded-2xl border border-zinc-200 bg-zinc-100 object-cover shadow-sm" />
+          ) : (
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-900 text-xl font-bold text-white shadow-sm">
+              {displayName.slice(0, 1).toUpperCase() || "U"}
+            </div>
+          )}
           <label className="dc-btn-secondary cursor-pointer">
             {uploadingAvatar ? "Đang tải..." : "Tải ảnh đại diện"}
             <input

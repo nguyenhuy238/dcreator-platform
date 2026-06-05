@@ -18,7 +18,7 @@ export const brandProfileSchema = z.object({
   brandName: z.string().trim().min(2).max(160),
   contactName: z.string().trim().min(2).max(120).optional().or(z.literal("")),
   contactEmail: z.email().trim().toLowerCase().optional().or(z.literal("")),
-  logoUrl: z.url().max(400).optional().or(z.literal("")),
+  logoUrl: uploadPathOrHttpUrlSchema.optional().or(z.literal("")),
   businessInfo: z.string().trim().max(2000).optional(),
   verificationStatus: z.enum(["UNVERIFIED", "PENDING", "VERIFIED", "REJECTED"]).default("UNVERIFIED")
 });

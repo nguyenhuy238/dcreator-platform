@@ -4,6 +4,7 @@ import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } fro
 import Link from "next/link";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
 import { useCurrentBrand } from "@/app/dashboard/brand/_hooks/use-brand-context";
+import { resolveImageUrl } from "@/lib/images/resolve-image-url";
 
 type BrandProfile = {
   brandName: string;
@@ -32,22 +33,6 @@ function statusLabel(status: BrandProfile["verificationStatus"]) {
   return "Chưa xác minh";
 }
 
-function resolveLogoSrc(input: string) {
-  const raw = input.trim();
-  if (!raw) return "";
-
-  try {
-    const parsed = new URL(raw);
-    if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
-      return `${parsed.pathname}${parsed.search}`;
-    }
-    return raw;
-  } catch {
-    if (raw.startsWith("/")) return raw;
-    return "";
-  }
-}
-
 export default function BrandProfilePage() {
   const { currentBrandId } = useCurrentBrand();
   const [loading, setLoading] = useState(true);
@@ -57,7 +42,7 @@ export default function BrandProfilePage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoLoadError, setLogoLoadError] = useState(false);
   const [form, setForm] = useState<BrandProfile>(defaultForm);
-  const previewLogoSrc = useMemo(() => resolveLogoSrc(form.logoUrl), [form.logoUrl]);
+  const previewLogoSrc = useMemo(() => resolveImageUrl(form.logoUrl, ""), [form.logoUrl]);
   const profileApiPath = useMemo(() => {
     if (!currentBrandId) return "/api/brand/dashboard/profile";
     return `/api/brand/dashboard/profile?brandId=${encodeURIComponent(currentBrandId)}`;
@@ -67,12 +52,7 @@ export default function BrandProfilePage() {
     const trimmed = value.trim();
     if (!trimmed) return "";
     if (/^https?:\/\//i.test(trimmed)) return trimmed;
-    if (trimmed.startsWith("/")) {
-      if (typeof window !== "undefined") {
-        return `${window.location.origin}${trimmed}`;
-      }
-      return trimmed;
-    }
+    if (trimmed.startsWith("/uploads/")) return trimmed;
     return `https://${trimmed}`;
   }
 
@@ -266,7 +246,6 @@ export default function BrandProfilePage() {
     </>
   );
 }
-
 
 
 

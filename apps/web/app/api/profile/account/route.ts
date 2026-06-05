@@ -7,7 +7,12 @@ import { prisma } from "@/lib/db";
 import { toErrorResponse } from "@/lib/errors";
 
 const updateAccountProfileSchema = z.object({
-  avatarUrl: z.url().max(400).nullable()
+  avatarUrl: z
+    .string()
+    .trim()
+    .max(400)
+    .refine((value) => value.startsWith("/uploads/") || /^https?:\/\//i.test(value), "avatarUrl must be an absolute URL or a local upload path")
+    .nullable()
 });
 
 export async function PATCH(request: NextRequest) {

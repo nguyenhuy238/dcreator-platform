@@ -12,6 +12,7 @@ import {
   StatusBadge
 } from "@/app/components/dcreator/ui/base";
 import { EmbeddedRoleUpgradePanels } from "@/app/dashboard/user/_components/EmbeddedRoleUpgradePanels";
+import { resolveImageUrl } from "@/lib/images/resolve-image-url";
 
 type SocialLink = { label: string; url: string };
 type CreatorProfile = {
@@ -111,6 +112,7 @@ export default function CreatorProfilePage() {
   const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
 
   const bioCount = useMemo(() => bio.trim().length, [bio]);
+  const avatarPreviewSrc = useMemo(() => resolveImageUrl(avatarUrl, ""), [avatarUrl]);
   const canSubmitChannel = useMemo(() => draft.url.trim().length > 0 && draft.handle.trim().length > 0, [draft.url, draft.handle]);
 
   const loadProfile = useCallback(async () => {
@@ -371,8 +373,8 @@ export default function CreatorProfilePage() {
             ) : (
               <div className="grid gap-4 lg:grid-cols-[auto_1fr] lg:items-start">
                 <div className="flex items-center gap-3">
-                  {avatarUrl ? (
-                    <div className="h-16 w-16 rounded-2xl border border-zinc-200 bg-cover bg-center" style={{ backgroundImage: `url(${avatarUrl})` }} />
+                  {avatarPreviewSrc ? (
+                    <div className="h-16 w-16 rounded-2xl border border-zinc-200 bg-cover bg-center" style={{ backgroundImage: `url(${avatarPreviewSrc})` }} />
                   ) : (
                     <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-900 text-xl font-black text-white">{displayName.slice(0, 1).toUpperCase() || "C"}</div>
                   )}
