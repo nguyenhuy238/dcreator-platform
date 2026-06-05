@@ -6,6 +6,8 @@ import { AppShell } from "@/app/components/dcreator/layout/shell";
 import { ActionToast, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
 import { EmbeddedRoleUpgradePanels } from "../_components/EmbeddedRoleUpgradePanels";
 import { UserAccountInfoCard, type UserAccountInfo, type UserSettingsFeedback } from "../_components/user-account-info-card";
+import { trackEvent } from "@/lib/analytics";
+import { AnalyticsEvents } from "@/lib/analytics-events";
 
 export default function UserSettingsPage() {
   const searchParams = useSearchParams();
@@ -19,6 +21,7 @@ export default function UserSettingsPage() {
   const [account, setAccount] = useState<UserAccountInfo | null>(null);
 
   useEffect(() => {
+    trackEvent(AnalyticsEvents.USER_SETTINGS_VIEW);
     Promise.all([
       fetch("/api/me/settings", { cache: "no-store" }),
       fetch("/api/profile/role-upgrade", { cache: "no-store" })
@@ -70,6 +73,7 @@ export default function UserSettingsPage() {
       });
       const payload = await response.json();
       if (!response.ok || !payload.success) throw new Error(payload.error ?? "Lưu cài đặt thất bại.");
+      trackEvent(AnalyticsEvents.PROFILE_UPDATE_SUCCESS, { page_source: "user_settings" });
       const successMessage = payload.data?.message ?? "Đã lưu cài đặt tài khoản.";
       setToast({
         tone: "success",
@@ -79,6 +83,7 @@ export default function UserSettingsPage() {
       setCurrentPassword("");
       setNewPassword("");
     } catch (saveError) {
+      trackEvent(AnalyticsEvents.PROFILE_UPDATE_FAILED, { page_source: "user_settings" });
       const errorMessage = saveError instanceof Error ? saveError.message : "Lưu cài đặt thất bại.";
       setToast({
         tone: "error",

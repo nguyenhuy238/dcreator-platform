@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CampaignDetailDTO } from "@/lib/dto/campaign-detail";
+import { trackEvent } from "@/lib/analytics";
+import { AnalyticsEvents } from "@/lib/analytics-events";
 import { BriefTab, HeroSection, OverviewTab } from "./CampaignDetailSections";
 import { CampaignRegisterCard } from "./CampaignRegisterCard";
 
@@ -60,6 +62,15 @@ export function CampaignDetailContainer({ slug }: Props) {
       active = false;
     };
   }, [slug]);
+
+  useEffect(() => {
+    if (!data) return;
+    trackEvent(AnalyticsEvents.CAMPAIGN_VIEW, {
+      campaign_id: data.hero.id,
+      campaign_title: data.hero.title,
+      campaign_type: data.hero.campaignType
+    });
+  }, [data]);
 
   if (loading) {
     return (
