@@ -3,16 +3,15 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/app/components/dcreator/layout/shell";
-import { PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
+import { ActionToast, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
 import { EmbeddedRoleUpgradePanels } from "../_components/EmbeddedRoleUpgradePanels";
-import { UserAccountInfoCard, type UserAccountInfo } from "../_components/user-account-info-card";
+import { UserAccountInfoCard, type UserAccountInfo, type UserSettingsFeedback } from "../_components/user-account-info-card";
 
 export default function UserSettingsPage() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [toast, setToast] = useState<UserSettingsFeedback | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [notifyReviewStatusEmail, setNotifyReviewStatusEmail] = useState(true);
@@ -33,9 +32,17 @@ export default function UserSettingsPage() {
         setNotifyVoucherMissionEmail(Boolean(settingsPayload.data.notifyVoucherMissionEmail));
         setAccount(profilePayload.data.account as UserAccountInfo);
       })
-      .catch((fetchError: Error) => setError(fetchError.message))
+      .catch((fetchError: Error) => {
+        setToast({ tone: "error", title: "Không thể tải cài đặt", description: fetchError.message });
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!toast || toast.tone === "loading") return;
+    const timer = window.setTimeout(() => setToast(null), 4200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -45,8 +52,11 @@ export default function UserSettingsPage() {
   async function onSave(event: FormEvent) {
     event.preventDefault();
     setSaving(true);
-    setMessage("");
-    setError("");
+    setToast({
+      tone: "loading",
+      title: "Đang lưu cài đặt",
+      description: "Hệ thống đang cập nhật cài đặt tài khoản."
+    });
     try {
       const response = await fetch("/api/me/settings", {
         method: "PATCH",
@@ -60,11 +70,21 @@ export default function UserSettingsPage() {
       });
       const payload = await response.json();
       if (!response.ok || !payload.success) throw new Error(payload.error ?? "Lưu cài đặt thất bại.");
-      setMessage(payload.data?.message ?? "Đã lưu cài đặt tài khoản.");
+      const successMessage = payload.data?.message ?? "Đã lưu cài đặt tài khoản.";
+      setToast({
+        tone: "success",
+        title: "Đã lưu cài đặt tài khoản",
+        description: successMessage
+      });
       setCurrentPassword("");
       setNewPassword("");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Lưu cài đặt thất bại.");
+      const errorMessage = saveError instanceof Error ? saveError.message : "Lưu cài đặt thất bại.";
+      setToast({
+        tone: "error",
+        title: "Không thể lưu cài đặt",
+        description: errorMessage
+      });
     } finally {
       setSaving(false);
     }
@@ -77,7 +97,7 @@ export default function UserSettingsPage() {
         {loading ? <div className="h-48 animate-pulse rounded-3xl bg-zinc-100" /> : null}
         {!loading ? (
           <>
-            {account ? <UserAccountInfoCard account={account} onAccountUpdate={setAccount} onError={setError} onSuccess={setMessage} /> : null}
+            {account ? <UserAccountInfoCard account={account} onAccountUpdate={setAccount} onFeedback={setToast} /> : null}
             <section className="mt-4">
               <EmbeddedRoleUpgradePanels targets={["creator", "brand"]} message={searchParams.get("message")} />
             </section>
@@ -116,9 +136,8 @@ export default function UserSettingsPage() {
             </section>
           </>
         ) : null}
-        {error ? <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
-        {message ? <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</p> : null}
       </AppShell>
+      {toast ? <ActionToast tone={toast.tone} title={toast.title} description={toast.description} onClose={() => setToast(null)} /> : null}
     </>
   );
 }
