@@ -99,6 +99,10 @@ function mapStatusVi(value: string | null | undefined) {
   return map[value] ?? value;
 }
 
+function hasText(value: string | null | undefined) {
+  return Boolean(value?.trim());
+}
+
 function CreatorSocialLinks({ name, profile }: { name?: string | null; profile: { socialLinks?: Array<{ id: string; platform: string; socialUrl: string; followers: number | null; handle: string | null }> } | null | undefined }) {
   const links = profile?.socialLinks ?? [];
   return (
@@ -259,10 +263,9 @@ function CampaignOverviewCard({
                 <strong className="text-zinc-900">-</strong>
               )}
             </p>
-            <p>Tiêu đề tham gia: <strong className="text-zinc-900">{mission?.title ?? "-"}</strong></p>
             <p>Hạn hoàn thành: <strong className="text-zinc-900">{fmtDate(mission?.deadlineAt ?? null)}</strong></p>
           </div>
-          <p className="mt-2 text-sm text-zinc-700 whitespace-pre-line">{mission?.description ?? "-"}</p>
+          {mission?.description?.trim() ? <p className="mt-2 text-sm text-zinc-700 whitespace-pre-line">{mission.description}</p> : null}
         </>
       )}
     </details>
@@ -1063,7 +1066,7 @@ function BrandMissionApplicationsTab({ apiBasePath, fixedCampaignId, hideFilters
             actionNode={
               <div className="grid gap-2 text-sm">
                 <p><strong>Trạng thái:</strong> {detail ? missionStatusLabel(detail.status) : "-"}</p>
-                {detail?.note && !detail.note.includes("[CREATOR_CAMPAIGN_APPLICATION]") ? <p><strong>Ghi chú Creator:</strong> {detail.note}</p> : null}
+                {hasText(detail?.note) && !detail?.note?.includes("[CREATOR_CAMPAIGN_APPLICATION]") ? <p><strong>Ghi chú Creator:</strong> {detail?.note}</p> : null}
                 {detail?.rejectReason ? <p><strong>Lý do từ chối:</strong> {detail.rejectReason}</p> : null}
                 <div className="flex flex-wrap gap-2">
                   {detail ? <button className="dc-btn-secondary" onClick={() => void loadCompletedHistory(detail.account.id, detail.account.displayName)}>Lịch sử</button> : null}
@@ -1260,14 +1263,14 @@ function BrandMissionVideoReviewsTab({ apiBasePath, fixedCampaignId, hideFilters
             timelineSteps={buildReviewTimelineForStage("video", detail?.mission.productReceiveOption === "PRODUCT_REQUIRED", detail?.videoReviewStatus)}
             campaignNode={<CampaignOverviewCard campaign={detail?.campaign} mission={detail?.mission} loading={detailLoading} />}
             missionNode={<>{detail?.mission.productReceiveOption === "PRODUCT_REQUIRED" ? <ProductInfoCard title={detail?.mission.productName} description={detail?.mission.productDescription} imageUrl={detail?.mission.productImageUrl} link={detail?.mission.productLink} /> : null}<CreatorSocialLinks name={detail?.account.displayName} profile={detail?.account.creatorProfile} /></>}
-            historyNode={<div className="space-y-3"><p className="text-sm font-semibold text-zinc-900">Lịch sử các lần đã nộp</p>{(detail?.videoSubmittedAt || detail?.submission?.videoUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp video</summary><div className="mt-2 space-y-1"><p>Thời gian nộp: {fmtDate(detail?.videoSubmittedAt ?? null)}</p><p>Video URL: <UrlValue value={detail?.submission?.videoUrl} /></p><p>Ghi chú: {detail?.submission?.note ?? "-"}</p></div></details> : null}{(detail?.submission?.publicVideoUrl || detail?.submission?.socialPostUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp link social</summary><div className="mt-2 space-y-1"><p>Link public: <UrlValue value={detail?.submission?.publicVideoUrl ?? detail?.submission?.socialPostUrl} label="Mở liên kết public" /></p></div></details> : null}</div>}
+            historyNode={<div className="space-y-3"><p className="text-sm font-semibold text-zinc-900">Lịch sử các lần đã nộp</p>{(detail?.videoSubmittedAt || detail?.submission?.videoUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp video</summary><div className="mt-2 space-y-1"><p>Thời gian nộp: {fmtDate(detail?.videoSubmittedAt ?? null)}</p><p>Video URL: <UrlValue value={detail?.submission?.videoUrl} /></p>{detail?.submission?.note?.trim() ? <p>Ghi chú: {detail.submission.note}</p> : null}</div></details> : null}{(detail?.submission?.publicVideoUrl || detail?.submission?.socialPostUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp link social</summary><div className="mt-2 space-y-1"><p>Link public: <UrlValue value={detail?.submission?.publicVideoUrl ?? detail?.submission?.socialPostUrl} label="Mở liên kết public" /></p></div></details> : null}</div>}
             actionNode={
               <div className="grid gap-2 text-sm">
                 {detail?.submission?.videoUrl ? (
                   <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
                     <p className="font-semibold text-zinc-900">Bước nộp video:</p>
                     <p className="mt-2">Video URL: <UrlValue value={detail.submission.videoUrl} /></p>
-                    <p>Ghi chú: {detail.submission.note ?? "-"}</p>
+                    {hasText(detail.submission.note) ? <p>Ghi chú: {detail.submission.note}</p> : null}
                   </div>
                 ) : null}
                 {detail?.submission?.rejectReason ? <p><strong>Lý do từ chối:</strong> {detail.submission.rejectReason}</p> : null}
@@ -1581,7 +1584,7 @@ function BrandMissionFinalReviewsTab({ apiBasePath, fixedCampaignId, hideFilters
             timelineSteps={buildReviewTimelineForStage("publish", detail?.productReceiveOption === "PRODUCT_REQUIRED", detail?.publishStatus)}
             campaignNode={<CampaignOverviewCard campaign={detail?.campaign} mission={detail?.mission} loading={detailLoading} />}
             missionNode={<>{detail?.productReceiveOption === "PRODUCT_REQUIRED" ? <ProductInfoCard title={detail?.mission.productName} description={detail?.mission.productDescription} imageUrl={detail?.mission.productImageUrl} link={detail?.mission.productLink} /> : null}<CreatorSocialLinks name={detail?.account.displayName} profile={detail?.account.creatorProfile} /></>}
-            historyNode={<div className="space-y-3"><p className="text-sm font-semibold text-zinc-900">Lịch sử các lần đã nộp</p>{(detail?.submission?.purchaseBillImageUrl || detail?.submission?.productReviewScreenshotUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước mua sản phẩm</summary><div className="mt-2 space-y-1"><p>Ảnh bill: <UrlValue value={detail?.submission?.purchaseBillImageUrl} label="Tải file ảnh" /></p><p>Ảnh đánh giá: <UrlValue value={detail?.submission?.productReviewScreenshotUrl} label="Tải file ảnh" /></p></div></details> : null}{detail?.submission?.videoUrl ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp video</summary><div className="mt-2 space-y-1"><p>Video review: <UrlValue value={detail?.submission?.videoUrl} /></p></div></details> : null}{(detail?.publishSubmittedAt || detail?.submission?.publicVideoUrl || detail?.submission?.socialPostUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp link social</summary><div className="mt-2 space-y-1"><p>Thời gian nộp: {fmtDate(detail?.publishSubmittedAt ?? null)}</p><p>Link public: <UrlValue value={detail?.submission?.publicVideoUrl ?? detail?.submission?.socialPostUrl} label="Mở liên kết public" /></p><p>Ảnh chụp màn hình minh chứng: <UrlValue value={detail?.submission?.screenshotUrl} label="Tải file ảnh" /></p><p>Mã quảng cáo: {detail?.submission?.adCode ?? "-"}</p><p>Ghi chú: {detail?.submission?.finalProofNote ?? "-"}</p></div></details> : null}</div>}
+            historyNode={<div className="space-y-3"><p className="text-sm font-semibold text-zinc-900">Lịch sử các lần đã nộp</p>{(detail?.submission?.purchaseBillImageUrl || detail?.submission?.productReviewScreenshotUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước mua sản phẩm</summary><div className="mt-2 space-y-1"><p>Ảnh bill: <UrlValue value={detail?.submission?.purchaseBillImageUrl} label="Tải file ảnh" /></p><p>Ảnh đánh giá: <UrlValue value={detail?.submission?.productReviewScreenshotUrl} label="Tải file ảnh" /></p></div></details> : null}{detail?.submission?.videoUrl ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp video</summary><div className="mt-2 space-y-1"><p>Video review: <UrlValue value={detail?.submission?.videoUrl} /></p></div></details> : null}{(detail?.publishSubmittedAt || detail?.submission?.publicVideoUrl || detail?.submission?.socialPostUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp link social</summary><div className="mt-2 space-y-1"><p>Thời gian nộp: {fmtDate(detail?.publishSubmittedAt ?? null)}</p><p>Link public: <UrlValue value={detail?.submission?.publicVideoUrl ?? detail?.submission?.socialPostUrl} label="Mở liên kết public" /></p><p>Ảnh chụp màn hình minh chứng: <UrlValue value={detail?.submission?.screenshotUrl} label="Tải file ảnh" /></p><p>Mã quảng cáo: {detail?.submission?.adCode ?? "-"}</p>{hasText(detail?.submission?.finalProofNote) ? <p>Ghi chú: {detail?.submission?.finalProofNote}</p> : null}</div></details> : null}</div>}
             actionNode={
               <div className="grid gap-2 text-sm">
                 {(detail?.submission?.publicVideoUrl || detail?.submission?.socialPostUrl) ? (
@@ -1596,7 +1599,7 @@ function BrandMissionFinalReviewsTab({ apiBasePath, fixedCampaignId, hideFilters
                         <p>Ảnh vote 5 sao: <UrlValue value={detail?.submission?.productReviewScreenshotUrl} label="Tải file ảnh" /></p>
                       </>
                     ) : null}
-                    <p>Ghi chú: {detail?.submission?.finalProofNote ?? "-"}</p>
+                    {hasText(detail?.submission?.finalProofNote) ? <p>Ghi chú: {detail.submission.finalProofNote}</p> : null}
                   </div>
                 ) : null}
                 {detail?.publishFeedback ? <p><strong>Lý do từ chối:</strong> {detail.publishFeedback}</p> : null}

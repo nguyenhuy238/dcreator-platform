@@ -151,8 +151,6 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
       campaignType: true,
       setupSource: true,
       benefits: true,
-      creatorBriefTitle: true,
-      creatorBriefDescription: true,
       productName: true,
       productDescription: true,
       productImageUrl: true,
@@ -248,9 +246,6 @@ function validateCampaignReadiness(detail: Awaited<ReturnType<typeof getCampaign
   }
   if (!detail.budgetVnd || detail.budgetVnd <= 0) {
     errors.push("Budget campaign không hợp lệ.");
-  }
-  if (!detail.creatorBriefTitle?.trim() || !detail.creatorBriefDescription?.trim()) {
-    errors.push("Campaign chưa có hướng dẫn creator.");
   }
   if (!detail.productName?.trim() || !detail.productDescription?.trim() || !detail.productLink?.trim() || !detail.productImageUrl?.trim()) {
     errors.push("Campaign chưa có đủ thông tin sản phẩm.");
@@ -387,8 +382,8 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
         setupSource: input.setupSource,
         objective: input.benefits || null,
         benefits: input.benefits || null,
-        creatorBriefTitle: input.creatorBriefTitle,
-        creatorBriefDescription: input.creatorBriefDescription,
+        creatorBriefTitle: null,
+        creatorBriefDescription: null,
         productName: input.productName,
         productDescription: input.productDescription,
         productImageUrl: input.productImageUrl,
@@ -539,8 +534,6 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         campaignType: input.campaignType,
         setupSource: input.setupSource,
         benefits: nextBenefits,
-        creatorBriefTitle: input.creatorBriefTitle?.trim(),
-        creatorBriefDescription: input.creatorBriefDescription?.trim(),
         productName: input.productName?.trim(),
         productDescription: input.productDescription?.trim(),
         productImageUrl: input.productImageUrl?.trim(),
@@ -578,8 +571,6 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         setupSource: campaign.setupSource,
         participationRoadmap: campaign.participationRoadmap,
         benefits: campaign.benefits ?? null,
-        creatorBriefTitle: campaign.creatorBriefTitle ?? null,
-        creatorBriefDescription: campaign.creatorBriefDescription ?? null,
         productName: campaign.productName ?? null,
         productDescription: campaign.productDescription ?? null,
         productImageUrl: campaign.productImageUrl ?? null,
@@ -602,8 +593,6 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         setupSource: updated.setupSource,
         participationRoadmap: updated.participationRoadmap,
         benefits: updated.benefits ?? null,
-        creatorBriefTitle: updated.creatorBriefTitle ?? null,
-        creatorBriefDescription: updated.creatorBriefDescription ?? null,
         productName: updated.productName ?? null,
         productDescription: updated.productDescription ?? null,
         productImageUrl: updated.productImageUrl ?? null,

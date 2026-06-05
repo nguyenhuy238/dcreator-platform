@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle, IdentificationCard, Megaphone, Package, Scroll, VideoCamera } from "@phosphor-icons/react";
 import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, SectionHeader } from "@/app/components/dcreator/ui/base";
 import type { CreatorOverview } from "@/app/dashboard/creator/_components/CreatorDashboardClient";
@@ -73,6 +74,9 @@ type DetailTab = "ACTIONS" | "HISTORY";
 
 type CreatorMissionsPanelProps = {
   overview: CreatorOverview | null;
+  initialDetailMissionId?: string;
+  detailOnly?: boolean;
+  onDetailClose?: () => void;
 };
 
 const publishResubmitFieldLabelMap: Record<string, string> = {
@@ -308,7 +312,17 @@ function toErrorMessage(error: unknown) {
   }
 }
 
-export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
+function hasText(value: string | null | undefined) {
+  return Boolean(value?.trim());
+}
+
+export function CreatorMissionsPanel({
+  overview,
+  initialDetailMissionId = "",
+  detailOnly = false,
+  onDetailClose
+}: CreatorMissionsPanelProps) {
+  const router = useRouter();
   const PAGE_SIZE = 8;
   const [items, setItems] = useState<MissionItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -522,6 +536,15 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
     void load();
   }, []);
 
+  useEffect(() => {
+    if (!initialDetailMissionId || items.length === 0) return;
+    if (items.some((item) => item.id === initialDetailMissionId)) {
+      setActiveFilter("ALL");
+      setDetailMissionId(initialDetailMissionId);
+      setDetailTab("ACTIONS");
+    }
+  }, [initialDetailMissionId, items]);
+
   const counters = useMemo(() => {
     const result = { doing: 0, pending: 0, revision: 0, completed: 0, overdue: 0 };
     for (const item of items) {
@@ -566,6 +589,12 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
 
   function closeMissionDetail() {
     setDetailMissionId("");
+    onDetailClose?.();
+    if (!onDetailClose && initialDetailMissionId) {
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.delete("missionId");
+      router.replace(`${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`, { scroll: false });
+    }
   }
 
   async function reapplyMission(item: MissionItem) {
@@ -825,13 +854,11 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
           ) : null}
 
           {rejectionNotices}
-          {renderProductInfoSection()}
 
           {canSubmitPurchase && !isOverdue ? (
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
               <p className="font-medium">Bước 1 - Mua sản phẩm</p>
-              <p className="text-sm text-zinc-600">Link sản phẩm: <UrlValue value={item.mission.productLink} /></p>
-              <p className="text-sm text-zinc-600">Hướng dẫn: Đặt hàng đúng link và bấm xác nhận sau khi đã mua. Ảnh bill và ảnh đánh giá 5 sao sẽ nộp ở bước link public.</p>
+              <p className="text-sm text-zinc-600">Đặt hàng đúng sản phẩm của campaign rồi bấm xác nhận đã mua để mở các bước tiếp theo. Ảnh bill và ảnh đánh giá 5 sao sẽ nộp ở bước link public.</p>
               <div className="mt-2 grid gap-2">
                 {formError?.form ? <p className="text-sm text-red-600">{formError.form}</p> : null}
                 <button className="dc-btn-primary" disabled={busyId === item.id} onClick={() => void submitPurchaseProof(item)}>Xác nhận đã mua hàng</button>
@@ -1129,7 +1156,7 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
                   <p>Link public: <UrlValue value={item.submission?.publicVideoUrl ?? item.submission?.socialPostUrl} label="Mở liên kết public" /></p>
                   <p>Ảnh chụp màn hình minh chứng: <UrlValue value={item.submission?.screenshotUrl} label="Tải file ảnh" /></p>
                   <p>Mã quảng cáo: {item.submission?.adCode || "-"}</p>
-                  <p>Ghi chú: {item.submission?.finalProofNote || "-"}</p>
+                  {hasText(item.submission?.finalProofNote) ? <p>Ghi chú: {item.submission?.finalProofNote}</p> : null}
                 </div>
               </details>
             ) : null}
@@ -1175,18 +1202,19 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
 
         {actionGuide}
 
+        {canSubmitPurchase ? renderProductInfoSection() : null}
+
         <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
           <summary className="cursor-pointer font-semibold text-zinc-900">Thông tin campaign</summary>
           <div className="mt-3 grid gap-2 text-sm text-zinc-700 md:grid-cols-2">
             <p>Tên campaign: <strong className="text-zinc-900">{item.campaign.title}</strong></p>
             <p>Đường dẫn campaign: <Link className="font-semibold text-zinc-900 underline" href={`/campaigns/${item.campaign.slug}`}>/campaigns/{item.campaign.slug}</Link></p>
-            <p>Tiêu đề tham gia: <strong className="text-zinc-900">{item.mission.title}</strong></p>
             <p>Hạn hoàn thành: <strong className="text-zinc-900">{fmtDate(item.mission.deadlineAt)}</strong></p>
           </div>
-          <p className="mt-2 text-sm text-zinc-700 whitespace-pre-line">{item.mission.description}</p>
+          {item.mission.description?.trim() ? <p className="mt-2 text-sm text-zinc-700 whitespace-pre-line">{item.mission.description}</p> : null}
         </details>
 
-        {renderProductInfoSection()}
+        {!canSubmitPurchase ? renderProductInfoSection() : null}
 
           </>
         )}
@@ -1203,100 +1231,104 @@ export function CreatorMissionsPanel({ overview }: CreatorMissionsPanelProps) {
 
       {!loading ? (
         <>
-          <section className="dc-grid-dashboard">
-            <article className="dc-card p-4"><p className="text-sm text-zinc-600">Yêu cầu đang chờ duyệt</p><p className="text-2xl font-bold">{counters.pending}</p></article>
-            <article className="dc-card p-4"><p className="text-sm text-zinc-600">Campaign đang thực hiện</p><p className="text-2xl font-bold">{counters.doing}</p></article>
-            <article className="dc-card p-4"><p className="text-sm text-zinc-600">Campaign bị từ chối</p><p className="text-2xl font-bold">{counters.revision}</p></article>
-            <article className="dc-card p-4"><p className="text-sm text-zinc-600">Campaign đã hoàn thành</p><p className="text-2xl font-bold">{counters.completed}</p></article>
-            <article className="dc-card p-4"><p className="text-sm text-zinc-600">Số N-Points</p><p className="text-2xl font-bold">{(overview?.nPointsBalance ?? 0).toLocaleString("vi-VN")} N-Points</p></article>
-          </section>
+          {!detailOnly ? (
+            <section className="dc-grid-dashboard">
+              <article className="dc-card p-4"><p className="text-sm text-zinc-600">Yêu cầu đang chờ duyệt</p><p className="text-2xl font-bold">{counters.pending}</p></article>
+              <article className="dc-card p-4"><p className="text-sm text-zinc-600">Campaign đang thực hiện</p><p className="text-2xl font-bold">{counters.doing}</p></article>
+              <article className="dc-card p-4"><p className="text-sm text-zinc-600">Campaign bị từ chối</p><p className="text-2xl font-bold">{counters.revision}</p></article>
+              <article className="dc-card p-4"><p className="text-sm text-zinc-600">Campaign đã hoàn thành</p><p className="text-2xl font-bold">{counters.completed}</p></article>
+              <article className="dc-card p-4"><p className="text-sm text-zinc-600">Số N-Points</p><p className="text-2xl font-bold">{(overview?.nPointsBalance ?? 0).toLocaleString("vi-VN")} N-Points</p></article>
+            </section>
+          ) : null}
 
-          <section id="nhiem-vu-cua-toi" className="space-y-3">
-            <SectionHeader title="Campaign của tôi" subtitle={`${items.length} campaign`} />
+          {!detailOnly ? (
+            <section id="nhiem-vu-cua-toi" className="space-y-3">
+              <SectionHeader title="Campaign của tôi" subtitle={`${items.length} campaign`} />
 
-            <div className="flex flex-wrap items-center gap-2">
-              {[
-                { key: "ALL" as const, label: "Tất cả" },
-                { key: "PENDING" as const, label: "Chờ duyệt" },
-                { key: "DOING" as const, label: "Đang làm" },
-                { key: "REVISION" as const, label: "Bị từ chối" },
-                { key: "COMPLETED" as const, label: "Hoàn thành" },
-                { key: "OVERDUE" as const, label: "Quá hạn" }
-              ].map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => setActiveFilter(item.key)}
-                  className={activeFilter === item.key ? "rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-semibold text-white" : "rounded-full border border-zinc-200 px-4 py-1.5 text-sm font-semibold text-zinc-600"}
-                >
-                  {item.label}
-                </button>
-              ))}
-              <select
-                id="creator-mission-sort"
-                className="ml-auto h-8 w-28 shrink-0 rounded-full border border-zinc-200 bg-white px-2 text-xs font-medium text-zinc-700"
-                value={missionSort}
-                onChange={(event) => setMissionSort(event.target.value as MissionSort)}
-                aria-label="Sắp xếp nhiệm vụ"
-              >
-                <option value="APPROVED_NEWEST">Mới nhất</option>
-                <option value="APPROVED_OLDEST">Cũ nhất</option>
-                <option value="EXPIRING_SOON">Sắp hết hạn</option>
-              </select>
-            </div>
-
-            {filteredItems.length === 0 ? (
-              <EmptyState title="Không có campaign phù hợp bộ lọc" description="Thử chuyển sang trạng thái khác hoặc tham gia campaign mới." />
-            ) : (
-              <div className="space-y-2">
-                {pagedItems.map((item) => (
-                  <article key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
-                    <div className="grid gap-3 xl:grid-cols-[2.4fr_1fr_1fr_1.2fr_1.4fr] xl:items-start">
-                      <div className="min-w-0">
-                        <p className="font-semibold text-zinc-900">{item.mission.title}</p>
-                        <p className="line-clamp-2 text-sm text-zinc-500">{item.campaign.title}</p>
-                      </div>
-                      <div>
-                        <p className="font-semibold text-zinc-900">Hoàn theo bill</p>
-                        <p className="text-xs text-zinc-500">N-Points</p>
-                      </div>
-                      <div>
-                        <p className={`font-semibold ${daysLeft(item.mission.deadlineAt) !== null && (daysLeft(item.mission.deadlineAt) ?? 0) <= 3 ? "text-red-600" : "text-zinc-900"}`}>{deadlineLabel(item.mission.deadlineAt)}</p>
-                        <p className="text-xs text-zinc-500">Deadline</p>
-                      </div>
-                      <div>
-                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusTone(item)}`}>{workflowStatus(item)}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2 xl:justify-end">
-                        {missionGroup(item) === "OVERDUE" ? (
-                          <button className="dc-btn-secondary" onClick={() => openMissionDetail(item.id)}>Xem chi tiết</button>
-                        ) : item.missionApplication?.status === "REJECTED" ? (
-                          <button className="dc-btn-secondary" onClick={() => setRejectedMissionId(item.id)}>Thao tác</button>
-                        ) : item.status === "COMPLETED" ? (
-                          <button className="dc-btn-secondary" onClick={() => openMissionDetail(item.id)}>Xem chi tiết</button>
-                        ) : (
-                          <button className="dc-btn-primary" onClick={() => openMissionDetail(item.id)}>Tiếp tục</button>
-                        )}
-                      </div>
-                    </div>
-                  </article>
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { key: "ALL" as const, label: "Tất cả" },
+                  { key: "PENDING" as const, label: "Chờ duyệt" },
+                  { key: "DOING" as const, label: "Đang làm" },
+                  { key: "REVISION" as const, label: "Bị từ chối" },
+                  { key: "COMPLETED" as const, label: "Hoàn thành" },
+                  { key: "OVERDUE" as const, label: "Quá hạn" }
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => setActiveFilter(item.key)}
+                    className={activeFilter === item.key ? "rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-semibold text-white" : "rounded-full border border-zinc-200 px-4 py-1.5 text-sm font-semibold text-zinc-600"}
+                  >
+                    {item.label}
+                  </button>
                 ))}
+                <select
+                  id="creator-mission-sort"
+                  className="ml-auto h-8 w-28 shrink-0 rounded-full border border-zinc-200 bg-white px-2 text-xs font-medium text-zinc-700"
+                  value={missionSort}
+                  onChange={(event) => setMissionSort(event.target.value as MissionSort)}
+                  aria-label="Sắp xếp nhiệm vụ"
+                >
+                  <option value="APPROVED_NEWEST">Mới nhất</option>
+                  <option value="APPROVED_OLDEST">Cũ nhất</option>
+                  <option value="EXPIRING_SOON">Sắp hết hạn</option>
+                </select>
               </div>
-            )}
-            {filteredItems.length > PAGE_SIZE ? (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-zinc-200 bg-white px-3 py-2">
-                <p className="text-sm text-zinc-600">Trang {currentPage}/{totalPages}</p>
-                <div className="flex items-center gap-2">
-                  <button type="button" className="dc-btn-secondary" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>
-                    Trang trước
-                  </button>
-                  <button type="button" className="dc-btn-secondary" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>
-                    Trang sau
-                  </button>
+
+              {filteredItems.length === 0 ? (
+                <EmptyState title="Không có campaign phù hợp bộ lọc" description="Thử chuyển sang trạng thái khác hoặc tham gia campaign mới." />
+              ) : (
+                <div className="space-y-2">
+                  {pagedItems.map((item) => (
+                    <article key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
+                      <div className="grid gap-3 xl:grid-cols-[2.4fr_1fr_1fr_1.2fr_1.4fr] xl:items-start">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-zinc-900">{item.mission.title}</p>
+                          <p className="line-clamp-2 text-sm text-zinc-500">{item.campaign.title}</p>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-zinc-900">Hoàn theo bill</p>
+                          <p className="text-xs text-zinc-500">N-Points</p>
+                        </div>
+                        <div>
+                          <p className={`font-semibold ${daysLeft(item.mission.deadlineAt) !== null && (daysLeft(item.mission.deadlineAt) ?? 0) <= 3 ? "text-red-600" : "text-zinc-900"}`}>{deadlineLabel(item.mission.deadlineAt)}</p>
+                          <p className="text-xs text-zinc-500">Deadline</p>
+                        </div>
+                        <div>
+                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusTone(item)}`}>{workflowStatus(item)}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2 xl:justify-end">
+                          {missionGroup(item) === "OVERDUE" ? (
+                            <button className="dc-btn-secondary" onClick={() => openMissionDetail(item.id)}>Xem chi tiết</button>
+                          ) : item.missionApplication?.status === "REJECTED" ? (
+                            <button className="dc-btn-secondary" onClick={() => setRejectedMissionId(item.id)}>Thao tác</button>
+                          ) : item.status === "COMPLETED" ? (
+                            <button className="dc-btn-secondary" onClick={() => openMissionDetail(item.id)}>Xem chi tiết</button>
+                          ) : (
+                            <button className="dc-btn-primary" onClick={() => openMissionDetail(item.id)}>Tiếp tục</button>
+                          )}
+                        </div>
+                      </div>
+                    </article>
+                  ))}
                 </div>
-              </div>
-            ) : null}
-          </section>
+              )}
+              {filteredItems.length > PAGE_SIZE ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-zinc-200 bg-white px-3 py-2">
+                  <p className="text-sm text-zinc-600">Trang {currentPage}/{totalPages}</p>
+                  <div className="flex items-center gap-2">
+                    <button type="button" className="dc-btn-secondary" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>
+                      Trang trước
+                    </button>
+                    <button type="button" className="dc-btn-secondary" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>
+                      Trang sau
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
 
           {activeMission ? (
             <div className="fixed inset-0 z-50 bg-zinc-900/50 p-3 md:p-6" onClick={closeMissionDetail}>

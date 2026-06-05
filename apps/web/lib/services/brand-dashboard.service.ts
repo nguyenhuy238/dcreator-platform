@@ -970,7 +970,7 @@ export async function listBrandCampaigns(accountId: string, currentBrandId?: str
     creatorJoinedByCampaignId.set(row.campaignId, (creatorJoinedByCampaignId.get(row.campaignId) ?? 0) + 1);
   }
 
-  const [pendingApplicationCounts, pendingTranscriptCounts, pendingVideoCounts, pendingPublishCounts] = await Promise.all([
+  const [pendingApplicationCounts, pendingTranscriptCounts, pendingVideoCounts, pendingPublishCounts, completedCounts] = await Promise.all([
     prisma.creatorMission.groupBy({
       by: ["campaignId"],
       where: { ...reviewableMissionWhere, applicationStatus: "PENDING_REVIEW" },
@@ -996,6 +996,15 @@ export async function listBrandCampaigns(accountId: string, currentBrandId?: str
       by: ["campaignId"],
       where: { ...reviewableMissionWhere, publishStatus: "PENDING" },
       _count: { _all: true }
+    }),
+    prisma.creatorMission.groupBy({
+      by: ["campaignId"],
+      where: {
+        ...reviewableMissionWhere,
+        applicationStatus: "APPROVED",
+        status: "COMPLETED"
+      },
+      _count: { _all: true }
     })
   ]);
 
@@ -1006,9 +1015,14 @@ export async function listBrandCampaigns(accountId: string, currentBrandId?: str
     }
   }
 
+  const completedCountMap = new Map<string, number>();
+  for (const row of completedCounts) {
+    completedCountMap.set(row.campaignId, row._count._all);
+  }
+
   return campaigns.map((campaign) => {
     const videoTarget = Math.max(0, campaign.ugcVideoQuota ?? 0);
-    const videoApproved = Math.max(0, campaign.ugcVideoApprovedCount ?? 0);
+    const videoApproved = completedCountMap.get(campaign.id) ?? 0;
     const videoProgressPercent = videoTarget > 0 ? Math.min(100, Math.round((videoApproved / videoTarget) * 100)) : 0;
     return {
       ...campaign,

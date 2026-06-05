@@ -597,19 +597,19 @@ export default function BrandCampaignsPage() {
 
                           <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                             <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-                              <p className="flex min-h-12 items-start text-xs leading-4 text-zinc-500">Creator ứng tuyển</p>
+                              <p className="flex min-h-8 items-start text-[9.5px] leading-3.5 text-zinc-500">Creator ứng tuyển</p>
                               <p className="text-lg font-black text-zinc-900">{campaign.applicationCount ?? 0}</p>
                             </div>
                             <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-                              <p className="flex min-h-12 items-start text-xs leading-4 text-zinc-500">Creator đã tham gia</p>
+                              <p className="flex min-h-8 items-start text-[9.5px] leading-3.5 text-zinc-500">Creator đã tham gia</p>
                               <p className="text-lg font-black text-zinc-900">{creatorJoined}</p>
                             </div>
                             <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-                              <p className="flex min-h-12 items-start text-xs leading-4 text-zinc-500">Video dự kiến</p>
+                              <p className="flex min-h-8 items-start text-[9.5px] leading-3.5 text-zinc-500">Video dự kiến</p>
                               <p className="text-lg font-black text-zinc-900">{videoTarget}</p>
                             </div>
                             <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-                              <p className="flex min-h-12 items-start text-xs leading-4 text-zinc-500">Video đã duyệt</p>
+                              <p className="flex min-h-8 items-start text-[9.5px] leading-3.5 text-zinc-500">Video đã duyệt</p>
                               <p className="text-lg font-black text-zinc-900">{videoApproved}</p>
                             </div>
                           </div>

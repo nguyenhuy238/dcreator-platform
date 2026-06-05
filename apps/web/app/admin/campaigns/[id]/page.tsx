@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -17,8 +17,6 @@ type ImageSelectionState = {
 };
 
 type CreatorBriefForm = {
-  title: string;
-  description: string;
   productName: string;
   productDescription: string;
   productLink: string;
@@ -48,8 +46,6 @@ type CampaignDetail = {
   campaignType: CampaignType;
   setupSource: SetupSource;
   benefits: string | null;
-  creatorBriefTitle: string | null;
-  creatorBriefDescription: string | null;
   productName: string | null;
   productDescription: string | null;
   productLink: string | null;
@@ -77,8 +73,6 @@ const DEFAULT_FORM: FormState = {
   endsAt: "",
   ugcVideoQuota: 1,
   creatorBrief: {
-    title: "",
-    description: "",
     productName: "",
     productDescription: "",
     productLink: "",
@@ -105,8 +99,6 @@ const fieldMessageMap: Record<string, string> = {
   startsAt: "Ngày bắt đầu chưa hợp lệ.",
   endsAt: "Ngày kết thúc phải sau ngày bắt đầu.",
   participationRoadmap: "Vui lòng nhập ít nhất 1 bước lộ trình tham gia.",
-  creatorBriefTitle: "Vui lòng nhập tiêu đề hướng dẫn creator tối thiểu 3 ký tự.",
-  creatorBriefDescription: "Vui lòng nhập mô tả hướng dẫn creator tối thiểu 10 ký tự.",
   productName: "Vui lòng nhập tên sản phẩm.",
   productDescription: "Vui lòng nhập mô tả sản phẩm.",
   productLink: "Vui lòng nhập link sản phẩm.",
@@ -131,8 +123,6 @@ function fieldErrorsText(message?: string) {
 
 function buildCreatorBriefForm(item: CampaignDetail): CreatorBriefForm {
   return {
-    title: item.creatorBriefTitle ?? "",
-    description: item.creatorBriefDescription ?? "",
     productName: item.productName ?? "",
     productDescription: item.productDescription ?? "",
     productLink: item.productLink ?? "",
@@ -162,7 +152,7 @@ function getApiFieldErrors(payload: ApiFailure) {
   const details = payload.details as { fieldErrors?: Record<string, string[]>; formErrors?: string[] } | undefined;
   if (details?.fieldErrors) {
     for (const [field, messages] of Object.entries(details.fieldErrors)) {
-      const targetField = field === "mission" ? "creatorBriefDescription" : field;
+      const targetField = field === "mission" ? "participationRoadmap" : field;
       nextErrors[targetField] = fieldMessageMap[targetField] ?? fieldErrorsText(messages[0]);
     }
   }
@@ -232,7 +222,7 @@ export default function AdminCampaignDetailPage() {
 
   function setCreatorBriefField<K extends keyof CreatorBriefForm>(name: K, value: CreatorBriefForm[K]) {
     setForm((current) => ({ ...current, creatorBrief: { ...current.creatorBrief, [name]: value } }));
-    const fieldName = name === "title" ? "creatorBriefTitle" : name === "description" ? "creatorBriefDescription" : String(name);
+    const fieldName = String(name);
     setFieldErrors((current) => ({ ...current, [fieldName]: undefined }));
   }
 
@@ -303,8 +293,6 @@ export default function AdminCampaignDetailPage() {
     if (form.startsAt && form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) {
       nextErrors.endsAt = "Ngày kết thúc phải sau ngày bắt đầu.";
     }
-    if (form.creatorBrief.title.trim().length < 3) nextErrors.creatorBriefTitle = "Tiêu đề hướng dẫn creator cần tối thiểu 3 ký tự.";
-    if (form.creatorBrief.description.trim().length < 10) nextErrors.creatorBriefDescription = "Mô tả hướng dẫn creator cần tối thiểu 10 ký tự.";
     if (!form.creatorBrief.productName.trim()) nextErrors.productName = "Vui lòng nhập tên sản phẩm.";
     if (!form.creatorBrief.productDescription.trim()) nextErrors.productDescription = "Vui lòng nhập mô tả sản phẩm.";
     if (!form.creatorBrief.productLink.trim()) nextErrors.productLink = "Vui lòng nhập link sản phẩm.";
@@ -339,8 +327,6 @@ export default function AdminCampaignDetailPage() {
           startsAt: toDateTime(form.startsAt),
           endsAt: toDateTime(form.endsAt),
           ugcVideoQuota: form.ugcVideoQuota,
-          creatorBriefTitle: form.creatorBrief.title,
-          creatorBriefDescription: form.creatorBrief.description,
           productName: form.creatorBrief.productName,
           productDescription: form.creatorBrief.productDescription,
           productLink: form.creatorBrief.productLink,
@@ -514,6 +500,74 @@ export default function AdminCampaignDetailPage() {
             <div />
 
             <div className="md:col-span-2">
+              <div className="mb-2">
+                <p className="text-sm font-semibold text-zinc-500">Sản phẩm campaign</p>
+                <h2 className="text-lg font-semibold text-zinc-900">Thông tin sản phẩm</h2>
+              </div>
+            </div>
+
+            <div className="grid gap-3 text-sm font-semibold text-zinc-700 md:col-span-2 md:grid-cols-2">
+              <label className="grid gap-2">
+                <span>Tên sản phẩm</span>
+                <input className="dc-input" value={form.creatorBrief.productName} onChange={(event) => setCreatorBriefField("productName", event.target.value)} />
+                {fieldErrors.productName ? <span className="text-xs text-red-600">{fieldErrors.productName}</span> : null}
+              </label>
+              <label className="grid gap-2">
+                <span>Link sản phẩm</span>
+                <input className="dc-input" value={form.creatorBrief.productLink} onChange={(event) => setCreatorBriefField("productLink", event.target.value)} placeholder="https://..." />
+                {fieldErrors.productLink ? <span className="text-xs text-red-600">{fieldErrors.productLink}</span> : null}
+              </label>
+              <label className="grid gap-2">
+                <span>Hình ảnh sản phẩm</span>
+                <input
+                  className="dc-input bg-white"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void uploadImage(file, "product");
+                  }}
+                />
+                {productImageState.source === "existing" ? (
+                  <span className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
+                    Đang dùng ảnh sản phẩm hiện tại
+                  </span>
+                ) : null}
+                {productImageState.source === "upload" ? (
+                  <span className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700">
+                    Đã chọn ảnh mới: {productImageState.fileName}
+                  </span>
+                ) : null}
+                <span className="text-xs text-zinc-500">
+                  {item.productImageUrl ? (
+                    <>
+                      Đang có ảnh sản phẩm sẵn.{" "}
+                      <button
+                        type="button"
+                        className="font-semibold text-zinc-900 underline underline-offset-2"
+                        onClick={() => {
+                          setCreatorBriefField("productImageUrl", item.productImageUrl ?? "");
+                          setProductImageState({ source: "existing", fileName: "" });
+                        }}
+                      >
+                        Chọn ảnh hiện tại
+                      </button>
+                    </>
+                  ) : (
+                    "Chưa có ảnh sản phẩm hiện tại. Vui lòng tải ảnh mới."
+                  )}
+                </span>
+                {uploadingProductImage ? <span className="text-xs text-zinc-500">Đang tải ảnh sản phẩm...</span> : null}
+                {fieldErrors.productImageUrl ? <span className="text-xs text-red-600">{fieldErrors.productImageUrl}</span> : null}
+              </label>
+              <label className="grid gap-2">
+                <span>Mô tả sản phẩm</span>
+                <textarea className="dc-input min-h-24" value={form.creatorBrief.productDescription} onChange={(event) => setCreatorBriefField("productDescription", event.target.value)} />
+                {fieldErrors.productDescription ? <span className="text-xs text-red-600">{fieldErrors.productDescription}</span> : null}
+              </label>
+            </div>
+
+            <div className="md:col-span-2">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-sm font-semibold text-zinc-700">Lộ trình tham gia</span>
               </div>
@@ -601,87 +655,6 @@ export default function AdminCampaignDetailPage() {
               <input className={`dc-input ${fieldErrors.ugcVideoQuota ? "border-red-500 ring-1 ring-red-300" : ""}`} type="number" min={1} value={form.ugcVideoQuota} onChange={(event) => setField("ugcVideoQuota", Number(event.target.value || 0))} />
               {fieldErrors.ugcVideoQuota ? <span className="text-xs text-red-600">{fieldErrors.ugcVideoQuota}</span> : null}
             </label>
-          </div>
-        </div>
-
-        <div className="dc-card p-4">
-          <div className="mb-4">
-            <p className="text-sm font-semibold text-zinc-500">Chỉnh sửa creator flow</p>
-            <h2 className="text-lg font-semibold text-zinc-900">Thông tin creator và sản phẩm</h2>
-          </div>
-
-          <div className="grid gap-4">
-            <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-              <span>Tiêu đề hướng dẫn creator</span>
-              <input className="dc-input" value={form.creatorBrief.title} onChange={(event) => setCreatorBriefField("title", event.target.value)} />
-              {fieldErrors.creatorBriefTitle ? <span className="text-xs text-red-600">{fieldErrors.creatorBriefTitle}</span> : null}
-            </label>
-            <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-              <span>Mô tả hướng dẫn creator</span>
-              <textarea className="dc-input min-h-24" value={form.creatorBrief.description} onChange={(event) => setCreatorBriefField("description", event.target.value)} />
-              {fieldErrors.creatorBriefDescription ? <span className="text-xs text-red-600">{fieldErrors.creatorBriefDescription}</span> : null}
-            </label>
-              <div className="grid items-start gap-3 rounded-xl border border-zinc-200 bg-white p-3 md:grid-cols-2">
-                <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-                  <span>Tên sản phẩm</span>
-                  <input className="dc-input" value={form.creatorBrief.productName} onChange={(event) => setCreatorBriefField("productName", event.target.value)} />
-                  {fieldErrors.productName ? <span className="text-xs text-red-600">{fieldErrors.productName}</span> : null}
-                </label>
-                
-                <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-                  <span>Link sản phẩm</span>
-                  <input className="dc-input" value={form.creatorBrief.productLink} onChange={(event) => setCreatorBriefField("productLink", event.target.value)} placeholder="https://..." />
-                  {fieldErrors.productLink ? <span className="text-xs text-red-600">{fieldErrors.productLink}</span> : null}
-                </label>
-                <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-                  <span>Hình ảnh sản phẩm</span>
-                  <input
-                    className="dc-input bg-white"
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (file) void uploadImage(file, "product");
-                    }}
-                  />
-                  {productImageState.source === "existing" ? (
-                    <span className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
-                      Đang dùng ảnh sản phẩm hiện tại
-                    </span>
-                  ) : null}
-                  {productImageState.source === "upload" ? (
-                    <span className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700">
-                      Đã chọn ảnh mới: {productImageState.fileName}
-                    </span>
-                  ) : null}
-                  <span className="text-xs text-zinc-500">
-                    {item.productImageUrl ? (
-                      <>
-                        Đang có ảnh sản phẩm sẵn.{" "}
-                        <button
-                          type="button"
-                          className="font-semibold text-zinc-900 underline underline-offset-2"
-                          onClick={() => {
-                            setCreatorBriefField("productImageUrl", item.productImageUrl ?? "");
-                            setProductImageState({ source: "existing", fileName: "" });
-                          }}
-                        >
-                          Chọn ảnh hiện tại
-                        </button>
-                      </>
-                    ) : (
-                      "Chưa có ảnh sản phẩm hiện tại. Vui lòng tải ảnh mới."
-                    )}
-                  </span>
-                  {uploadingProductImage ? <span className="text-xs text-zinc-500">Đang tải ảnh sản phẩm...</span> : null}
-                  {fieldErrors.productImageUrl ? <span className="text-xs text-red-600">{fieldErrors.productImageUrl}</span> : null}
-                </label>
-                <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-                  <span>Mô tả sản phẩm</span>
-                  <textarea className="dc-input min-h-24" value={form.creatorBrief.productDescription} onChange={(event) => setCreatorBriefField("productDescription", event.target.value)} />
-                  {fieldErrors.productDescription ? <span className="text-xs text-red-600">{fieldErrors.productDescription}</span> : null}
-                </label>
-              </div>
           </div>
         </div>
 

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -12,8 +12,6 @@ type SetupSource = "JOIN_EXISTING_DCREATOR_CAMP" | "BRAND_REQUESTED";
 type BrandOption = { id: string; displayName: string; email: string };
 
 type CreatorBriefForm = {
-  title: string;
-  description: string;
   productName: string;
   productDescription: string;
   productLink: string;
@@ -71,8 +69,6 @@ const defaultForm: FormState = {
   startsAt: "",
   endsAt: "",
   creatorBrief: {
-    title: "",
-    description: "",
     productName: "",
     productDescription: "",
     productLink: "",
@@ -130,8 +126,6 @@ const vietnameseErrorMessages: Record<string, string> = {
   startsAt: "Ngày bắt đầu chưa hợp lệ.",
   endsAt: "Ngày kết thúc phải sau ngày bắt đầu.",
   participationRoadmap: "Vui lòng nhập ít nhất 1 bước lộ trình tham gia.",
-  creatorBriefTitle: "Vui lòng nhập tiêu đề hướng dẫn creator tối thiểu 3 ký tự.",
-  creatorBriefDescription: "Vui lòng nhập mô tả hướng dẫn creator tối thiểu 10 ký tự.",
   productName: "Vui lòng nhập tên sản phẩm.",
   productDescription: "Vui lòng nhập mô tả sản phẩm.",
   productLink: "Vui lòng nhập link sản phẩm.",
@@ -147,7 +141,7 @@ function getApiFieldErrors(payload: ApiFailure) {
   const details = payload.details as { fieldErrors?: Record<string, string[]>; formErrors?: string[] } | undefined;
   if (details?.fieldErrors) {
     for (const [field, messages] of Object.entries(details.fieldErrors)) {
-      const targetField = field === "mission" ? "creatorBriefDescription" : field;
+      const targetField = field === "mission" ? "participationRoadmap" : field;
       nextErrors[targetField] = vietnameseErrorMessages[targetField] ?? fieldErrorsText(messages[0]);
     }
   }
@@ -181,7 +175,7 @@ export default function AdminCreateCampaignPage() {
 
   function setCreatorBriefField<K extends keyof CreatorBriefForm>(name: K, value: CreatorBriefForm[K]) {
     setForm((current) => ({ ...current, creatorBrief: { ...current.creatorBrief, [name]: value } }));
-    const fieldName = name === "title" ? "creatorBriefTitle" : name === "description" ? "creatorBriefDescription" : String(name);
+    const fieldName = String(name);
     setFieldErrors((current) => ({ ...current, [fieldName]: undefined }));
   }
 
@@ -317,8 +311,6 @@ export default function AdminCreateCampaignPage() {
     if (form.startsAt && form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) {
       nextErrors.endsAt = "Ngày kết thúc phải sau ngày bắt đầu.";
     }
-    if (form.creatorBrief.title.trim().length < 3) nextErrors.creatorBriefTitle = "Tiêu đề hướng dẫn creator cần tối thiểu 3 ký tự.";
-    if (form.creatorBrief.description.trim().length < 10) nextErrors.creatorBriefDescription = "Mô tả hướng dẫn creator cần tối thiểu 10 ký tự.";
     if (!form.creatorBrief.productName.trim()) nextErrors.productName = "Vui lòng nhập tên sản phẩm.";
     if (!form.creatorBrief.productDescription.trim()) nextErrors.productDescription = "Vui lòng nhập mô tả sản phẩm.";
     if (!form.creatorBrief.productLink.trim()) nextErrors.productLink = "Vui lòng nhập link sản phẩm.";
@@ -350,8 +342,6 @@ export default function AdminCreateCampaignPage() {
           startsAt: toDateTime(form.startsAt),
           endsAt: toDateTime(form.endsAt),
           participationRoadmap: form.participationRoadmap.filter((item) => item.trim().length > 0),
-          creatorBriefTitle: form.creatorBrief.title,
-          creatorBriefDescription: form.creatorBrief.description,
           productName: form.creatorBrief.productName,
           productDescription: form.creatorBrief.productDescription,
           productLink: form.creatorBrief.productLink,
@@ -459,6 +449,30 @@ export default function AdminCreateCampaignPage() {
             </label>
           </div>
 
+          <div className="grid gap-3 text-sm font-semibold text-zinc-700 md:col-span-2 md:grid-cols-3">
+            <label className="grid gap-2">
+              <span>Tên sản phẩm</span>
+              <input className="dc-input" value={form.creatorBrief.productName} onChange={(event) => setCreatorBriefField("productName", event.target.value)} required />
+              {fieldErrors.productName ? <span className="text-xs text-red-600">{fieldErrors.productName}</span> : null}
+            </label>
+            <label className="grid gap-2">
+              <span>Link sản phẩm</span>
+              <input className="dc-input" value={form.creatorBrief.productLink} onChange={(event) => setCreatorBriefField("productLink", event.target.value)} placeholder="https://..." required />
+              {fieldErrors.productLink ? <span className="text-xs text-red-600">{fieldErrors.productLink}</span> : null}
+            </label>
+            <label className="grid gap-2">
+              <span>Hình ảnh sản phẩm</span>
+              <input className="dc-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadImage(file, "product"); }} required={!form.creatorBrief.productImageUrl} />
+              {uploadingProductImage ? <span className="text-xs text-zinc-500">Đang tải ảnh sản phẩm...</span> : null}
+              {fieldErrors.productImageUrl ? <span className="text-xs text-red-600">{fieldErrors.productImageUrl}</span> : null}
+            </label>
+            <label className="grid gap-2 md:col-span-3">
+              <span>Mô tả sản phẩm</span>
+              <textarea className="dc-input min-h-32" value={form.creatorBrief.productDescription} onChange={(event) => setCreatorBriefField("productDescription", event.target.value)} required />
+              {fieldErrors.productDescription ? <span className="text-xs text-red-600">{fieldErrors.productDescription}</span> : null}
+            </label>
+          </div>
+
           <div className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
             <span>Lộ trình tham gia</span>
             {form.participationRoadmap.map((step, index) => (
@@ -507,76 +521,7 @@ export default function AdminCreateCampaignPage() {
             </label>
           </div>
 
-          <section className="grid gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:col-span-2">
-            <h3 className="text-base font-semibold text-zinc-900">Sản phẩm của chiến dịch</h3>
-            <div className="grid gap-3 rounded-xl border border-zinc-200 bg-white p-3 md:grid-cols-3">
-              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-                <span>Tên sản phẩm</span>
-                <input
-                  className="dc-input"
-                  value={form.creatorBrief.productName}
-                  onChange={(event) => setCreatorBriefField("productName", event.target.value)}
-                  required
-                />
-                {fieldErrors.productName ? <span className="text-xs text-red-600">{fieldErrors.productName}</span> : null}
-              </label>
 
-              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-                <span>Link sản phẩm</span>
-                <input
-                  className="dc-input"
-                  value={form.creatorBrief.productLink}
-                  onChange={(event) => setCreatorBriefField("productLink", event.target.value)}
-                  placeholder="https://..."
-                  required
-                />
-                {fieldErrors.productLink ? <span className="text-xs text-red-600">{fieldErrors.productLink}</span> : null}
-              </label>
-
-              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-                <span>Hình ảnh sản phẩm</span>
-                <input
-                  className="dc-input"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) void uploadImage(file, "product");
-                  }}
-                  required={!form.creatorBrief.productImageUrl}
-                />
-                {uploadingProductImage ? <span className="text-xs text-zinc-500">Đang tải ảnh sản phẩm...</span> : null}
-                {fieldErrors.productImageUrl ? <span className="text-xs text-red-600">{fieldErrors.productImageUrl}</span> : null}
-              </label>
-
-              <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-3">
-                <span>Mô tả sản phẩm</span>
-                <textarea
-                  className="dc-input min-h-32"
-                  value={form.creatorBrief.productDescription}
-                  onChange={(event) => setCreatorBriefField("productDescription", event.target.value)}
-                  required
-                />
-                {fieldErrors.productDescription ? <span className="text-xs text-red-600">{fieldErrors.productDescription}</span> : null}
-              </label>
-            </div>
-          </section>
-
-          <section className="grid gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:col-span-2">
-            <div className="grid gap-3">
-              <h3 className="text-base font-semibold text-zinc-900">Thông tin creator khi tham gia campaign</h3>
-              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-                <span>Tiêu đề hướng dẫn creator</span>
-                <input className="dc-input" value={form.creatorBrief.title} onChange={(event) => setCreatorBriefField("title", event.target.value)} placeholder="Ví dụ: Quay video review sản phẩm" required />
-                {fieldErrors.creatorBriefTitle ? <span className="text-xs text-red-600">{fieldErrors.creatorBriefTitle}</span> : null}
-              </label>
-              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-                <span>Mô tả hướng dẫn creator</span>
-                <textarea className="dc-input min-h-24" value={form.creatorBrief.description} onChange={(event) => setCreatorBriefField("description", event.target.value)} placeholder="Mô tả yêu cầu video, tiêu chí duyệt và cách nộp link public" required />
-                {fieldErrors.creatorBriefDescription ? <span className="text-xs text-red-600">{fieldErrors.creatorBriefDescription}</span> : null}
-              </label>
-            </div>
-          </section>
         </div>
 
         <div className="flex justify-end">

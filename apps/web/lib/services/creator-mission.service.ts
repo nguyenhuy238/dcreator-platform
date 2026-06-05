@@ -184,8 +184,8 @@ function toCreatorMissionState(option: ProductReceiveOption) {
 function buildMissionView(item: CreatorMissionEntity) {
   return {
     id: item.mission?.id ?? item.campaignId,
-    title: item.campaign.creatorBriefTitle ?? item.mission?.title ?? item.campaign.title,
-    description: item.campaign.creatorBriefDescription ?? item.mission?.description ?? item.campaign.brief,
+    title: item.campaign.title,
+    description: item.campaign.brief ?? item.mission?.description ?? "",
     rewardPoints: 0,
     rewardCommissionVnd: 0,
     audience: item.mission?.audience ?? "CREATOR",
@@ -544,7 +544,6 @@ function applyMissionHistoryFilters(
     where.OR = [
       { account: { displayName: { contains: q, mode: "insensitive" } } },
       { account: { email: { contains: q, mode: "insensitive" } } },
-      { campaign: { creatorBriefTitle: { contains: q, mode: "insensitive" } } },
       { campaign: { title: { contains: q, mode: "insensitive" } } }
     ];
   }
@@ -1289,8 +1288,8 @@ function buildApplicationMissionSummary(input: {
 }) {
   return {
     id: input.mission?.id ?? input.campaign.id,
-    title: input.campaign.creatorBriefTitle ?? input.mission?.title ?? input.campaign.title,
-    description: input.campaign.creatorBriefDescription ?? input.mission?.description ?? input.campaign.brief ?? "",
+    title: input.campaign.title,
+    description: input.campaign.brief ?? input.mission?.description ?? "",
     rewardPoints: input.mission?.rewardPoints ?? 0,
     productReceiveOption: input.productReceiveOption ?? input.mission?.productReceiveOption ?? "PRODUCT_REQUIRED",
     productLink: input.campaign.productLink ?? input.mission?.productLink ?? null,
@@ -1345,7 +1344,6 @@ export async function listMissionApplicationsForAdmin(input: {
       { account: { displayName: { contains: q, mode: "insensitive" } } },
       { account: { email: { contains: q, mode: "insensitive" } } },
       { mission: { title: { contains: q, mode: "insensitive" } } },
-      { campaign: { creatorBriefTitle: { contains: q, mode: "insensitive" } } },
       { campaign: { title: { contains: q, mode: "insensitive" } } }
     ];
   }
