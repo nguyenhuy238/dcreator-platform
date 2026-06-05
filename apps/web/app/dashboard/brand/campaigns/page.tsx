@@ -11,6 +11,8 @@ import { BrandMissionHistoryPanel } from "@/app/dashboard/brand/_components/Bran
 import { BrandSubscriptionPanel } from "@/app/dashboard/brand/_components/BrandSubscriptionPanel";
 import { useCurrentBrand } from "@/app/dashboard/brand/_hooks/use-brand-context";
 import { MissionReviewsPage, type MissionReviewsTabKey } from "@/app/dashboard/brand/mission-reviews/page";
+import { trackEvent } from "@/lib/analytics";
+import { AnalyticsEvents } from "@/lib/analytics-events";
 
 type CampaignItem = {
   id: string;
@@ -223,6 +225,14 @@ export default function BrandCampaignsPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (activeTab !== "requests") return;
+    trackEvent(AnalyticsEvents.BRAND_CAMPAIGN_CREATE_OPEN, {
+      brand_id: currentBrandId ?? undefined,
+      role: "brand"
+    });
+  }, [activeTab, currentBrandId]);
+
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     let list = items.filter((item) => {
@@ -421,11 +431,19 @@ export default function BrandCampaignsPage() {
 
   async function createCampaignRequest(event: FormEvent) {
     event.preventDefault();
+    trackEvent(AnalyticsEvents.BRAND_CAMPAIGN_CREATE_SUBMIT, {
+      brand_id: currentBrandId ?? undefined,
+      role: "brand"
+    });
     const nextErrors = validateRequestForm();
     if (Object.values(nextErrors).some(Boolean)) {
       setRequestFieldErrors(nextErrors);
       setError("Vui lòng kiểm tra các trường được đánh dấu đỏ.");
       setNotice("");
+      trackEvent(AnalyticsEvents.BRAND_CAMPAIGN_CREATE_FAILED, {
+        brand_id: currentBrandId ?? undefined,
+        role: "brand"
+      });
       return;
     }
     setCreatingRequest(true);
@@ -439,12 +457,22 @@ export default function BrandCampaignsPage() {
       });
       const payload = (await response.json()) as ApiResponse<CampaignRequestItem>;
       if (!response.ok || !payload.success) throw new Error(payload.success ? "Không thể gửi yêu cầu" : payload.error);
+      trackEvent(AnalyticsEvents.BRAND_CAMPAIGN_CREATE_SUCCESS, {
+        brand_id: currentBrandId ?? undefined,
+        campaign_id: payload.data?.id,
+        campaign_type: payload.data?.campaignType,
+        role: "brand"
+      });
       setRequestForm(defaultRequestForm);
       setRequestFieldErrors({});
       setNotice("Đã gửi yêu cầu tạo campaign cho Admin.");
       setActiveTab("requests");
       await load();
     } catch (requestError) {
+      trackEvent(AnalyticsEvents.BRAND_CAMPAIGN_CREATE_FAILED, {
+        brand_id: currentBrandId ?? undefined,
+        role: "brand"
+      });
       setError(requestError instanceof Error ? requestError.message : "Không thể gửi yêu cầu");
     } finally {
       setCreatingRequest(false);

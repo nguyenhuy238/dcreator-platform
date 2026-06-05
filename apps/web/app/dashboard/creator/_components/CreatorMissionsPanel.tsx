@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { CheckCircle, IdentificationCard, Megaphone, Package, Scroll, VideoCamera } from "@phosphor-icons/react";
 import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, SectionHeader } from "@/app/components/dcreator/ui/base";
 import type { CreatorOverview } from "@/app/dashboard/creator/_components/CreatorDashboardClient";
+import { trackEvent } from "@/lib/analytics";
+import { AnalyticsEvents } from "@/lib/analytics-events";
 
 type ApiResult<T> = { success: boolean; data?: T; error?: string };
 
@@ -83,6 +85,15 @@ type CreatorMissionsPanelProps = {
   detailOnly?: boolean;
   onDetailClose?: () => void;
 };
+
+function missionAnalyticsParams(item: MissionItem, proofType: string) {
+  return {
+    mission_id: item.id,
+    campaign_id: item.campaign.slug,
+    proof_type: proofType,
+    role: "creator"
+  };
+}
 
 const publishResubmitFieldLabelMap: Record<string, string> = {
   PUBLIC_URL: "Link public",
@@ -430,15 +441,18 @@ export function CreatorMissionsPanel({
     clearMissionFormErrors(item.id);
     setBusyId(item.id);
     setNotice("");
+    trackEvent(AnalyticsEvents.MISSION_SUBMIT, missionAnalyticsParams(item, "purchase"));
     try {
       await fetchJson(`/api/creator/missions/${item.id}/purchase-proof`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({})
       });
+      trackEvent(AnalyticsEvents.MISSION_SUBMIT_SUCCESS, missionAnalyticsParams(item, "purchase"));
       pushSuccess("Đã xác nhận mua hàng. Bạn có thể chọn nộp kịch bản trước hoặc nộp video trực tiếp.");
       await load();
     } catch (e) {
+      trackEvent(AnalyticsEvents.MISSION_SUBMIT_FAILED, missionAnalyticsParams(item, "purchase"));
       setMissionFormErrors(item.id, { form: toErrorMessage(e) });
     } finally {
       setBusyId("");
@@ -452,6 +466,7 @@ export function CreatorMissionsPanel({
 
     if (mode === "TEXT" && !transcript) {
       setMissionFormErrors(item.id, { transcript: "Bạn chưa nhập nội dung kịch bản." });
+      trackEvent(AnalyticsEvents.MISSION_SUBMIT_FAILED, missionAnalyticsParams(item, "transcript"));
       return;
     }
     if (mode === "FILE" && !transcriptUrl) {
@@ -466,6 +481,7 @@ export function CreatorMissionsPanel({
     clearMissionFormErrors(item.id);
     setBusyId(item.id);
     setNotice("");
+    trackEvent(AnalyticsEvents.MISSION_SUBMIT, missionAnalyticsParams(item, "transcript"));
     try {
       await fetchJson(`/api/creator/missions/${item.id}/transcript-submission`, {
         method: "PATCH",
@@ -476,9 +492,11 @@ export function CreatorMissionsPanel({
             : { mode, fileUploadUrl: mode === "URL" ? normalizeHttpUrl(transcriptUrl) : transcriptUrl }
         )
       });
+      trackEvent(AnalyticsEvents.MISSION_SUBMIT_SUCCESS, missionAnalyticsParams(item, "transcript"));
       pushSuccess("Đã gửi kịch bản. Vui lòng chờ Brand/Admin duyệt trước khi nộp video review.");
       await load();
     } catch (e) {
+      trackEvent(AnalyticsEvents.MISSION_SUBMIT_FAILED, missionAnalyticsParams(item, "transcript"));
       setMissionFormErrors(item.id, { form: toErrorMessage(e) });
     } finally {
       setBusyId("");
@@ -489,20 +507,24 @@ export function CreatorMissionsPanel({
     const videoUrl = videoUrlMap[item.id]?.trim();
     if (!videoUrl) {
       setMissionFormErrors(item.id, { videoUrl: "Bạn chưa nhập URL video review." });
+      trackEvent(AnalyticsEvents.MISSION_SUBMIT_FAILED, missionAnalyticsParams(item, "video"));
       return;
     }
     clearMissionFormErrors(item.id);
     setBusyId(item.id);
     setNotice("");
+    trackEvent(AnalyticsEvents.MISSION_SUBMIT, missionAnalyticsParams(item, "video"));
     try {
       await fetchJson(`/api/creator/missions/${item.id}/video-submission`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ videoUrl, note: videoNoteMap[item.id]?.trim() || undefined })
       });
+      trackEvent(AnalyticsEvents.MISSION_SUBMIT_SUCCESS, missionAnalyticsParams(item, "video"));
       pushSuccess("Đã gửi video review. Video đang chờ Brand/Admin duyệt.");
       await load();
     } catch (e) {
+      trackEvent(AnalyticsEvents.MISSION_SUBMIT_FAILED, missionAnalyticsParams(item, "video"));
       setMissionFormErrors(item.id, { form: toErrorMessage(e) });
     } finally {
       setBusyId("");
@@ -515,6 +537,7 @@ export function CreatorMissionsPanel({
     const publicUrl = publicUrlMap[item.id]?.trim() || item.submission?.publicVideoUrl || item.submission?.socialPostUrl || "";
     if (shouldResubmit("PUBLIC_URL") && !publicUrl.trim()) {
       setMissionFormErrors(item.id, { publicUrl: "Bạn chưa nhập link video social public." });
+      trackEvent(AnalyticsEvents.MISSION_SUBMIT_FAILED, missionAnalyticsParams(item, "publish"));
       return;
     }
     const normalizedPublicUrl = normalizeHttpUrl(publicUrl);
@@ -526,11 +549,13 @@ export function CreatorMissionsPanel({
     if (item.productReceiveOption === "PRODUCT_REQUIRED" && shouldResubmit("PRODUCT_REVIEW_SCREENSHOT") && !rating) errors.rating = "Bạn chưa tải ảnh đánh giá 5 sao.";
     if (errors.bill || errors.rating || errors.publicUrl) {
       setMissionFormErrors(item.id, errors);
+      trackEvent(AnalyticsEvents.MISSION_SUBMIT_FAILED, missionAnalyticsParams(item, "publish"));
       return;
     }
     clearMissionFormErrors(item.id);
     setBusyId(item.id);
     setNotice("");
+    trackEvent(AnalyticsEvents.MISSION_SUBMIT, missionAnalyticsParams(item, "publish"));
     try {
       await fetchJson(`/api/creator/missions/${item.id}/publish-submission`, {
         method: "PATCH",
@@ -544,9 +569,11 @@ export function CreatorMissionsPanel({
           finalProofNote: finalNoteMap[item.id]?.trim() || item.submission?.finalProofNote || undefined
         })
       });
+      trackEvent(AnalyticsEvents.MISSION_SUBMIT_SUCCESS, missionAnalyticsParams(item, "publish"));
       pushSuccess("Đã gửi link social public. Bước này đang chờ Brand/Admin duyệt.");
       await load();
     } catch (e) {
+      trackEvent(AnalyticsEvents.MISSION_SUBMIT_FAILED, missionAnalyticsParams(item, "publish"));
       setMissionFormErrors(item.id, { form: toErrorMessage(e) });
     } finally {
       setBusyId("");

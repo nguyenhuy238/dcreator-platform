@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { trackEvent } from "@/lib/analytics";
+import { AnalyticsEvents } from "@/lib/analytics-events";
 
 export function AcceptMissionButton({ missionId }: { missionId: string }) {
   const [message, setMessage] = useState("");
@@ -10,6 +12,10 @@ export function AcceptMissionButton({ missionId }: { missionId: string }) {
   async function onAccept() {
     setLoading(true);
     setMessage("Đang xử lý...");
+    trackEvent(AnalyticsEvents.MISSION_ACCEPT, {
+      mission_id: missionId,
+      role: "creator"
+    });
     try {
       const res = await fetch(`/api/missions/${missionId}/accept`, { method: "POST" });
       const payload = (await res.json()) as { success: boolean; error?: string };

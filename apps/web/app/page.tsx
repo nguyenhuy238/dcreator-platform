@@ -1,13 +1,15 @@
 import Link from "next/link";
 import Image from "next/image";
+import { AnalyticsLink } from "@/app/components/analytics/AnalyticsLink";
+import { TrackPageEvent } from "@/app/components/analytics/TrackPageEvent";
 import { ExploreCampaignsButton } from "@/app/components/dcreator/home/ExploreCampaignsButton";
 import { FaqSection } from "@/app/components/dcreator/home/FaqSection";
 import { FeaturedCampaignsSection } from "@/app/components/dcreator/home/FeaturedCampaignsSection";
-import { HomepageSectionButton } from "@/app/components/dcreator/home/HomepageSectionButton";
 import { PartnerLogo } from "@/app/components/dcreator/home/PartnerLogo";
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { getCurrentUserFromServer } from "@/lib/auth/current-user";
 import { deriveCapabilities } from "@/lib/auth/capabilities";
+import { AnalyticsEvents } from "@/lib/analytics-events";
 import { listCampaigns } from "@/lib/services/campaign.service";
 
 const faqs = [
@@ -104,6 +106,7 @@ export default async function HomePage() {
   const partneredBrands = Array.from(brandMap.values()).slice(0, 12);
   return (
     <>
+      <TrackPageEvent eventName={AnalyticsEvents.LANDING_PAGE_VIEW} />
       <PublicHeader
         hideRoleSwitch
         audienceToggles={[
@@ -259,7 +262,14 @@ export default async function HomePage() {
                 </p>
               </div>
               <div className="mt-7">
-                <HomepageSectionButton targetId="creator-homepage" href="/creator" />
+                <AnalyticsLink
+                  href="/creator"
+                  eventName={AnalyticsEvents.LANDING_CREATOR_LEARN_MORE_CLICK}
+                  eventParams={{ page_source: "landing_creator_section" }}
+                  className="dc-btn-primary min-w-[190px] rounded-full px-6"
+                >
+                  Tìm hiểu thêm
+                </AnalyticsLink>
               </div>
             </div>
             <div className="relative h-full min-h-[300px]">
@@ -286,7 +296,14 @@ export default async function HomePage() {
                 </p>
               </div>
               <div className="mt-7">
-                <HomepageSectionButton targetId="brand-homepage" href="/brand" />
+                <AnalyticsLink
+                  href="/brand"
+                  eventName={AnalyticsEvents.LANDING_BRAND_LEARN_MORE_CLICK}
+                  eventParams={{ page_source: "landing_brand_section" }}
+                  className="dc-btn-primary min-w-[190px] rounded-full px-6"
+                >
+                  Tìm hiểu thêm
+                </AnalyticsLink>
               </div>
             </div>
             <div className="relative h-full min-h-[300px]">

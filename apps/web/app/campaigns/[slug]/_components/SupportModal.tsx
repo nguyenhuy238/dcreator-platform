@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { trackEvent } from "@/lib/analytics";
+import { AnalyticsEvents } from "@/lib/analytics-events";
 
 type Reward = { id: string; title: string; pricePoints: number; priceVnd: number | null; isOutOfStock: boolean };
 
@@ -53,6 +55,13 @@ export function SupportModal({
 
   async function confirmSupport() {
     if (!campaignSlug || !selected || selected.isOutOfStock) return;
+    const amountVnd = toSupportAmount(selected);
+    trackEvent(AnalyticsEvents.CAMPAIGN_CONTRIBUTION_CLICK, {
+      campaign_id: campaignSlug,
+      reward_id: selected.id,
+      amount_vnd: amountVnd,
+      payment_method: method
+    });
     setLoading(true);
     setError(null);
     try {
@@ -62,7 +71,7 @@ export function SupportModal({
         body: JSON.stringify({
           rewardId: selected.id,
           paymentMethod: method,
-          amount: toSupportAmount(selected),
+          amount: amountVnd,
           idempotencyKey: `support-${selected.id}-${Date.now()}`
         })
       });
@@ -71,11 +80,29 @@ export function SupportModal({
         throw new Error(body.error ?? "Khong the tao giao dich ung ho.");
       }
       if (body.data.paymentUrl) {
+        trackEvent(AnalyticsEvents.CAMPAIGN_CONTRIBUTION_SUCCESS, {
+          campaign_id: campaignSlug,
+          reward_id: selected.id,
+          amount_vnd: amountVnd,
+          payment_method: method
+        });
         window.location.href = body.data.paymentUrl;
         return;
       }
+      trackEvent(AnalyticsEvents.CAMPAIGN_CONTRIBUTION_SUCCESS, {
+        campaign_id: campaignSlug,
+        reward_id: selected.id,
+        amount_vnd: amountVnd,
+        payment_method: method
+      });
       setStep(4);
     } catch (err) {
+      trackEvent(AnalyticsEvents.CAMPAIGN_CONTRIBUTION_FAILED, {
+        campaign_id: campaignSlug,
+        reward_id: selected.id,
+        amount_vnd: amountVnd,
+        payment_method: method
+      });
       setError(err instanceof Error ? err.message : "He thong dang ban, vui long thu lai.");
     } finally {
       setLoading(false);

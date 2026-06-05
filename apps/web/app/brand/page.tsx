@@ -1,7 +1,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { CampaignStatus } from "@prisma/client";
+import { AnalyticsLink } from "@/app/components/analytics/AnalyticsLink";
+import { TrackPageEvent } from "@/app/components/analytics/TrackPageEvent";
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
+import { AnalyticsEvents } from "@/lib/analytics-events";
 import { getCurrentUserFromServer } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/db";
 import { listCampaigns } from "@/lib/services/campaign.service";
@@ -123,6 +126,7 @@ export default async function BrandHomePage() {
 
   return (
     <>
+      <TrackPageEvent eventName={AnalyticsEvents.BRAND_LANDING_VIEW} />
       <PublicHeader
         hideRoleSwitch
         audienceToggle={{ href: "/creator", label: "Dành cho Creator" }}
@@ -140,7 +144,7 @@ export default async function BrandHomePage() {
               dCREATOR
             </h1>
             <p className="mt-1 text-4xl font-medium italic leading-none text-zinc-400 [font-family:Georgia,'Times_New_Roman',serif] md:text-6xl">
-              Creator Landing
+              Brand Landing
             </p>
 
             <h2 className="mx-auto mt-6 max-w-5xl text-3xl font-semibold leading-tight text-zinc-600 md:whitespace-nowrap md:text-5xl">
@@ -151,9 +155,14 @@ export default async function BrandHomePage() {
             </p>
 
             <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-              <Link href={primaryCtaHref} className="dc-btn-primary min-w-[220px] rounded-xl px-6 text-base font-bold">
+              <AnalyticsLink
+                href={primaryCtaHref}
+                eventName={AnalyticsEvents.BRAND_UPGRADE_CLICK}
+                eventParams={{ role: "brand", page_source: "brand_landing_hero" }}
+                className="dc-btn-primary min-w-[220px] rounded-xl px-6 text-base font-bold"
+              >
                 {primaryCtaLabel}
-              </Link>
+              </AnalyticsLink>
               <Link href="/campaigns" className="dc-btn-secondary min-w-[220px] rounded-xl px-6 text-base font-semibold">
                 Xem campaign đang hoạt động
               </Link>
@@ -351,12 +360,22 @@ export default async function BrandHomePage() {
                 Hãy để dCreator giúp thương hiệu của bạn kết nối với hàng triệu khách hàng thông qua những người kể chuyện tài năng nhất.
               </p>
               <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-                <Link href="/auth/register" className="rounded-md bg-white px-8 py-3 text-sm font-black !text-black transition-colors duration-200 hover:bg-zinc-200">
+                <AnalyticsLink
+                  href="/auth/register"
+                  eventName={AnalyticsEvents.BRAND_UPGRADE_CLICK}
+                  eventParams={{ role: "brand", page_source: "brand_landing_bottom" }}
+                  className="rounded-md bg-white px-8 py-3 text-sm font-black !text-black transition-colors duration-200 hover:bg-zinc-200"
+                >
                   Bắt đầu ngay hôm nay
-                </Link>
-                <Link href="/brand/register" className="rounded-md border border-white/15 bg-black/20 px-8 py-3 text-sm font-black text-white transition-colors duration-200 hover:bg-white/10">
+                </AnalyticsLink>
+                <AnalyticsLink
+                  href="/brand/register"
+                  eventName={AnalyticsEvents.BRAND_UPGRADE_CLICK}
+                  eventParams={{ role: "brand", page_source: "brand_landing_consultation" }}
+                  className="rounded-md border border-white/15 bg-black/20 px-8 py-3 text-sm font-black text-white transition-colors duration-200 hover:bg-white/10"
+                >
                   Đặt lịch tư vấn 1:1
-                </Link>
+                </AnalyticsLink>
               </div>
             </div>
           </div>

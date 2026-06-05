@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/app/components/dcreator/ui/base";
+import { trackEvent } from "@/lib/analytics";
+import { AnalyticsEvents } from "@/lib/analytics-events";
 import { CampaignCard, type CampaignCardData } from "./CampaignCard";
 import { CampaignFilters, type CampaignFilterState } from "./CampaignFilters";
 
@@ -49,6 +51,12 @@ export function CampaignList({ excludeSlugs = [], compact = false }: { excludeSl
     query.set("limit", "12");
     return query.toString();
   }, [filters.category, filters.status, filters.rewardAvailable, filters.sort, debouncedSearch, page]);
+
+  useEffect(() => {
+    trackEvent(AnalyticsEvents.CAMPAIGN_LIST_VIEW, {
+      page_source: compact ? "embedded_campaign_list" : "campaigns"
+    });
+  }, [compact]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -107,7 +115,7 @@ export function CampaignList({ excludeSlugs = [], compact = false }: { excludeSl
         <>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {visibleItems.map((campaign) => (
-              <CampaignCard key={campaign.slug} campaign={campaign} compact={compact} />
+              <CampaignCard key={campaign.slug} campaign={campaign} compact={compact} pageSource={compact ? "embedded_campaign_list" : "campaigns"} />
             ))}
           </div>
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-3">

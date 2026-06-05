@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
+import { trackEvent } from "@/lib/analytics";
+import { AnalyticsEvents } from "@/lib/analytics-events";
 import { CreatorCampaignApplyButton } from "./CreatorCampaignApplyButton";
 
 export type CampaignCardData = {
@@ -24,7 +26,15 @@ export type CampaignCardData = {
   deadline: string | Date | null;
 };
 
-export function CampaignCard({ campaign, compact = false }: { campaign: CampaignCardData; compact?: boolean }) {
+export function CampaignCard({
+  campaign,
+  compact = false,
+  pageSource = "campaigns"
+}: {
+  campaign: CampaignCardData;
+  compact?: boolean;
+  pageSource?: string;
+}) {
   const videoTarget = campaign.videoTarget ?? 0;
   const videoApproved = campaign.videoApproved ?? 0;
   const creatorJoined = campaign.creatorJoined ?? 0;
@@ -82,6 +92,14 @@ export function CampaignCard({ campaign, compact = false }: { campaign: Campaign
               href={`/campaigns/${campaign.slug}`}
               className={`inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100 ${compact ? "px-3 py-2" : "px-3 py-2"}`}
               aria-label={`Xem chi ti\u1ebft ${campaign.title}`}
+              onClick={() =>
+                trackEvent(AnalyticsEvents.CAMPAIGN_CARD_CLICK, {
+                  campaign_id: campaign.slug,
+                  campaign_title: campaign.title,
+                  campaign_status: "ACTIVE",
+                  page_source: pageSource
+                })
+              }
             >
               {"Xem chi ti\u1ebft"}
               <span className="text-base font-bold">→</span>

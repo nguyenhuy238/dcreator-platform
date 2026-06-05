@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import { Manrope, Space_Grotesk } from "next/font/google";
+import { Suspense } from "react";
+import { GoogleAnalyticsPageView } from "@/app/components/analytics/GoogleAnalyticsPageView";
+import { getGoogleAnalyticsMeasurementId } from "@/lib/analytics-config";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -18,9 +22,19 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const gaId = getGoogleAnalyticsMeasurementId();
+
   return (
     <html lang="vi" suppressHydrationWarning>
-      <body className={`${spaceGrotesk.variable} ${manrope.variable}`}>{children}</body>
+      <body className={`${spaceGrotesk.variable} ${manrope.variable}`}>
+        {children}
+        {gaId ? (
+          <Suspense fallback={null}>
+            <GoogleAnalyticsPageView gaId={gaId} />
+          </Suspense>
+        ) : null}
+        {gaId ? <GoogleAnalytics gaId={gaId} /> : null}
+      </body>
     </html>
   );
 }

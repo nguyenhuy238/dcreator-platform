@@ -1,14 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
 import { CampaignStatus } from "@prisma/client";
+import { AnalyticsLink } from "@/app/components/analytics/AnalyticsLink";
+import { TrackPageEvent } from "@/app/components/analytics/TrackPageEvent";
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
+import { AnalyticsEvents } from "@/lib/analytics-events";
 import { getCurrentUserFromServer } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/db";
 import { listCampaigns } from "@/lib/services/campaign.service";
-
-function formatRatio(value: number) {
-  return `${value.toFixed(2)}x`;
-}
 
 const formatCompactNumber = (value: number) =>
   new Intl.NumberFormat("vi-VN", {
@@ -71,7 +70,7 @@ function MonoIcon({ kind }: { kind: "box" | "users" | "video" | "eye" | "chart" 
 }
 
 export default async function CreatorLandingPage() {
-  const [campaignData, currentUser, featuredCreatorProfiles] = await Promise.all([
+  const [campaignData, currentUser, featuredCreatorProfiles, brandCount, creatorCount, videoCount] = await Promise.all([
     listCampaigns({
       sort: "trending",
       page: 1,
@@ -96,22 +95,25 @@ export default async function CreatorLandingPage() {
           select: { handle: true, followers: true }
         }
       }
+    }),
+    prisma.brand.count(),
+    prisma.creatorProfile.count(),
+    prisma.missionSubmission.count({
+      where: {
+        OR: [{ videoUrl: { not: null } }, { socialPostUrl: { not: null } }]
+      }
     })
   ]);
 
   const hasCreatorRole = Boolean(currentUser?.capabilities.creator);
 
   const activeCampaignCount = campaignData.pagination.total;
-  const totalApplicants = campaignData.items.reduce((sum, item) => sum + Math.max(0, item.creatorApplicants ?? 0), 0);
-  const totalRewardsLeft = campaignData.items.reduce((sum, item) => sum + Math.max(0, item.rewardsLeft ?? 0), 0);
-
-  const fundedRatioSamples = campaignData.items
-    .filter((item) => item.targetAmount > 0)
-    .map((item) => item.fundedAmount / item.targetAmount);
-  const averageFundedRatio =
-    fundedRatioSamples.length > 0
-      ? fundedRatioSamples.reduce((sum, value) => sum + value, 0) / fundedRatioSamples.length
-      : 0;
+  const heroStats = [
+    [brandCount, "Brand đồng hành"],
+    [activeCampaignCount, "Campaign active"],
+    [creatorCount, "Creator tham gia"],
+    [videoCount, "Video UGC"]
+  ] as const;
   const featuredCreators = featuredCreatorProfiles.map((creator) => {
     const social = creator.socialLinks[0];
     const followers = social?.followers ?? creator.followerCount ?? 0;
@@ -131,6 +133,7 @@ export default async function CreatorLandingPage() {
 
   return (
     <>
+      <TrackPageEvent eventName={AnalyticsEvents.CREATOR_LANDING_VIEW} />
       <PublicHeader
         hideRoleSwitch
         audienceToggle={{ href: "/brand", label: "Dành cho Brand" }}
@@ -152,9 +155,14 @@ export default async function CreatorLandingPage() {
               </p>
 
               <div className="mt-7 flex flex-wrap items-center gap-3">
-                <Link href={primaryCtaHref} className="dc-btn-primary min-w-[220px] rounded-xl px-6 text-base font-bold">
+                <AnalyticsLink
+                  href={primaryCtaHref}
+                  eventName={AnalyticsEvents.CREATOR_UPGRADE_CLICK}
+                  eventParams={{ role: "creator", page_source: "creator_landing_hero" }}
+                  className="dc-btn-primary min-w-[220px] rounded-xl px-6 text-base font-bold"
+                >
                   Bắt Đầu Nhận Job UGC
-                </Link>
+                </AnalyticsLink>
                 <Link href="#creator-how-it-works" className="dc-btn-secondary min-w-[220px] rounded-xl px-6 text-base font-semibold">
                   Xem Cách dCreator Hoạt Động
                 </Link>
@@ -177,63 +185,12 @@ export default async function CreatorLandingPage() {
           </div>
 
           <div className="mt-7 grid overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-50/80 md:grid-cols-4">
-            <article className="px-4 py-4 text-center md:border-r md:border-zinc-200">
-              <p className="text-3xl font-black text-zinc-900 md:text-4xl">{activeCampaignCount}</p>
-              <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">Campaign active</p>
-            </article>
-            <article className="px-4 py-4 text-center md:border-r md:border-zinc-200">
-              <p className="text-3xl font-black text-zinc-900 md:text-4xl">{formatRatio(averageFundedRatio)}</p>
-              <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">Tỉ lệ tài trợ TB</p>
-            </article>
-            <article className="px-4 py-4 text-center md:border-r md:border-zinc-200">
-              <p className="text-3xl font-black text-zinc-900 md:text-4xl">{totalApplicants}</p>
-              <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">Creator ứng tuyển</p>
-            </article>
-            <article className="px-4 py-4 text-center">
-              <p className="text-3xl font-black text-zinc-900 md:text-4xl">{totalRewardsLeft}</p>
-              <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">Reward còn lại</p>
-            </article>
-          </div>
-        </section>
-
-        <section className="mt-10 rounded-[2rem] border border-zinc-800 bg-zinc-950 p-5 text-white shadow-[0_24px_70px_-35px_rgba(0,0,0,0.9)] md:p-8">
-          <div className="grid items-center gap-8 lg:grid-cols-[0.95fr_1.05fr]">
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.05] p-4 md:p-5">
-              <div className="flex min-h-[340px] items-center justify-center rounded-[1.25rem] bg-zinc-900/60 px-4 py-5 ring-1 ring-white/10">
-                <div className="flex h-[320px] w-[174px] flex-col justify-between rounded-[2rem] border border-zinc-300 bg-zinc-900 p-4 text-white shadow-[0_24px_55px_-32px_rgba(0,0,0,1)]">
-                  <div className="h-2 w-16 self-center rounded-full bg-zinc-700" />
-                  <div className="space-y-3">
-                    {Array.from({ length: 4 }).map((_, idx) => (
-                      <div key={idx} className="h-12 rounded-xl bg-zinc-800" />
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="rounded-lg border border-zinc-700 bg-zinc-800 px-2 py-2 text-center text-xs font-black">ROI 3.2x</div>
-                    <div className="rounded-lg border border-zinc-700 bg-zinc-800 px-2 py-2 text-center text-xs font-black">+48%</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mx-auto max-w-2xl lg:mx-0">
-              <h2 className="text-3xl font-black leading-tight text-white md:text-[42px]">
-                Tạo hàng trăm video UGC từ Creator thật
-              </h2>
-              <ul className="mt-6 space-y-4 text-base leading-7 text-zinc-200">
-                <li className="flex gap-3">
-                  <span className="mt-3 h-1.5 w-1.5 shrink-0 rounded-full bg-white" />
-                  <span>Không cần booking KOL đắt đỏ.</span>
-                </li>
-                <li className="flex gap-3">
-                  <span className="mt-3 h-1.5 w-1.5 shrink-0 rounded-full bg-white" />
-                  <span>Không cần tự tìm Creator.</span>
-                </li>
-                <li className="flex gap-3">
-                  <span className="mt-3 h-1.5 w-1.5 shrink-0 rounded-full bg-white" />
-                  <span>dCreator giúp Brand triển khai chiến dịch UGC với quy trình minh bạch từ đăng campaign đến đo lường kết quả.</span>
-                </li>
-              </ul>
-            </div>
+            {heroStats.map(([value, label], index) => (
+              <article key={label} className={`px-4 py-4 text-center ${index < heroStats.length - 1 ? "md:border-r md:border-zinc-200" : ""}`}>
+                <p className="text-3xl font-black text-zinc-900 md:text-4xl">{formatCompactNumber(value)}</p>
+                <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">{label}</p>
+              </article>
+            ))}
           </div>
         </section>
 
@@ -417,9 +374,14 @@ export default async function CreatorLandingPage() {
               Tham gia cộng đồng Creator dCreator để nhận job UGC, kết nối brand thật và xây profile nội dung của riêng mình.
             </p>
             <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-              <Link href="/auth/register" className="inline-flex min-w-[190px] items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-black !text-zinc-950 transition-colors hover:bg-zinc-200">
+              <AnalyticsLink
+                href="/auth/register"
+                eventName={AnalyticsEvents.CREATOR_UPGRADE_CLICK}
+                eventParams={{ role: "creator", page_source: "creator_landing_bottom" }}
+                className="inline-flex min-w-[190px] items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-black !text-zinc-950 transition-colors hover:bg-zinc-200"
+              >
                 Trở Thành Creator
-              </Link>
+              </AnalyticsLink>
               <Link href="#creator-how-it-works" className="rounded-xl border border-white/20 px-6 py-3 text-sm font-black text-white transition-colors hover:bg-white hover:text-zinc-950">
                 Khám Phá Cộng Đồng
               </Link>
