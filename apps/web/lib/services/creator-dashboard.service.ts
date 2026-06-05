@@ -399,8 +399,8 @@ export async function createCreatorChannel(accountId: string, input: CreatorChan
         followers: input.followerCount,
         engagementRate: input.engagementRate ?? null,
         isActive: true,
-        verificationStatus: "PENDING",
-        status: "PENDING",
+        verificationStatus: "UNVERIFIED",
+        status: "APPROVED",
         rejectReason: null,
         reviewNote: null,
         reviewedAt: null,
@@ -417,8 +417,8 @@ export async function createCreatorChannel(accountId: string, input: CreatorChan
   await createNotification({
     accountId,
     event: "PROOF_SUBMITTED",
-    title: "Đã gửi kênh mạng xã hội",
-    content: "Kênh mạng xã hội mới đã được gửi để Admin duyệt.",
+    title: "Đã thêm kênh mạng xã hội",
+    content: "Kênh mạng xã hội mới đã được thêm và có thể sử dụng.",
     metadata: { platform: input.platform, url: input.url }
   });
 
@@ -459,8 +459,8 @@ export async function updateCreatorChannel(accountId: string, linkId: string, in
       socialUrl: input.url,
       followers: input.followerCount,
       engagementRate: input.engagementRate ?? null,
-      status: "PENDING",
-      verificationStatus: "PENDING",
+      status: "APPROVED",
+      verificationStatus: "UNVERIFIED",
       rejectReason: null,
       reviewNote: null,
       reviewedAt: null,
@@ -472,7 +472,7 @@ export async function updateCreatorChannel(accountId: string, linkId: string, in
     accountId,
     event: "PROOF_SUBMITTED",
     title: "Đã cập nhật kênh mạng xã hội",
-    content: "Thông tin kênh đã được gửi lại để Admin duyệt.",
+    content: "Thông tin kênh đã được cập nhật và có thể sử dụng.",
     metadata: { linkId, platform: input.platform, url: input.url }
   });
 

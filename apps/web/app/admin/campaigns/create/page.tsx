@@ -9,7 +9,6 @@ import { getCampaignTypeLabel } from "@/lib/constants/campaign-type";
 type CampaignCategory = "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
 type CampaignType = "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
 type SetupSource = "JOIN_EXISTING_DCREATOR_CAMP" | "BRAND_REQUESTED";
-type ProductReceiveOption = "PRODUCT_REQUIRED" | "NO_PRODUCT_REQUIRED";
 type BrandOption = { id: string; displayName: string; email: string };
 
 type MissionForm = {
@@ -18,7 +17,6 @@ type MissionForm = {
   audience: "CREATOR" | "USER";
   rewardCommissionVnd: number;
   rewardPoints: number;
-  productReceiveOption: ProductReceiveOption;
   productName: string;
   productDescription: string;
   productLink: string;
@@ -85,7 +83,6 @@ const defaultForm: FormState = {
     audience: "CREATOR",
     rewardCommissionVnd: 0,
     rewardPoints: 0,
-    productReceiveOption: "PRODUCT_REQUIRED",
     productName: "",
     productDescription: "",
     productLink: "",
@@ -335,7 +332,7 @@ export default function AdminCreateCampaignPage() {
     }
     if (form.hasMission && form.mission.title.trim().length < 3) nextErrors["mission.title"] = "Tên nhiệm vụ cần tối thiểu 3 ký tự.";
     if (form.hasMission && form.mission.description.trim().length < 10) nextErrors["mission.description"] = "Mô tả nhiệm vụ cần tối thiểu 10 ký tự.";
-    if (form.hasMission && form.mission.productReceiveOption === "PRODUCT_REQUIRED") {
+    if (form.hasMission) {
       if (!form.mission.productName.trim()) nextErrors["mission.productName"] = "Vui lòng nhập tên sản phẩm.";
       if (!form.mission.productDescription.trim()) nextErrors["mission.productDescription"] = "Vui lòng nhập mô tả sản phẩm.";
       if (!form.mission.productLink.trim()) nextErrors["mission.productLink"] = "Vui lòng nhập link sản phẩm.";
@@ -370,10 +367,7 @@ export default function AdminCreateCampaignPage() {
           participationRoadmap: form.participationRoadmap.filter((item) => item.trim().length > 0),
           mission: form.hasMission ? {
             ...form.mission,
-            productName: form.mission.productReceiveOption === "PRODUCT_REQUIRED" ? form.mission.productName : "",
-            productDescription: form.mission.productReceiveOption === "PRODUCT_REQUIRED" ? form.mission.productDescription : "",
-            productLink: form.mission.productReceiveOption === "PRODUCT_REQUIRED" ? form.mission.productLink : "",
-            productImageUrl: form.mission.productReceiveOption === "PRODUCT_REQUIRED" ? form.mission.productImageUrl : "",
+            productReceiveOption: "PRODUCT_REQUIRED",
             audience: "CREATOR",
             deadlineAt: toDateTime(form.endsAt)
           } : undefined
@@ -530,66 +524,57 @@ export default function AdminCreateCampaignPage() {
 
           <section className="grid gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:col-span-2">
             <h3 className="text-base font-semibold text-zinc-900">Sản phẩm của chiến dịch</h3>
-            <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:max-w-sm">
-              <span>Sản phẩm</span>
-              <select className="dc-input" value={form.mission.productReceiveOption} onChange={(event) => setMissionField("productReceiveOption", event.target.value as ProductReceiveOption)}>
-                <option value="PRODUCT_REQUIRED">Có yêu cầu</option>
-                <option value="NO_PRODUCT_REQUIRED">Không yêu cầu</option>
-              </select>
-            </label>
-            {form.mission.productReceiveOption === "PRODUCT_REQUIRED" ? (
-              <div className="grid gap-3 rounded-xl border border-zinc-200 bg-white p-3 md:grid-cols-3">
-                <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-                  <span>Tên sản phẩm</span>
-                  <input
-                    className="dc-input"
-                    value={form.mission.productName}
-                    onChange={(event) => setMissionField("productName", event.target.value)}
-                    required={form.hasMission}
-                  />
-                  {fieldErrors["mission.productName"] ? <span className="text-xs text-red-600">{fieldErrors["mission.productName"]}</span> : null}
-                </label>
+            <div className="grid gap-3 rounded-xl border border-zinc-200 bg-white p-3 md:grid-cols-3">
+              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                <span>Tên sản phẩm</span>
+                <input
+                  className="dc-input"
+                  value={form.mission.productName}
+                  onChange={(event) => setMissionField("productName", event.target.value)}
+                  required={form.hasMission}
+                />
+                {fieldErrors["mission.productName"] ? <span className="text-xs text-red-600">{fieldErrors["mission.productName"]}</span> : null}
+              </label>
 
-                <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-                  <span>Link sản phẩm</span>
-                  <input
-                    className="dc-input"
-                    value={form.mission.productLink}
-                    onChange={(event) => setMissionField("productLink", event.target.value)}
-                    placeholder="https://..."
-                    required={form.hasMission}
-                  />
-                  {fieldErrors["mission.productLink"] ? <span className="text-xs text-red-600">{fieldErrors["mission.productLink"]}</span> : null}
-                </label>
+              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                <span>Link sản phẩm</span>
+                <input
+                  className="dc-input"
+                  value={form.mission.productLink}
+                  onChange={(event) => setMissionField("productLink", event.target.value)}
+                  placeholder="https://..."
+                  required={form.hasMission}
+                />
+                {fieldErrors["mission.productLink"] ? <span className="text-xs text-red-600">{fieldErrors["mission.productLink"]}</span> : null}
+              </label>
 
-                <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-                  <span>Hình ảnh sản phẩm</span>
-                  <input
-                    className="dc-input"
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (file) void uploadImage(file, "product");
-                    }}
-                    required={form.hasMission && !form.mission.productImageUrl}
-                  />
-                  {uploadingProductImage ? <span className="text-xs text-zinc-500">Đang tải ảnh sản phẩm...</span> : null}
-                  {fieldErrors["mission.productImageUrl"] ? <span className="text-xs text-red-600">{fieldErrors["mission.productImageUrl"]}</span> : null}
-                </label>
+              <label className="grid gap-2 text-sm font-semibold text-zinc-700">
+                <span>Hình ảnh sản phẩm</span>
+                <input
+                  className="dc-input"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void uploadImage(file, "product");
+                  }}
+                  required={form.hasMission && !form.mission.productImageUrl}
+                />
+                {uploadingProductImage ? <span className="text-xs text-zinc-500">Đang tải ảnh sản phẩm...</span> : null}
+                {fieldErrors["mission.productImageUrl"] ? <span className="text-xs text-red-600">{fieldErrors["mission.productImageUrl"]}</span> : null}
+              </label>
 
-                <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-3">
-                  <span>Mô tả sản phẩm</span>
-                  <textarea
-                    className="dc-input min-h-32"
-                    value={form.mission.productDescription}
-                    onChange={(event) => setMissionField("productDescription", event.target.value)}
-                    required={form.hasMission}
-                  />
-                  {fieldErrors["mission.productDescription"] ? <span className="text-xs text-red-600">{fieldErrors["mission.productDescription"]}</span> : null}
-                </label>
-              </div>
-            ) : null}
+              <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-3">
+                <span>Mô tả sản phẩm</span>
+                <textarea
+                  className="dc-input min-h-32"
+                  value={form.mission.productDescription}
+                  onChange={(event) => setMissionField("productDescription", event.target.value)}
+                  required={form.hasMission}
+                />
+                {fieldErrors["mission.productDescription"] ? <span className="text-xs text-red-600">{fieldErrors["mission.productDescription"]}</span> : null}
+              </label>
+            </div>
           </section>
 
           <section className="grid gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:col-span-2">

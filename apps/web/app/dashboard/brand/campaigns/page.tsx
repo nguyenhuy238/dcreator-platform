@@ -5,6 +5,7 @@ import { DownloadSimple, FileArrowDown, ImageSquare } from "@phosphor-icons/reac
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { ClickableUrl } from "@/app/components/dcreator/ui/clickable-url";
 import { BrandSubscriptionPanel } from "@/app/dashboard/brand/_components/BrandSubscriptionPanel";
 import { useCurrentBrand } from "@/app/dashboard/brand/_hooks/use-brand-context";
 import { MissionReviewsPage, type MissionReviewsTabKey } from "@/app/dashboard/brand/mission-reviews/page";
@@ -662,7 +663,11 @@ export default function BrandCampaignsPage() {
               <input className={`dc-input ${requestFieldErrors.imageUrl ? "border-red-500 ring-1 ring-red-300" : ""}`} value={requestForm.imageUrl} onChange={(event) => setRequestField("imageUrl", event.target.value.trim())} placeholder="/uploads/... hoặc https://..." />
               {requestFieldErrors.imageUrl ? <span className="text-xs text-red-600">{requestFieldErrors.imageUrl}</span> : null}
               {uploadingCover ? <span className="text-xs font-semibold text-amber-700">Đang tải ảnh campaign...</span> : null}
-              {requestForm.imageUrl ? <span className="text-xs font-medium text-emerald-700">Đã chọn ảnh: {getFileNameFromUrl(requestForm.imageUrl, "campaign-image")}</span> : null}
+              {requestForm.imageUrl ? (
+                <span className="text-xs font-medium text-emerald-700">
+                  Đã chọn ảnh: <ClickableUrl url={requestForm.imageUrl} label={getFileNameFromUrl(requestForm.imageUrl, "campaign-image")} className="break-all underline decoration-emerald-300 underline-offset-4" />
+                </span>
+              ) : null}
             </label>
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">
               File nội dung campaign
@@ -674,7 +679,11 @@ export default function BrandCampaignsPage() {
               <input className={`dc-input ${requestFieldErrors.contentFileUrl ? "border-red-500 ring-1 ring-red-300" : ""}`} value={requestForm.contentFileUrl} onChange={(event) => setRequestField("contentFileUrl", event.target.value.trim())} placeholder="/uploads/... hoặc https://..." required />
               {requestFieldErrors.contentFileUrl ? <span className="text-xs text-red-600">{requestFieldErrors.contentFileUrl}</span> : null}
               {uploadingContentFile ? <span className="text-xs font-semibold text-amber-700">Đang tải file nội dung campaign...</span> : null}
-              {requestForm.contentFileUrl ? <span className="text-xs font-medium text-emerald-700">Đã chọn file: {getFileNameFromUrl(requestForm.contentFileUrl, "campaign-content")}</span> : null}
+              {requestForm.contentFileUrl ? (
+                <span className="text-xs font-medium text-emerald-700">
+                  Đã chọn file: <ClickableUrl url={requestForm.contentFileUrl} label={getFileNameFromUrl(requestForm.contentFileUrl, "campaign-content")} className="break-all underline decoration-emerald-300 underline-offset-4" />
+                </span>
+              ) : null}
             </label>
             <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:col-span-2">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -759,7 +768,7 @@ export default function BrandCampaignsPage() {
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
                           {getContentFileUrlFromBrief(request.brief) ? (
-                            <a className="inline-flex rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100" href={`/api/uploads/onboarding-doc-download?url=${encodeURIComponent(getContentFileUrlFromBrief(request.brief))}`} target="_blank" rel="noreferrer">
+                            <a className="inline-flex rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100" href={`/api/uploads/onboarding-doc-download?url=${encodeURIComponent(getContentFileUrlFromBrief(request.brief))}`} target="_blank" rel="noopener noreferrer">
                               Mở file nội dung đã gửi
                             </a>
                           ) : null}

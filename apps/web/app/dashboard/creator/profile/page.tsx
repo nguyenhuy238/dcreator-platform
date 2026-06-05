@@ -11,7 +11,8 @@ import {
   SectionHeader,
   StatusBadge
 } from "@/app/components/dcreator/ui/base";
-import { EmbeddedRoleUpgradePanels } from "@/app/dashboard/user/_components/EmbeddedRoleUpgradePanels";
+import { ClickableUrl } from "@/app/components/dcreator/ui/clickable-url";
+import { BrandUpgradeTabPanel } from "@/app/dashboard/user/_components/BrandUpgradeTabPanel";
 import { resolveImageUrl } from "@/lib/images/resolve-image-url";
 
 type SocialLink = { label: string; url: string };
@@ -86,14 +87,12 @@ function formatIntForInput(value: number) {
   return value.toLocaleString("vi-VN");
 }
 
-function toExternalUrl(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return "#";
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+function getChannelUsageLabel(item: Channel) {
+  return item.isActive ? "Đang sử dụng" : "Tạm ngừng";
 }
 
 export default function CreatorProfilePage() {
-  const [activeTab, setActiveTab] = useState<"profile" | "channels">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "channels" | "brand-upgrade">("profile");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -150,7 +149,7 @@ export default function CreatorProfilePage() {
 
   useEffect(() => {
     void loadAll();
-  }, []);
+  }, [loadAll]);
 
   function toggleCategory(category: string) {
     setCategories((current) => {
@@ -300,7 +299,7 @@ export default function CreatorProfilePage() {
     <>
       <PageHeader title="Cài đặt Creator" subtitle="Quản lý hồ sơ, kênh xã hội và mở rộng quyền từ cùng một nơi." />
 
-      <div className="mb-4 flex gap-2 border-b border-zinc-200 pb-2">
+      <div className="mb-4 flex flex-wrap gap-2 border-b border-zinc-200 pb-2">
         <button
           type="button"
           onClick={() => setActiveTab("profile")}
@@ -314,6 +313,13 @@ export default function CreatorProfilePage() {
           className={`rounded-full px-4 py-2 text-sm font-semibold ${activeTab === "channels" ? "bg-zinc-900 !text-white" : "text-zinc-600 hover:bg-zinc-100"}`}
         >
           Kênh mạng xã hội
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("brand-upgrade")}
+          className={`rounded-full px-4 py-2 text-sm font-semibold ${activeTab === "brand-upgrade" ? "bg-zinc-900 !text-white" : "text-zinc-600 hover:bg-zinc-100"}`}
+        >
+          Nâng cấp Brand
         </button>
       </div>
 
@@ -397,7 +403,6 @@ export default function CreatorProfilePage() {
             )}
           </article>
 
-          <EmbeddedRoleUpgradePanels targets={["brand"]} />
         </section>
       ) : null}
 
@@ -417,23 +422,16 @@ export default function CreatorProfilePage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="font-semibold text-zinc-900">{item.platform}</p>
                           <StatusBadge status={platformCode} />
-                          <span className={`rounded-full px-2 py-1 text-xs font-semibold ${item.isActive ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-                            {item.isActive ? "Đang kích hoạt" : "Tạm ngừng"}
-                          </span>
                         </div>
-                        <StatusBadge status={item.status} />
+                        <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${item.isActive ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+                          {getChannelUsageLabel(item)}
+                        </span>
                       </div>
-                      <a
-                        className="mt-1 block break-all text-sm font-semibold text-zinc-800 underline decoration-zinc-300 underline-offset-4 hover:text-zinc-950"
-                        href={toExternalUrl(item.url)}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {item.url}
-                      </a>
+                      <div className="mt-1 text-sm">
+                        <ClickableUrl url={item.url} label={item.url} />
+                      </div>
                       <p className="text-sm text-zinc-600">Tên tài khoản / ID kênh: @{item.handle}</p>
                       <p className="text-sm text-zinc-600">Người theo dõi: {item.followerCount.toLocaleString("vi-VN")}</p>
-                      {item.rejectReason ? <p className="mt-1 text-sm text-red-600">Lý do từ chối: {item.rejectReason}</p> : null}
                       <div className="mt-2 flex flex-wrap gap-2">
                         <button className="dc-btn-secondary" onClick={() => void toggleChannelActive(item.id, !item.isActive)} disabled={saving}>
                           {item.isActive ? "Tạm ngừng" : "Kích hoạt"}
@@ -449,7 +447,7 @@ export default function CreatorProfilePage() {
           </article>
 
           <article className="dc-card p-4">
-            <SectionHeader title={editingChannelId ? "Chỉnh sửa kênh" : "Thêm kênh mới"} subtitle="Kênh mới hoặc chỉnh sửa sẽ ở trạng thái chờ duyệt để Admin xác minh." />
+            <SectionHeader title={editingChannelId ? "Chỉnh sửa kênh" : "Thêm kênh mới"} subtitle="Kênh mới hoặc chỉnh sửa có thể sử dụng ngay sau khi lưu." />
             <div className="grid gap-3">
               <FormField label="Nền tảng">
                 <select className="dc-input" value={draft.platform} onChange={(event) => setDraft((current) => ({ ...current, platform: event.target.value as typeof emptyDraft.platform }))}>
@@ -487,6 +485,8 @@ export default function CreatorProfilePage() {
           </article>
         </section>
       ) : null}
+
+      {!loading && activeTab === "brand-upgrade" ? <BrandUpgradeTabPanel /> : null}
 
       {toast ? <ActionToast message={toast} /> : null}
     </>
