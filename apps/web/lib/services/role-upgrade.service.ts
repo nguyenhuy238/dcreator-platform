@@ -244,7 +244,7 @@ export async function getRoleUpgradeSnapshot(accountId: string) {
         creatorProfile: { select: { id: true } },
         ownedBrandMemberships: {
           where: { status: BrandMemberStatus.ACTIVE },
-          select: { brand: { select: { id: true, name: true } }, role: true }
+          select: { brand: { select: { id: true, name: true, website: true, brandLinks: true } }, role: true }
         }
       }
     }),
@@ -254,7 +254,13 @@ export async function getRoleUpgradeSnapshot(accountId: string) {
 
   const roles = Array.from(new Set(account.roleAssignments.map((x) => x.role)));
   const primaryRole = resolvePrimaryRole(roles);
-  const brandMemberships = account.ownedBrandMemberships.map((item) => ({ id: item.brand.id, name: item.brand.name, role: item.role }));
+  const brandMemberships = account.ownedBrandMemberships.map((item) => ({
+    id: item.brand.id,
+    name: item.brand.name,
+    role: item.role,
+    website: item.brand.website,
+    brandLinks: item.brand.brandLinks
+  }));
   return { account: { ...account, role: primaryRole, roles, brandMemberships, hasCreatorProfile: Boolean(account.creatorProfile) }, creatorApplication: creatorLatest, brandApplication: brandLatest };
 }
 

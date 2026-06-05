@@ -652,6 +652,7 @@ model Brand {
   legalName                   String?
   industry                    String?
   website                     String?
+  brandLinks                  Json?
   fanpage                     String?
   address                     String?
   contactName                 String

@@ -1,0 +1,2 @@
+ALTER TABLE "Brand"
+ADD COLUMN IF NOT EXISTS "brandLinks" JSONB;

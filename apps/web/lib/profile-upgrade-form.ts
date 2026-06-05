@@ -1,12 +1,19 @@
 export const CREATOR_PLATFORMS = ["tiktok", "facebook", "instagram", "shopee"] as const;
+export const BRAND_LINK_PLATFORMS = ["website", "tiktok", "tiktok_shop", "shopee", "facebook", "instagram", "youtube", "lazada", "other"] as const;
 
 export type CreatorPlatform = (typeof CREATOR_PLATFORMS)[number];
+export type BrandLinkPlatform = (typeof BRAND_LINK_PLATFORMS)[number];
 
 export type CreatorLink = {
   platform: CreatorPlatform;
   url: string;
   handle: string;
   followerCount: number;
+};
+
+export type BrandLink = {
+  platform: BrandLinkPlatform;
+  url: string;
 };
 
 export function normalizeCreatorUrl(input: string) {
@@ -41,6 +48,25 @@ export function normalizeCreatorLinks(links: CreatorLink[]) {
       throw new Error("Số lượng follower không hợp lệ.");
     }
     return { platform: item.platform, url, handle, followerCount: Math.trunc(item.followerCount) };
+  });
+}
+
+export function normalizeBrandLinks(links: BrandLink[]) {
+  const populatedLinks = links.filter((item) => item.url.trim());
+  const seenPlatforms = new Set<BrandLinkPlatform>();
+  return populatedLinks.map((item) => {
+    if (!BRAND_LINK_PLATFORMS.includes(item.platform)) {
+      throw new Error("Nền tảng website/kênh bán hàng không hợp lệ.");
+    }
+    if (item.platform !== "other" && seenPlatforms.has(item.platform)) {
+      throw new Error("Không được chọn trùng cùng một nền tảng, trừ mục Khác.");
+    }
+    seenPlatforms.add(item.platform);
+    const url = normalizeCreatorUrl(item.url);
+    if (!url) {
+      throw new Error("Liên kết website/kênh bán hàng không hợp lệ. Vui lòng nhập URL hợp lệ.");
+    }
+    return { platform: item.platform, url };
   });
 }
 

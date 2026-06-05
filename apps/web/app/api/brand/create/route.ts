@@ -9,6 +9,7 @@ import { requireAuth } from "@/lib/auth/guard";
 import { getCurrentSessionFromRequest } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { toErrorResponse } from "@/lib/errors";
+import { BRAND_LINK_PLATFORMS, normalizeBrandLinks } from "@/lib/profile-upgrade-form";
 
 const createBrandSchema = z.object({
   brandName: z.string().trim().min(2).max(160),
@@ -17,6 +18,10 @@ const createBrandSchema = z.object({
   description: z.string().trim().max(300).optional(),
   logoUrl: z.string().trim().url().max(400).optional().or(z.literal("")),
   website: z.string().trim().url().max(400).optional().or(z.literal("")),
+  brandLinks: z.array(z.object({
+    platform: z.enum(BRAND_LINK_PLATFORMS),
+    url: z.string().trim().max(400)
+  })).max(20).optional().default([]),
   contactName: z.string().trim().max(160).optional(),
   contactPhone: z.string().trim().max(40).optional(),
   contactEmail: z.string().trim().email().max(200).optional().or(z.literal(""))
@@ -37,6 +42,8 @@ export async function POST(request: NextRequest) {
     const session = await getCurrentSessionFromRequest(request);
     const payload = createBrandSchema.parse(await request.json());
     const industry = payload.selectedIndustries?.filter(Boolean).join(", ") || payload.industry!;
+    const brandLinks = normalizeBrandLinks(payload.brandLinks);
+    const primaryWebsite = brandLinks.find((item) => item.platform === "website")?.url ?? payload.website?.trim() ?? null;
 
     const account = await prisma.account.findUniqueOrThrow({
       where: { id: user.id },
@@ -56,22 +63,29 @@ export async function POST(request: NextRequest) {
         }
       });
 
-      const createdBrand =
-        existing ??
-        (await tx.brand.create({
-          data: {
-            ownerAccountId: user.id,
-            name: payload.brandName,
-            industry,
-            description: payload.description?.trim() || null,
-            logoUrl: payload.logoUrl?.trim() || null,
-            website: payload.website?.trim() || null,
-            contactName: payload.contactName?.trim() || account.displayName || payload.brandName,
-            contactPhone: payload.contactPhone?.trim() || account.profile?.phone || "N/A",
-            contactEmail: payload.contactEmail?.trim() || account.email,
-            status: BrandStatus.ACTIVE
-          }
-        }));
+      const brandData = {
+        industry,
+        description: payload.description?.trim() || null,
+        logoUrl: payload.logoUrl?.trim() || null,
+        website: primaryWebsite,
+        brandLinks,
+        contactName: payload.contactName?.trim() || account.displayName || payload.brandName,
+        contactPhone: payload.contactPhone?.trim() || account.profile?.phone || "N/A",
+        contactEmail: payload.contactEmail?.trim() || account.email,
+        status: BrandStatus.ACTIVE
+      };
+      const createdBrand = existing
+        ? await tx.brand.update({
+            where: { id: existing.id },
+            data: brandData
+          })
+        : await tx.brand.create({
+            data: {
+              ownerAccountId: user.id,
+              name: payload.brandName,
+              ...brandData
+            }
+          });
 
       await tx.brandMember.upsert({
         where: { brandId_accountId: { brandId: createdBrand.id, accountId: user.id } },
@@ -99,7 +113,11 @@ export async function POST(request: NextRequest) {
       id: brand.brand.id,
       name: brand.brand.name,
       status: brand.brand.status,
-      created: brand.created
+      created: brand.created,
+      role: Role.BRAND_OWNER,
+      roles: [Role.BRAND_OWNER],
+      brandMembership: { id: brand.brand.id, name: brand.brand.name, role: BrandMemberRole.OWNER },
+      brandLinks
     }, brand.created ? 201 : 200);
 
     response.cookies.set(CURRENT_BRAND_COOKIE, brand.brand.id, {
