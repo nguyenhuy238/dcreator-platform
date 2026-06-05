@@ -92,6 +92,10 @@ function toExternalUrl(value: string) {
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
+function getChannelUsageLabel(item: Channel) {
+  return item.isActive ? "Đang sử dụng" : "Tạm ngừng";
+}
+
 export default function CreatorProfilePage() {
   const [activeTab, setActiveTab] = useState<"profile" | "channels">("profile");
 
@@ -150,7 +154,7 @@ export default function CreatorProfilePage() {
 
   useEffect(() => {
     void loadAll();
-  }, []);
+  }, [loadAll]);
 
   function toggleCategory(category: string) {
     setCategories((current) => {
@@ -417,11 +421,10 @@ export default function CreatorProfilePage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="font-semibold text-zinc-900">{item.platform}</p>
                           <StatusBadge status={platformCode} />
-                          <span className={`rounded-full px-2 py-1 text-xs font-semibold ${item.isActive ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-                            {item.isActive ? "Đang kích hoạt" : "Tạm ngừng"}
-                          </span>
                         </div>
-                        <StatusBadge status={item.status} />
+                        <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${item.isActive ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+                          {getChannelUsageLabel(item)}
+                        </span>
                       </div>
                       <a
                         className="mt-1 block break-all text-sm font-semibold text-zinc-800 underline decoration-zinc-300 underline-offset-4 hover:text-zinc-950"
@@ -433,7 +436,6 @@ export default function CreatorProfilePage() {
                       </a>
                       <p className="text-sm text-zinc-600">Tên tài khoản / ID kênh: @{item.handle}</p>
                       <p className="text-sm text-zinc-600">Người theo dõi: {item.followerCount.toLocaleString("vi-VN")}</p>
-                      {item.rejectReason ? <p className="mt-1 text-sm text-red-600">Lý do từ chối: {item.rejectReason}</p> : null}
                       <div className="mt-2 flex flex-wrap gap-2">
                         <button className="dc-btn-secondary" onClick={() => void toggleChannelActive(item.id, !item.isActive)} disabled={saving}>
                           {item.isActive ? "Tạm ngừng" : "Kích hoạt"}
@@ -449,7 +451,7 @@ export default function CreatorProfilePage() {
           </article>
 
           <article className="dc-card p-4">
-            <SectionHeader title={editingChannelId ? "Chỉnh sửa kênh" : "Thêm kênh mới"} subtitle="Kênh mới hoặc chỉnh sửa sẽ ở trạng thái chờ duyệt để Admin xác minh." />
+            <SectionHeader title={editingChannelId ? "Chỉnh sửa kênh" : "Thêm kênh mới"} subtitle="Kênh mới hoặc chỉnh sửa có thể sử dụng ngay sau khi lưu." />
             <div className="grid gap-3">
               <FormField label="Nền tảng">
                 <select className="dc-input" value={draft.platform} onChange={(event) => setDraft((current) => ({ ...current, platform: event.target.value as typeof emptyDraft.platform }))}>

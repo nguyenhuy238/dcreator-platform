@@ -6,6 +6,7 @@ import { AdminTabs } from "@/app/admin/_components/AdminTabs";
 import { ManagementActionMenu } from "@/app/admin/_components/ManagementActionMenu";
 import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
+import { parseCampaignRequestContent, type CampaignRequestLink } from "./_lib/parseCampaignRequestContent";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
 type CampaignItem = { id: string; slug: string; title: string; brief: string; status: string; statusView?: string; budgetVnd: number; targetAmountVnd: number; fundedAmountVnd: number; brand: { displayName: string; email: string }; endsAt?: string | null };
@@ -15,6 +16,14 @@ type CampaignRequestItem = {
   title: string;
   brief: string;
   status: "PENDING_REVIEW" | "NEEDS_REVISION" | "APPROVED" | "REJECTED";
+  setupSource: string;
+  objective: string | null;
+  priorityChannels: string | null;
+  missionTypes: string | null;
+  campaignType: string;
+  category: string;
+  startsAt: string | null;
+  endsAt: string | null;
   adminNote: string | null;
   brandFeedback: string | null;
   updatedAt: string;
@@ -33,6 +42,58 @@ const tabs = [
   { key: "REJECTED", label: "Bị từ chối" },
   { key: "RISK", label: "Có rủi ro" }
 ];
+
+const requestStatusLabelMap: Record<string, string> = {
+  PENDING_REVIEW: "Chờ duyệt",
+  pending_review: "Chờ duyệt",
+  APPROVED: "Đã duyệt",
+  approved: "Đã duyệt",
+  REJECTED: "Từ chối",
+  rejected: "Từ chối",
+  NEEDS_REVISION: "Cần bổ sung",
+  needs_revision: "Cần bổ sung",
+  need_more_info: "Cần bổ sung",
+  PROCESSED: "Đã tạo campaign",
+  processed: "Đã tạo campaign",
+  CREATED: "Đã tạo campaign",
+  created: "Đã tạo campaign",
+  DRAFT: "Nháp",
+  draft: "Nháp"
+};
+
+function getRequestStatusLabel(status: string) {
+  return requestStatusLabelMap[status] ?? "Không xác định";
+}
+
+function getRequestStatusClass(status: string) {
+  if (status === "APPROVED" || status === "PROCESSED" || status === "CREATED") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (status === "REJECTED") return "border-red-200 bg-red-50 text-red-700";
+  if (status === "NEEDS_REVISION") return "border-amber-200 bg-amber-50 text-amber-700";
+  return "border-zinc-200 bg-zinc-50 text-zinc-700";
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "Chưa có";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Không hợp lệ";
+  return date.toLocaleString("vi-VN");
+}
+
+function FileLinkCard({ link }: { link: CampaignRequestLink }) {
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-white p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold text-zinc-900">{link.label}</p>
+          <p className="mt-1 truncate text-xs text-zinc-500">{link.url}</p>
+        </div>
+        <a className="dc-btn-secondary shrink-0" href={link.url} target="_blank" rel="noopener noreferrer">
+          {link.type === "file" ? "Mở file" : "Mở link"}
+        </a>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminCampaignsPage() {
   const [items, setItems] = useState<CampaignItem[]>([]);
@@ -161,7 +222,9 @@ export default function AdminCampaignsPage() {
                         <p className="font-semibold text-zinc-900">{request.title}</p>
                         <p className="text-sm text-zinc-600">/{request.requestedSlug} • {request.brand.name ?? "Brand chưa đặt tên"}</p>
                       </div>
-                      <StatusBadge status={request.status.toLowerCase()} />
+                      <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${getRequestStatusClass(request.status)}`}>
+                        {getRequestStatusLabel(request.status)}
+                      </span>
                     </div>
                     <p className="mt-2 line-clamp-2 text-sm text-zinc-600">{request.brief}</p>
                     {request.adminNote ? <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">Admin note: {request.adminNote}</p> : null}
@@ -234,34 +297,102 @@ export default function AdminCampaignsPage() {
       {toast ? <ActionToast message={toast} /> : null}
       {selectedRequest ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4" onClick={() => setSelectedRequest(null)}>
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xl font-bold text-zinc-900">{selectedRequest.title}</p>
-                <p className="text-sm text-zinc-600">/{selectedRequest.requestedSlug} • {selectedRequest.brand.name ?? "Brand chưa đặt tên"}</p>
+          {(() => {
+            const parsed = parseCampaignRequestContent(selectedRequest.brief);
+            const imageLinks = parsed.links.filter((link) => link.type === "image");
+            const fileLinks = parsed.links.filter((link) => link.type !== "image");
+            return (
+              <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
+                <div className="flex items-start justify-between gap-3 border-b border-zinc-100 pb-4">
+                  <div className="min-w-0">
+                    <p className="text-2xl font-bold text-zinc-900">{selectedRequest.title}</p>
+                    <p className="mt-1 break-all text-sm text-zinc-600">/{selectedRequest.requestedSlug}</p>
+                    <p className="mt-1 text-sm text-zinc-600">
+                      {selectedRequest.brand.name ?? "Brand chưa đặt tên"} • {selectedRequest.brand.contactEmail ?? "Chưa có email"}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${getRequestStatusClass(selectedRequest.status)}`}>
+                    {getRequestStatusLabel(selectedRequest.status)}
+                  </span>
+                </div>
+
+                <div className="mt-4 grid gap-4">
+                  <section className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4">
+                    <p className="font-semibold text-zinc-900">Thông tin cơ bản</p>
+                    <div className="mt-3 grid gap-3 text-sm text-zinc-700 md:grid-cols-2">
+                      <p><span className="font-semibold">Tên campaign:</span> {selectedRequest.title}</p>
+                      <p><span className="font-semibold">Brand:</span> {selectedRequest.brand.name ?? "Chưa có"}</p>
+                      <p><span className="font-semibold">Email Brand:</span> {selectedRequest.brand.contactEmail ?? "Chưa có"}</p>
+                      <p className="break-all"><span className="font-semibold">Slug:</span> /{selectedRequest.requestedSlug}</p>
+                      <p><span className="font-semibold">Loại campaign:</span> {selectedRequest.campaignType}</p>
+                      <p><span className="font-semibold">Nguồn tạo:</span> {selectedRequest.setupSource}</p>
+                      <p><span className="font-semibold">Ngành hàng:</span> {selectedRequest.category}</p>
+                      <p><span className="font-semibold">Cập nhật:</span> {formatDateTime(selectedRequest.updatedAt)}</p>
+                      <p><span className="font-semibold">Bắt đầu:</span> {formatDateTime(selectedRequest.startsAt)}</p>
+                      <p><span className="font-semibold">Kết thúc:</span> {formatDateTime(selectedRequest.endsAt)}</p>
+                    </div>
+                  </section>
+
+                  <section className="rounded-2xl border border-zinc-100 bg-white p-4">
+                    <p className="font-semibold text-zinc-900">Nội dung yêu cầu</p>
+                    {parsed.cleanContent ? (
+                      <div className="mt-3 whitespace-pre-wrap break-words rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-sm text-zinc-700">{parsed.cleanContent}</div>
+                    ) : (
+                      <p className="mt-3 rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-sm text-zinc-500">Không có mô tả bổ sung.</p>
+                    )}
+                    {selectedRequest.objective ? <p className="mt-3 text-sm text-zinc-700"><span className="font-semibold">Mục tiêu/quyền lợi:</span> {selectedRequest.objective}</p> : null}
+                    {selectedRequest.priorityChannels ? <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-700"><span className="font-semibold">Lộ trình/kênh ưu tiên:</span> {selectedRequest.priorityChannels}</p> : null}
+                    {selectedRequest.missionTypes ? <p className="mt-2 text-sm text-zinc-700"><span className="font-semibold">Mission:</span> {selectedRequest.missionTypes}</p> : null}
+                  </section>
+
+                  <section className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4">
+                    <p className="font-semibold text-zinc-900">File / Link đính kèm</p>
+                    {parsed.links.length === 0 ? (
+                      <p className="mt-3 rounded-xl border border-zinc-200 bg-white p-3 text-sm text-zinc-500">Không có file hoặc link đính kèm.</p>
+                    ) : (
+                      <div className="mt-3 grid gap-3">
+                        {imageLinks.map((link) => (
+                          <div key={link.url} className="rounded-xl border border-zinc-200 bg-white p-3">
+                            <div className="overflow-hidden rounded-xl border border-zinc-100 bg-zinc-50">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={link.url} alt={link.label} className="max-h-64 w-full object-contain" />
+                            </div>
+                            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                              <p className="font-semibold text-zinc-900">{link.label}</p>
+                              <a className="dc-btn-secondary" href={link.url} target="_blank" rel="noopener noreferrer">Mở ảnh gốc</a>
+                            </div>
+                          </div>
+                        ))}
+                        {fileLinks.map((link) => <FileLinkCard key={link.url} link={link} />)}
+                      </div>
+                    )}
+                  </section>
+
+                  {selectedRequest.adminNote ? <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700"><span className="font-semibold">Admin note:</span> {selectedRequest.adminNote}</p> : null}
+                  {selectedRequest.brandFeedback ? <p className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-700"><span className="font-semibold">Phản hồi Brand:</span> {selectedRequest.brandFeedback}</p> : null}
+                  {selectedRequest.createdCampaign ? (
+                    <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                      <span className="font-semibold">Campaign đã tạo:</span> {selectedRequest.createdCampaign.title} /{selectedRequest.createdCampaign.slug}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-zinc-100 pt-4">
+                  {selectedRequest.createdCampaign ? (
+                    <Link className="dc-btn-primary" href={`/admin/campaigns/${selectedRequest.createdCampaign.id}`}>Mở campaign đã tạo</Link>
+                  ) : null}
+                  {selectedRequest.status === "PENDING_REVIEW" || selectedRequest.status === "NEEDS_REVISION" ? (
+                    <>
+                      <Link className="dc-btn-primary" href={`/admin/campaigns/create?requestId=${selectedRequest.id}`}>Mở form tạo campaign</Link>
+                      <button className="dc-btn-secondary" onClick={() => setRequestAction({ id: selectedRequest.id, decision: "CHANGES_REQUESTED" })}>Cần bổ sung</button>
+                      <button className="dc-btn-secondary" onClick={() => setRequestAction({ id: selectedRequest.id, decision: "REJECTED" })}>Từ chối</button>
+                    </>
+                  ) : null}
+                  <button className="dc-btn-secondary" onClick={() => setSelectedRequest(null)}>Đóng</button>
+                </div>
               </div>
-              <StatusBadge status={selectedRequest.status.toLowerCase()} />
-            </div>
-            <div className="mt-4 grid gap-3 text-sm text-zinc-700">
-              <p><span className="font-semibold">Brand email:</span> {selectedRequest.brand.contactEmail ?? "Chưa có"}</p>
-              <p><span className="font-semibold">Nội dung yêu cầu:</span></p>
-              <pre className="whitespace-pre-wrap rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">{selectedRequest.brief}</pre>
-              {selectedRequest.adminNote ? <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700"><span className="font-semibold">Admin note:</span> {selectedRequest.adminNote}</p> : null}
-              {selectedRequest.brandFeedback ? <p className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sky-700"><span className="font-semibold">Phản hồi Brand:</span> {selectedRequest.brandFeedback}</p> : null}
-              {selectedRequest.createdCampaign ? (
-                <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-700">
-                  <span className="font-semibold">Campaign đã tạo:</span> {selectedRequest.createdCampaign.title} /{selectedRequest.createdCampaign.slug}
-                </p>
-              ) : null}
-              <p className="text-xs text-zinc-500">Cập nhật: {new Date(selectedRequest.updatedAt).toLocaleString("vi-VN")}</p>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {selectedRequest.createdCampaign ? (
-                <Link className="dc-btn-primary" href={`/admin/campaigns/${selectedRequest.createdCampaign.id}`}>Mở campaign đã tạo</Link>
-              ) : null}
-              <button className="dc-btn-secondary" onClick={() => setSelectedRequest(null)}>Đóng</button>
-            </div>
-          </div>
+            );
+          })()}
         </div>
       ) : null}
       <ReviewActionDialog

@@ -1,14 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import SocialLinkRequestsTab from "./_components/SocialLinkRequestsTab";
 import { AccountRoleRequestsTab } from "./_components/AccountRoleRequestsTab";
 
-type TabKey = "social-review" | "account-review";
+type TabKey = "account-review";
 
 const tabs: Array<{ key: TabKey; label: string }> = [
-  { key: "account-review", label: "Quản lý tài khoản" },
-  { key: "social-review", label: "Quản lý mạng xã hội" }
+  { key: "account-review", label: "Quản lý tài khoản" }
 ];
 
 export default function AdminCreatorRequestsPage() {
@@ -33,7 +31,6 @@ export default function AdminCreatorRequestsPage() {
         ))}
       </section>
 
-      {activeTab === "social-review" ? <SocialLinkRequestsTab /> : null}
       {activeTab === "account-review" ? <AccountRoleRequestsTab /> : null}
     </div>
   );
