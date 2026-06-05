@@ -1,7 +1,9 @@
 import Link from "next/link";
+import Image from "next/image";
 import { CampaignStatus } from "@prisma/client";
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { getCurrentUserFromServer } from "@/lib/auth/current-user";
+import { prisma } from "@/lib/db";
 import { listCampaigns } from "@/lib/services/campaign.service";
 
 type IconKind = "users" | "video" | "rocket" | "target" | "gauge" | "coins" | "doc" | "package" | "play" | "chart";
@@ -52,45 +54,72 @@ const processSteps = [
   ["5", "DCREATOR THEO DÕI HIỆU QUẢ", "Theo dõi hiệu quả, hoàn thiện sản phẩm nếu có, cập nhật mã quảng cáo và giúp Brand tối ưu campaign cho các đợt sau.", "chart"]
 ] as const;
 
-const trustedBrands = [
-  { name: "L'ORÉAL", avatar: "L'O", className: "bg-zinc-950 text-white" },
-  { name: "LA ROCHE-POSAY", avatar: "LRP", className: "bg-sky-50 text-sky-700 ring-sky-100" },
-  { name: "THE BODY SHOP", avatar: "TBS", className: "bg-emerald-50 text-emerald-700 ring-emerald-100" },
-  { name: "innisfree", avatar: "in", className: "bg-green-50 text-green-700 ring-green-100" },
-  { name: "Tiki", avatar: "T", className: "bg-blue-50 text-blue-700 ring-blue-100" },
-  { name: "belif", avatar: "b", className: "bg-indigo-50 text-indigo-700 ring-indigo-100" }
-];
+const formatCompactNumber = (value: number) =>
+  new Intl.NumberFormat("vi-VN", {
+    notation: "compact",
+    maximumFractionDigits: 1
+  }).format(value);
 
-const reasons = [
-  ["MỞ RỘNG SẢN XUẤT NỘI DUNG", ["Kết nối với mạng lưới Creator đa dạng.", "Tạo nhiều nội dung hơn với chi phí tối ưu.", "Triển khai chiến dịch nhiều chiến dịch."], "rocket"],
-  ["SỐ HÓA QUY TRÌNH VẬN HÀNH", ["Tìm kiếm Creator phù hợp.", "Quản lý Campaign tập trung.", "Theo dõi tiến độ và nội dung trên một nền tảng duy nhất."], "gauge"],
-  ["ĐO LƯỜNG BẰNG DOANH THU", ["Theo dõi đơn hàng và GMV.", "Đánh giá hiệu quả từng Creator.", "Tối ưu chiến dịch dựa trên dữ liệu thực tế."], "chart"],
-  ["MINH BẠCH GIÁ TRỊ TẠO RA", ["Brand biết nội dung nào hiệu quả.", "Creator biết giá trị mình đóng góp.", "User tiếp cận thông tin đáng tin cậy hơn."], "coins"]
-] as const;
-
-const extraBenefits = [
-  ["Đồng hành cùng thương hiệu", "Đội ngũ chuyên môn hỗ trợ từ chiến lược, triển khai đến tối ưu hiệu quả."],
-  ["Cộng đồng phát triển", "Kết nối, học hỏi và phát triển cùng hàng nghìn Creator."],
-  ["Bảo mật và an toàn dữ liệu", "Bảo vệ tuyệt đối thông tin cá nhân và dữ liệu của người dùng."]
-];
+const getInitials = (name: string) =>
+  name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("") || "DC";
 
 export default async function BrandHomePage() {
-  const [campaignData, currentUser] = await Promise.all([
+  const [campaignData, currentUser, systemCreators, creatorCount, videoCount] = await Promise.all([
     listCampaigns({
       sort: "trending",
       page: 1,
       limit: 24,
       status: CampaignStatus.ACTIVE
     }),
-    getCurrentUserFromServer()
+    getCurrentUserFromServer(),
+    prisma.creatorProfile.findMany({
+      orderBy: [{ followerCount: "desc" }, { createdAt: "desc" }],
+      take: 6,
+      select: {
+        id: true,
+        displayName: true,
+        avatarUrl: true,
+        handle: true,
+        followerCount: true,
+        socialLinks: {
+          where: { isActive: true },
+          orderBy: { followers: "desc" },
+          take: 1,
+          select: { handle: true, followers: true }
+        }
+      }
+    }),
+    prisma.creatorProfile.count(),
+    prisma.missionSubmission.count({
+      where: {
+        OR: [{ videoUrl: { not: null } }, { socialPostUrl: { not: null } }]
+      }
+    })
   ]);
 
   const roles = currentUser?.roles ?? [];
   const hasBrandRole = roles.includes("BRAND_OWNER") || roles.includes("BRAND_STAFF");
   const primaryCtaHref = hasBrandRole ? "/dashboard/brand/campaigns" : "/brand/register";
   const primaryCtaLabel = hasBrandRole ? "Vào Brand Dashboard" : "Đăng ký Brand";
-  const activeCampaignCount = campaignData.pagination.total || 13;
+  const activeCampaignCount = campaignData.pagination.total ?? 0;
   const stats = creatorStats.map(([value, label]) => [label === "Campaign active" ? String(activeCampaignCount) : value, label]);
+  const communityCreators = systemCreators.map((creator) => {
+    const social = creator.socialLinks[0];
+    const followers = social?.followers ?? creator.followerCount ?? 0;
+    const handle = social?.handle ?? creator.handle;
+
+    return {
+      name: creator.displayName,
+      handle: handle ? (handle.startsWith("@") ? handle : `@${handle}`) : "Chưa cập nhật",
+      followers: `${formatCompactNumber(followers)} followers`,
+      avatar: creator.avatarUrl
+    };
+  });
 
   return (
     <>
@@ -100,7 +129,7 @@ export default async function BrandHomePage() {
       />
       <main className="mx-auto w-full max-w-7xl overflow-x-hidden px-4 pb-24 pt-5 md:px-6">
         <section className="rounded-[2.2rem] bg-gradient-to-b from-zinc-100 via-zinc-50/50 to-white px-4 py-8 md:px-6 md:py-10">
-          <div className="mx-auto max-w-4xl text-center">
+          <div className="mx-auto max-w-6xl text-center">
             <div className="flex flex-wrap items-center justify-center gap-2">
               <span className="rounded-full bg-zinc-200/70 px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-zinc-700">#UGC</span>
               <span className="rounded-full bg-zinc-200/70 px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-zinc-700">#CREATOR</span>
@@ -114,10 +143,10 @@ export default async function BrandHomePage() {
               Creator Landing
             </p>
 
-            <h2 className="mx-auto mt-6 max-w-3xl text-3xl font-semibold leading-tight text-zinc-600 md:text-5xl">
+            <h2 className="mx-auto mt-6 max-w-5xl text-3xl font-semibold leading-tight text-zinc-600 md:whitespace-nowrap md:text-5xl">
               Biến nội dung thành <span className="font-black text-zinc-900">doanh thu thực tế.</span>
             </h2>
-            <p className="mx-auto mt-4 max-w-3xl text-lg text-zinc-600 md:text-[25px] md:leading-tight">
+            <p className="mx-auto mt-4 max-w-5xl text-lg text-zinc-600 md:text-[25px] md:leading-tight">
               Kết nối thương hiệu với mạng lưới Massive Creators (1k - 100k followers) để tạo nội dung UGC, thúc đẩy Social Commerce và tăng trưởng doanh thu.
             </p>
 
@@ -141,91 +170,194 @@ export default async function BrandHomePage() {
           </div>
         </section>
 
-        <section className="mt-8 rounded-[2rem] border border-zinc-200 bg-white p-6 md:p-8">
-          <div className="mx-auto max-w-3xl text-center">
-            <h2 className="text-3xl font-black text-zinc-900 md:text-4xl">Tại sao nên chọn dCreator</h2>
-            <p className="mt-3 text-zinc-600">dCreator số hóa quy trình Brand - Creator - Campaign trên một nền tảng duy nhất.</p>
-          </div>
-          <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {reasons.map(([title, items, kind]) => (
-              <article key={title} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5 shadow-sm">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700">
-                  <MonoIcon kind={kind} />
-                </div>
-                <h3 className="mt-4 text-base font-black text-zinc-900">{title}</h3>
-                <ul className="mt-3 space-y-2 text-sm leading-6 text-zinc-600">
-                  {items.map((item) => (
-                    <li key={item} className="flex gap-2">
-                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-900" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            ))}
-          </div>
-          <div className="mt-8 rounded-[1.5rem] border border-zinc-200 bg-white p-5">
-            <h3 className="text-center text-2xl font-black text-zinc-900">Và nhiều lợi ích khác</h3>
-            <div className="mt-5 grid gap-4 md:grid-cols-3">
-              {extraBenefits.map(([title, description], index) => (
-                <article key={title} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">0{index + 1}</p>
-                  <h4 className="mt-3 text-lg font-bold text-zinc-900">{title}</h4>
-                  <p className="mt-2 text-sm leading-6 text-zinc-600">{description}</p>
+        <section className="mt-8 rounded-[2rem] border border-zinc-200 bg-zinc-50 px-4 py-10 md:px-8 md:py-12">
+          <div className="mx-auto max-w-5xl text-center">
+            <h2 className="text-3xl font-black tracking-tight text-zinc-950 md:text-4xl">
+              Cộng đồng <span className="text-zinc-950">nhà sáng tạo</span> của dCreator
+            </h2>
+            <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-zinc-600 md:text-base">
+              Những Creator đang tham gia hệ thống dCreator, sẵn sàng đồng hành cùng Brand trong các chiến dịch UGC và social commerce.
+            </p>
+
+            <div className="mx-auto mt-6 grid max-w-xl grid-cols-3 divide-x divide-zinc-200 rounded-2xl border border-zinc-200 bg-white px-3 py-4 shadow-sm">
+              {[
+                [formatCompactNumber(creatorCount), "Creator"],
+                [formatCompactNumber(videoCount), "Video"],
+                [String(activeCampaignCount), "Campaign"]
+              ].map(([value, label]) => (
+                <article key={label} className="px-3">
+                  <p className="text-2xl font-black text-zinc-950 md:text-3xl">{value}</p>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">{label}</p>
                 </article>
               ))}
             </div>
-          </div>
-        </section>
 
-        <section className="mt-8 rounded-[2rem] border border-zinc-200 bg-white p-6 md:p-8">
-          <h2 className="text-center text-3xl font-black text-zinc-900 md:text-4xl">Quy trình triển khai</h2>
-          <div className="mt-7 grid gap-4 lg:grid-cols-5">
-            {processSteps.map(([step, title, description, kind], index) => (
-              <article key={title} className="relative rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-                {index < processSteps.length - 1 ? <div className="absolute left-[calc(100%-0.25rem)] top-8 hidden h-px w-5 bg-zinc-200 lg:block" /> : null}
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">{step}</span>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700">
-                    <MonoIcon kind={kind} />
-                  </div>
+            {communityCreators.length > 0 ? (
+              <div className="dc-creator-marquee-mask mt-8 overflow-hidden">
+                <div className="dc-creator-marquee-track flex w-max gap-3">
+                  {[...communityCreators, ...communityCreators].map((creator, index) => (
+                    <article key={`${creator.handle}-${index}`} className="w-44 shrink-0 rounded-2xl border border-zinc-200 bg-white p-4 text-center shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
+                      <div className="mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-zinc-200 text-lg font-black text-zinc-700 shadow-sm ring-1 ring-zinc-200">
+                        {creator.avatar ? (
+                          <Image
+                            src={creator.avatar}
+                            alt={creator.name}
+                            width={64}
+                            height={64}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          getInitials(creator.name)
+                        )}
+                      </div>
+                      <h3 className="mt-3 truncate text-sm font-black text-zinc-950">{creator.name}</h3>
+                      <p className="mt-1 truncate text-xs text-zinc-500">{creator.handle}</p>
+                      <p className="mt-3 inline-flex items-center justify-center gap-1 text-xs font-black text-zinc-900">
+                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-zinc-900" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="9" cy="8" r="3" /><path d="M3.5 19c.8-3 2.8-4.6 5.5-4.6s4.7 1.6 5.5 4.6" /><circle cx="17" cy="9" r="2.3" /><path d="M15 15.2c2.4-.4 4.4.8 5.5 3.3" /></svg>
+                        {creator.followers}
+                      </p>
+                    </article>
+                  ))}
                 </div>
-                <h3 className="mt-4 text-sm font-black uppercase leading-5 tracking-[0.04em] text-zinc-900">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-zinc-600">{description}</p>
-              </article>
-            ))}
+              </div>
+            ) : (
+              <div className="mt-8 rounded-2xl border border-dashed border-zinc-300 bg-white px-5 py-8 text-center text-sm text-zinc-500">
+                Chưa có Creator trong hệ thống.
+              </div>
+            )}
           </div>
         </section>
 
-        <section className="mt-8 rounded-[2rem] border border-zinc-200 bg-white p-6 md:p-8">
-          <h2 className="text-center text-3xl font-black text-zinc-900 md:text-4xl">Được tin tưởng bởi những thương hiệu hàng đầu</h2>
-          <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {trustedBrands.map((brand) => (
-              <article key={brand.name} className="flex min-h-36 flex-col items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-5 text-center shadow-sm">
-                <div className={`flex h-16 w-16 items-center justify-center rounded-full text-lg font-black shadow-sm ring-1 ring-inset ${brand.className}`}>
-                  {brand.avatar}
-                </div>
-                <p className="mt-4 text-sm font-black tracking-[0.08em] text-zinc-800 md:text-base">{brand.name}</p>
-              </article>
-            ))}
+        <section className="mt-8 rounded-[2rem] border border-zinc-800 bg-zinc-950 p-5 text-white shadow-[0_24px_70px_-35px_rgba(0,0,0,0.9)] md:p-8">
+          <div className="mx-auto max-w-3xl text-center">
+            <h2 className="text-3xl font-black text-white md:text-4xl">Lợi ích cốt lõi cho doanh nghiệp</h2>
+            <p className="mt-3 text-sm leading-6 text-zinc-300">
+              Quản lý Creator, nội dung, hiệu suất và đối soát chiến dịch trên cùng một hệ thống.
+            </p>
           </div>
-        </section>
 
-        <section className="mt-8 rounded-[2rem] border border-zinc-900 bg-zinc-950 p-6 text-white shadow-[0_25px_60px_-25px_rgba(0,0,0,0.8)] md:p-8">
-          <div className="flex flex-wrap items-center justify-between gap-5">
-            <div>
-              <h2 className="text-3xl font-black text-white md:text-4xl">Sẵn sàng biến nội dung thành doanh thu?</h2>
-              <p className="mt-3 max-w-2xl text-zinc-300">
-                Tham gia dCreator để kết nối với Brand, nhận campaign phù hợp và phát triển thu nhập từ nội dung UGC.
+          <div className="mt-7 grid gap-5 lg:grid-cols-5">
+            <article className="rounded-xl border border-white/10 bg-zinc-900 p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/25 hover:bg-zinc-800 hover:shadow-md lg:col-span-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-zinc-950">
+                <MonoIcon kind="rocket" />
+              </div>
+              <h3 className="mt-8 text-lg font-black text-white">Mở rộng nội dung UGC</h3>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-300">
+                Hệ thống hóa việc tuyển chọn Creator, nhận nội dung và theo dõi tiến độ để Brand có nguồn UGC đều đặn, dễ kiểm nghiệm theo dữ liệu thực tế.
               </p>
+              <div className="mt-8 flex items-center justify-between border-t border-white/10 pt-5">
+                <div className="flex -space-x-2">
+                  {communityCreators.slice(0, 3).map((creator) => (
+                    <span key={creator.handle} className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-zinc-800 text-[10px] font-black text-zinc-200 ring-2 ring-zinc-950">
+                      {creator.avatar ? (
+                        <Image src={creator.avatar} alt={creator.name} width={32} height={32} className="h-full w-full object-cover" />
+                      ) : (
+                        getInitials(creator.name)
+                      )}
+                    </span>
+                  ))}
+                </div>
+                <span className="text-xs font-bold text-white">{formatCompactNumber(creatorCount)} Creator trong hệ thống</span>
+              </div>
+            </article>
+
+            <article className="rounded-xl border border-white bg-white p-6 text-zinc-950 shadow-[0_18px_45px_-28px_rgba(255,255,255,0.9)] transition-all duration-300 hover:-translate-y-1 hover:border-zinc-200 hover:bg-zinc-50 hover:shadow-[0_24px_55px_-32px_rgba(255,255,255,0.95)] lg:col-span-2">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-950 text-white">
+                <MonoIcon kind="gauge" />
+              </div>
+              <h3 className="mt-8 text-lg font-black text-zinc-950">Vận hành chiến dịch tập trung</h3>
+              <p className="mt-3 text-sm leading-6 text-zinc-600">
+                Brand theo dõi brief, duyệt Creator, quản lý nhiệm vụ và cập nhật trạng thái nội dung trong một luồng làm việc rõ ràng.
+              </p>
+              <Link href="#quy-trinh-trien-khai" className="mt-10 inline-flex text-xs font-bold text-zinc-950 underline decoration-zinc-300 decoration-2 underline-offset-4 transition-colors hover:decoration-zinc-950">
+                Xem quy trình triển khai
+              </Link>
+            </article>
+
+            <article className="rounded-xl border border-white/10 bg-zinc-900 p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/25 hover:bg-zinc-800 hover:shadow-md lg:col-span-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-zinc-950">
+                <MonoIcon kind="chart" />
+              </div>
+              <h3 className="mt-6 text-lg font-black text-white">Đo lường bằng doanh thu</h3>
+              <p className="mt-3 text-sm leading-6 text-zinc-300">
+                Kết nối hiệu quả nội dung với đơn hàng, GMV và kết quả campaign để tối ưu các đợt triển khai tiếp theo.
+              </p>
+            </article>
+
+            <article className="rounded-xl border border-white/10 bg-zinc-900 p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/25 hover:bg-zinc-800 hover:shadow-md lg:col-span-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-zinc-950">
+                <MonoIcon kind="target" />
+              </div>
+              <h3 className="mt-6 text-lg font-black text-white">Minh bạch giá trị tạo ra</h3>
+              <p className="mt-3 text-sm leading-6 text-zinc-300">
+                Creator, Brand và đội ngũ vận hành cùng nhìn thấy nhiệm vụ, nội dung, trạng thái duyệt và dữ liệu đóng góp.
+              </p>
+            </article>
+
+            <article className="rounded-xl border border-white/10 bg-zinc-900 p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/25 hover:bg-zinc-800 hover:shadow-md lg:col-span-1">
+              <div className="rounded-xl border border-white/15 bg-white/[0.06] p-5">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-300">Trạng thái hệ thống</p>
+                <div className="mt-5 flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-white" />
+                  <p className="text-xs font-bold text-white">Creator đã được ghi nhận</p>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section id="quy-trinh-trien-khai" className="mt-8 scroll-mt-24 rounded-[2rem] border border-zinc-200 bg-gradient-to-br from-zinc-50 via-white to-zinc-100 p-5 shadow-sm md:p-8">
+          <div className="mx-auto max-w-3xl text-center">
+            <span className="inline-flex rounded-full bg-zinc-900 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-white">Quy trình</span>
+            <h2 className="mt-4 text-3xl font-black leading-tight text-zinc-900 md:text-4xl">Triển khai campaign trong 5 bước</h2>
+            <p className="mt-3 text-sm leading-6 text-zinc-600">
+              dCreator chuẩn hóa luồng làm việc từ brief, tạo campaign, nhận Creator đến duyệt nội dung và tối ưu hiệu quả sau chiến dịch.
+            </p>
+          </div>
+
+          <div className="mt-9 overflow-x-auto pb-2">
+            <div className="relative min-w-[980px]">
+              <div className="absolute left-20 right-20 top-12 h-px bg-zinc-300" />
+              <div className="grid grid-cols-5 gap-4">
+                {processSteps.map(([step, title, description, kind], index) => (
+                  <article key={title} className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 text-center shadow-[0_16px_42px_-28px_rgba(24,24,27,0.55)] ring-1 ring-white transition-all duration-300 hover:-translate-y-1 hover:border-zinc-300 hover:shadow-[0_24px_58px_-32px_rgba(24,24,27,0.45)]">
+                    <div className="absolute inset-x-0 top-0 h-1 bg-zinc-900" />
+                    {index < processSteps.length - 1 ? (
+                      <span className="absolute -right-5 top-10 z-20 hidden h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 shadow-sm lg:flex">
+                        →
+                      </span>
+                    ) : null}
+                    <div className="relative z-10 mx-auto flex h-16 w-16 items-center justify-center rounded-full border-4 border-white bg-zinc-900 text-lg font-black text-white shadow-[0_12px_30px_-18px_rgba(24,24,27,0.9)] ring-2 ring-zinc-300">
+                      {step}
+                    </div>
+                    <div className="mx-auto mt-4 flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-50 text-zinc-700 shadow-sm ring-1 ring-zinc-200">
+                      <MonoIcon kind={kind} />
+                    </div>
+                    <h3 className="mt-4 text-sm font-black uppercase leading-5 tracking-[0.04em] text-zinc-900">{title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-zinc-600">{description}</p>
+                  </article>
+                ))}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <Link href={primaryCtaHref} className="dc-btn-primary rounded-xl bg-white px-7 text-zinc-900 hover:bg-zinc-100">
-                {primaryCtaLabel}
-              </Link>
-              <Link href="/campaigns" className="dc-btn-secondary rounded-xl border-white/15 bg-zinc-900 px-7 text-white hover:bg-zinc-800">
-                Xem campaign đang hoạt động
-              </Link>
+          </div>
+        </section>
+
+        <section className="mt-8 bg-zinc-50 py-5 md:py-8">
+          <div className="relative overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 px-6 py-12 text-center text-white shadow-[0_24px_70px_-35px_rgba(0,0,0,0.9)] md:px-10 md:py-16">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(255,255,255,0.08),transparent_28%),radial-gradient(circle_at_12%_75%,rgba(255,255,255,0.06),transparent_26%)]" />
+            <div className="relative mx-auto max-w-3xl">
+              <h2 className="text-3xl font-black tracking-tight text-white md:text-5xl">Sẵn sàng để bứt phá doanh thu?</h2>
+              <p className="mx-auto mt-5 max-w-2xl text-sm leading-6 text-zinc-400 md:text-base">
+                Hãy để dCreator giúp thương hiệu của bạn kết nối với hàng triệu khách hàng thông qua những người kể chuyện tài năng nhất.
+              </p>
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+                <Link href="/auth/register" className="rounded-md bg-white px-8 py-3 text-sm font-black !text-black transition-colors duration-200 hover:bg-zinc-200">
+                  Bắt đầu ngay hôm nay
+                </Link>
+                <Link href="/brand/register" className="rounded-md border border-white/15 bg-black/20 px-8 py-3 text-sm font-black text-white transition-colors duration-200 hover:bg-white/10">
+                  Đặt lịch tư vấn 1:1
+                </Link>
+              </div>
             </div>
           </div>
         </section>

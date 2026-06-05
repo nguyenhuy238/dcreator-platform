@@ -5,6 +5,10 @@ import {
   CampaignType,
   CampaignCategory,
   MissionStatus,
+  MissionLifecycleStatus,
+  SocialPlatform,
+  CreatorSocialLinkStatus,
+  CreatorChannelVerificationStatus,
   RewardType
 } from "@prisma/client";
 import { randomBytes, scryptSync } from "node:crypto";
@@ -51,6 +55,148 @@ async function main() {
   const brand = seededAccounts[Role.BRAND_OWNER];
   const creator = seededAccounts[Role.CREATOR];
   const user = seededAccounts[Role.USER];
+
+  const creatorSeeds = [
+    {
+      email: "camchi.creator@dcreator.local",
+      displayName: "Cẩm Chi-hè",
+      handle: "haeraya1008",
+      followers: 42300,
+      avatarUrl: "/uploads/creator-avatar/seed-cam-chi-avatar.png",
+      category: "Lifestyle",
+      location: "TP. Hồ Chí Minh"
+    },
+    {
+      email: "trungtrachnhiem.creator@dcreator.local",
+      displayName: "Trung Trách Nhiệm",
+      handle: "trungtrachnhiem",
+      followers: 45800,
+      avatarUrl: "/uploads/creator-avatar/seed-trung-avatar.png",
+      category: "Review",
+      location: "Hà Nội"
+    },
+    {
+      email: "tieuai.creator@dcreator.local",
+      displayName: "Tiểu Ái",
+      handle: "tieuai0511",
+      followers: 54400,
+      avatarUrl: "/uploads/creator-avatar/seed-tieu-ai-avatar.png",
+      category: "Beauty",
+      location: "Đà Nẵng"
+    },
+    {
+      email: "sansau.creator@dcreator.local",
+      displayName: "Sân sau Showbiz",
+      handle: "sansau_0",
+      followers: 30000,
+      avatarUrl: "/uploads/creator-avatar/seed-san-sau-avatar.png",
+      category: "Entertainment",
+      location: "TP. Hồ Chí Minh"
+    },
+    {
+      email: "huynhly.creator@dcreator.local",
+      displayName: "Huỳnh Ly",
+      handle: "iamhly__",
+      followers: 29100,
+      avatarUrl: "/uploads/creator-avatar/seed-huynh-ly-avatar.png",
+      category: "Fashion",
+      location: "Cần Thơ"
+    },
+    {
+      email: "cris.creator@dcreator.local",
+      displayName: "Cris",
+      handle: "cris.dangg",
+      followers: 44100,
+      avatarUrl: "/uploads/creator-avatar/seed-cris-avatar.png",
+      category: "Tech",
+      location: "Hà Nội"
+    }
+  ];
+
+  const seededCreatorAccounts = [];
+  for (const item of creatorSeeds) {
+    const account = await prisma.account.upsert({
+      where: { email: item.email },
+      update: {
+        displayName: item.displayName,
+        avatarUrl: item.avatarUrl,
+        role: Role.CREATOR,
+        isActive: true
+      },
+      create: {
+        email: item.email,
+        displayName: item.displayName,
+        avatarUrl: item.avatarUrl,
+        role: Role.CREATOR,
+        isActive: true,
+        passwordHash: hashPassword(DEFAULT_PASSWORD)
+      }
+    });
+
+    await prisma.accountRole.upsert({
+      where: { accountId_role: { accountId: account.id, role: Role.CREATOR } },
+      update: {},
+      create: { accountId: account.id, role: Role.CREATOR }
+    });
+
+    const profile = await prisma.creatorProfile.upsert({
+      where: { accountId: account.id },
+      update: {
+        displayName: item.displayName,
+        avatarUrl: item.avatarUrl,
+        bio: `${item.displayName} là Creator ${item.category} trong hệ thống dCreator.`,
+        mainPlatform: SocialPlatform.TIKTOK,
+        socialUrl: `https://www.tiktok.com/@${item.handle}`,
+        handle: item.handle,
+        followerCount: item.followers,
+        contentCategory: item.category,
+        location: item.location,
+        maxJobsPerMonth: 6
+      },
+      create: {
+        accountId: account.id,
+        displayName: item.displayName,
+        avatarUrl: item.avatarUrl,
+        bio: `${item.displayName} là Creator ${item.category} trong hệ thống dCreator.`,
+        mainPlatform: SocialPlatform.TIKTOK,
+        socialUrl: `https://www.tiktok.com/@${item.handle}`,
+        handle: item.handle,
+        followerCount: item.followers,
+        contentCategory: item.category,
+        location: item.location,
+        maxJobsPerMonth: 6
+      }
+    });
+
+    await prisma.creatorSocialLink.upsert({
+      where: {
+        creatorProfileId_platform_socialUrl: {
+          creatorProfileId: profile.id,
+          platform: SocialPlatform.TIKTOK,
+          socialUrl: `https://www.tiktok.com/@${item.handle}`
+        }
+      },
+      update: {
+        handle: item.handle,
+        followers: item.followers,
+        isActive: true,
+        verificationStatus: CreatorChannelVerificationStatus.VERIFIED,
+        status: CreatorSocialLinkStatus.APPROVED
+      },
+      create: {
+        creatorProfileId: profile.id,
+        platform: SocialPlatform.TIKTOK,
+        handle: item.handle,
+        socialUrl: `https://www.tiktok.com/@${item.handle}`,
+        followers: item.followers,
+        isActive: true,
+        verificationStatus: CreatorChannelVerificationStatus.VERIFIED,
+        status: CreatorSocialLinkStatus.APPROVED
+      }
+    });
+
+    seededCreatorAccounts.push(account);
+  }
 
   const campaignSeeds = [
     ["spring-ugc-2026", "UGC 15 video - Sữa hạt X cho Gen Z", CampaignCategory.LIFESTYLE, 50000000, 32000000, 30, "Ra mắt sản phẩm mới và test thị trường Gen Z", "TikTok, Shopee, Instagram", "Video review, Livestream"],
@@ -154,6 +300,49 @@ async function main() {
     });
   }
 
+  const seededMissions = await prisma.mission.findMany({
+    where: {
+      campaign: {
+        slug: { in: campaignSeeds.map(([slug]) => slug) }
+      }
+    },
+    orderBy: { createdAt: "asc" },
+    take: seededCreatorAccounts.length,
+    select: { id: true, campaignId: true }
+  });
+
+  for (const [index, account] of seededCreatorAccounts.entries()) {
+    const mission = seededMissions[index % seededMissions.length];
+    if (!mission) continue;
+
+    await prisma.missionSubmission.upsert({
+      where: {
+        missionId_accountId: {
+          missionId: mission.id,
+          accountId: account.id
+        }
+      },
+      update: {
+        lifecycleStatus: MissionLifecycleStatus.APPROVED,
+        status: MissionStatus.APPROVED,
+        videoUrl: `https://video.dcreator.local/demo/${account.id}`,
+        socialPostUrl: `https://www.tiktok.com/@demo/video/${index + 1}`,
+        proofTextNote: "Seed demo UGC video submission.",
+        approvedAt: new Date()
+      },
+      create: {
+        missionId: mission.id,
+        accountId: account.id,
+        lifecycleStatus: MissionLifecycleStatus.APPROVED,
+        status: MissionStatus.APPROVED,
+        videoUrl: `https://video.dcreator.local/demo/${account.id}`,
+        socialPostUrl: `https://www.tiktok.com/@demo/video/${index + 1}`,
+        proofTextNote: "Seed demo UGC video submission.",
+        approvedAt: new Date()
+      }
+    });
+  }
+
   for (const account of Object.values(seededAccounts)) {
     await prisma.wallet.upsert({
       where: { userId: account.id },
@@ -170,6 +359,7 @@ async function main() {
   for (const account of defaultAccounts) {
     console.log(`- ${account.role}: ${account.email}`);
   }
+  console.log(`Seeded ${creatorSeeds.length} creator profiles and ${seededCreatorAccounts.length} demo video submissions.`);
 }
 
 main().finally(async () => {
