@@ -140,7 +140,7 @@ export default async function BrandHomePage() {
               dCREATOR
             </h1>
             <p className="mt-1 text-4xl font-medium italic leading-none text-zinc-400 [font-family:Georgia,'Times_New_Roman',serif] md:text-6xl">
-              Creator Landing
+              Brand Landing
             </p>
 
             <h2 className="mx-auto mt-6 max-w-5xl text-3xl font-semibold leading-tight text-zinc-600 md:whitespace-nowrap md:text-5xl">
