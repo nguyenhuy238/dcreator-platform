@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DownloadSimple, FileArrowDown, ImageSquare } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
@@ -101,6 +102,43 @@ function progress(current: number, target: number) {
   return Math.min(100, Math.round((current / target) * 100));
 }
 
+const REQUEST_STATUS_OPTIONS = [
+  { value: "", label: "Tất cả trạng thái" },
+  { value: "PENDING_REVIEW", label: "Chờ duyệt" },
+  { value: "APPROVED", label: "Đã duyệt" },
+  { value: "REJECTED", label: "Từ chối" },
+  { value: "NEEDS_REVISION", label: "Đang xử lý" },
+  { value: "DRAFT", label: "Nháp" },
+  { value: "CAMPAIGN_CREATED", label: "Đã tạo campaign" }
+];
+
+const CAMPAIGN_STATUS_OPTIONS = [
+  { value: "", label: "Tất cả trạng thái" },
+  { value: "LIVE", label: "Đang hoạt động" },
+  { value: "APPROVED", label: "Đã duyệt" },
+  { value: "PENDING_REVIEW", label: "Chờ duyệt" },
+  { value: "NEEDS_REVISION", label: "Cần bổ sung" },
+  { value: "DRAFT", label: "Nháp" },
+  { value: "PAUSED", label: "Tạm dừng" },
+  { value: "COMPLETED", label: "Đã hoàn thành" },
+  { value: "REJECTED", label: "Từ chối" },
+  { value: "CANCELLED", label: "Đã hủy" }
+];
+
+function CampaignRequestCover({ src, title }: { src: string | null; title: string }) {
+  if (!src) {
+    return (
+      <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-zinc-100 via-white to-zinc-200 text-zinc-500">
+        <div className="grid justify-items-center gap-2 text-sm font-semibold">
+          <ImageSquare size={28} weight="duotone" />
+          <span>Chưa có ảnh</span>
+        </div>
+      </div>
+    );
+  }
+  return <CampaignCoverImage src={src} alt={title} className="object-cover" sizes="(max-width: 1280px) 100vw, 50vw" />;
+}
+
 export default function BrandCampaignsPage() {
   const { currentBrandId } = useCurrentBrand();
   const [activeTab, setActiveTab] = useState<"campaigns" | "requests" | "packages">("campaigns");
@@ -156,6 +194,11 @@ export default function BrandCampaignsPage() {
       const campaignPayload = (await campaignResponse.json()) as ApiResponse<CampaignItem[]>;
       const requestPayload = (await requestResponse.json()) as ApiResponse<CampaignRequestItem[]>;
       const templatePayload = (await templateResponse.json()) as ApiResponse<{ campaignContentTemplateUrl: string }>;
+      if (templateResponse.ok && templatePayload.success && templatePayload.data) {
+        setTemplateUrl(templatePayload.data.campaignContentTemplateUrl ?? "");
+      } else {
+        setTemplateUrl("");
+      }
       if (!campaignResponse.ok || !campaignPayload.success || !campaignPayload.data) {
         throw new Error(campaignPayload.error ?? "Không thể tải campaign");
       }
@@ -164,9 +207,6 @@ export default function BrandCampaignsPage() {
       }
       setItems(campaignPayload.data);
       setRequests(requestPayload.data);
-      if (templateResponse.ok && templatePayload.success && templatePayload.data) {
-        setTemplateUrl(templatePayload.data.campaignContentTemplateUrl ?? "");
-      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Không thể tải campaign");
     } finally {
@@ -207,7 +247,8 @@ export default function BrandCampaignsPage() {
     const normalized = query.trim().toLowerCase();
     const list = requests.filter((request) => {
       if (normalized && !(`${request.title} ${request.requestedSlug}`.toLowerCase().includes(normalized))) return false;
-      if (statusFilter && request.status !== statusFilter) return false;
+      if (statusFilter === "CAMPAIGN_CREATED" && !request.createdCampaign) return false;
+      if (statusFilter && statusFilter !== "CAMPAIGN_CREATED" && request.status !== statusFilter) return false;
       if (typeFilter && request.campaignType !== typeFilter) return false;
       if (setupSourceFilter && request.setupSource !== setupSourceFilter) return false;
       return true;
@@ -485,36 +526,39 @@ export default function BrandCampaignsPage() {
 
       {activeTab === "campaigns" ? (
         <>
-          <section className="dc-card p-4">
-            <div className="grid gap-2 md:grid-cols-5">
-              <input className="dc-input" placeholder="Tìm tên campaign" value={query} onChange={(event) => setQuery(event.target.value)} />
-              <input className="dc-input" placeholder="Filter status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} />
-              <select className="dc-input" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
-                <option value="">Tất cả loại</option>
-                <option value="DONATION">DONATION</option>
-                <option value="PREORDER">PREORDER</option>
-                <option value="SPONSORSHIP">SPONSORSHIP</option>
-                <option value="COMMUNITY">COMMUNITY</option>
-              </select>
-              <select className="dc-input" value={setupSourceFilter} onChange={(event) => setSetupSourceFilter(event.target.value)}>
-                <option value="">Tất cả setup source</option>
-                <option value="BRAND_REQUESTED">BRAND_REQUESTED</option>
-                <option value="JOIN_EXISTING_DCREATOR_CAMP">JOIN_EXISTING_DCREATOR_CAMP</option>
-              </select>
-              <select className="dc-input" value={sortBy} onChange={(event) => setSortBy(event.target.value as "newest" | "funded" | "ending")}>
-                <option value="newest">Mới nhất</option>
-                <option value="funded">Nhiều funding nhất</option>
-                <option value="ending">Gần kết thúc</option>
-              </select>
-            </div>
-          </section>
-
           {error ? <div className="mt-4"><ErrorState title="Không thể tải campaign" description={error} onRetry={() => void load()} /></div> : null}
           {loading ? <div className="mt-4"><LoadingSkeleton rows={5} /></div> : null}
 
           {!loading ? (
             <section className="mt-6">
               <SectionHeader title="Danh sách campaign" subtitle={`${campaignCount} campaign`} />
+              <div className="mt-4 rounded-2xl border border-zinc-100 bg-white/80 p-4">
+                <div className="grid gap-2 md:grid-cols-5">
+                  <input className="dc-input" placeholder="Tìm theo tên campaign" value={query} onChange={(event) => setQuery(event.target.value)} />
+                  <select className="dc-input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                    {CAMPAIGN_STATUS_OPTIONS.map((option) => (
+                      <option key={option.value || "all"} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  <select className="dc-input" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+                    <option value="">Tất cả loại campaign</option>
+                    <option value="DONATION">Ủng hộ</option>
+                    <option value="PREORDER">Đặt trước</option>
+                    <option value="SPONSORSHIP">Tài trợ</option>
+                    <option value="COMMUNITY">Cộng đồng</option>
+                  </select>
+                  <select className="dc-input" value={setupSourceFilter} onChange={(event) => setSetupSourceFilter(event.target.value)}>
+                    <option value="">Tất cả nguồn tạo</option>
+                    <option value="BRAND_REQUESTED">Brand gửi yêu cầu</option>
+                    <option value="JOIN_EXISTING_DCREATOR_CAMP">Tham gia campaign dCreator</option>
+                  </select>
+                  <select className="dc-input" value={sortBy} onChange={(event) => setSortBy(event.target.value as "newest" | "funded" | "ending")}>
+                    <option value="newest">Mới nhất</option>
+                    <option value="funded">Funding cao nhất</option>
+                    <option value="ending">Gần kết thúc</option>
+                  </select>
+                </div>
+              </div>
               {campaignCount === 0 ? (
                 <EmptyState
                   title="Chưa có campaign"
@@ -618,6 +662,8 @@ export default function BrandCampaignsPage() {
               }} disabled={uploadingCover} />
               <input className={`dc-input ${requestFieldErrors.imageUrl ? "border-red-500 ring-1 ring-red-300" : ""}`} value={requestForm.imageUrl} onChange={(event) => setRequestField("imageUrl", event.target.value.trim())} placeholder="/uploads/... hoặc https://..." />
               {requestFieldErrors.imageUrl ? <span className="text-xs text-red-600">{requestFieldErrors.imageUrl}</span> : null}
+              {uploadingCover ? <span className="text-xs font-semibold text-amber-700">Đang tải ảnh campaign...</span> : null}
+              {requestForm.imageUrl ? <span className="text-xs font-medium text-emerald-700">Đã chọn ảnh: {getFileNameFromUrl(requestForm.imageUrl, "campaign-image")}</span> : null}
             </label>
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">
               File nội dung campaign
@@ -628,14 +674,30 @@ export default function BrandCampaignsPage() {
               }} disabled={uploadingContentFile} />
               <input className={`dc-input ${requestFieldErrors.contentFileUrl ? "border-red-500 ring-1 ring-red-300" : ""}`} value={requestForm.contentFileUrl} onChange={(event) => setRequestField("contentFileUrl", event.target.value.trim())} placeholder="/uploads/... hoặc https://..." required />
               {requestFieldErrors.contentFileUrl ? <span className="text-xs text-red-600">{requestFieldErrors.contentFileUrl}</span> : null}
-              {templateUrl ? (
-                <a className="text-xs font-semibold text-sky-700 underline" href={`/api/uploads/onboarding-doc-download?url=${encodeURIComponent(templateUrl)}`} target="_blank" rel="noreferrer">
-                  Tải template form nội dung campaign
-                </a>
-              ) : (
-                <span className="text-xs text-zinc-500">Template nội dung đang chờ Admin cấu hình.</span>
-              )}
+              {uploadingContentFile ? <span className="text-xs font-semibold text-amber-700">Đang tải file nội dung campaign...</span> : null}
+              {requestForm.contentFileUrl ? <span className="text-xs font-medium text-emerald-700">Đã chọn file: {getFileNameFromUrl(requestForm.contentFileUrl, "campaign-content")}</span> : null}
             </label>
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:col-span-2">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex gap-3">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-700">
+                    <FileArrowDown size={22} weight="duotone" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-zinc-900">Tải file mẫu nội dung campaign</p>
+                    <p className="mt-1 text-sm font-normal text-zinc-600">Tải template để điền brief, yêu cầu nội dung, hashtag, deadline trước khi gửi yêu cầu tạo campaign.</p>
+                  </div>
+                </div>
+                {templateUrl ? (
+                  <a className="dc-btn-primary inline-flex w-fit items-center gap-2" href={`/api/uploads/onboarding-doc-download?url=${encodeURIComponent(templateUrl)}`} target="_blank" rel="noreferrer">
+                    <DownloadSimple size={18} weight="bold" />
+                    Tải template
+                  </a>
+                ) : (
+                  <span className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700">Chưa cấu hình file template</span>
+                )}
+              </div>
+            </div>
             <div className="md:col-span-2">
               <button className="dc-btn-primary" type="submit" disabled={creatingRequest || uploadingCover || uploadingContentFile}>
                 {creatingRequest ? "Đang gửi..." : "Gửi yêu cầu tạo campaign"}
@@ -643,31 +705,34 @@ export default function BrandCampaignsPage() {
             </div>
           </form>
 
-          <section className="dc-card mt-4 p-4">
-            <div className="grid gap-2 md:grid-cols-4">
-              <input className="dc-input" placeholder="Tìm tên campaign request" value={query} onChange={(event) => setQuery(event.target.value)} />
-              <input className="dc-input" placeholder="Filter status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} />
-              <select className="dc-input" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
-                <option value="">Tất cả loại</option>
-                <option value="DONATION">DONATION</option>
-                <option value="PREORDER">PREORDER</option>
-                <option value="SPONSORSHIP">SPONSORSHIP</option>
-                <option value="COMMUNITY">COMMUNITY</option>
-              </select>
-              <select className="dc-input" value={setupSourceFilter} onChange={(event) => setSetupSourceFilter(event.target.value)}>
-                <option value="">Tất cả setup source</option>
-                <option value="BRAND_REQUESTED">BRAND_REQUESTED</option>
-                <option value="JOIN_EXISTING_DCREATOR_CAMP">JOIN_EXISTING_DCREATOR_CAMP</option>
-              </select>
-            </div>
-          </section>
-
           {error ? <div className="mt-4"><ErrorState title="Không thể tải yêu cầu campaign" description={error} onRetry={() => void load()} /></div> : null}
           {loading ? <div className="mt-4"><LoadingSkeleton rows={5} /></div> : null}
 
           {!loading ? (
             <section className="mt-6">
               <SectionHeader title="Yêu cầu tạo campaign của tôi" subtitle={`${requestCount} yêu cầu`} />
+              <div className="mt-4 rounded-2xl border border-zinc-100 bg-white/80 p-4">
+                <div className="grid gap-2 md:grid-cols-4">
+                  <input className="dc-input" placeholder="Tìm theo tên campaign" value={query} onChange={(event) => setQuery(event.target.value)} />
+                  <select className="dc-input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                    {REQUEST_STATUS_OPTIONS.map((option) => (
+                      <option key={option.value || "all"} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  <select className="dc-input" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+                    <option value="">Tất cả loại campaign</option>
+                    <option value="DONATION">Ủng hộ</option>
+                    <option value="PREORDER">Đặt trước</option>
+                    <option value="SPONSORSHIP">Tài trợ</option>
+                    <option value="COMMUNITY">Cộng đồng</option>
+                  </select>
+                  <select className="dc-input" value={setupSourceFilter} onChange={(event) => setSetupSourceFilter(event.target.value)}>
+                    <option value="">Tất cả nguồn tạo</option>
+                    <option value="BRAND_REQUESTED">Brand gửi yêu cầu</option>
+                    <option value="JOIN_EXISTING_DCREATOR_CAMP">Tham gia campaign dCreator</option>
+                  </select>
+                </div>
+              </div>
               {requestCount === 0 ? (
                 <EmptyState
                   title="Chưa có yêu cầu tạo campaign"
@@ -679,7 +744,7 @@ export default function BrandCampaignsPage() {
                   {filteredRequests.map((request) => (
                     <article key={request.id} className="dc-card overflow-hidden p-0">
                       <div className="relative flex h-40 items-end overflow-hidden bg-zinc-100">
-                        <CampaignCoverImage src={request.coverImageUrl} alt={request.title} className="object-cover" sizes="(max-width: 1280px) 100vw, 50vw" />
+                        <CampaignRequestCover src={request.coverImageUrl} title={request.title} />
                         <div className="relative w-full bg-black/50 px-4 py-3 text-white">
                           <p className="text-lg font-bold">{request.title}</p>
                           <p className="text-xs">/{request.requestedSlug}</p>

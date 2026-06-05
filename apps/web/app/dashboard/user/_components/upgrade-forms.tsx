@@ -4,13 +4,22 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Role } from "@prisma/client";
-import { CREATOR_PLATFORMS, normalizeCreatorLinks, resolveSelectedIndustries, type CreatorLink } from "@/lib/profile-upgrade-form";
+import {
+  BRAND_LINK_PLATFORMS,
+  CREATOR_PLATFORMS,
+  normalizeBrandLinks,
+  normalizeCreatorLinks,
+  resolveSelectedIndustries,
+  type BrandLink,
+  type BrandLinkPlatform,
+  type CreatorLink
+} from "@/lib/profile-upgrade-form";
 
 export type UpgradeSnapshot = {
   account: {
     displayName: string;
     roles: Role[];
-    brandMemberships?: Array<{ id: string; name: string; role: string }>;
+    brandMemberships?: Array<{ id: string; name: string; role: string; website?: string | null; brandLinks?: unknown }>;
     hasCreatorProfile?: boolean;
   };
   creatorApplication: null | Record<string, unknown>;
@@ -23,6 +32,28 @@ const CREATOR_PLATFORM_LABELS: Record<CreatorLink["platform"], string> = {
   facebook: "Facebook",
   instagram: "Instagram",
   shopee: "Shopee"
+};
+const BRAND_LINK_LABELS: Record<BrandLinkPlatform, string> = {
+  website: "Website chính thức",
+  tiktok: "TikTok",
+  tiktok_shop: "TikTok Shop",
+  shopee: "Shopee",
+  facebook: "Facebook",
+  instagram: "Instagram",
+  youtube: "YouTube",
+  lazada: "Lazada",
+  other: "Khác"
+};
+const BRAND_LINK_PLACEHOLDERS: Record<BrandLinkPlatform, string> = {
+  website: "https://brand.vn",
+  tiktok: "https://www.tiktok.com/@brand",
+  tiktok_shop: "https://shop.tiktok.com/...",
+  shopee: "https://shopee.vn/...",
+  facebook: "https://facebook.com/...",
+  instagram: "https://instagram.com/...",
+  youtube: "https://youtube.com/@brand",
+  lazada: "https://www.lazada.vn/shop/...",
+  other: "https://..."
 };
 
 type UpgradeFormProps = {
@@ -62,6 +93,33 @@ function statusClassName(embedded: boolean) {
   return embedded ? "text-sm" : "mt-2 text-sm";
 }
 
+async function waitForRoleAccess(target: "brand" | "creator", expectedBrandId?: string) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const response = await fetch("/api/profile/role-upgrade", { cache: "no-store" });
+    const payload = await response.json();
+    const account = payload.data?.account as UpgradeSnapshot["account"] | undefined;
+    if (response.ok && payload.success && account) {
+      const hasCreator = target === "creator" && (account.hasCreatorProfile || account.roles.includes("CREATOR"));
+      const hasBrand = target === "brand" && (account.brandMemberships ?? []).some((brand) => !expectedBrandId || brand.id === expectedBrandId);
+      if (hasCreator || hasBrand) return;
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 250));
+  }
+  throw new Error(target === "brand" ? "Brand đã tạo nhưng quyền dashboard chưa sẵn sàng. Vui lòng thử lại sau ít giây." : "Creator đã tạo nhưng quyền dashboard chưa sẵn sàng. Vui lòng thử lại sau ít giây.");
+}
+
+function parseBrandLinks(value: unknown, fallbackWebsite?: string | null): BrandLink[] {
+  const parsed = Array.isArray(value)
+    ? value.filter((item): item is BrandLink => {
+        if (!item || typeof item !== "object") return false;
+        const candidate = item as { platform?: unknown; url?: unknown };
+        return typeof candidate.url === "string" && BRAND_LINK_PLATFORMS.includes(candidate.platform as BrandLinkPlatform);
+      })
+    : [];
+  if (parsed.length > 0) return parsed;
+  return fallbackWebsite ? [{ platform: "website", url: fallbackWebsite }] : [];
+}
+
 export function CreatorUpgradeForm({ data, onError, onSuccess, embedded = false }: UpgradeFormProps) {
   const router = useRouter();
   const [form, setForm] = useState({ displayName: "", bio: "" });
@@ -95,9 +153,10 @@ export function CreatorUpgradeForm({ data, onError, onSuccess, embedded = false 
       });
       const payload = await response.json();
       if (!response.ok || !payload.success) throw new Error(payload.error ?? "Gửi đơn Creator thất bại");
-      onSuccess("Creator Profile đã được tạo cùng các liên kết mạng xã hội.");
-      router.push("/dashboard/creator?created=1");
+      await waitForRoleAccess("creator");
       router.refresh();
+      onSuccess("Creator Profile đã được tạo cùng các liên kết mạng xã hội.");
+      router.replace("/dashboard/creator?created=1");
     } catch (requestError) {
       onError(requestError instanceof Error ? requestError.message : "Gửi đơn Creator thất bại");
     } finally {
@@ -168,22 +227,55 @@ export function CreatorUpgradeForm({ data, onError, onSuccess, embedded = false 
 
 export function BrandUpgradeForm({ data, onError, onSuccess, embedded = false }: UpgradeFormProps) {
   const router = useRouter();
-  const [form, setForm] = useState({ brandName: "", description: "", contactName: "", contactPhone: "", contactEmail: "", website: "" });
+  const [form, setForm] = useState({ brandName: "", description: "", contactName: "", contactPhone: "", contactEmail: "" });
+  const [brandLinks, setBrandLinks] = useState<BrandLink[]>([{ platform: "website", url: "" }]);
+  const [linkErrors, setLinkErrors] = useState<Record<number, string>>({});
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [otherIndustry, setOtherIndustry] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const brandStatus = data.brandApplication?.status as string | undefined;
   const hasBrand = (data.account.brandMemberships?.length ?? 0) > 0;
+  const savedBrandLinks = parseBrandLinks(data.account.brandMemberships?.[0]?.brandLinks, data.account.brandMemberships?.[0]?.website);
+
+  function addBrandLink() {
+    const used = new Set(brandLinks.map((item) => item.platform));
+    const nextPlatform = BRAND_LINK_PLATFORMS.find((platform) => platform === "other" || !used.has(platform)) ?? "other";
+    setBrandLinks((items) => [...items, { platform: nextPlatform, url: "" }]);
+  }
+
+  function validateBrandLinks() {
+    const nextErrors: Record<number, string> = {};
+    const seen = new Set<BrandLinkPlatform>();
+    brandLinks.forEach((item, index) => {
+      if (!item.url.trim()) return;
+      if (item.platform !== "other" && seen.has(item.platform)) {
+        nextErrors[index] = "Platform này đã được chọn. Vui lòng chọn nền tảng khác.";
+        return;
+      }
+      seen.add(item.platform);
+      try {
+        normalizeBrandLinks([item]);
+      } catch {
+        nextErrors[index] = "URL không hợp lệ. Vui lòng nhập đủ https://...";
+      }
+    });
+    setLinkErrors(nextErrors);
+    return nextErrors;
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     onError("");
     onSuccess("");
     let industries: string[];
+    let normalizedLinks: BrandLink[];
     try {
       industries = resolveSelectedIndustries(selectedIndustries, otherIndustry);
+      const nextLinkErrors = validateBrandLinks();
+      if (Object.values(nextLinkErrors).some(Boolean)) return;
+      normalizedLinks = normalizeBrandLinks(brandLinks);
     } catch (validationError) {
-      onError(validationError instanceof Error ? validationError.message : "Vui lòng chọn ít nhất 1 ngành hàng.");
+      onError(validationError instanceof Error ? validationError.message : "Vui lòng kiểm tra ngành hàng và liên kết.");
       return;
     }
 
@@ -192,13 +284,14 @@ export function BrandUpgradeForm({ data, onError, onSuccess, embedded = false }:
       const response = await fetch("/api/brand/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, selectedIndustries: industries, industry: industries.join(", ") })
+        body: JSON.stringify({ ...form, brandLinks: normalizedLinks, website: normalizedLinks.find((item) => item.platform === "website")?.url ?? "", selectedIndustries: industries, industry: industries.join(", ") })
       });
       const payload = await response.json();
       if (!response.ok || !payload.success) throw new Error(payload.error ?? "Tạo Brand thất bại");
-      onSuccess("Brand đã được tạo. Bạn có thể bắt đầu thiết lập sản phẩm/campaign.");
-      router.push("/dashboard/brand?created=1");
+      await waitForRoleAccess("brand", payload.data?.id);
       router.refresh();
+      onSuccess("Brand đã được tạo. Bạn có thể bắt đầu thiết lập sản phẩm/campaign.");
+      router.replace("/dashboard/brand?created=1");
     } catch (requestError) {
       onError(requestError instanceof Error ? requestError.message : "Tạo Brand thất bại");
     } finally {
@@ -213,9 +306,23 @@ export function BrandUpgradeForm({ data, onError, onSuccess, embedded = false }:
         Trạng thái: <span className="font-semibold">{hasBrand ? "Brand đã được tạo" : statusText(brandStatus)}</span>
       </p>
       {hasBrand ? (
-        <Link className="dc-btn-primary mt-4 inline-flex w-fit" href="/dashboard/brand">
-          Vào Bảng điều khiển Nhãn hàng
-        </Link>
+        <div className="mt-4 grid gap-3">
+          <Link className="dc-btn-primary inline-flex w-fit" href="/dashboard/brand">
+            Vào Bảng điều khiển Nhãn hàng
+          </Link>
+          {savedBrandLinks.length > 0 ? (
+            <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-3">
+              <p className="text-sm font-semibold text-zinc-800">Website / kênh đã lưu</p>
+              <div className="mt-2 grid gap-2">
+                {savedBrandLinks.map((item, index) => (
+                  <a key={`${item.platform}-${index}`} className="break-all text-sm font-medium text-zinc-600 underline" href={item.url} target="_blank" rel="noreferrer">
+                    {BRAND_LINK_LABELS[item.platform]}: {item.url}
+                  </a>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
       ) : (
         <form className="mt-4 grid gap-3" onSubmit={submit}>
           <input className="dc-input" placeholder="Tên nhãn hàng" value={form.brandName} onChange={(event) => setForm((current) => ({ ...current, brandName: event.target.value }))} required />
@@ -242,7 +349,54 @@ export function BrandUpgradeForm({ data, onError, onSuccess, embedded = false }:
           <input className="dc-input" placeholder="Tên người liên hệ" value={form.contactName} onChange={(event) => setForm((current) => ({ ...current, contactName: event.target.value }))} required />
           <input className="dc-input" placeholder="Số điện thoại liên hệ" value={form.contactPhone} onChange={(event) => setForm((current) => ({ ...current, contactPhone: event.target.value }))} required />
           <input className="dc-input" placeholder="Email liên hệ" type="email" value={form.contactEmail} onChange={(event) => setForm((current) => ({ ...current, contactEmail: event.target.value }))} required />
-          <input className="dc-input" placeholder="Website" type="url" value={form.website} onChange={(event) => setForm((current) => ({ ...current, website: event.target.value }))} />
+          <div className="grid gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-zinc-700">Website / kênh bán hàng / mạng xã hội</p>
+              <button type="button" className="dc-btn-secondary" onClick={addBrandLink}>
+                Thêm link
+              </button>
+            </div>
+            {brandLinks.map((item, index) => {
+              const selectedPlatforms = new Set(brandLinks.map((link, linkIndex) => linkIndex === index ? "" : link.platform));
+              return (
+                <div key={`${index}-${item.platform}`} className="grid gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 sm:grid-cols-[12rem_minmax(0,1fr)_auto]">
+                  <select
+                    className="dc-input bg-white"
+                    value={item.platform}
+                    onChange={(event) => {
+                      const platform = event.target.value as BrandLinkPlatform;
+                      setBrandLinks((items) => items.map((link, itemIndex) => itemIndex === index ? { ...link, platform } : link));
+                      setLinkErrors((current) => ({ ...current, [index]: "" }));
+                    }}
+                  >
+                    {BRAND_LINK_PLATFORMS.map((platform) => (
+                      <option key={platform} value={platform} disabled={platform !== "other" && selectedPlatforms.has(platform)}>
+                        {BRAND_LINK_LABELS[platform]}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="grid gap-1">
+                    <input
+                      className={`dc-input bg-white ${linkErrors[index] ? "border-red-500 ring-1 ring-red-300" : ""}`}
+                      inputMode="url"
+                      placeholder={BRAND_LINK_PLACEHOLDERS[item.platform]}
+                      value={item.url}
+                      onChange={(event) => {
+                        setBrandLinks((items) => items.map((link, itemIndex) => itemIndex === index ? { ...link, url: event.target.value } : link));
+                        setLinkErrors((current) => ({ ...current, [index]: "" }));
+                      }}
+                      onBlur={validateBrandLinks}
+                    />
+                    {linkErrors[index] ? <span className="text-xs text-red-600">{linkErrors[index]}</span> : null}
+                  </div>
+                  <button type="button" className="dc-btn-secondary h-fit text-red-700" onClick={() => setBrandLinks((items) => items.length > 1 ? items.filter((_, itemIndex) => itemIndex !== index) : [{ platform: "website", url: "" }])}>
+                    Xóa
+                  </button>
+                </div>
+              );
+            })}
+            <p className="text-xs font-medium text-zinc-500">Có thể bỏ trống link chưa dùng. Các platform không được trùng, trừ mục Khác.</p>
+          </div>
           <button className="dc-btn-primary" disabled={submitting} type="submit">
             {submitting ? "Đang tạo..." : "Tạo Brand mới"}
           </button>

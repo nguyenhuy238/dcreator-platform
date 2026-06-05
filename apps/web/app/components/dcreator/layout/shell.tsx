@@ -410,6 +410,17 @@ export function AppShell({ children, sidebarItems }: { children: React.ReactNode
     };
   }, [pathname]);
 
+  useEffect(() => {
+    function handleUserUpdated(event: Event) {
+      const detail = event instanceof CustomEvent ? event.detail as Partial<Pick<AuthUser, "displayName" | "avatarUrl">> : null;
+      if (!detail) return;
+      setUser((current) => current ? { ...current, ...detail } : current);
+    }
+
+    window.addEventListener("dc:user-updated", handleUserUpdated);
+    return () => window.removeEventListener("dc:user-updated", handleUserUpdated);
+  }, []);
+
   const workspace = getWorkspaceForPath(pathname);
   const workspaceConfig = getWorkspaceConfig(workspace);
   const accessSubject = { roles, capabilities };

@@ -94,7 +94,10 @@ export async function POST(request: NextRequest) {
 
     return ok({
       id: profile.id,
-      displayName: profile.displayName
+      displayName: profile.displayName,
+      role: Role.CREATOR,
+      roles: [Role.CREATOR],
+      hasCreatorProfile: true
     }, 201);
   } catch (error) {
     return toErrorResponse(error);

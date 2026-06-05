@@ -17,10 +17,11 @@ export async function getCookieCurrentBrandId() {
   return store.get(CURRENT_BRAND_COOKIE)?.value ?? null;
 }
 
-export function resolveCurrentBrandIdForUser(user: CurrentUser, preferredBrandId?: string | null) {
+export function resolveCurrentBrandIdForUser(user: CurrentUser, preferredBrandId?: string | null, options?: { allowInvalidPreferredFallback?: boolean }) {
   return resolveCurrentBrandIdFromMemberships({
     brandMemberships: user.brandMemberships,
     activeBrandId: user.activeBrandId,
-    preferredBrandId
+    preferredBrandId,
+    allowInvalidPreferredFallback: options?.allowInvalidPreferredFallback
   });
 }

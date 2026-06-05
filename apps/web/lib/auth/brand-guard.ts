@@ -7,8 +7,10 @@ import { AppError } from "@/lib/errors";
 export async function requireBrandActor(request: NextRequest) {
   const user = await requireAuth(request);
   const cookieBrandId = await getCookieCurrentBrandId();
-  const requestedBrandId = getRequestedBrandId(request) ?? cookieBrandId;
-  const currentBrandId = resolveCurrentBrandIdForUser(user, requestedBrandId);
+  const explicitBrandId = getRequestedBrandId(request);
+  const currentBrandId = explicitBrandId
+    ? resolveCurrentBrandIdForUser(user, explicitBrandId)
+    : resolveCurrentBrandIdForUser(user, cookieBrandId, { allowInvalidPreferredFallback: true });
   const membership = user.brandMemberships.find((item) => item.id === currentBrandId);
   if (!membership) {
     throw new AppError("Brand membership not found", 403, "BRAND_FORBIDDEN");
