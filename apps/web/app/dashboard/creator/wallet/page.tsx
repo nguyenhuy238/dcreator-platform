@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { PayoutDetailModal, type PayoutModalCreator } from "@/app/components/dcreator/ui/PayoutDetailModal";
 import {
   ActionToast,
@@ -125,6 +125,8 @@ export default function CreatorWalletPage() {
   const [editingBankId, setEditingBankId] = useState<string | null>(null);
   const [deleteBankId, setDeleteBankId] = useState<string | null>(null);
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
+  const [bankPanelHeight, setBankPanelHeight] = useState<number | null>(null);
+  const payoutRequestCardRef = useRef<HTMLElement | null>(null);
 
   async function load() {
     setLoading(true);
@@ -175,6 +177,23 @@ export default function CreatorWalletPage() {
 
   const payoutReason = buildPayoutReason(payout?.availableBalanceVnd ?? 0, Boolean(selectedBank));
   const canRequestPayout = payoutReason.length === 0;
+
+  useEffect(() => {
+    const element = payoutRequestCardRef.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver((entries) => {
+      const nextHeight = entries[0]?.contentRect.height;
+      if (nextHeight) {
+        setBankPanelHeight(Math.ceil(nextHeight));
+      }
+    });
+
+    observer.observe(element);
+    setBankPanelHeight(Math.ceil(element.getBoundingClientRect().height));
+
+    return () => observer.disconnect();
+  }, [payout, note, amountVnd, selectedBank?.id, bankForm.bankCode, bankForm.accountHolderName, bankForm.accountNumber]);
 
   async function onRequestPayout(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -326,7 +345,7 @@ export default function CreatorWalletPage() {
           </section>
 
           <section className="mt-6 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-            <article className="dc-card p-4">
+            <article ref={payoutRequestCardRef} className="dc-card h-full p-4">
               <SectionHeader
                 title="Yêu cầu rút tiền"
                 subtitle="Chọn tài khoản nhận tiền và gửi yêu cầu rút N-Point khi đủ điều kiện."
@@ -384,7 +403,10 @@ export default function CreatorWalletPage() {
               </form>
             </article>
 
-            <article className="dc-card p-4">
+            <article
+              className="dc-card flex h-full flex-col overflow-hidden p-4"
+              style={bankPanelHeight ? { height: `${bankPanelHeight}px` } : undefined}
+            >
               <SectionHeader title="Tài khoản ngân hàng" subtitle={`${payout.bankAccounts.length} tài khoản`} />
 
               <form className="grid gap-3" onSubmit={saveBankAccount}>
@@ -415,7 +437,6 @@ export default function CreatorWalletPage() {
                       <div>
                         <p className="font-semibold text-zinc-900">{selectedBankOption.shortName}</p>
                         <p className="text-sm text-zinc-600">{selectedBankOption.name}</p>
-                        <p className="text-xs text-zinc-500">BIN / acqId: {selectedBankOption.bin}</p>
                       </div>
                     </div>
                   </div>
@@ -470,14 +491,15 @@ export default function CreatorWalletPage() {
               </form>
 
               {payout.bankAccounts.length === 0 ? (
-                <div className="mt-4">
+                <div className="mt-4 flex-1">
                   <EmptyState
                     title="Chưa có tài khoản ngân hàng"
                     description="Thêm ít nhất một tài khoản để có thể nhận tiền rút."
                   />
                 </div>
               ) : (
-                <div className="mt-4 grid gap-3">
+                <div className="mt-4 flex-1 overflow-y-auto pr-1">
+                  <div className="grid gap-3">
                   {payout.bankAccounts.map((bankAccount) => (
                     <article key={bankAccount.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
                       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -485,9 +507,6 @@ export default function CreatorWalletPage() {
                           <p className="font-semibold text-zinc-900">{bankAccount.bankName}</p>
                           <p className="text-sm text-zinc-600">{bankAccount.accountHolderName}</p>
                           <p className="text-sm text-zinc-500">{maskAccountNumber(bankAccount.accountNumber)}</p>
-                          {bankAccount.bankBin ? (
-                            <p className="text-xs text-zinc-500">BIN / acqId: {bankAccount.bankBin}</p>
-                          ) : null}
                         </div>
                         {bankAccount.isDefault ? (
                           <span className="rounded-full bg-zinc-900 px-3 py-1 text-xs font-semibold text-white">
@@ -526,6 +545,7 @@ export default function CreatorWalletPage() {
                       </div>
                     </article>
                   ))}
+                  </div>
                 </div>
               )}
             </article>
