@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { ClickableUrl } from "@/app/components/dcreator/ui/clickable-url";
+import { BrandMissionHistoryPanel } from "@/app/dashboard/brand/_components/BrandMissionHistoryPanel";
 import { BrandSubscriptionPanel } from "@/app/dashboard/brand/_components/BrandSubscriptionPanel";
 import { useCurrentBrand } from "@/app/dashboard/brand/_hooks/use-brand-context";
 import { MissionReviewsPage, type MissionReviewsTabKey } from "@/app/dashboard/brand/mission-reviews/page";
@@ -144,6 +145,7 @@ export default function BrandCampaignsPage() {
   const { currentBrandId } = useCurrentBrand();
   const [activeTab, setActiveTab] = useState<"campaigns" | "requests" | "packages">("campaigns");
   const [reviewCampaign, setReviewCampaign] = useState<Pick<CampaignItem, "id" | "title" | "slug"> | null>(null);
+  const [historyCampaign, setHistoryCampaign] = useState<Pick<CampaignItem, "id" | "title" | "slug"> | null>(null);
   const [reviewInitialTab, setReviewInitialTab] = useState<MissionReviewsTabKey>("applications");
   const [items, setItems] = useState<CampaignItem[]>([]);
   const [requests, setRequests] = useState<CampaignRequestItem[]>([]);
@@ -388,7 +390,7 @@ export default function BrandCampaignsPage() {
     input.files = dataTransfer.files;
   }
 
-  async function useOldRevisionImage(request: CampaignRequestItem) {
+  async function restoreOldRevisionImage(request: CampaignRequestItem) {
     if (!request.coverImageUrl) return;
     setError("");
     try {
@@ -399,7 +401,7 @@ export default function BrandCampaignsPage() {
     }
   }
 
-  async function useOldRevisionContentFile(request: CampaignRequestItem) {
+  async function restoreOldRevisionContentFile(request: CampaignRequestItem) {
     const contentFileUrl = getContentFileUrlFromBrief(request.brief);
     if (!contentFileUrl) return;
     setError("");
@@ -621,8 +623,9 @@ export default function BrandCampaignsPage() {
                             <p className="mt-1 text-xs text-zinc-500">Tiến độ video hoàn thành: {videoProgressPercent}%</p>
                           </div>
 
-                          <div className="mt-4 grid grid-cols-[1fr_1fr_1.2fr] gap-1.5">
+                          <div className="mt-4 grid grid-cols-2 gap-1.5 lg:grid-cols-[1fr_1fr_1.2fr_1.2fr]">
                             <Link href={`/campaigns/${campaign.slug}`} className="dc-btn-secondary min-w-0 px-2 py-2 text-center text-xs leading-tight">Xem chi tiết</Link>
+                            <button type="button" className="dc-btn-secondary min-w-0 px-2 py-2 text-xs leading-tight" onClick={() => setHistoryCampaign({ id: campaign.id, title: campaign.title, slug: campaign.slug })}>Xem lịch sử</button>
                             <button type="button" className="dc-btn-secondary min-w-0 px-2 py-2 text-xs leading-tight" disabled>KPI / Analytics</button>
                             <button
                               type="button"
@@ -826,7 +829,7 @@ export default function BrandCampaignsPage() {
                 <span className="flex items-center justify-between gap-2">
                   Ảnh campaign
                   {revisionTarget.coverImageUrl ? (
-                    <button type="button" className="text-xs font-semibold text-amber-700 underline" onClick={() => void useOldRevisionImage(revisionTarget)}>
+                    <button type="button" className="text-xs font-semibold text-amber-700 underline" onClick={() => void restoreOldRevisionImage(revisionTarget)}>
                       Dùng ảnh cũ
                     </button>
                   ) : null}
@@ -847,7 +850,7 @@ export default function BrandCampaignsPage() {
                 <span className="flex items-center justify-between gap-2">
                   File nội dung campaign
                   {getContentFileUrlFromBrief(revisionTarget.brief) ? (
-                    <button type="button" className="text-xs font-semibold text-amber-700 underline" onClick={() => void useOldRevisionContentFile(revisionTarget)}>
+                    <button type="button" className="text-xs font-semibold text-amber-700 underline" onClick={() => void restoreOldRevisionContentFile(revisionTarget)}>
                       Dùng file cũ
                     </button>
                   ) : null}
@@ -896,6 +899,22 @@ export default function BrandCampaignsPage() {
               embedded
               fixedCampaignId={reviewCampaign.id}
             />
+          </div>
+        </div>
+      ) : null}
+
+      {historyCampaign ? (
+        <div className="fixed inset-0 z-[90] bg-zinc-900/50 p-3 md:p-6" onClick={() => setHistoryCampaign(null)}>
+          <div className="mx-auto max-h-[95vh] w-full max-w-7xl overflow-y-auto rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:p-6" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-semibold text-zinc-900">Lịch sử nhiệm vụ campaign</h3>
+                <p className="text-sm text-zinc-600">{historyCampaign.title} • /{historyCampaign.slug}</p>
+              </div>
+              <button type="button" className="dc-btn-secondary" onClick={() => setHistoryCampaign(null)}>Đóng</button>
+            </div>
+
+            <BrandMissionHistoryPanel embedded fixedCampaignId={historyCampaign.id} />
           </div>
         </div>
       ) : null}

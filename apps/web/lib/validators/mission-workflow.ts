@@ -121,6 +121,7 @@ export const missionFinalReviewRejectSchema = z.object({
 
 export const missionHistoryQuerySchema = z.object({
   accountId: z.string().trim().min(3).optional(),
+  campaignId: z.string().trim().min(3).optional(),
   query: z.string().trim().min(1).max(120).optional(),
   campaign: z.string().trim().min(1).max(120).optional(),
   status: z.enum(["PRODUCT_PENDING", "DRAFT_PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),

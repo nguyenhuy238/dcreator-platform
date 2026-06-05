@@ -513,6 +513,7 @@ export async function listCreatorMissionsForAdmin() {
 
 type MissionHistoryFilterInput = {
   accountId?: string;
+  campaignId?: string;
   query?: string;
   campaign?: string;
   status?: "PRODUCT_PENDING" | "DRAFT_PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
@@ -539,6 +540,10 @@ function applyMissionHistoryFilters(
       ...(campaignScope ?? {}),
       ...(input.campaign?.trim() ? { title: { contains: input.campaign.trim(), mode: "insensitive" } } : {})
     };
+  }
+
+  if (input.campaignId?.trim()) {
+    where.campaignId = input.campaignId.trim();
   }
 
   if (input.query?.trim()) {
