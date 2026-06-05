@@ -555,7 +555,6 @@ export default function CreatorWalletPage() {
                         </p>
                         {tx.bankBin ? <p className="text-xs text-zinc-500">BIN / acqId: {tx.bankBin}</p> : null}
                         <p className="text-xs text-zinc-500">Ngày chi trả: {formatDate(tx.paidAt)}</p>
-                        {tx.note ? <p className="mt-1 text-sm text-zinc-600">{tx.note}</p> : null}
                         <div className="mt-3 flex justify-end">
                           <button
                             type="button"
@@ -577,7 +576,6 @@ export default function CreatorWalletPage() {
                           <th className="px-3 py-2 text-left">Số N-Point</th>
                           <th className="px-3 py-2 text-left">Ngân hàng nhận</th>
                           <th className="px-3 py-2 text-left">Trạng thái</th>
-                          <th className="px-3 py-2 text-left">Ghi chú</th>
                           <th className="px-3 py-2 text-right">Chi tiết</th>
                         </tr>
                       </thead>
@@ -596,7 +594,6 @@ export default function CreatorWalletPage() {
                             <td className="px-3 py-2">
                               <StatusBadge status={tx.status} />
                             </td>
-                            <td className="px-3 py-2 text-zinc-600">{tx.note ?? "-"}</td>
                             <td className="px-3 py-2 text-right">
                               <button
                                 type="button"
