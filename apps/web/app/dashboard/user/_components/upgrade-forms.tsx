@@ -14,6 +14,7 @@ import {
   type BrandLinkPlatform,
   type CreatorLink
 } from "@/lib/profile-upgrade-form";
+import { ClickableUrl } from "@/app/components/dcreator/ui/clickable-url";
 
 export type UpgradeSnapshot = {
   account: {
@@ -184,12 +185,7 @@ export function CreatorUpgradeForm({ data, onError, onSuccess, embedded = false 
           <input className="dc-input" placeholder="Tên hiển thị" value={form.displayName} onChange={(event) => setForm((current) => ({ ...current, displayName: event.target.value }))} required />
           <textarea className="dc-input min-h-24" placeholder="Giới thiệu bản thân" value={form.bio} onChange={(event) => setForm((current) => ({ ...current, bio: event.target.value }))} />
           <div className="grid gap-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-zinc-700">Liên kết mạng xã hội / kênh bán hàng</p>
-              <button type="button" className="dc-btn-secondary" onClick={() => setCreatorLinks((items) => [...items, { platform: "tiktok", url: "", handle: "", followerCount: 0 }])}>
-                Thêm liên kết
-              </button>
-            </div>
+            <p className="text-sm font-semibold text-zinc-700">Liên kết mạng xã hội / kênh bán hàng</p>
             {creatorLinks.map((item, index) => (
               <div key={`${index}-${item.platform}`} className="grid gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 sm:grid-cols-[8rem_minmax(0,1fr)]">
                 <select className="dc-input bg-white" value={item.platform} onChange={(event) => setCreatorLinks((items) => items.map((link, itemIndex) => itemIndex === index ? { ...link, platform: event.target.value as CreatorLink["platform"] } : link))}>
@@ -204,10 +200,19 @@ export function CreatorUpgradeForm({ data, onError, onSuccess, embedded = false 
                   value={formatFollowerCount(item.followerCount)}
                   onChange={(event) => setCreatorLinks((items) => items.map((link, itemIndex) => itemIndex === index ? { ...link, followerCount: parseFollowerCount(event.target.value) } : link))}
                 />
-                <div className="sm:col-span-2">
-                  <button type="button" className="dc-btn-secondary text-red-700" onClick={() => setCreatorLinks((items) => items.filter((_, itemIndex) => itemIndex !== index))}>
+                <div className="flex flex-wrap gap-2 sm:col-span-2">
+                  <button
+                    type="button"
+                    className="dc-btn-secondary text-red-700"
+                    onClick={() => setCreatorLinks((items) => items.length > 1 ? items.filter((_, itemIndex) => itemIndex !== index) : [{ platform: "tiktok", url: "", handle: "", followerCount: 0 }])}
+                  >
                     Xóa
                   </button>
+                  {index === creatorLinks.length - 1 ? (
+                    <button type="button" className="dc-btn-secondary" onClick={() => setCreatorLinks((items) => [...items, { platform: "tiktok", url: "", handle: "", followerCount: 0 }])}>
+                      Thêm liên kết
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -315,9 +320,10 @@ export function BrandUpgradeForm({ data, onError, onSuccess, embedded = false }:
               <p className="text-sm font-semibold text-zinc-800">Website / kênh đã lưu</p>
               <div className="mt-2 grid gap-2">
                 {savedBrandLinks.map((item, index) => (
-                  <a key={`${item.platform}-${index}`} className="break-all text-sm font-medium text-zinc-600 underline" href={item.url} target="_blank" rel="noreferrer">
-                    {BRAND_LINK_LABELS[item.platform]}: {item.url}
-                  </a>
+                  <div key={`${item.platform}-${index}`} className="text-sm">
+                    <span className="font-semibold text-zinc-700">{BRAND_LINK_LABELS[item.platform]}: </span>
+                    <ClickableUrl url={item.url} label={item.url} className="break-all font-medium text-zinc-600 underline decoration-zinc-300 underline-offset-4 hover:text-zinc-900" />
+                  </div>
                 ))}
               </div>
             </div>

@@ -1,3 +1,5 @@
+import { extractUrlsFromText, normalizeUrl } from "@/lib/url";
+
 export type CampaignRequestLink = {
   key: string;
   type: "image" | "file" | "link";
@@ -14,17 +16,6 @@ export type ParsedCampaignRequestContent = {
 };
 
 const MARKER_PATTERN = /^\s*(?:\[\[([A-Z0-9_ -]+)\]\]|([A-Z0-9_ -]+))\s*:\s*(.+?)\s*$/i;
-const URL_PATTERN = /https?:\/\/[^\s<>"')]+/gi;
-
-function toSafeUrl(value: string) {
-  try {
-    const url = new URL(value.trim());
-    if (url.protocol === "http:" || url.protocol === "https:") return url.toString();
-  } catch {
-    return null;
-  }
-  return null;
-}
 
 function normalizeKey(value: string) {
   return value.trim().toUpperCase().replace(/[\s-]+/g, "_");
@@ -48,7 +39,7 @@ function getLabel(key: string, type: CampaignRequestLink["type"]) {
 }
 
 function addLink(links: CampaignRequestLink[], key: string, rawUrl: string) {
-  const url = toSafeUrl(rawUrl);
+  const url = normalizeUrl(rawUrl);
   if (!url || links.some((item) => item.url === url)) return null;
   const normalizedKey = normalizeKey(key);
   const type = inferType(normalizedKey, url);
@@ -78,8 +69,7 @@ export function parseCampaignRequestContent(rawContent?: string | null): ParsedC
     }
 
     cleanLines.push(line);
-    const urls = line.match(URL_PATTERN) ?? [];
-    urls.forEach((url) => addLink(links, "URL", url));
+    extractUrlsFromText(line).forEach((url) => addLink(links, "URL", url));
   }
 
   return {

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AdminAvatar } from "@/app/admin/_components/AdminAvatar";
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
 import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { ClickableUrl } from "@/app/components/dcreator/ui/clickable-url";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
 type CreatorApplicationDetail = {
@@ -52,16 +53,6 @@ type CreatorApplicationDetail = {
 function getSocialChannelLabel(channel: { isPrimary: boolean; verificationStatus?: string }) {
   if (channel.isPrimary) return "Kênh chính";
   return channel.verificationStatus === "UNVERIFIED" ? "Đã thêm" : "Đang sử dụng";
-}
-
-function getSafeUrl(value: string) {
-  try {
-    const url = new URL(value);
-    if (url.protocol === "http:" || url.protocol === "https:") return url.toString();
-  } catch {
-    return null;
-  }
-  return null;
 }
 
 export default function AdminCreatorDetailPage() {
@@ -176,7 +167,6 @@ export default function AdminCreatorDetailPage() {
         <p className="mt-1 text-sm text-zinc-500">Danh sách kênh Creator đã thêm để Admin tham khảo. Không cần duyệt từng kênh.</p>
         <div className="mt-3 grid gap-2">
           {channels.map((channel, index) => {
-            const safeUrl = getSafeUrl(channel.url);
             return (
               <div key={`${channel.url}-${index}`} className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm">
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -185,13 +175,9 @@ export default function AdminCreatorDetailPage() {
                     {getSocialChannelLabel(channel)}
                   </span>
                 </div>
-                {safeUrl ? (
-                  <a className="mt-2 block break-all text-zinc-700 underline decoration-zinc-300 underline-offset-4 hover:text-zinc-900" href={safeUrl} target="_blank" rel="noopener noreferrer">
-                    {channel.url}
-                  </a>
-                ) : (
-                  <p className="mt-2 break-all text-zinc-700">{channel.url}</p>
-                )}
+                <div className="mt-2">
+                  <ClickableUrl url={channel.url} label={channel.url} className="break-all text-zinc-700 underline decoration-zinc-300 underline-offset-4 hover:text-zinc-900" />
+                </div>
                 <p className="mt-2 text-zinc-500">Followers: {(channel.followers ?? 0).toLocaleString("vi-VN")}</p>
               </div>
             );

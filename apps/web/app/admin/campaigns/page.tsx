@@ -6,6 +6,7 @@ import { AdminTabs } from "@/app/admin/_components/AdminTabs";
 import { ManagementActionMenu } from "@/app/admin/_components/ManagementActionMenu";
 import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
+import { ClickableUrl, LinkifiedText } from "@/app/components/dcreator/ui/clickable-url";
 import { parseCampaignRequestContent, type CampaignRequestLink } from "./_lib/parseCampaignRequestContent";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
@@ -87,9 +88,7 @@ function FileLinkCard({ link }: { link: CampaignRequestLink }) {
           <p className="font-semibold text-zinc-900">{link.label}</p>
           <p className="mt-1 truncate text-xs text-zinc-500">{link.url}</p>
         </div>
-        <a className="dc-btn-secondary shrink-0" href={link.url} target="_blank" rel="noopener noreferrer">
-          {link.type === "file" ? "Mở file" : "Mở link"}
-        </a>
+        <ClickableUrl url={link.url} label={link.type === "file" ? "Mở file" : "Mở link"} className="dc-btn-secondary shrink-0" />
       </div>
     </div>
   );
@@ -336,7 +335,9 @@ export default function AdminCampaignsPage() {
                   <section className="rounded-2xl border border-zinc-100 bg-white p-4">
                     <p className="font-semibold text-zinc-900">Nội dung yêu cầu</p>
                     {parsed.cleanContent ? (
-                      <div className="mt-3 whitespace-pre-wrap break-words rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-sm text-zinc-700">{parsed.cleanContent}</div>
+                      <div className="mt-3 whitespace-pre-wrap break-words rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-sm text-zinc-700">
+                        <LinkifiedText text={parsed.cleanContent} />
+                      </div>
                     ) : (
                       <p className="mt-3 rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-sm text-zinc-500">Không có mô tả bổ sung.</p>
                     )}
@@ -359,7 +360,7 @@ export default function AdminCampaignsPage() {
                             </div>
                             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                               <p className="font-semibold text-zinc-900">{link.label}</p>
-                              <a className="dc-btn-secondary" href={link.url} target="_blank" rel="noopener noreferrer">Mở ảnh gốc</a>
+                              <ClickableUrl url={link.url} label="Mở ảnh gốc" className="dc-btn-secondary" />
                             </div>
                           </div>
                         ))}
