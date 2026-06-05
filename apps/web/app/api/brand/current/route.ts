@@ -10,11 +10,20 @@ export async function GET(request: NextRequest) {
     const user = await requireAuth(request);
     const store = await cookies();
     const cookieBrandId = store.get(CURRENT_BRAND_COOKIE)?.value ?? null;
-    const currentBrandId = resolveCurrentBrandIdForUser(user, cookieBrandId);
-    return ok({
+    const currentBrandId = resolveCurrentBrandIdForUser(user, cookieBrandId, { allowInvalidPreferredFallback: true });
+    const response = ok({
       currentBrandId,
       brands: user.brandMemberships
     });
+    if (currentBrandId !== cookieBrandId) {
+      response.cookies.set(CURRENT_BRAND_COOKIE, currentBrandId, {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30
+      });
+    }
+    return response;
   } catch (error) {
     return toErrorResponse(error);
   }

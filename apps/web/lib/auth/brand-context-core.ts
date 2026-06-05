@@ -6,6 +6,7 @@ export function resolveCurrentBrandIdFromMemberships(input: {
   brandMemberships: BrandContextMembership[];
   activeBrandId?: string | null;
   preferredBrandId?: string | null;
+  allowInvalidPreferredFallback?: boolean;
 }) {
   if (input.brandMemberships.length === 0) {
     throw new AppError("Bạn chưa thuộc Brand nào. Vui lòng tạo Brand mới.", 403, "BRAND_MEMBERSHIP_REQUIRED");
@@ -14,6 +15,9 @@ export function resolveCurrentBrandIdFromMemberships(input: {
   if (input.preferredBrandId) {
     const canAccess = input.brandMemberships.some((membership) => membership.id === input.preferredBrandId);
     if (!canAccess) {
+      if (input.allowInvalidPreferredFallback) {
+        return input.activeBrandId ?? input.brandMemberships[0]!.id;
+      }
       throw new AppError("Bạn không có quyền truy cập Brand này.", 403, "BRAND_FORBIDDEN");
     }
     return input.preferredBrandId;

@@ -23,6 +23,10 @@ const nextConfig = {
       },
       {
         protocol: "https",
+        hostname: "dcreator.vn"
+      },
+      {
+        protocol: "https",
         hostname: "images.unsplash.com"
       },
       {

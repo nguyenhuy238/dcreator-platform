@@ -147,11 +147,57 @@ a {
   animation: flywheel-rotate-ring 20s linear infinite;
 }
 
+.dc-creator-marquee-mask {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+
+.dc-creator-marquee-track {
+  animation: dc-creator-marquee 22s linear infinite;
+  will-change: transform;
+}
+
+.dc-creator-marquee-mask:hover .dc-creator-marquee-track {
+  animation-play-state: paused;
+}
+
+.dc-brand-strip-mask {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+}
+
+.dc-brand-strip-track {
+  animation: dc-brand-strip 28s linear infinite;
+  will-change: transform;
+}
+
+.dc-brand-strip-mask:hover .dc-brand-strip-track {
+  animation-play-state: paused;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .flywheel-fade,
   .flywheel-pulse,
   .flywheel-rotate {
     animation: none !important;
+  }
+}
+
+@keyframes dc-creator-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-50% - 0.375rem));
+  }
+}
+
+@keyframes dc-brand-strip {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-50% - 0.375rem));
   }
 }
 

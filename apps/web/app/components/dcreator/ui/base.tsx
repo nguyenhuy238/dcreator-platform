@@ -87,15 +87,61 @@ export function LoadingSpinner({ label = "Đang tải..." }: { label?: string })
   );
 }
 
-export function ActionToast({ message, tone = "success" }: { message: string; tone?: "success" | "error" | "info" }) {
+export function ActionToast({
+  message,
+  title,
+  description,
+  tone = "success",
+  onClose
+}: {
+  message?: string;
+  title?: string;
+  description?: string;
+  tone?: "success" | "error" | "info" | "warning" | "loading";
+  onClose?: () => void;
+}) {
   const toneClass =
     tone === "error"
-      ? "bg-red-600 text-white"
-      : tone === "info"
-        ? "bg-zinc-900 text-white"
-        : "bg-emerald-600 text-white";
+      ? "border-red-200 bg-red-50 text-red-800"
+      : tone === "warning"
+        ? "border-amber-200 bg-amber-50 text-amber-800"
+        : tone === "info"
+          ? "border-blue-200 bg-blue-50 text-blue-800"
+          : tone === "loading"
+            ? "border-zinc-200 bg-white text-zinc-800"
+            : "border-emerald-200 bg-emerald-50 text-emerald-800";
+  const iconClass =
+    tone === "error"
+      ? "bg-red-100 text-red-700"
+      : tone === "warning"
+        ? "bg-amber-100 text-amber-700"
+        : tone === "info"
+          ? "bg-blue-100 text-blue-700"
+          : tone === "loading"
+            ? "bg-zinc-100 text-zinc-700"
+            : "bg-emerald-100 text-emerald-700";
+  const resolvedTitle = title ?? message ?? "";
+  const resolvedDescription = description ?? (title ? message : "");
+  const icon = tone === "error" ? "!" : tone === "warning" ? "!" : tone === "info" ? "i" : tone === "loading" ? "" : "✓";
 
-  return <div className={`fixed bottom-20 right-4 z-50 rounded-2xl px-4 py-3 text-sm font-semibold shadow-xl ${toneClass}`}>{message}</div>;
+  return (
+    <div role="status" aria-live="polite" className={`fixed right-4 top-4 z-[70] w-[calc(100vw-2rem)] max-w-sm rounded-2xl border px-4 py-3 shadow-xl ${toneClass}`}>
+      <div className="flex items-start gap-3">
+        <span className={`mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-black ${iconClass}`}>
+          {tone === "loading" ? <span className="dc-loading-spinner" aria-hidden="true" /> : icon}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold">{resolvedTitle}</p>
+          {resolvedDescription ? <p className="mt-0.5 text-sm opacity-85">{resolvedDescription}</p> : null}
+        </div>
+        {onClose ? (
+          <button type="button" aria-label="Đóng thông báo" className="rounded-lg px-2 py-1 text-sm font-bold opacity-70 transition hover:bg-black/5 hover:opacity-100" onClick={onClose}>
+            ×
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 export function FormField({ label, error, children }: { label: ReactNode; error?: string; children: ReactNode }) {

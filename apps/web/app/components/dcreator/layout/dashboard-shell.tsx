@@ -33,6 +33,7 @@ import {
   UsersThree
 } from "@phosphor-icons/react";
 import { getBreadcrumbsForPath, getWorkspaceForPath } from "@/lib/navigation";
+import { resolveImageUrl } from "@/lib/images/resolve-image-url";
 
 export type DashboardNavItem = {
   href: string;
@@ -127,6 +128,7 @@ export function DashboardShell({
   const activeHref = useMemo(() => getActiveHref(pathname, navItems), [pathname, navItems]);
   const activeTitle = navItems.find((item) => item.href === activeHref)?.label ?? workspaceTitle;
   const userInitials = initials(user.displayName || user.email || "U");
+  const userAvatarSrc = useMemo(() => resolveImageUrl(user.avatarUrl, ""), [user.avatarUrl]);
   const profileHref = useMemo(() => {
     if (workspace === "admin") return "/admin";
     if (workspace === "brand") return "/dashboard/brand";
@@ -250,7 +252,12 @@ export function DashboardShell({
                   {headerAccessory}
                   <div className="relative">
                     <button type="button" className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-2 py-1.5 hover:bg-zinc-100" onClick={() => setMenuOpen((prev) => !prev)}>
-                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">{userInitials}</span>
+                      {userAvatarSrc ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={userAvatarSrc} alt={user.displayName} className="h-7 w-7 rounded-full border border-zinc-200 bg-zinc-100 object-cover" />
+                      ) : (
+                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">{userInitials}</span>
+                      )}
                       <span className="hidden text-sm font-semibold text-zinc-800 sm:inline">{user.displayName}</span>
                     </button>
                     {menuOpen ? (
