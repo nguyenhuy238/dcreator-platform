@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DownloadSimple, FileArrowDown, ImageSquare } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
@@ -142,6 +143,7 @@ function CampaignRequestCover({ src, title }: { src: string | null; title: strin
 }
 
 export default function BrandCampaignsPage() {
+  const router = useRouter();
   const { currentBrandId } = useCurrentBrand();
   const [activeTab, setActiveTab] = useState<"campaigns" | "requests" | "packages">("campaigns");
   const [reviewCampaign, setReviewCampaign] = useState<Pick<CampaignItem, "id" | "title" | "slug"> | null>(null);
@@ -577,7 +579,19 @@ export default function BrandCampaignsPage() {
                     const creatorJoined = campaign.creatorJoinedCount ?? 0;
 
                     return (
-                      <article key={campaign.id} className="dc-card overflow-hidden p-0">
+                      <article
+                        key={campaign.id}
+                        className="dc-card cursor-pointer overflow-hidden p-0"
+                        role="link"
+                        tabIndex={0}
+                        onClick={() => router.push(`/campaigns/${campaign.slug}`)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            router.push(`/campaigns/${campaign.slug}`);
+                          }
+                        }}
+                      >
                         <div className="relative flex h-40 items-end overflow-hidden bg-zinc-100">
                           <CampaignCoverImage src={campaign.coverImageUrl} alt={campaign.title} className="object-cover" sizes="(max-width: 1280px) 100vw, 50vw" />
                           <div className="relative w-full bg-black/50 px-4 py-3 text-white">
@@ -623,14 +637,25 @@ export default function BrandCampaignsPage() {
                             <p className="mt-1 text-xs text-zinc-500">Tiến độ video hoàn thành: {videoProgressPercent}%</p>
                           </div>
 
-                          <div className="mt-4 grid grid-cols-2 gap-1.5 lg:grid-cols-[1fr_1fr_1.2fr_1.2fr]">
-                            <Link href={`/campaigns/${campaign.slug}`} className="dc-btn-secondary min-w-0 px-2 py-2 text-center text-xs leading-tight">Xem chi tiết</Link>
-                            <button type="button" className="dc-btn-secondary min-w-0 px-2 py-2 text-xs leading-tight" onClick={() => setHistoryCampaign({ id: campaign.id, title: campaign.title, slug: campaign.slug })}>Xem lịch sử</button>
-                            <button type="button" className="dc-btn-secondary min-w-0 px-2 py-2 text-xs leading-tight" disabled>KPI / Analytics</button>
+                          <div className="mt-4 grid grid-cols-2 gap-1.5 lg:grid-cols-[1fr_1fr_1.2fr]">
+                            <button
+                              type="button"
+                              className="dc-btn-secondary min-w-0 px-2 py-2 text-xs leading-tight"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setHistoryCampaign({ id: campaign.id, title: campaign.title, slug: campaign.slug });
+                              }}
+                            >
+                              Xem lịch sử
+                            </button>
+                            <button type="button" className="dc-btn-secondary min-w-0 px-2 py-2 text-xs leading-tight" disabled onClick={(event) => event.stopPropagation()}>KPI / Analytics</button>
                             <button
                               type="button"
                               className={`${campaign.reviewPendingCount ? "dc-btn-primary" : "dc-btn-secondary"} min-w-0 px-2 py-2 text-xs leading-tight`}
-                              onClick={() => openMissionReview(campaign)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openMissionReview(campaign);
+                              }}
                             >
                               Duyệt nhiệm vụ{campaign.reviewPendingCount ? ` (${campaign.reviewPendingCount})` : ""}
                             </button>

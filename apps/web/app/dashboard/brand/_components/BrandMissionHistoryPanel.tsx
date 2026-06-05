@@ -71,6 +71,8 @@ type BrandMissionHistoryPanelProps = {
   fixedCampaignId?: string;
 };
 
+type HistoryDetailTab = "DETAILS" | "HISTORY";
+
 type TimelineStep = {
   key: string;
   label: string;
@@ -179,6 +181,19 @@ function TimelineStepIcon({ step }: { step: TimelineStep["icon"] }) {
 function buildTimeline(item: HistoryItem): TimelineStep[] {
   const includePurchase = item.productReceiveOption === "PRODUCT_REQUIRED";
   const rejected = item.status !== "COMPLETED";
+  if (rejected) {
+    return [
+      { key: "application", label: "Duyệt tham gia", icon: "application", done: false, current: false, failed: true },
+      ...(includePurchase ? [{ key: "purchase", label: "Mua sản phẩm", icon: "purchase" as const, done: false, current: false, failed: false }] : []),
+      { key: "draftSubmit", label: "Nộp kịch bản", icon: "draftSubmit", done: false, current: false, failed: false },
+      { key: "videoSubmit", label: "Nộp video", icon: "videoSubmit", done: false, current: false, failed: false },
+      { key: "videoReview", label: "Duyệt video", icon: "videoReview", done: false, current: false, failed: false },
+      { key: "publish", label: "Nộp link public", icon: "publish", done: false, current: false, failed: false },
+      { key: "publishReview", label: "Duyệt link public", icon: "publishReview", done: false, current: false, failed: false },
+      { key: "completed", label: "Hoàn thành", icon: "completed", done: false, current: false, failed: false }
+    ];
+  }
+
   const steps: TimelineStep[] = [
     { key: "application", label: "Duyệt tham gia", icon: "application", done: true, current: false, failed: false },
     ...(includePurchase ? [{ key: "purchase", label: "Mua sản phẩm", icon: "purchase" as const, done: item.productStatus === "RECEIVED" || item.status === "COMPLETED", current: false, failed: false }] : []),
@@ -189,17 +204,6 @@ function buildTimeline(item: HistoryItem): TimelineStep[] {
     { key: "publishReview", label: "Duyệt link public", icon: "publishReview", done: item.publishStatus === "APPROVED" || item.status === "COMPLETED", current: false, failed: item.publishStatus === "REJECTED" || rejected },
     { key: "completed", label: "Hoàn thành", icon: "completed", done: item.status === "COMPLETED", current: item.status === "COMPLETED", failed: false }
   ];
-
-  if (rejected) {
-    const failedIndex = steps.findIndex((step) => step.failed);
-    if (failedIndex >= 0) {
-      return steps.map((step, index) => ({
-        ...step,
-        current: index === failedIndex,
-        done: index < failedIndex && step.done
-      }));
-    }
-  }
 
   return steps;
 }
@@ -265,6 +269,7 @@ function CampaignInfoCard({ item }: { item: HistoryItem }) {
 
 function HistoryDetailModal({ item, onClose }: { item: HistoryItem; onClose: () => void }) {
   const timelineSteps = buildTimeline(item);
+  const [activeTab, setActiveTab] = useState<HistoryDetailTab>("DETAILS");
   return (
     <div className="fixed inset-0 z-[95] bg-zinc-900/50 p-3 md:p-6" onClick={onClose}>
       <div className="mx-auto max-h-[95vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:p-6" onClick={(event) => event.stopPropagation()}>
@@ -302,62 +307,83 @@ function HistoryDetailModal({ item, onClose }: { item: HistoryItem; onClose: () 
             </div>
           </div>
 
-          <div className="space-y-3 rounded-xl border border-zinc-200 bg-white p-3">
-            <p className="text-sm font-semibold text-zinc-900">Lịch sử các lần đã nộp</p>
-
-            {(item.submission?.purchaseBillImageUrl || item.submission?.productReviewScreenshotUrl) ? (
-              <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
-                <summary className="cursor-pointer font-semibold text-zinc-900">Bước mua sản phẩm</summary>
-                <div className="mt-2 space-y-1">
-                  <p>Ảnh bill: <UrlValue value={item.submission?.purchaseBillImageUrl} label="Tải file ảnh" /></p>
-                  <p>Ảnh đánh giá: <UrlValue value={item.submission?.productReviewScreenshotUrl} label="Tải file ảnh" /></p>
-                </div>
-              </details>
-            ) : null}
-
-            {(item.submission?.transcriptTextNote || item.submission?.transcriptResourceUrl) ? (
-              <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
-                <summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp kịch bản</summary>
-                <div className="mt-2 space-y-1">
-                  <p>Trạng thái: {mapStatusVi(item.submission?.status)}</p>
-                  <p>Hình thức gửi: {transcriptModeLabel(item.submission?.transcriptType, item.submission?.transcriptResourceUrl)}</p>
-                  {hasText(item.submission?.transcriptTextNote) ? <p className="whitespace-pre-line">Nội dung: {item.submission?.transcriptTextNote}</p> : null}
-                  {item.submission?.transcriptResourceUrl ? <p>{isTranscriptUploadPath(item.submission.transcriptResourceUrl) ? "File kịch bản: " : "Link kịch bản: "}<UrlValue value={item.submission.transcriptResourceUrl} label={transcriptLinkLabel(item.submission.transcriptResourceUrl)} /></p> : null}
-                  {hasText(item.submission?.rejectReason) ? <p>Lý do từ chối: {item.submission?.rejectReason}</p> : null}
-                </div>
-              </details>
-            ) : null}
-
-            {item.submission?.videoUrl ? (
-              <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
-                <summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp video</summary>
-                <div className="mt-2 space-y-1">
-                  <p>Thời gian nộp: {fmtDate(item.videoSubmittedAt)}</p>
-                  <p>Video URL: <UrlValue value={item.submission.videoUrl} label="Mở liên kết video" /></p>
-                  {hasText(item.submission?.note) ? <p>Ghi chú: {item.submission.note}</p> : null}
-                  {hasText(item.videoReviewFeedback) ? <p>Lý do từ chối: {item.videoReviewFeedback}</p> : null}
-                </div>
-              </details>
-            ) : null}
-
-            {(item.submission?.publicVideoUrl || item.submission?.socialPostUrl || item.submission?.screenshotUrl || item.submission?.adCode || item.submission?.finalProofNote) ? (
-              <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
-                <summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp link social</summary>
-                <div className="mt-2 space-y-1">
-                  <p>Thời gian nộp: {fmtDate(item.publishSubmittedAt)}</p>
-                  <p>Link public: <UrlValue value={item.submission?.publicVideoUrl ?? item.submission?.socialPostUrl} label="Mở liên kết public" /></p>
-                  <p>Ảnh chụp màn hình minh chứng: <UrlValue value={item.submission?.screenshotUrl} label="Tải file ảnh" /></p>
-                  <p>Mã quảng cáo: {item.submission?.adCode ?? "-"}</p>
-                  {hasText(item.submission?.finalProofNote) ? <p>Ghi chú: {item.submission?.finalProofNote}</p> : null}
-                  {hasText(item.publishFeedback) ? <p>Lý do từ chối: {item.publishFeedback}</p> : null}
-                </div>
-              </details>
-            ) : null}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={activeTab === "DETAILS" ? "rounded-full border border-zinc-900 bg-zinc-900 px-4 py-1.5 text-sm font-semibold text-white" : "rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"}
+              onClick={() => setActiveTab("DETAILS")}
+            >
+              Chi tiết nhiệm vụ
+            </button>
+            <button
+              type="button"
+              className={activeTab === "HISTORY" ? "rounded-full border border-zinc-900 bg-zinc-900 px-4 py-1.5 text-sm font-semibold text-white" : "rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"}
+              onClick={() => setActiveTab("HISTORY")}
+            >
+              Lịch sử các lần đã nộp
+            </button>
           </div>
 
-          <CampaignInfoCard item={item} />
-          <ProductInfoCard item={item} />
-          <CreatorInfoCard item={item} />
+          {activeTab === "DETAILS" ? (
+            <>
+              <CampaignInfoCard item={item} />
+              <ProductInfoCard item={item} />
+              <CreatorInfoCard item={item} />
+            </>
+          ) : (
+            <div className="space-y-3 rounded-xl border border-zinc-200 bg-white p-3">
+              <p className="text-sm font-semibold text-zinc-900">Lịch sử các lần đã nộp</p>
+
+              {(item.submission?.purchaseBillImageUrl || item.submission?.productReviewScreenshotUrl) ? (
+                <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
+                  <summary className="cursor-pointer font-semibold text-zinc-900">Bước mua sản phẩm</summary>
+                  <div className="mt-2 space-y-1">
+                    <p>Ảnh bill: <UrlValue value={item.submission?.purchaseBillImageUrl} label="Tải file ảnh" /></p>
+                    <p>Ảnh đánh giá: <UrlValue value={item.submission?.productReviewScreenshotUrl} label="Tải file ảnh" /></p>
+                  </div>
+                </details>
+              ) : null}
+
+              {(item.submission?.transcriptTextNote || item.submission?.transcriptResourceUrl) ? (
+                <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
+                  <summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp kịch bản</summary>
+                  <div className="mt-2 space-y-1">
+                    <p>Trạng thái: {mapStatusVi(item.submission?.status)}</p>
+                    <p>Hình thức gửi: {transcriptModeLabel(item.submission?.transcriptType, item.submission?.transcriptResourceUrl)}</p>
+                    {hasText(item.submission?.transcriptTextNote) ? <p className="whitespace-pre-line">Nội dung: {item.submission?.transcriptTextNote}</p> : null}
+                    {item.submission?.transcriptResourceUrl ? <p>{isTranscriptUploadPath(item.submission.transcriptResourceUrl) ? "File kịch bản: " : "Link kịch bản: "}<UrlValue value={item.submission.transcriptResourceUrl} label={transcriptLinkLabel(item.submission.transcriptResourceUrl)} /></p> : null}
+                    {hasText(item.submission?.rejectReason) ? <p>Lý do từ chối: {item.submission?.rejectReason}</p> : null}
+                  </div>
+                </details>
+              ) : null}
+
+              {item.submission?.videoUrl ? (
+                <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
+                  <summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp video</summary>
+                  <div className="mt-2 space-y-1">
+                    <p>Thời gian nộp: {fmtDate(item.videoSubmittedAt)}</p>
+                    <p>Video URL: <UrlValue value={item.submission.videoUrl} label="Mở liên kết video" /></p>
+                    {hasText(item.submission?.note) ? <p>Ghi chú: {item.submission.note}</p> : null}
+                    {hasText(item.videoReviewFeedback) ? <p>Lý do từ chối: {item.videoReviewFeedback}</p> : null}
+                  </div>
+                </details>
+              ) : null}
+
+              {(item.submission?.publicVideoUrl || item.submission?.socialPostUrl || item.submission?.screenshotUrl || item.submission?.adCode || item.submission?.finalProofNote) ? (
+                <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open>
+                  <summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp link social</summary>
+                  <div className="mt-2 space-y-1">
+                    <p>Thời gian nộp: {fmtDate(item.publishSubmittedAt)}</p>
+                    <p>Link public: <UrlValue value={item.submission?.publicVideoUrl ?? item.submission?.socialPostUrl} label="Mở liên kết public" /></p>
+                    <p>Ảnh chụp màn hình minh chứng: <UrlValue value={item.submission?.screenshotUrl} label="Tải file ảnh" /></p>
+                    <p>Mã quảng cáo: {item.submission?.adCode ?? "-"}</p>
+                    {hasText(item.submission?.finalProofNote) ? <p>Ghi chú: {item.submission?.finalProofNote}</p> : null}
+                    {hasText(item.publishFeedback) ? <p>Lý do từ chối: {item.publishFeedback}</p> : null}
+                  </div>
+                </details>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -445,7 +471,7 @@ export function BrandMissionHistoryPanel({ embedded = false, fixedCampaignId }: 
                   <div className="min-w-0">
                     <p className="font-semibold text-zinc-900">{item.mission.title}</p>
                     <p className="line-clamp-1 text-sm text-zinc-500">{item.campaign.title}</p>
-                    <p className="line-clamp-1 text-sm text-zinc-500">{item.account.displayName}</p>
+                    <p className="line-clamp-1 text-sm font-medium text-zinc-700">Creator: {item.account.displayName}</p>
                   </div>
                   <div>
                     <p className="font-semibold text-zinc-900">{fmtDateOnly(item.status === "COMPLETED" ? item.completedAt : item.updatedAt)}</p>
