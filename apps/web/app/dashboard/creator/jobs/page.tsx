@@ -299,7 +299,13 @@ export default function CreatorJobsPage() {
           )}
         </div>
       </section>
-      <CampaignList excludeSlugs={participatedSlugs} compact detailHrefBase="/dashboard/creator/jobs" />
+      <CampaignList
+        excludeSlugs={participatedSlugs}
+        compact
+        detailHrefBase="/dashboard/creator/jobs"
+        clickableCard
+        showDetailButton={false}
+      />
       {detailMissionId ? (
         <CreatorMissionsPanel
           overview={null}

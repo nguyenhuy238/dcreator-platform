@@ -26,11 +26,15 @@ const defaultFilters: CampaignFilterState = {
 export function CampaignList({
   excludeSlugs = [],
   compact = false,
-  detailHrefBase = "/campaigns"
+  detailHrefBase = "/campaigns",
+  clickableCard = false,
+  showDetailButton = true
 }: {
   excludeSlugs?: string[];
   compact?: boolean;
   detailHrefBase?: string;
+  clickableCard?: boolean;
+  showDetailButton?: boolean;
 }) {
   const [filters, setFilters] = useState<CampaignFilterState>(defaultFilters);
   const [page, setPage] = useState(1);
@@ -129,6 +133,8 @@ export function CampaignList({
                 compact={compact}
                 pageSource={compact ? "embedded_campaign_list" : "campaigns"}
                 detailHrefBase={detailHrefBase}
+                clickableCard={clickableCard}
+                showDetailButton={showDetailButton}
               />
             ))}
           </div>
