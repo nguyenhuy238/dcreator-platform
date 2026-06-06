@@ -28,13 +28,15 @@ export function CampaignList({
   compact = false,
   detailHrefBase = "/campaigns",
   clickableCard = false,
-  showDetailButton = true
+  showDetailButton = true,
+  gridClassName = "grid gap-3 md:grid-cols-2 xl:grid-cols-3"
 }: {
   excludeSlugs?: string[];
   compact?: boolean;
   detailHrefBase?: string;
   clickableCard?: boolean;
   showDetailButton?: boolean;
+  gridClassName?: string;
 }) {
   const [filters, setFilters] = useState<CampaignFilterState>(defaultFilters);
   const [page, setPage] = useState(1);
@@ -125,7 +127,7 @@ export function CampaignList({
 
       {!loading && !error && visibleItems.length > 0 ? (
         <>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className={gridClassName}>
             {visibleItems.map((campaign) => (
               <CampaignCard
                 key={campaign.slug}

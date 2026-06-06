@@ -305,6 +305,7 @@ export default function CreatorJobsPage() {
         detailHrefBase="/dashboard/creator/jobs"
         clickableCard
         showDetailButton={false}
+        gridClassName="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
       />
       {detailMissionId ? (
         <CreatorMissionsPanel

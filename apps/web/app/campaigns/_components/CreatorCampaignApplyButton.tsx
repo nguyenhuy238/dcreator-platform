@@ -39,9 +39,18 @@ type Props = {
   compact?: boolean;
   inline?: boolean;
   hideStatusMessage?: boolean;
+  labelOverride?: string;
+  fullWidth?: boolean;
 };
 
-export function CreatorCampaignApplyButton({ slug, compact = false, inline = false, hideStatusMessage = false }: Props) {
+export function CreatorCampaignApplyButton({
+  slug,
+  compact = false,
+  inline = false,
+  hideStatusMessage = false,
+  labelOverride,
+  fullWidth = true
+}: Props) {
   const [status, setStatus] = useState<StatusPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkingSession, setCheckingSession] = useState(false);
@@ -108,13 +117,20 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
   }, [slug, status]);
 
   const buttonLabel = useMemo(() => {
+    if (labelOverride) {
+      if (loading) return "Đang kiểm tra...";
+      if (checkingSession) return "Đang kiểm tra...";
+      if (submitting) return "Đang gửi...";
+      return labelOverride;
+    }
+
     if (loading) return "Đang kiểm tra...";
     if (!status) return "Nộp đơn đăng ký";
     if (checkingSession) return "Đang kiểm tra...";
     if (submitting) return "Đang gửi đơn...";
     if (missingAction) return "Đăng ký tham gia campaign";
     return status.label;
-  }, [loading, status, checkingSession, submitting, missingAction]);
+  }, [labelOverride, loading, status, checkingSession, submitting, missingAction]);
 
   const buttonDisabled = useMemo(() => {
     if (loading || checkingSession || submitting) return true;
@@ -197,7 +213,7 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
       }
 
       setStatus(payload.data.status);
-      setNotice({ type: "success", text: "Đăng kí thành công" });
+      setNotice({ type: "success", text: "Đăng ký thành công" });
       trackEvent(AnalyticsEvents.CAMPAIGN_REGISTER_SUCCESS, {
         campaign_id: slug,
         campaign_status: payload.data.status.lifecycleStatus ?? payload.data.status.state
@@ -220,7 +236,7 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
     <div className={`${inline ? "" : "grid gap-2"} ${compact ? "" : "mt-2"}`}>
       <button
         type="button"
-        className={`inline-flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-center font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:scale-100 ${inline ? "w-full min-w-0 px-3 py-2 text-sm leading-tight" : ""}`}
+        className={`inline-flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-center font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:scale-100 ${inline ? `${fullWidth ? "w-full" : "w-auto"} min-w-0 px-3 py-2 text-sm leading-tight` : ""}`}
         disabled={buttonDisabled}
         onClick={() => void applyCampaign()}
       >
@@ -246,7 +262,13 @@ export function CreatorCampaignApplyButton({ slug, compact = false, inline = fal
       {portalReady && actionNotice
         ? createPortal(
             <div className="fixed bottom-4 right-4 z-[9999] w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-xl">
-              <p className="font-semibold">Bạn cần cập nhật kênh mạng xã hội trước khi đăng ký campaign. Hãy vào <a href={actionNotice.href} className="font-semibold underline">Kênh Creator</a> để hoàn thiện hồ sơ.</p>
+              <p className="font-semibold">
+                Bạn cần cập nhật kênh mạng xã hội trước khi đăng ký campaign. Hãy vào{" "}
+                <a href={actionNotice.href} className="font-semibold underline">
+                  Kênh Creator
+                </a>{" "}
+                để hoàn thiện hồ sơ.
+              </p>
 
               <button type="button" className="mt-3 text-xs font-semibold underline" onClick={() => setActionNotice(null)}>
                 Đóng
