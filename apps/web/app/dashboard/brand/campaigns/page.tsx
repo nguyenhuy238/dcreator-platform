@@ -609,19 +609,27 @@ export default function BrandCampaignsPage() {
                     return (
                       <article
                         key={campaign.id}
-                        className="dc-card cursor-pointer overflow-hidden p-0"
+                        className="group dc-card cursor-pointer overflow-hidden p-0 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-1 hover:ring-zinc-300 focus-visible:-translate-y-1 focus-visible:shadow-xl focus-visible:ring-2 focus-visible:ring-zinc-400"
                         role="link"
                         tabIndex={0}
-                        onClick={() => router.push(`/campaigns/${campaign.slug}`)}
+                        onClick={() => router.push(`/dashboard/brand/campaigns/detail/${campaign.slug}`)}
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
                             event.preventDefault();
-                            router.push(`/campaigns/${campaign.slug}`);
+                            router.push(`/dashboard/brand/campaigns/detail/${campaign.slug}`);
                           }
                         }}
                       >
                         <div className="relative flex h-40 items-end overflow-hidden bg-zinc-100">
-                          <CampaignCoverImage src={campaign.coverImageUrl} alt={campaign.title} className="object-cover" sizes="(max-width: 1280px) 100vw, 50vw" />
+                          <CampaignCoverImage
+                            src={campaign.coverImageUrl}
+                            alt={campaign.title}
+                            className="object-cover transition duration-500 group-hover:scale-[1.03]"
+                            sizes="(max-width: 1280px) 100vw, 50vw"
+                          />
+                          <div className="pointer-events-none absolute right-3 top-3 rounded-full border border-white/70 bg-white/90 px-3 py-1 text-[11px] font-semibold text-zinc-900 opacity-0 shadow-sm transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:opacity-100">
+                            Xem chi tiết
+                          </div>
                           <div className="relative w-full bg-black/50 px-4 py-3 text-white">
                             <p className="text-lg font-bold">{campaign.title}</p>
                             <p className="text-xs">/{campaign.slug}</p>
@@ -837,7 +845,7 @@ export default function BrandCampaignsPage() {
                         {request.createdCampaign ? (
                           <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
                             <p>Đã tạo campaign: {request.createdCampaign.title}</p>
-                            <Link href={`/campaigns/${request.createdCampaign.slug}`} className="font-semibold underline">Xem campaign</Link>
+                            <Link href={`/dashboard/brand/campaigns/detail/${request.createdCampaign.slug}`} className="font-semibold underline">Xem campaign</Link>
                           </div>
                         ) : null}
                       </div>
