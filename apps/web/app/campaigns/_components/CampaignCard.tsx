@@ -29,11 +29,13 @@ export type CampaignCardData = {
 export function CampaignCard({
   campaign,
   compact = false,
-  pageSource = "campaigns"
+  pageSource = "campaigns",
+  detailHrefBase = "/campaigns"
 }: {
   campaign: CampaignCardData;
   compact?: boolean;
   pageSource?: string;
+  detailHrefBase?: string;
 }) {
   const videoTarget = campaign.videoTarget ?? 0;
   const videoApproved = campaign.videoApproved ?? 0;
@@ -48,6 +50,8 @@ export function CampaignCard({
       page_source: pageSource
     });
   }
+
+  const detailHref = `${detailHrefBase}/${campaign.slug}`;
 
   return (
     <article className={`dc-card flex flex-col overflow-hidden p-0 ${compact ? "" : "h-full"}`}>
@@ -76,7 +80,7 @@ export function CampaignCard({
               <CreatorCampaignApplyButton slug={campaign.slug} compact inline hideStatusMessage />
             </div>
             <Link
-              href={`/campaigns/${campaign.slug}`}
+              href={detailHref}
               className="inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
               aria-label={`Xem chi tiết ${campaign.title}`}
               onClick={trackCampaignClick}
@@ -113,7 +117,7 @@ export function CampaignCard({
               <CreatorCampaignApplyButton slug={campaign.slug} compact inline hideStatusMessage />
             </div>
             <Link
-              href={`/campaigns/${campaign.slug}`}
+              href={detailHref}
               className="inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
               aria-label={`Xem chi tiết ${campaign.title}`}
               onClick={trackCampaignClick}

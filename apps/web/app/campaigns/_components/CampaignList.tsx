@@ -23,7 +23,15 @@ const defaultFilters: CampaignFilterState = {
   sort: "trending"
 };
 
-export function CampaignList({ excludeSlugs = [], compact = false }: { excludeSlugs?: string[]; compact?: boolean }) {
+export function CampaignList({
+  excludeSlugs = [],
+  compact = false,
+  detailHrefBase = "/campaigns"
+}: {
+  excludeSlugs?: string[];
+  compact?: boolean;
+  detailHrefBase?: string;
+}) {
   const [filters, setFilters] = useState<CampaignFilterState>(defaultFilters);
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<CampaignCardData[]>([]);
@@ -115,7 +123,13 @@ export function CampaignList({ excludeSlugs = [], compact = false }: { excludeSl
         <>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {visibleItems.map((campaign) => (
-              <CampaignCard key={campaign.slug} campaign={campaign} compact={compact} pageSource={compact ? "embedded_campaign_list" : "campaigns"} />
+              <CampaignCard
+                key={campaign.slug}
+                campaign={campaign}
+                compact={compact}
+                pageSource={compact ? "embedded_campaign_list" : "campaigns"}
+                detailHrefBase={detailHrefBase}
+              />
             ))}
           </div>
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-3">

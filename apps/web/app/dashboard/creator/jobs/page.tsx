@@ -231,7 +231,7 @@ export default function CreatorJobsPage() {
               <article
                 key={`${activeStatus}-${campaign.slug}`}
                 className="min-w-[230px] max-w-[230px] cursor-pointer overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm sm:min-w-[260px] sm:max-w-[260px]"
-                onClick={() => router.push(`/campaigns/${campaign.slug}`)}
+                onClick={() => router.push(`/dashboard/creator/jobs/${campaign.slug}`)}
               >
                 <div className="relative aspect-[16/9] w-full overflow-hidden bg-zinc-100">
                   <CampaignCoverImage
@@ -296,7 +296,7 @@ export default function CreatorJobsPage() {
           )}
         </div>
       </section>
-      <CampaignList excludeSlugs={participatedSlugs} compact />
+      <CampaignList excludeSlugs={participatedSlugs} compact detailHrefBase="/dashboard/creator/jobs" />
       {detailMissionId ? (
         <CreatorMissionsPanel
           overview={null}
