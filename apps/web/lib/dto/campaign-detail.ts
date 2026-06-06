@@ -15,6 +15,12 @@ export type CampaignDetailDTO = {
     participationRoadmap: string[];
     status: "DRAFT" | "ACTIVE" | "PAUSED" | "COMPLETED" | "CANCELLED" | "ARCHIVED";
     deadline: string | null;
+    product: {
+      name: string | null;
+      description: string | null;
+      imageUrl: string | null;
+      link: string | null;
+    };
   };
   funding: {
     targetAmountVnd: number;

@@ -74,7 +74,13 @@ export async function getCampaignDetailBySlug(slug: string, viewerId?: string): 
       benefits: campaign.benefits ?? campaign.objective,
       participationRoadmap: normalizeRoadmap(campaign.participationRoadmap, campaign.priorityChannels),
       status: campaign.status,
-      deadline: campaign.endsAt?.toISOString() ?? null
+      deadline: campaign.endsAt?.toISOString() ?? null,
+      product: {
+        name: campaign.productName ?? null,
+        description: campaign.productDescription ?? null,
+        imageUrl: campaign.productImageUrl ?? null,
+        link: campaign.productLink ?? null
+      }
     },
     funding: {
       targetAmountVnd: campaign.targetAmountVnd,
