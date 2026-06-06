@@ -15,7 +15,7 @@ export default async function CreatorCampaignDetailPage({ params }: Props) {
   const resolvedSlug = legacySlugMap[slug] ?? slug;
 
   return (
-    <main className="mx-auto w-full max-w-[1480px] pb-16 pt-2">
+    <main className="mx-auto w-full max-w-7xl pb-16 pt-2">
       <CampaignDetailContainer slug={resolvedSlug} />
     </main>
   );
