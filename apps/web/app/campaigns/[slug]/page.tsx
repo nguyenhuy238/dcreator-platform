@@ -18,7 +18,7 @@ export default async function CampaignDetailPage({ params }: Props) {
   return (
     <>
       <PublicHeader />
-      <main className="mx-auto w-full max-w-[1480px] px-4 pb-16 pt-6 md:px-6">
+      <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-6 md:px-6">
         <CampaignDetailContainer slug={resolvedSlug} />
       </main>
     </>

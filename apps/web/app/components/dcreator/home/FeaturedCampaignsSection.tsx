@@ -146,7 +146,9 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
                 <p className="mt-1 text-xs text-zinc-500">Tiến độ video: {campaign.videoProgressPercent ?? 0}%</p>
 
                 <div className="mt-4 flex items-center gap-2">
-                  <div className="min-w-0 flex-1">
+                  <div
+                    className="min-w-0 flex-1"
+                  >
                     <CreatorCampaignApplyButton slug={campaign.slug} compact inline hideStatusMessage />
                   </div>
                   <Link

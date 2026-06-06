@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 import { trackEvent } from "@/lib/analytics";
 import { AnalyticsEvents } from "@/lib/analytics-events";
@@ -29,16 +32,24 @@ export type CampaignCardData = {
 export function CampaignCard({
   campaign,
   compact = false,
-  pageSource = "campaigns"
+  pageSource = "campaigns",
+  detailHrefBase = "/campaigns",
+  clickableCard = false,
+  showDetailButton = true
 }: {
   campaign: CampaignCardData;
   compact?: boolean;
   pageSource?: string;
+  detailHrefBase?: string;
+  clickableCard?: boolean;
+  showDetailButton?: boolean;
 }) {
+  const router = useRouter();
   const videoTarget = campaign.videoTarget ?? 0;
   const videoApproved = campaign.videoApproved ?? 0;
   const creatorJoined = campaign.creatorJoined ?? 0;
   const videoProgressPercent = campaign.videoProgressPercent ?? 0;
+  const detailHref = `${detailHrefBase}/${campaign.slug}`;
 
   function trackCampaignClick() {
     trackEvent(AnalyticsEvents.CAMPAIGN_CARD_CLICK, {
@@ -49,19 +60,48 @@ export function CampaignCard({
     });
   }
 
+  function openDetail() {
+    trackCampaignClick();
+    router.push(detailHref);
+  }
+
   return (
-    <article className={`dc-card flex flex-col overflow-hidden p-0 ${compact ? "" : "h-full"}`}>
+    <article
+      className={
+        clickableCard
+          ? "group dc-card flex h-full cursor-pointer flex-col overflow-hidden p-0 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-1 hover:ring-zinc-300 focus-visible:-translate-y-1 focus-visible:shadow-xl focus-visible:ring-2 focus-visible:ring-zinc-400"
+          : `dc-card flex flex-col overflow-hidden p-0 ${compact ? "" : "h-full"}`
+      }
+      role={clickableCard ? "link" : undefined}
+      tabIndex={clickableCard ? 0 : undefined}
+      onClick={clickableCard ? openDetail : undefined}
+      onKeyDown={
+        clickableCard
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                openDetail();
+              }
+            }
+          : undefined
+      }
+    >
       <div className="relative aspect-[16/9] w-full overflow-hidden bg-zinc-100">
         <CampaignCoverImage
           src={campaign.coverImageUrl}
           alt={campaign.title}
-          className="object-cover transition duration-500 hover:scale-[1.03]"
+          className={`object-cover transition duration-500 ${clickableCard ? "group-hover:scale-[1.03]" : "hover:scale-[1.03]"}`}
           sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/55 via-zinc-950/10 to-transparent" />
         <div className="absolute left-3 top-3 rounded-full border border-white/25 bg-zinc-900/65 px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-white">
           Video seeding
         </div>
+        {clickableCard ? (
+          <div className="pointer-events-none absolute right-3 top-3 rounded-full border border-white/70 bg-white/90 px-3 py-1 text-[11px] font-semibold text-zinc-900 opacity-0 shadow-sm transition-all duration-300 group-hover:opacity-100 group-focus-visible:opacity-100">
+            Xem chi tiết
+          </div>
+        ) : null}
       </div>
 
       {compact ? (
@@ -72,18 +112,31 @@ export function CampaignCard({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 md:flex-nowrap">
-            <div className="min-w-0 flex-1">
-              <CreatorCampaignApplyButton slug={campaign.slug} compact inline hideStatusMessage />
-            </div>
-            <Link
-              href={`/campaigns/${campaign.slug}`}
-              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
-              aria-label={`Xem chi tiết ${campaign.title}`}
-              onClick={trackCampaignClick}
+            <div
+              className={`min-w-0 ${showDetailButton ? "flex-1" : "ml-auto w-auto"}`}
+              onClick={clickableCard ? (event) => event.stopPropagation() : undefined}
+              onKeyDown={clickableCard ? (event) => event.stopPropagation() : undefined}
             >
-              Xem chi tiết
-              <span className="text-base font-bold">→</span>
-            </Link>
+              <CreatorCampaignApplyButton
+                slug={campaign.slug}
+                compact
+                inline
+                hideStatusMessage
+                labelOverride={showDetailButton ? undefined : "Nộp đơn đăng kí"}
+                fullWidth={showDetailButton}
+              />
+            </div>
+            {showDetailButton ? (
+              <Link
+                href={detailHref}
+                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
+                aria-label={`Xem chi tiết ${campaign.title}`}
+                onClick={trackCampaignClick}
+              >
+                Xem chi tiết
+                <span className="text-base font-bold">→</span>
+              </Link>
+            ) : null}
           </div>
         </div>
       ) : (
@@ -109,18 +162,31 @@ export function CampaignCard({
           <p className="mt-1 text-xs text-zinc-500">Tiến độ video: {videoProgressPercent}%</p>
 
           <div className="mt-4 flex items-center gap-2">
-            <div className="min-w-0 flex-1">
-              <CreatorCampaignApplyButton slug={campaign.slug} compact inline hideStatusMessage />
-            </div>
-            <Link
-              href={`/campaigns/${campaign.slug}`}
-              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
-              aria-label={`Xem chi tiết ${campaign.title}`}
-              onClick={trackCampaignClick}
+            <div
+              className={`min-w-0 ${showDetailButton ? "flex-1" : "ml-auto w-auto"}`}
+              onClick={clickableCard ? (event) => event.stopPropagation() : undefined}
+              onKeyDown={clickableCard ? (event) => event.stopPropagation() : undefined}
             >
-              Xem chi tiết
-              <span className="text-base font-bold">→</span>
-            </Link>
+              <CreatorCampaignApplyButton
+                slug={campaign.slug}
+                compact
+                inline
+                hideStatusMessage
+                labelOverride={showDetailButton ? undefined : "Nộp đơn đăng kí"}
+                fullWidth={showDetailButton}
+              />
+            </div>
+            {showDetailButton ? (
+              <Link
+                href={detailHref}
+                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
+                aria-label={`Xem chi tiết ${campaign.title}`}
+                onClick={trackCampaignClick}
+              >
+                Xem chi tiết
+                <span className="text-base font-bold">→</span>
+              </Link>
+            ) : null}
           </div>
         </div>
       )}

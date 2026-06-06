@@ -16,8 +16,8 @@ function formatRemainingTime(endsAt: Date | null) {
   if (diff <= 0) return "Da ket thuc";
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const days = Math.floor(hours / 24);
-  if (days > 0) return `${days} ngay con lai`;
-  return `${Math.max(1, hours)} gio con lai`;
+  if (days > 0) return `${days} ngày còn lại`;
+  return `${Math.max(1, hours)} giờ còn lại`;
 }
 
 function isVideoUrl(url: string | null) {
@@ -74,7 +74,13 @@ export async function getCampaignDetailBySlug(slug: string, viewerId?: string): 
       benefits: campaign.benefits ?? campaign.objective,
       participationRoadmap: normalizeRoadmap(campaign.participationRoadmap, campaign.priorityChannels),
       status: campaign.status,
-      deadline: campaign.endsAt?.toISOString() ?? null
+      deadline: campaign.endsAt?.toISOString() ?? null,
+      product: {
+        name: campaign.productName ?? null,
+        description: campaign.productDescription ?? null,
+        imageUrl: campaign.productImageUrl ?? null,
+        link: campaign.productLink ?? null
+      }
     },
     funding: {
       targetAmountVnd: campaign.targetAmountVnd,

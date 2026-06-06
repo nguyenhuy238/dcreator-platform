@@ -230,16 +230,19 @@ export default function CreatorJobsPage() {
             historyItems.map((campaign) => (
               <article
                 key={`${activeStatus}-${campaign.slug}`}
-                className="min-w-[230px] max-w-[230px] cursor-pointer overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm sm:min-w-[260px] sm:max-w-[260px]"
-                onClick={() => router.push(`/campaigns/${campaign.slug}`)}
+                className="group min-w-[230px] max-w-[230px] cursor-pointer overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-1 hover:ring-zinc-300 sm:min-w-[260px] sm:max-w-[260px]"
+                onClick={() => router.push(`/dashboard/creator/jobs/${campaign.slug}`)}
               >
                 <div className="relative aspect-[16/9] w-full overflow-hidden bg-zinc-100">
                   <CampaignCoverImage
                     src={campaign.coverImageUrl}
                     alt={campaign.title}
-                    className="object-cover"
+                    className="object-cover transition duration-500 group-hover:scale-[1.03]"
                     sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
                   />
+                  <div className="pointer-events-none absolute right-3 top-3 rounded-full border border-white/70 bg-white/90 px-3 py-1 text-[11px] font-semibold text-zinc-900 opacity-0 shadow-sm transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+                    Xem campaign
+                  </div>
                 </div>
                 <div className="flex min-h-[136px] flex-col gap-2 p-3">
                   <div className="flex items-start justify-between gap-3">
@@ -296,7 +299,14 @@ export default function CreatorJobsPage() {
           )}
         </div>
       </section>
-      <CampaignList excludeSlugs={participatedSlugs} compact />
+      <CampaignList
+        excludeSlugs={participatedSlugs}
+        compact
+        detailHrefBase="/dashboard/creator/jobs"
+        clickableCard
+        showDetailButton={false}
+        gridClassName="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+      />
       {detailMissionId ? (
         <CreatorMissionsPanel
           overview={null}

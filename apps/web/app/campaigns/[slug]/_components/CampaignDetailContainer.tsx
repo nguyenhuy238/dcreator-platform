@@ -106,7 +106,7 @@ export function CampaignDetailContainer({ slug }: Props) {
 
   return (
     <main className="py-6">
-      <div className="mx-auto grid w-full max-w-[1440px] gap-5">
+      <div className="mx-auto grid w-full max-w-7xl gap-5">
         <div>
           <button
             type="button"

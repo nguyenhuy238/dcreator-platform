@@ -1,32 +1,23 @@
 ﻿"use client";
 
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
-import { CreatorWorkspaceGate } from "@/app/dashboard/creator/_components/CreatorWorkspaceGate";
 import { PageHeader } from "@/app/components/dcreator/ui/base";
 import { CampaignList } from "./_components/CampaignList";
 
 export default function CampaignsPage() {
-  const content = (
-    <div className="space-y-6">
-      <PageHeader
-        title="Chiến dịch dành cho bạn"
-        subtitle="Tìm chiến dịch phù hợp để ủng hộ hoặc tham gia nhiệm vụ."
-      />
-      <CampaignList />
-    </div>
-  );
-
   return (
-    <CreatorWorkspaceGate
-      fallback={
-        <>
-          <PublicHeader />
-          <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-6 md:px-6">{content}</main>
-          <PublicFooter />
-        </>
-      }
-    >
-      {content}
-    </CreatorWorkspaceGate>
+    <>
+      <PublicHeader />
+      <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-6 md:px-6">
+        <div className="space-y-6">
+          <PageHeader
+            title="Chiến dịch dành cho bạn"
+            subtitle="Tìm chiến dịch phù hợp để ủng hộ hoặc tham gia nhiệm vụ."
+          />
+          <CampaignList clickableCard showDetailButton={false} />
+        </div>
+      </main>
+      <PublicFooter />
+    </>
   );
 }
