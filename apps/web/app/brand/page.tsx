@@ -3,6 +3,7 @@ import Image from "next/image";
 import { CampaignStatus } from "@prisma/client";
 import { AnalyticsLink } from "@/app/components/analytics/AnalyticsLink";
 import { TrackPageEvent } from "@/app/components/analytics/TrackPageEvent";
+import { BrandConsultationModal } from "@/app/brand/_components/BrandConsultationModal";
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { AnalyticsEvents } from "@/lib/analytics-events";
 import { getCurrentUserFromServer } from "@/lib/auth/current-user";
@@ -105,10 +106,8 @@ export default async function BrandHomePage() {
     })
   ]);
 
-  const roles = currentUser?.roles ?? [];
-  const hasBrandRole = roles.includes("BRAND_OWNER") || roles.includes("BRAND_STAFF");
-  const primaryCtaHref = hasBrandRole ? "/dashboard/brand/campaigns" : "/brand/register";
-  const primaryCtaLabel = hasBrandRole ? "Vào Brand Dashboard" : "Đăng ký Brand";
+  const primaryCtaHref = currentUser ? "/campaigns" : "/auth/register";
+  const primaryCtaLabel = currentUser ? "Xem campaign" : "Đăng ký Brand";
   const activeCampaignCount = campaignData.pagination.total ?? 0;
   const stats = creatorStats.map(([value, label]) => [label === "Campaign active" ? String(activeCampaignCount) : value, label]);
   const communityCreators = systemCreators.map((creator) => {
@@ -361,21 +360,14 @@ export default async function BrandHomePage() {
               </p>
               <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
                 <AnalyticsLink
-                  href="/auth/register"
+                  href={primaryCtaHref}
                   eventName={AnalyticsEvents.BRAND_UPGRADE_CLICK}
                   eventParams={{ role: "brand", page_source: "brand_landing_bottom" }}
                   className="rounded-md bg-white px-8 py-3 text-sm font-black !text-black transition-colors duration-200 hover:bg-zinc-200"
                 >
                   Bắt đầu ngay hôm nay
                 </AnalyticsLink>
-                <AnalyticsLink
-                  href="/brand/register"
-                  eventName={AnalyticsEvents.BRAND_UPGRADE_CLICK}
-                  eventParams={{ role: "brand", page_source: "brand_landing_consultation" }}
-                  className="rounded-md border border-white/15 bg-black/20 px-8 py-3 text-sm font-black text-white transition-colors duration-200 hover:bg-white/10"
-                >
-                  Đặt lịch tư vấn 1:1
-                </AnalyticsLink>
+                <BrandConsultationModal source="brand_landing_consultation" />
               </div>
             </div>
           </div>

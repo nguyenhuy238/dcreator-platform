@@ -234,13 +234,10 @@ export default async function CreatorLandingPage() {
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-950 text-white shadow-sm">
                 <MonoIcon kind="chart" />
               </div>
-              <h3 className="mt-7 text-xl font-black text-zinc-950">Tracking Đơn Hàng & Hoa Hồng Minh Bạch</h3>
+              <h3 className="mt-7 text-xl font-black text-zinc-950">Nhận tiền affiliate lên tới 12%</h3>
               <p className="mt-3 text-sm leading-6 text-zinc-600">
                 Xem được hiệu quả từng video: click, đơn hàng, hoa hồng… ngay trong hệ thống dCreator, biết rõ nội dung nào chốt đơn tốt nhất.
               </p>
-              <Link href="/dashboard/creator/wallet" className="mt-5 inline-flex text-sm font-black text-zinc-950 underline decoration-zinc-300 decoration-2 underline-offset-4 transition-colors hover:decoration-zinc-950">
-                Tìm hiểu cách tính hoa hồng →
-              </Link>
             </article>
 
             <article className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:bg-zinc-50 hover:shadow-md lg:col-span-3">
