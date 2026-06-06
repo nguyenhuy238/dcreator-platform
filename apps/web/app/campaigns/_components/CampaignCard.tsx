@@ -122,7 +122,7 @@ export function CampaignCard({
                 compact
                 inline
                 hideStatusMessage
-                labelOverride={showDetailButton ? undefined : "Tham gia ngay"}
+                labelOverride={showDetailButton ? undefined : "Nộp đơn đăng kí"}
                 fullWidth={showDetailButton}
               />
             </div>
@@ -163,11 +163,18 @@ export function CampaignCard({
 
           <div className="mt-4 flex items-center gap-2">
             <div
-              className="min-w-0 flex-1"
+              className={`min-w-0 ${showDetailButton ? "flex-1" : "ml-auto w-auto"}`}
               onClick={clickableCard ? (event) => event.stopPropagation() : undefined}
               onKeyDown={clickableCard ? (event) => event.stopPropagation() : undefined}
             >
-              <CreatorCampaignApplyButton slug={campaign.slug} compact inline hideStatusMessage />
+              <CreatorCampaignApplyButton
+                slug={campaign.slug}
+                compact
+                inline
+                hideStatusMessage
+                labelOverride={showDetailButton ? undefined : "Nộp đơn đăng kí"}
+                fullWidth={showDetailButton}
+              />
             </div>
             {showDetailButton ? (
               <Link

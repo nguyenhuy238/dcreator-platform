@@ -14,7 +14,7 @@ export default function CampaignsPage() {
             title="Chiến dịch dành cho bạn"
             subtitle="Tìm chiến dịch phù hợp để ủng hộ hoặc tham gia nhiệm vụ."
           />
-          <CampaignList />
+          <CampaignList clickableCard showDetailButton={false} />
         </div>
       </main>
       <PublicFooter />

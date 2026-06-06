@@ -121,6 +121,8 @@ export function CreatorCampaignApplyButton({
       if (loading) return "Đang kiểm tra...";
       if (checkingSession) return "Đang kiểm tra...";
       if (submitting) return "Đang gửi...";
+      if (status?.state === "PENDING_REVIEW") return "Đã nộp - Chờ duyệt";
+      if (status?.state === "ASSIGNED") return "Đã tham gia";
       return labelOverride;
     }
 
