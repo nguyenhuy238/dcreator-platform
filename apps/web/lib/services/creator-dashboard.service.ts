@@ -6,7 +6,7 @@ import { createNotification, createNotificationForAdminOps } from "@/lib/service
 import { createCreatorPayoutRequest, ensureWalletByAccountId } from "@/lib/services/wallet.service";
 import { getCreatorKpis } from "@/lib/services/analytics.service";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
-import type { CreatorChannelsUpdateInput, CreatorProfileUpdateInput } from "@/lib/validators/creator-dashboard";
+import type { CreatorBankAccountInput, CreatorChannelsUpdateInput, CreatorProfileUpdateInput } from "@/lib/validators/creator-dashboard";
 
 function toJobStatus(status: MissionLifecycleStatus) {
   if (status === "ACCEPTED") return "accepted";
@@ -522,13 +522,40 @@ export async function getCreatorPortfolio(accountId: string) {
 
 export async function getCreatorPayoutData(accountId: string) {
   const wallet = await ensureWalletByAccountId(accountId);
-  const history = await prisma.payoutRequest.findMany({ where: { accountId }, orderBy: { createdAt: "desc" } });
-  return { availableBalanceVnd: wallet.cashBalanceVnd, history };
+  const [account, history, bankAccounts] = await Promise.all([
+    prisma.account.findUniqueOrThrow({
+      where: { id: accountId },
+      select: {
+        id: true,
+        displayName: true,
+        email: true,
+        creatorProfile: {
+          select: {
+            mainPlatform: true,
+            socialUrl: true,
+            followerCount: true
+          }
+        }
+      }
+    }),
+    prisma.payoutRequest.findMany({ where: { accountId }, orderBy: { createdAt: "desc" } }),
+    prisma.creatorBankAccount.findMany({ where: { accountId }, orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }] })
+  ]);
+
+  return {
+    creator: account,
+    availableBalanceVnd: wallet.pointsBalance,
+    pendingPayoutVnd: wallet.pendingPayoutVnd,
+    withdrawnPayoutVnd: wallet.withdrawnPayoutVnd,
+    history,
+    bankAccounts
+  };
 }
 
 export async function createCreatorPayoutWithKyc(
   accountId: string,
   amountVnd: number,
+  creatorBankAccountId: string,
   note: string | undefined,
   idempotencyKey: string
 ) {
@@ -541,7 +568,139 @@ export async function createCreatorPayoutWithKyc(
     throw new AppError("KYC or identity verification is required before payout", 403, "KYC_REQUIRED");
   }
 
-  return createCreatorPayoutRequest(accountId, amountVnd, note, idempotencyKey);
+  return createCreatorPayoutRequest(accountId, amountVnd, creatorBankAccountId, note, idempotencyKey);
+}
+
+export async function listCreatorBankAccounts(accountId: string) {
+  return prisma.creatorBankAccount.findMany({
+    where: { accountId },
+    orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }]
+  });
+}
+
+export async function createCreatorBankAccount(accountId: string, input: CreatorBankAccountInput) {
+  const normalizedBankCode = input.bankCode.trim();
+  const normalizedAccountNumber = input.accountNumber.replace(/\s+/g, "");
+  const duplicate = await prisma.creatorBankAccount.findFirst({
+    where: {
+      accountId,
+      bankCode: normalizedBankCode,
+      accountNumber: normalizedAccountNumber
+    },
+    select: { id: true }
+  });
+  if (duplicate) {
+    throw new AppError("Số tài khoản này đã tồn tại", 409, "BANK_ACCOUNT_EXISTS");
+  }
+
+  const existingCount = await prisma.creatorBankAccount.count({ where: { accountId } });
+
+  await prisma.creatorBankAccount.create({
+    data: {
+      accountId,
+      bankName: input.bankName.trim(),
+      bankCode: normalizedBankCode,
+      bankBin: input.bankBin.trim(),
+      accountNumber: normalizedAccountNumber,
+      accountHolderName: input.accountHolderName.trim(),
+      isDefault: existingCount === 0
+    }
+  });
+
+  return listCreatorBankAccounts(accountId);
+}
+
+export async function updateCreatorBankAccount(accountId: string, bankAccountId: string, input: CreatorBankAccountInput) {
+  const bankAccount = await prisma.creatorBankAccount.findUnique({ where: { id: bankAccountId } });
+  if (!bankAccount || bankAccount.accountId !== accountId) {
+    throw new AppError("Không tìm thấy tài khoản ngân hàng", 404, "BANK_ACCOUNT_NOT_FOUND");
+  }
+
+  const normalizedBankCode = input.bankCode.trim();
+  const normalizedAccountNumber = input.accountNumber.replace(/\s+/g, "");
+  const duplicate = await prisma.creatorBankAccount.findFirst({
+    where: {
+      accountId,
+      bankCode: normalizedBankCode,
+      accountNumber: normalizedAccountNumber,
+      id: { not: bankAccountId }
+    },
+    select: { id: true }
+  });
+  if (duplicate) {
+    throw new AppError("Số tài khoản này đã tồn tại", 409, "BANK_ACCOUNT_EXISTS");
+  }
+
+  await prisma.creatorBankAccount.update({
+    where: { id: bankAccountId },
+    data: {
+      bankName: input.bankName.trim(),
+      bankCode: normalizedBankCode,
+      bankBin: input.bankBin.trim(),
+      accountNumber: normalizedAccountNumber,
+      accountHolderName: input.accountHolderName.trim()
+    }
+  });
+
+  return listCreatorBankAccounts(accountId);
+}
+
+export async function deleteCreatorBankAccount(accountId: string, bankAccountId: string) {
+  const bankAccount = await prisma.creatorBankAccount.findUnique({ where: { id: bankAccountId } });
+  if (!bankAccount || bankAccount.accountId !== accountId) {
+    throw new AppError("Không tìm thấy tài khoản ngân hàng", 404, "BANK_ACCOUNT_NOT_FOUND");
+  }
+
+  const pendingPayout = await prisma.payoutRequest.findFirst({
+    where: {
+      accountId,
+      creatorBankAccountId: bankAccountId,
+      status: { in: ["PENDING", "APPROVED"] }
+    },
+    select: { id: true }
+  });
+  if (pendingPayout) {
+    throw new AppError("Tài khoản ngân hàng này đang có yêu cầu rút tiền chờ xử lý", 409, "BANK_ACCOUNT_IN_USE");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.creatorBankAccount.delete({ where: { id: bankAccountId } });
+
+    if (bankAccount.isDefault) {
+      const nextDefault = await tx.creatorBankAccount.findFirst({
+        where: { accountId },
+        orderBy: { createdAt: "desc" }
+      });
+      if (nextDefault) {
+        await tx.creatorBankAccount.update({
+          where: { id: nextDefault.id },
+          data: { isDefault: true }
+        });
+      }
+    }
+  });
+
+  return listCreatorBankAccounts(accountId);
+}
+
+export async function setDefaultCreatorBankAccount(accountId: string, bankAccountId: string) {
+  const bankAccount = await prisma.creatorBankAccount.findUnique({ where: { id: bankAccountId } });
+  if (!bankAccount || bankAccount.accountId !== accountId) {
+    throw new AppError("Không tìm thấy tài khoản ngân hàng", 404, "BANK_ACCOUNT_NOT_FOUND");
+  }
+
+  await prisma.$transaction([
+    prisma.creatorBankAccount.updateMany({
+      where: { accountId, isDefault: true },
+      data: { isDefault: false }
+    }),
+    prisma.creatorBankAccount.update({
+      where: { id: bankAccountId },
+      data: { isDefault: true }
+    })
+  ]);
+
+  return listCreatorBankAccounts(accountId);
 }
 
 export async function getCreatorAnalyticsKpis(accountId: string) {

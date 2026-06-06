@@ -122,9 +122,9 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
               </div>
 
               <div className="p-5">
-                <h3 className="line-clamp-2 text-2xl font-black leading-tight text-zinc-900">{campaign.title}</h3>
+                <h3 className="line-clamp-2 min-h-[4rem] text-2xl font-black leading-tight text-zinc-900">{campaign.title}</h3>
 
-                <p className="mt-3 text-sm font-semibold text-zinc-600">Brand: {campaign.brand}</p>
+                <p className="mt-3 truncate text-sm font-semibold text-zinc-600">Brand: {campaign.brand}</p>
                 <p className="mt-1 text-xs font-semibold text-zinc-600">
                   Video hoàn thành: {campaign.videoApproved ?? 0}/{campaign.videoTarget ?? 0}
                 </p>

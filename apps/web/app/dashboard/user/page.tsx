@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { AppShell } from "@/app/components/dcreator/layout/shell";
 import {
   EmptyState,
   ErrorState,
@@ -13,9 +12,6 @@ import {
   StatsCard
 } from "@/app/components/dcreator/ui/base";
 import { MissionCard, VoucherCard } from "@/app/components/dcreator/cards/campaign";
-import { getNavItemsForWorkspace } from "@/lib/navigation";
-
-const nav = getNavItemsForWorkspace("user", ["USER", "CREATOR", "BRAND_OWNER", "BRAND_STAFF", "ADMIN", "OPS"]);
 
 type ApiSuccess<T> = { success: true; data: T };
 type ApiFailure = { success: false; error: string };
@@ -119,7 +115,6 @@ export default function UserDashboardPage() {
 
   return (
     <>
-      <AppShell sidebarItems={nav}>
         <PageHeader
           title="Dashboard Người dùng"
           subtitle="Theo dõi ủng hộ, voucher, mission và số dư N-Points."
@@ -211,7 +206,6 @@ export default function UserDashboardPage() {
             </div>
           )}
         </section>
-      </AppShell>
     </>
   );
 }

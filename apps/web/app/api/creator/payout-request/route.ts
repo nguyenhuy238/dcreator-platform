@@ -4,15 +4,16 @@ import { requireRole } from "@/lib/auth/guards";
 import { DASHBOARD_ACCESS } from "@/lib/auth/role-constants";
 import { toErrorResponse } from "@/lib/errors";
 import { createCreatorPayoutRequest } from "@/lib/services/wallet.service";
-import { payoutRequestSchema } from "@/lib/validators";
+import { creatorPayoutRequestSchema } from "@/lib/validators/creator-dashboard";
 
 export async function POST(request: NextRequest) {
   try {
     const account = await requireRole(request, DASHBOARD_ACCESS.creator);
-    const payload = payoutRequestSchema.parse(await request.json());
+    const payload = creatorPayoutRequestSchema.parse(await request.json());
     const data = await createCreatorPayoutRequest(
       account.id,
       payload.amountVnd,
+      payload.creatorBankAccountId,
       payload.note,
       payload.idempotencyKey
     );

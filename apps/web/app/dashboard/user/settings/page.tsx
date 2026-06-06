@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AppShell } from "@/app/components/dcreator/layout/shell";
 import { ActionToast, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
 import { EmbeddedRoleUpgradePanels } from "../_components/EmbeddedRoleUpgradePanels";
 import { UserAccountInfoCard, type UserAccountInfo, type UserSettingsFeedback } from "../_components/user-account-info-card";
@@ -97,7 +96,6 @@ export default function UserSettingsPage() {
 
   return (
     <>
-      <AppShell>
         <PageHeader title="Cài đặt tài khoản" subtitle="Thông tin cá nhân, bảo mật, thông báo và phiên đăng nhập." />
         {loading ? <div className="h-48 animate-pulse rounded-3xl bg-zinc-100" /> : null}
         {!loading ? (
@@ -141,7 +139,6 @@ export default function UserSettingsPage() {
             </section>
           </>
         ) : null}
-      </AppShell>
       {toast ? <ActionToast tone={toast.tone} title={toast.title} description={toast.description} onClose={() => setToast(null)} /> : null}
     </>
   );

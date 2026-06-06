@@ -241,17 +241,17 @@ export default function CreatorJobsPage() {
                     sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
                   />
                 </div>
-                <div className="grid min-h-[136px] grid-rows-[auto_1fr] gap-3 p-3">
+                <div className="flex min-h-[136px] flex-col gap-2 p-3">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <div className="min-w-0 space-y-1">
                       <p className="line-clamp-2 min-h-10 text-sm font-bold leading-5 text-zinc-900">{campaign.title}</p>
-                      <p className="mt-1 line-clamp-2 min-h-10 text-sm leading-5 text-zinc-500">Brand: {campaign.brand}</p>
+                      <p className="truncate text-sm leading-5 text-zinc-500">Brand: {campaign.brand}</p>
                     </div>
                     <span className={`max-w-[92px] shrink-0 rounded-xl border px-2 py-1 text-center text-[11px] font-bold leading-tight ${missionStatusPillClass(campaign.missionStatus)}`}>
                       {campaign.missionStatus}
                     </span>
                   </div>
-                  <div className="flex items-end justify-end">
+                  <div className="flex justify-end pt-1">
                     <div className="flex flex-wrap justify-end gap-2">
                       {campaign.canReapply ? (
                         <button
