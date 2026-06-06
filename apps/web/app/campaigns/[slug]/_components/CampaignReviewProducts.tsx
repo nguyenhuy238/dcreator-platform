@@ -81,7 +81,7 @@ export function CampaignReviewProducts({ data }: { data: CampaignDetailDTO }) {
   }
 
   return (
-    <section className="dc-card flex h-full flex-col p-5 md:p-6">
+    <section className="dc-card w-full max-w-[440px] justify-self-end p-5 md:p-6">
       <h3 className="text-2xl font-black text-zinc-900">Sản Phẩm Review</h3>
       {notice ? (
         <p
@@ -99,45 +99,45 @@ export function CampaignReviewProducts({ data }: { data: CampaignDetailDTO }) {
           Campaign này chưa có sản phẩm review.
         </div>
       ) : (
-        <div className="mt-4 flex-1 space-y-4">
+        <div className="mt-4 space-y-4">
           {hasProduct ? (
             product.link ? (
               <a
                 href={product.link}
                 target="_blank"
                 rel="noreferrer"
-                className="group flex h-full flex-col overflow-hidden rounded-[24px] border border-zinc-100 bg-zinc-50/70 transition-all duration-300 hover:-translate-y-1 hover:border-zinc-200 hover:shadow-lg hover:shadow-zinc-200/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/20"
+                className="group block overflow-hidden rounded-[24px] border border-zinc-100 bg-zinc-50/70 transition-all duration-300 hover:-translate-y-1 hover:border-zinc-200 hover:shadow-lg hover:shadow-zinc-200/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/20"
               >
-                {product.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={product.imageUrl}
-                    alt={product.name ?? data.hero.title}
-                    className="h-40 w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                  />
-                ) : (
-                  <div className="h-40 bg-gradient-to-br from-emerald-50 to-teal-100" />
-                )}
-                <div className="flex flex-1 flex-col p-5">
+                <div className="h-64 w-full overflow-hidden bg-gradient-to-br from-emerald-50 to-teal-100">
+                  {product.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name ?? data.hero.title}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                    />
+                  ) : null}
+                </div>
+                <div className="p-5">
                   <h4 className="text-lg font-black text-zinc-900 underline-offset-4 group-hover:underline">
                     {product.name ?? "Sản phẩm review"}
                   </h4>
-                  <p className="mt-2 flex-1 text-sm text-zinc-600">
+                  <p className="mt-2 text-sm text-zinc-600">
                     {product.description ?? "Brand sẽ gửi sản phẩm review theo brief của campaign."}
                   </p>
                 </div>
               </a>
             ) : (
-              <article className="flex h-full flex-col overflow-hidden rounded-[24px] border border-zinc-100 bg-zinc-50/70">
-                {product.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={product.imageUrl} alt={product.name ?? data.hero.title} className="h-40 w-full object-cover" />
-                ) : (
-                  <div className="h-40 bg-gradient-to-br from-emerald-50 to-teal-100" />
-                )}
-                <div className="flex flex-1 flex-col p-5">
+              <article className="overflow-hidden rounded-[24px] border border-zinc-100 bg-zinc-50/70">
+                <div className="h-64 w-full overflow-hidden bg-gradient-to-br from-emerald-50 to-teal-100">
+                  {product.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={product.imageUrl} alt={product.name ?? data.hero.title} className="h-full w-full object-cover" />
+                  ) : null}
+                </div>
+                <div className="p-5">
                   <h4 className="text-lg font-black text-zinc-900">{product.name ?? "Sản phẩm review"}</h4>
-                  <p className="mt-2 flex-1 text-sm text-zinc-600">
+                  <p className="mt-2 text-sm text-zinc-600">
                     {product.description ?? "Brand sẽ gửi sản phẩm review theo brief của campaign."}
                   </p>
                 </div>
@@ -146,15 +146,15 @@ export function CampaignReviewProducts({ data }: { data: CampaignDetailDTO }) {
           ) : null}
 
           {data.rewards.length > 0 ? (
-            <div className="grid gap-4 xl:grid-cols-2">
+            <div className="grid gap-4">
               {data.rewards.map((reward) => (
                 <article key={reward.id} className="overflow-hidden rounded-[24px] border border-zinc-100 bg-white">
-                  {product.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={product.imageUrl} alt={reward.title} className="h-36 w-full object-cover" />
-                  ) : (
-                    <div className="h-36 bg-gradient-to-br from-emerald-50 to-teal-100" />
-                  )}
+                  <div className="h-48 w-full overflow-hidden bg-gradient-to-br from-emerald-50 to-teal-100">
+                    {product.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={product.imageUrl} alt={reward.title} className="h-full w-full object-cover" />
+                    ) : null}
+                  </div>
                   <div className="p-5">
                     {product.link ? (
                       <a href={product.link} target="_blank" rel="noreferrer" className="text-lg font-black text-zinc-900 hover:underline">

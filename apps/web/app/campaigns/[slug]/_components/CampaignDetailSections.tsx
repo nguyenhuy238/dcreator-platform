@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 import type { CampaignDetailDTO } from "@/lib/dto/campaign-detail";
 import { getCampaignTypeLabel } from "@/lib/constants/campaign-type";
@@ -18,17 +18,8 @@ const fallbackRoadmap = [
   "Brand/Admin kiểm tra bài đăng và hoàn tất nghiệm thu."
 ];
 
-const REVIEW_COLUMN_MIN = 300;
-const REVIEW_COLUMN_MAX = 520;
-const REVIEW_COLUMN_DEFAULT = 420;
-const HEIGHT_TOLERANCE = 12;
-
 function stripStepPrefix(step: string) {
   return step.replace(/^\s*(bước|step)\s*\d+\s*[:.)-]?\s*/i, "").trim();
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
 }
 
 export function HeroSection({ data, applyCard }: { data: CampaignDetailDTO; applyCard: ReactNode }) {
@@ -76,14 +67,14 @@ function CampaignDealOverview({ data }: { data: CampaignDetailDTO }) {
   };
 
   return (
-    <section className="dc-card h-full p-5 md:p-6">
+    <section className="dc-card p-5 md:p-6">
       <h3 className="text-2xl font-black text-zinc-900">Tổng Quan Deal</h3>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <article
           className={`rounded-[24px] border border-white/70 bg-gradient-to-br ${benefitCard.color} p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md md:col-span-2`}
         >
           <p className="text-xs font-black tracking-[0.18em] text-zinc-500">{benefitCard.eyebrow}</p>
-          <p className="mt-3 text-lg font-black text-zinc-900">{benefitCard.title}</p>
+          <p className="mt-3 whitespace-pre-line text-lg font-black text-zinc-900">{benefitCard.title}</p>
         </article>
         <article
           className={`rounded-[24px] border border-white/70 bg-gradient-to-br ${requirementCard.color} p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md`}
@@ -128,82 +119,11 @@ function CampaignJoinTimeline({ data }: { data: CampaignDetailDTO }) {
 }
 
 export function OverviewTab({ data }: { data: CampaignDetailDTO }) {
-  const gridRef = useRef<HTMLDivElement | null>(null);
-  const overviewRef = useRef<HTMLDivElement | null>(null);
-  const reviewRef = useRef<HTMLDivElement | null>(null);
-  const [reviewWidth, setReviewWidth] = useState(REVIEW_COLUMN_DEFAULT);
-
-  useEffect(() => {
-    const gridNode = gridRef.current;
-    const overviewNode = overviewRef.current;
-    const reviewNode = reviewRef.current;
-
-    if (!gridNode || !overviewNode || !reviewNode || typeof window === "undefined") return;
-
-    let frameId = 0;
-
-    const syncColumns = () => {
-      frameId = 0;
-
-      if (window.innerWidth < 1024) {
-        setReviewWidth(REVIEW_COLUMN_DEFAULT);
-        return;
-      }
-
-      const containerWidth = gridNode.clientWidth;
-      const maxReviewWidth = Math.min(REVIEW_COLUMN_MAX, Math.max(REVIEW_COLUMN_MIN, containerWidth - 320));
-      const minReviewWidth = Math.min(REVIEW_COLUMN_MIN, maxReviewWidth);
-      const overviewHeight = overviewNode.offsetHeight;
-      const reviewHeight = reviewNode.offsetHeight;
-      const heightDiff = overviewHeight - reviewHeight;
-
-      if (Math.abs(heightDiff) <= HEIGHT_TOLERANCE) return;
-
-      const widthStep = clamp(Math.ceil(Math.abs(heightDiff) / 12), 8, 28);
-
-      setReviewWidth((current) => {
-        const baseWidth = clamp(current, minReviewWidth, maxReviewWidth);
-        const nextWidth =
-          heightDiff > 0
-            ? clamp(baseWidth - widthStep, minReviewWidth, maxReviewWidth)
-            : clamp(baseWidth + widthStep, minReviewWidth, maxReviewWidth);
-
-        return Math.abs(nextWidth - baseWidth) < 1 ? baseWidth : nextWidth;
-      });
-    };
-
-    const requestSync = () => {
-      if (frameId) return;
-      frameId = window.requestAnimationFrame(syncColumns);
-    };
-
-    const resizeObserver = new ResizeObserver(requestSync);
-    resizeObserver.observe(gridNode);
-    resizeObserver.observe(overviewNode);
-    resizeObserver.observe(reviewNode);
-    window.addEventListener("resize", requestSync);
-    requestSync();
-
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener("resize", requestSync);
-      if (frameId) window.cancelAnimationFrame(frameId);
-    };
-  }, [data]);
-
   return (
     <section className="grid gap-8">
-      <div
-        ref={gridRef}
-        className="grid gap-6 lg:items-stretch lg:[grid-template-columns:minmax(0,1fr)_var(--review-column)]"
-        style={{ ["--review-column" as string]: `${reviewWidth}px` }}
-      >
-        <div ref={overviewRef}>
-          <CampaignDealOverview data={data} />
-        </div>
-        <div ref={reviewRef} className="w-full justify-self-end transition-[width] duration-300">
-          <CampaignReviewProducts data={data} />
-        </div>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_440px] lg:items-start">
+        <CampaignDealOverview data={data} />
+        <CampaignReviewProducts data={data} />
       </div>
       <CampaignJoinTimeline data={data} />
     </section>
