@@ -7,7 +7,7 @@ type AdminDataTableProps = {
 
 export function AdminDataTable({ headers, children }: AdminDataTableProps) {
   return (
-    <div className="overflow-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
+    <div className="w-full overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
       <table className="w-full min-w-[760px] text-sm">
         <thead className="bg-zinc-50 text-zinc-600">
           <tr>

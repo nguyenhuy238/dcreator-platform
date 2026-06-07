@@ -66,9 +66,9 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
 
   return (
     <section id="featured-campaigns" className="mt-10">
-      <div className="mb-4 flex items-end justify-between gap-4">
+      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <h2 className="text-2xl font-black">Chiến dịch nổi bật</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-3 sm:justify-end">
           {canSlide ? (
             <button
               type="button"
@@ -86,7 +86,7 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
       </div>
 
       <div className="mb-5 overflow-x-auto pb-1">
-        <div className="flex w-max gap-2">
+        <div className="flex w-max flex-nowrap gap-2">
           {filters.map((filter) => (
             <button
               key={filter}
@@ -121,7 +121,7 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
                 </div>
               </div>
 
-              <div className="p-5">
+              <div className="p-4 sm:p-5">
                 <h3 className="line-clamp-2 min-h-[4rem] text-2xl font-black leading-tight text-zinc-900">{campaign.title}</h3>
 
                 <p className="mt-3 truncate text-sm font-semibold text-zinc-600">Brand: {campaign.brand}</p>
@@ -145,15 +145,15 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
                 </div>
                 <p className="mt-1 text-xs text-zinc-500">Tiến độ video: {campaign.videoProgressPercent ?? 0}%</p>
 
-                <div className="mt-4 flex items-center gap-2">
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
                   <div
-                    className="min-w-0 flex-1"
+                    className="min-w-0 sm:flex-1"
                   >
                     <CreatorCampaignApplyButton slug={campaign.slug} compact inline hideStatusMessage />
                   </div>
                   <Link
                     href={`/campaigns/${campaign.slug}`}
-                    className="inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
+                    className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-full border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100 sm:w-auto"
                     aria-label={`Xem chi tiết ${campaign.title}`}
                   >
                     Xem chi tiết

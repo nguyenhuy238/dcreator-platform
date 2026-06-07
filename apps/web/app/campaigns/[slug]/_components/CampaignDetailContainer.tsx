@@ -124,18 +124,18 @@ export function CampaignDetailContainer({ slug }: Props) {
           }
         />
         <section className="sticky top-16 z-10 border-y border-zinc-200 bg-white/95 backdrop-blur">
-          <div className="mx-auto flex w-full max-w-[960px] items-center gap-1 py-2">
+          <div className="mx-auto flex w-full max-w-[960px] items-center gap-1 overflow-x-auto px-1 py-2">
             <button
               type="button"
               onClick={() => setActiveTab("overview")}
-              className={`rounded-xl px-4 py-2 text-sm font-bold uppercase tracking-wide ${activeTab === "overview" ? "bg-zinc-900 text-white" : "text-zinc-500"}`}
+              className={`shrink-0 rounded-xl px-4 py-2 text-sm font-bold uppercase tracking-wide ${activeTab === "overview" ? "bg-zinc-900 text-white" : "text-zinc-500"}`}
             >
               Tổng quan
             </button>
             <button
               type="button"
               onClick={() => setActiveTab("brief")}
-              className={`rounded-xl px-4 py-2 text-sm font-bold uppercase tracking-wide ${activeTab === "brief" ? "bg-zinc-900 text-white" : "text-zinc-500"}`}
+              className={`shrink-0 rounded-xl px-4 py-2 text-sm font-bold uppercase tracking-wide ${activeTab === "brief" ? "bg-zinc-900 text-white" : "text-zinc-500"}`}
             >
               Yêu cầu & brief
             </button>

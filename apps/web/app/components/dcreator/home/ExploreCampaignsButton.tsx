@@ -18,7 +18,7 @@ export function ExploreCampaignsButton() {
     <a
       href="#featured-campaigns"
       onClick={handleClick}
-      className="dc-btn-primary h-10 min-w-[190px] rounded-full px-6 text-base font-bold tracking-[0.02em]"
+      className="dc-btn-primary h-10 w-full rounded-full px-6 text-base font-bold tracking-[0.02em] sm:w-auto sm:min-w-[190px]"
     >
       Khám phá chiến dịch
     </a>
