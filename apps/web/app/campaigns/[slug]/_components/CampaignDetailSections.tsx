@@ -39,8 +39,8 @@ export function HeroSection({ data, applyCard }: { data: CampaignDetailDTO; appl
           <span className="inline-flex rounded-full border border-emerald-200/40 bg-emerald-500/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-emerald-100">
             {getCampaignTypeLabel()}
           </span>
-          <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-tight md:text-6xl">{data.hero.title}</h1>
-          <p className="mt-3 text-base font-semibold text-zinc-100">Brand: {data.hero.brand}</p>
+          <h1 className="mt-4 max-w-4xl break-words text-3xl font-black tracking-tight sm:text-4xl md:text-6xl">{data.hero.title}</h1>
+          <p className="mt-3 break-words text-base font-semibold text-zinc-100">Brand: {data.hero.brand}</p>
         </div>
         <div className="hidden lg:block">{applyCard}</div>
       </div>
@@ -74,19 +74,19 @@ function CampaignDealOverview({ data }: { data: CampaignDetailDTO }) {
           className={`rounded-[24px] border border-white/70 bg-gradient-to-br ${benefitCard.color} p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md md:col-span-2`}
         >
           <p className="text-xs font-black tracking-[0.18em] text-zinc-500">{benefitCard.eyebrow}</p>
-          <p className="mt-3 whitespace-pre-line text-lg font-black text-zinc-900">{benefitCard.title}</p>
+          <p className="mt-3 whitespace-pre-line break-words text-lg font-black text-zinc-900">{benefitCard.title}</p>
         </article>
         <article
           className={`rounded-[24px] border border-white/70 bg-gradient-to-br ${requirementCard.color} p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md`}
         >
           <p className="text-xs font-black tracking-[0.18em] text-zinc-500">{requirementCard.eyebrow}</p>
-          <p className="mt-3 text-lg font-black text-zinc-900">{requirementCard.title}</p>
+          <p className="mt-3 break-words text-lg font-black text-zinc-900">{requirementCard.title}</p>
         </article>
         <article
           className={`rounded-[24px] border border-white/70 bg-gradient-to-br ${deadlineCard.color} p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md`}
         >
           <p className="text-xs font-black tracking-[0.18em] text-zinc-500">{deadlineCard.eyebrow}</p>
-          <p className="mt-3 text-lg font-black text-zinc-900">{deadlineCard.title}</p>
+          <p className="mt-3 break-words text-lg font-black text-zinc-900">{deadlineCard.title}</p>
         </article>
       </div>
     </section>

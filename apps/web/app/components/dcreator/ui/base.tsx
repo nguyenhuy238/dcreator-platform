@@ -48,15 +48,15 @@ export function StatusBadge({ status }: { status: string }) {
     archived: "bg-zinc-100 text-zinc-700 border-zinc-200"
   };
 
-  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${map[status.toLowerCase()] ?? "bg-zinc-100 text-zinc-700 border-zinc-200"}`}>{labels[status] ?? status}</span>;
+  return <span className={`inline-flex max-w-full rounded-full border px-2.5 py-1 text-xs font-semibold leading-4 ${map[status.toLowerCase()] ?? "bg-zinc-100 text-zinc-700 border-zinc-200"}`}><span className="truncate">{labels[status] ?? status}</span></span>;
 }
 
 export function PageHeader({ title, subtitle, action }: { title: string; subtitle: string; action?: ReactNode }) {
-  return <header className="mb-6 flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-3xl font-black tracking-tight text-zinc-900">{title}</h1><p className="mt-1 text-sm text-zinc-600">{subtitle}</p></div>{action}</header>;
+  return <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div className="min-w-0"><h1 className="break-words text-2xl font-black tracking-tight text-zinc-900 sm:text-3xl">{title}</h1><p className="mt-1 text-sm text-zinc-600">{subtitle}</p></div>{action ? <div className="shrink-0">{action}</div> : null}</header>;
 }
 
 export function SectionHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
-  return <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-bold text-zinc-900">{title}</h2>{subtitle ? <p className="mt-1 text-sm text-zinc-600">{subtitle}</p> : null}</div>{action}</div>;
+  return <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div className="min-w-0"><h2 className="break-words text-xl font-bold text-zinc-900">{title}</h2>{subtitle ? <p className="mt-1 text-sm text-zinc-600">{subtitle}</p> : null}</div>{action ? <div className="shrink-0">{action}</div> : null}</div>;
 }
 
 export function StatsCard({ title, value, hint }: { title: string; value: string; hint?: string }) {
@@ -198,9 +198,9 @@ export function ConfirmDialog({
       <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-lg font-bold text-zinc-900">{title}</h3>
         <p className="mt-2 text-sm text-zinc-600">{resolvedMessage}</p>
-        <div className="mt-5 flex justify-end gap-2">
-          <button className="dc-btn-secondary" onClick={onCancel}>{cancelLabel}</button>
-          <button className={tone === "danger" ? "dc-btn-secondary" : "dc-btn-primary"} onClick={onConfirm}>{resolvedConfirm}</button>
+      <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button className="dc-btn-secondary w-full sm:w-auto" onClick={onCancel}>{cancelLabel}</button>
+          <button className={`${tone === "danger" ? "dc-btn-secondary" : "dc-btn-primary"} w-full sm:w-auto`} onClick={onConfirm}>{resolvedConfirm}</button>
         </div>
       </div>
     </div>

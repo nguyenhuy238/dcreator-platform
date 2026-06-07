@@ -138,7 +138,7 @@ export default async function CreatorLandingPage() {
         hideRoleSwitch
         audienceToggle={{ href: "/brand", label: "Dành cho Brand" }}
       />
-      <main className="mx-auto w-full max-w-7xl overflow-x-hidden px-4 pb-24 pt-5 md:px-6">
+      <main className="mx-auto w-full max-w-7xl overflow-x-hidden px-4 pb-24 pt-5 sm:px-6 lg:px-8">
         <section className="relative overflow-hidden rounded-[2.2rem] border border-zinc-200 bg-white px-5 py-9 shadow-sm md:px-8 md:py-12">
           <div className="grid items-center gap-8 md:grid-cols-2">
             <div>
@@ -146,24 +146,24 @@ export default async function CreatorLandingPage() {
                 <span className="rounded-full bg-zinc-950 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-white">Phát triển cùng thương hiệu thật</span>
               </div>
 
-              <h1 className="mt-5 max-w-none text-3xl font-black leading-[1.08] text-zinc-950 md:text-[36px] lg:text-[40px] xl:text-[44px]">
-                <span className="block whitespace-nowrap">Nơi Creator Biến Nội Dung</span>
-                <span className="block whitespace-nowrap">Thành Doanh Thu Thật</span>
+              <h1 className="mt-5 max-w-none break-words text-3xl font-black leading-[1.08] text-zinc-950 md:text-[36px] lg:text-[40px] xl:text-[44px]">
+                <span className="block">Nơi Creator Biến Nội Dung</span>
+                <span className="block">Thành Doanh Thu Thật</span>
               </h1>
               <p className="mt-5 max-w-2xl text-base leading-7 text-zinc-600 md:text-lg">
                 dCreator là hệ sinh thái social commerce kết nối bạn với các brand/SME. Nhận sản phẩm thật, làm video UGC theo brief rõ ràng, gắn giỏ hàng và nhận hoa hồng minh bạch trên từng đơn hàng. Từ 1.000 follower, bạn đã có thể bắt đầu xây profile và kiếm thêm thu nhập từ content của mình.
               </p>
 
-              <div className="mt-7 flex flex-wrap items-center gap-3">
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <AnalyticsLink
                   href={primaryCtaHref}
                   eventName={AnalyticsEvents.CREATOR_UPGRADE_CLICK}
                   eventParams={{ role: "creator", page_source: "creator_landing_hero" }}
-                  className="dc-btn-primary min-w-[220px] rounded-xl px-6 text-base font-bold"
+                  className="dc-btn-primary w-full rounded-xl px-6 text-base font-bold sm:w-auto sm:min-w-[220px]"
                 >
                   Bắt Đầu Nhận Job UGC
                 </AnalyticsLink>
-                <Link href="#creator-how-it-works" className="dc-btn-secondary min-w-[220px] rounded-xl px-6 text-base font-semibold">
+                <Link href="#creator-how-it-works" className="dc-btn-secondary w-full rounded-xl px-6 text-base font-semibold sm:w-auto sm:min-w-[220px]">
                   Xem Cách dCreator Hoạt Động
                 </Link>
               </div>
@@ -184,11 +184,11 @@ export default async function CreatorLandingPage() {
             </div>
           </div>
 
-          <div className="mt-7 grid overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-50/80 md:grid-cols-4">
+          <div className="mt-7 grid overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-50/80 sm:grid-cols-2 lg:grid-cols-4">
             {heroStats.map(([value, label], index) => (
-              <article key={label} className={`px-4 py-4 text-center ${index < heroStats.length - 1 ? "md:border-r md:border-zinc-200" : ""}`}>
-                <p className="text-3xl font-black text-zinc-900 md:text-4xl">{formatCompactNumber(value)}</p>
-                <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">{label}</p>
+              <article key={label} className={`border-b border-zinc-200 px-4 py-4 text-center sm:[&:nth-child(odd)]:border-r lg:border-b-0 ${index < heroStats.length - 1 ? "lg:border-r" : ""}`}>
+                <p className="text-3xl font-black text-zinc-900 sm:text-4xl">{formatCompactNumber(value)}</p>
+                <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500 sm:text-xs">{label}</p>
               </article>
             ))}
           </div>
@@ -270,7 +270,7 @@ export default async function CreatorLandingPage() {
           </div>
 
           <div className="mt-9 overflow-x-auto pb-2">
-            <div className="relative min-w-[980px]">
+            <div className="relative min-w-[860px] lg:min-w-[980px]">
               <div className="absolute left-20 right-20 top-12 h-px bg-zinc-300" />
               <div className="grid grid-cols-5 gap-4">
                 {[
@@ -370,16 +370,16 @@ export default async function CreatorLandingPage() {
             <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-zinc-300">
               Tham gia cộng đồng Creator dCreator để nhận job UGC, kết nối brand thật và xây profile nội dung của riêng mình.
             </p>
-            <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+            <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <AnalyticsLink
                 href="/auth/register"
                 eventName={AnalyticsEvents.CREATOR_UPGRADE_CLICK}
                 eventParams={{ role: "creator", page_source: "creator_landing_bottom" }}
-                className="inline-flex min-w-[190px] items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-black !text-zinc-950 transition-colors hover:bg-zinc-200"
+                className="inline-flex w-full items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-black !text-zinc-950 transition-colors hover:bg-zinc-200 sm:w-auto sm:min-w-[190px]"
               >
                 Trở Thành Creator
               </AnalyticsLink>
-              <Link href="#creator-how-it-works" className="rounded-xl border border-white/20 px-6 py-3 text-sm font-black text-white transition-colors hover:bg-white hover:text-zinc-950">
+              <Link href="#creator-how-it-works" className="inline-flex w-full items-center justify-center rounded-xl border border-white/20 px-6 py-3 text-sm font-black text-white transition-colors hover:bg-white hover:text-zinc-950 sm:w-auto">
                 Khám Phá Cộng Đồng
               </Link>
             </div>

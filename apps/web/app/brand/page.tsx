@@ -130,7 +130,7 @@ export default async function BrandHomePage() {
         hideRoleSwitch
         audienceToggle={{ href: "/creator", label: "Dành cho Creator" }}
       />
-      <main className="mx-auto w-full max-w-7xl overflow-x-hidden px-4 pb-24 pt-5 md:px-6">
+      <main className="mx-auto w-full max-w-7xl overflow-x-hidden px-4 pb-24 pt-5 sm:px-6 lg:px-8">
         <section className="rounded-[2.2rem] bg-gradient-to-b from-zinc-100 via-zinc-50/50 to-white px-4 py-8 md:px-6 md:py-10">
           <div className="mx-auto max-w-6xl text-center">
             <div className="flex flex-wrap items-center justify-center gap-2">
@@ -139,40 +139,40 @@ export default async function BrandHomePage() {
               <span className="rounded-full bg-zinc-200/70 px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-zinc-700">#SOCIALCOMMERCE</span>
             </div>
 
-            <h1 className="font-display mt-4 bg-gradient-to-b from-zinc-950 to-zinc-700 bg-clip-text text-[46px] font-black leading-none tracking-[-0.045em] text-transparent md:text-[82px]">
+            <h1 className="font-display mt-4 bg-gradient-to-b from-zinc-950 to-zinc-700 bg-clip-text text-4xl font-black leading-none text-transparent sm:text-5xl md:text-6xl lg:text-7xl">
               dCREATOR
             </h1>
-            <p className="mt-1 text-4xl font-medium italic leading-none text-zinc-400 [font-family:Georgia,'Times_New_Roman',serif] md:text-6xl">
+            <p className="mt-1 text-4xl font-medium italic leading-none text-zinc-400 [font-family:Georgia,'Times_New_Roman',serif] sm:text-5xl md:text-6xl">
               Brand Landing
             </p>
 
-            <h2 className="mx-auto mt-6 max-w-5xl text-3xl font-semibold leading-tight text-zinc-600 md:whitespace-nowrap md:text-5xl">
+            <h2 className="mx-auto mt-6 max-w-5xl break-words text-2xl font-semibold leading-tight text-zinc-600 sm:text-3xl md:text-5xl">
               Biến nội dung thành <span className="font-black text-zinc-900">doanh thu thực tế.</span>
             </h2>
-            <p className="mx-auto mt-4 max-w-5xl text-lg text-zinc-600 md:text-[25px] md:leading-tight">
+            <p className="mx-auto mt-4 max-w-5xl text-base text-zinc-600 sm:text-lg md:text-xl lg:text-[25px] lg:leading-tight">
               Kết nối thương hiệu với mạng lưới Massive Creators (1k - 100k followers) để tạo nội dung UGC, thúc đẩy Social Commerce và tăng trưởng doanh thu.
             </p>
 
-            <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+            <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <AnalyticsLink
                 href={primaryCtaHref}
                 eventName={AnalyticsEvents.BRAND_UPGRADE_CLICK}
                 eventParams={{ role: "brand", page_source: "brand_landing_hero" }}
-                className="dc-btn-primary min-w-[220px] rounded-xl px-6 text-base font-bold"
+                className="dc-btn-primary w-full rounded-xl px-6 text-base font-bold sm:w-auto sm:min-w-[220px]"
               >
                 {primaryCtaLabel}
               </AnalyticsLink>
-              <Link href="/campaigns" className="dc-btn-secondary min-w-[220px] rounded-xl px-6 text-base font-semibold">
+              <Link href="/campaigns" className="dc-btn-secondary w-full rounded-xl px-6 text-base font-semibold sm:w-auto sm:min-w-[220px]">
                 Xem campaign đang hoạt động
               </Link>
             </div>
           </div>
 
-          <div className="mt-7 grid overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-50/80 md:grid-cols-4">
+          <div className="mt-7 grid overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-50/80 sm:grid-cols-2 lg:grid-cols-4">
             {stats.map(([value, label], index) => (
-              <article key={label} className={`px-4 py-4 text-center ${index < stats.length - 1 ? "md:border-r md:border-zinc-200" : ""}`}>
-                <p className="text-3xl font-black text-zinc-900 md:text-4xl">{value}</p>
-                <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">{label}</p>
+              <article key={label} className={`border-b border-zinc-200 px-4 py-4 text-center sm:[&:nth-child(odd)]:border-r lg:border-b-0 ${index < stats.length - 1 ? "lg:border-r" : ""}`}>
+                <p className="text-3xl font-black text-zinc-900 sm:text-4xl">{value}</p>
+                <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500 sm:text-xs">{label}</p>
               </article>
             ))}
           </div>
@@ -324,7 +324,7 @@ export default async function BrandHomePage() {
           </div>
 
           <div className="mt-9 overflow-x-auto pb-2">
-            <div className="relative min-w-[980px]">
+            <div className="relative min-w-[860px] lg:min-w-[980px]">
               <div className="absolute left-20 right-20 top-12 h-px bg-zinc-300" />
               <div className="grid grid-cols-5 gap-4">
                 {processSteps.map(([step, title, description, kind], index) => (
@@ -358,12 +358,12 @@ export default async function BrandHomePage() {
               <p className="mx-auto mt-5 max-w-2xl text-sm leading-6 text-zinc-400 md:text-base">
                 Hãy để dCreator giúp thương hiệu của bạn kết nối với hàng triệu khách hàng thông qua những người kể chuyện tài năng nhất.
               </p>
-              <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+              <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
                 <AnalyticsLink
                   href={primaryCtaHref}
                   eventName={AnalyticsEvents.BRAND_UPGRADE_CLICK}
                   eventParams={{ role: "brand", page_source: "brand_landing_bottom" }}
-                  className="rounded-md bg-white px-8 py-3 text-sm font-black !text-black transition-colors duration-200 hover:bg-zinc-200"
+                  className="inline-flex w-full items-center justify-center rounded-md bg-white px-8 py-3 text-sm font-black !text-black transition-colors duration-200 hover:bg-zinc-200 sm:w-auto"
                 >
                   Bắt đầu ngay hôm nay
                 </AnalyticsLink>

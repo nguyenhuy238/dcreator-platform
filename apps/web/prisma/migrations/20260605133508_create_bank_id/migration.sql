@@ -5,13 +5,13 @@
 
 */
 -- DropForeignKey
-ALTER TABLE "Campaign" DROP CONSTRAINT "Campaign_movedToAuditById_fkey";
+ALTER TABLE "Campaign" DROP CONSTRAINT IF EXISTS "Campaign_movedToAuditById_fkey";
 
 -- DropForeignKey
-ALTER TABLE "MissionSubmission" DROP CONSTRAINT "MissionSubmission_rewardHeldById_fkey";
+ALTER TABLE "MissionSubmission" DROP CONSTRAINT IF EXISTS "MissionSubmission_rewardHeldById_fkey";
 
 -- DropForeignKey
-ALTER TABLE "MissionSubmission" DROP CONSTRAINT "MissionSubmission_rewardReleasedById_fkey";
+ALTER TABLE "MissionSubmission" DROP CONSTRAINT IF EXISTS "MissionSubmission_rewardReleasedById_fkey";
 
 -- AlterTable
 ALTER TABLE "BrandSubscription" ALTER COLUMN "updatedAt" DROP DEFAULT;
@@ -31,7 +31,7 @@ END $$;
 ALTER TABLE "CreatorMission" ALTER COLUMN "productReceiveOption" DROP DEFAULT;
 
 -- AlterTable
-ALTER TABLE "CreatorSocialLink" DROP COLUMN "isPrimary";
+ALTER TABLE "CreatorSocialLink" DROP COLUMN IF EXISTS "isPrimary";
 
 -- AlterTable
 ALTER TABLE "InternalNote" ALTER COLUMN "updatedAt" DROP DEFAULT;

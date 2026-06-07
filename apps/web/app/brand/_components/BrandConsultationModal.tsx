@@ -62,7 +62,7 @@ export function BrandConsultationModal({ source }: BrandConsultationModalProps) 
     <>
       <button
         type="button"
-        className="rounded-md border border-white/15 bg-black/20 px-8 py-3 text-sm font-black text-white transition-colors duration-200 hover:bg-white/10"
+        className="inline-flex w-full items-center justify-center rounded-md border border-white/15 bg-black/20 px-8 py-3 text-sm font-black text-white transition-colors duration-200 hover:bg-white/10 sm:w-auto"
         onClick={() => setOpen(true)}
       >
         Đặt lịch tư vấn 1:1
@@ -70,7 +70,7 @@ export function BrandConsultationModal({ source }: BrandConsultationModalProps) 
 
       {open ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4" onClick={() => !loading && setOpen(false)}>
-          <form className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl" onSubmit={onSubmit} onClick={(event) => event.stopPropagation()}>
+          <form className="max-h-[90dvh] w-[calc(100vw-2rem)] max-w-md overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl" onSubmit={onSubmit} onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-bold text-zinc-900">Đặt lịch tư vấn 1:1</h3>
@@ -105,11 +105,11 @@ export function BrandConsultationModal({ source }: BrandConsultationModalProps) 
             {error ? <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
             {success ? <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p> : null}
 
-            <div className="mt-5 flex flex-wrap justify-end gap-2">
-              <button type="button" className="dc-btn-secondary" disabled={loading} onClick={() => setOpen(false)}>
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button type="button" className="dc-btn-secondary w-full sm:w-auto" disabled={loading} onClick={() => setOpen(false)}>
                 Hủy
               </button>
-              <button type="submit" className="dc-btn-primary" disabled={loading}>
+              <button type="submit" className="dc-btn-primary w-full sm:w-auto" disabled={loading}>
                 {loading ? "Đang gửi..." : "Gửi thông tin"}
               </button>
             </div>
@@ -119,4 +119,3 @@ export function BrandConsultationModal({ source }: BrandConsultationModalProps) 
     </>
   );
 }
-

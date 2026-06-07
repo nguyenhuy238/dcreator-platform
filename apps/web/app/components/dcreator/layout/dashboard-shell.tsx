@@ -154,7 +154,7 @@ export function DashboardShell({
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50">
+    <div className="min-h-dvh bg-zinc-50">
       <div className="mx-auto flex w-full max-w-[96rem]">
         <aside className={`sticky top-0 hidden h-screen shrink-0 border-r border-zinc-200 bg-white transition-all duration-200 lg:block ${desktopNavOpen ? "w-80" : "w-20"}`}>
           {desktopNavOpen ? (
@@ -215,7 +215,7 @@ export function DashboardShell({
           </nav>
         </aside>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 overflow-x-hidden">
           <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 backdrop-blur">
             <div className="px-4 py-3 md:px-6">
               <div className="flex items-center gap-3">
@@ -248,20 +248,20 @@ export function DashboardShell({
                     </nav>
                   </div>
                 </div>
-                <div className="shrink-0 flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-2">
                   {headerAccessory}
                   <div className="relative">
-                    <button type="button" className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-2 py-1.5 hover:bg-zinc-100" onClick={() => setMenuOpen((prev) => !prev)}>
+                    <button type="button" className="inline-flex max-w-[42vw] items-center gap-2 rounded-full border border-zinc-200 bg-white px-2 py-1.5 hover:bg-zinc-100 sm:max-w-xs" onClick={() => setMenuOpen((prev) => !prev)}>
                       {userAvatarSrc ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={userAvatarSrc} alt={user.displayName} className="h-7 w-7 rounded-full border border-zinc-200 bg-zinc-100 object-cover" />
                       ) : (
                         <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">{userInitials}</span>
                       )}
-                      <span className="hidden text-sm font-semibold text-zinc-800 sm:inline">{user.displayName}</span>
+                      <span className="hidden max-w-36 truncate text-sm font-semibold text-zinc-800 sm:inline">{user.displayName}</span>
                     </button>
                     {menuOpen ? (
-                      <div className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-zinc-200 bg-white p-2 shadow-lg">
+                      <div className="absolute right-0 z-50 mt-2 w-[calc(100vw-2rem)] max-w-72 rounded-xl border border-zinc-200 bg-white p-2 shadow-lg">
                         <div className="rounded-lg bg-zinc-50 px-3 py-2">
                           <p className="text-sm font-semibold text-zinc-900">{user.displayName}</p>
                           <p className="truncate text-xs text-zinc-500">{user.email}</p>
@@ -278,19 +278,19 @@ export function DashboardShell({
               </div>
             </div>
           </header>
-          <main className="px-4 pb-10 pt-5 md:px-6">{children}</main>
+          <main className="min-w-0 px-4 pb-[calc(2.5rem+env(safe-area-inset-bottom))] pt-5 md:px-6">{children}</main>
         </div>
       </div>
 
       {mobileOpen ? (
         <div className="fixed inset-0 z-50 bg-black/40 lg:hidden" onClick={() => setMobileOpen(false)}>
-          <aside className="h-full w-80 max-w-[85vw] bg-white p-3" onClick={(event) => event.stopPropagation()}>
+          <aside className="h-full w-80 max-w-[85vw] overflow-y-auto bg-white p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]" onClick={(event) => event.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between border-b border-zinc-200 pb-3">
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <Link href="/" className="inline-flex items-center" aria-label="Về trang chủ dCreator" onClick={() => setMobileOpen(false)}>
                   <Image src="/uploads/dCreator-logo-new.png" alt="dCreator logo" width={120} height={32} className="h-8 w-auto" style={{ width: "auto" }} />
                 </Link>
-                <p className="font-black text-zinc-900">{workspaceTitle}</p>
+                <p className="truncate font-black text-zinc-900">{workspaceTitle}</p>
               </div>
               <button type="button" className="rounded-lg border border-zinc-200 px-2 py-1 text-sm" onClick={() => setMobileOpen(false)}>Đóng</button>
             </div>

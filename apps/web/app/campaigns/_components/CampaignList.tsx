@@ -29,7 +29,7 @@ export function CampaignList({
   detailHrefBase = "/campaigns",
   clickableCard = false,
   showDetailButton = true,
-  gridClassName = "grid gap-3 md:grid-cols-2 xl:grid-cols-3"
+  gridClassName = "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-6"
 }: {
   excludeSlugs?: string[];
   compact?: boolean;
@@ -140,14 +140,14 @@ export function CampaignList({
               />
             ))}
           </div>
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-3">
-            <button className="dc-btn-secondary" disabled={page <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
+          <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+            <button className="dc-btn-secondary w-full sm:w-auto" disabled={page <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
               Trang trước
             </button>
-            <span className="text-sm text-zinc-600">
+            <span className="text-center text-sm text-zinc-600">
               Trang {page}/{totalPages}
             </span>
-            <button className="dc-btn-secondary" disabled={page >= totalPages} onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}>
+            <button className="dc-btn-secondary w-full sm:w-auto" disabled={page >= totalPages} onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}>
               Trang sau
             </button>
           </div>

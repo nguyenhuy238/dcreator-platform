@@ -55,7 +55,7 @@ function AudienceIcon({ href }: { href: string }) {
 
 function AudienceButton({ item }: { item: AudienceLink }) {
   return (
-    <Link href={item.href} className="dc-btn-secondary gap-2">
+    <Link href={item.href} className="dc-btn-secondary gap-2 whitespace-nowrap px-3 text-xs sm:px-4 sm:text-sm">
       <AudienceIcon href={item.href} />
       <span>{item.label}</span>
     </Link>
@@ -152,46 +152,59 @@ export function PublicHeader({ hideRoleSwitch = false, audienceToggle = null, au
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/70 bg-white/90 backdrop-blur">
-      <div className="mx-auto grid w-full max-w-7xl grid-cols-[auto_1fr_auto] items-center px-4 py-3 md:px-6">
-        <Link href="/" className="dc-focus font-display inline-flex items-center gap-2 text-[1.7rem] font-black tracking-tight">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-900 text-white shadow-sm">
+      <div className="mx-auto grid w-full max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3 md:px-6">
+        <Link href="/" className="dc-focus font-display inline-flex min-w-0 items-center gap-2 text-xl font-black tracking-tight sm:text-[1.7rem]">
+          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-white shadow-sm">
             <span className="text-[16px] font-black leading-none tracking-[-0.08em]">d</span>
           </span>
-          <span>dCreator</span>
+          <span className="truncate">dCreator</span>
         </Link>
         <div />
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex min-w-0 items-center justify-end gap-2">
           {!authReady ? (
-            <div className="h-10 w-44 animate-pulse rounded-full bg-zinc-200" />
+            <div className="h-10 w-10 animate-pulse rounded-full bg-zinc-200 md:w-44" />
           ) : currentUser ? (
             <>
-              {shouldShowRoleSwitch ? <Link href={roleSwitchHref} className="dc-btn-secondary">{roleSwitchLabel}</Link> : null}
-              {audienceLinks.map((item) => (
-                <AudienceButton key={item.href} item={item} />
-              ))}
-              {canAccessAdmin ? (
-                <>
-                  <Link href="/admin" className="dc-btn-secondary hidden xl:inline-flex">Admin</Link>
-                </>
-              ) : null}
+              <div className="hidden items-center justify-end gap-2 md:flex">
+                {shouldShowRoleSwitch ? <Link href={roleSwitchHref} className="dc-btn-secondary whitespace-nowrap px-3 text-xs sm:px-4 sm:text-sm">{roleSwitchLabel}</Link> : null}
+                {audienceLinks.map((item) => (
+                  <AudienceButton key={item.href} item={item} />
+                ))}
+                {canAccessAdmin ? <Link href="/admin" className="dc-btn-secondary hidden whitespace-nowrap xl:inline-flex">Admin</Link> : null}
+              </div>
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setMenuOpen((prev) => !prev)}
-                  className="dc-focus inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
+                  className="dc-focus inline-flex max-w-[44vw] items-center gap-2 rounded-full border border-zinc-200 bg-white px-2 py-1.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100 sm:max-w-xs sm:px-3 sm:py-2"
                 >
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">
+                  <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">
                     {initials}
                   </span>
-                  <span className="max-w-28 truncate">{currentUser.displayName}</span>
+                  <span className="hidden max-w-28 truncate sm:inline">{currentUser.displayName}</span>
                 </button>
                 {menuOpen ? (
-                  <div className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-zinc-200 bg-white p-2 shadow-lg">
+                  <div className="absolute right-0 z-50 mt-2 w-[calc(100vw-2rem)] max-w-72 rounded-xl border border-zinc-200 bg-white p-2 shadow-lg">
                     <div className="rounded-lg bg-zinc-50 px-3 py-2">
                       <p className="text-sm font-semibold text-zinc-900">{currentUser.displayName}</p>
                       <p className="truncate text-xs text-zinc-500">{currentUser.email}</p>
                     </div>
                     <div className="mt-2 grid gap-1">
+                      {shouldShowRoleSwitch ? (
+                        <Link href={roleSwitchHref} className="rounded-lg px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 md:hidden">
+                          {roleSwitchLabel}
+                        </Link>
+                      ) : null}
+                      {audienceLinks.map((item) => (
+                        <Link key={item.href} href={item.href} className="rounded-lg px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 md:hidden">
+                          {item.label}
+                        </Link>
+                      ))}
+                      {canAccessAdmin ? (
+                        <Link href="/admin" className="rounded-lg px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 xl:hidden">
+                          Admin
+                        </Link>
+                      ) : null}
                       <Link href={profileHref} className="rounded-lg px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100">
                         Hồ sơ
                       </Link>
@@ -205,12 +218,38 @@ export function PublicHeader({ hideRoleSwitch = false, audienceToggle = null, au
             </>
           ) : (
             <>
-              {shouldShowRoleSwitch ? <Link href={roleSwitchHref} className="dc-btn-secondary">{roleSwitchLabel}</Link> : null}
-              {audienceLinks.map((item) => (
-                <AudienceButton key={item.href} item={item} />
-              ))}
-              <Link href="/auth/login" className="dc-btn-secondary" onClick={() => trackEvent(AnalyticsEvents.LOGIN_BUTTON_CLICK, { page_source: "public_header" })}>Đăng nhập</Link>
-              <Link href="/auth/register" className="dc-btn-primary hidden px-7 py-3 text-base sm:inline-flex" onClick={() => trackEvent(AnalyticsEvents.REGISTER_BUTTON_CLICK, { page_source: "public_header" })}>Đăng ký tài khoản</Link>
+              <div className="hidden items-center justify-end gap-2 md:flex">
+                {shouldShowRoleSwitch ? <Link href={roleSwitchHref} className="dc-btn-secondary whitespace-nowrap px-3 text-xs sm:px-4 sm:text-sm">{roleSwitchLabel}</Link> : null}
+                {audienceLinks.map((item) => (
+                  <AudienceButton key={item.href} item={item} />
+                ))}
+                <Link href="/auth/login" className="dc-btn-secondary whitespace-nowrap px-3 text-xs sm:px-4 sm:text-sm" onClick={() => trackEvent(AnalyticsEvents.LOGIN_BUTTON_CLICK, { page_source: "public_header" })}>Đăng nhập</Link>
+                <Link href="/auth/register" className="dc-btn-primary whitespace-nowrap px-4 py-2.5 text-sm lg:px-7 lg:py-3 lg:text-base" onClick={() => trackEvent(AnalyticsEvents.REGISTER_BUTTON_CLICK, { page_source: "public_header" })}>Đăng ký tài khoản</Link>
+              </div>
+              <div className="relative md:hidden">
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen((prev) => !prev)}
+                  aria-label={menuOpen ? "Đóng menu" : "Mở menu"}
+                  className="dc-focus inline-flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-lg font-black text-zinc-800"
+                >
+                  {menuOpen ? "×" : "☰"}
+                </button>
+                {menuOpen ? (
+                  <div className="absolute right-0 z-50 mt-2 w-[calc(100vw-2rem)] max-w-72 rounded-xl border border-zinc-200 bg-white p-2 shadow-lg">
+                    <div className="grid gap-1">
+                      {shouldShowRoleSwitch ? <Link href={roleSwitchHref} className="rounded-lg px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100">{roleSwitchLabel}</Link> : null}
+                      {audienceLinks.map((item) => (
+                        <Link key={item.href} href={item.href} className="rounded-lg px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100">
+                          {item.label}
+                        </Link>
+                      ))}
+                      <Link href="/auth/login" className="rounded-lg px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100" onClick={() => trackEvent(AnalyticsEvents.LOGIN_BUTTON_CLICK, { page_source: "public_header" })}>Đăng nhập</Link>
+                      <Link href="/auth/register" className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-semibold text-white" onClick={() => trackEvent(AnalyticsEvents.REGISTER_BUTTON_CLICK, { page_source: "public_header" })}>Đăng ký tài khoản</Link>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </>
           )}
         </div>
@@ -332,7 +371,7 @@ export function MobileBottomNav({ items }: { items: NavItem[] }) {
   return (
     <div className="fixed bottom-4 right-4 z-50 lg:hidden">
       {isOpen ? (
-        <div className="mb-2 grid min-w-80 grid-cols-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-md">
+        <div className="mb-2 grid w-[calc(100vw-2rem)] max-w-sm grid-cols-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-md">
           {items.slice(0, 4).map((item) => (
             <Link
               key={item.href}
