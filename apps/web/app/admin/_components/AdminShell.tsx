@@ -15,11 +15,13 @@ type AdminShellUser = {
 export function AdminShell({
   children,
   navItems,
-  user
+  user,
+  initialSidebarCollapsed = false
 }: {
   children: React.ReactNode;
   navItems: readonly AdminNavItem[];
   user: AdminShellUser;
+  initialSidebarCollapsed?: boolean;
 }) {
   return (
     <DashboardShell
@@ -28,6 +30,7 @@ export function AdminShell({
       workspaceTitle="Bảng điều khiển Admin"
       workspaceDescription="Trung tâm vận hành và quản lý"
       loginRedirect="/admin"
+      initialSidebarCollapsed={initialSidebarCollapsed}
     >
       {children}
     </DashboardShell>

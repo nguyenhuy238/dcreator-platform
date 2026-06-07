@@ -34,6 +34,7 @@ import {
 } from "@phosphor-icons/react";
 import { getBreadcrumbsForPath, getWorkspaceForPath } from "@/lib/navigation";
 import { resolveImageUrl } from "@/lib/images/resolve-image-url";
+import { DASHBOARD_SIDEBAR_COLLAPSED_KEY } from "@/lib/dashboard-sidebar";
 
 export type DashboardNavItem = {
   href: string;
@@ -109,6 +110,7 @@ export function DashboardShell({
   workspaceTitle,
   workspaceDescription,
   loginRedirect,
+  initialSidebarCollapsed = false,
   headerAccessory
 }: {
   children: React.ReactNode;
@@ -117,12 +119,13 @@ export function DashboardShell({
   workspaceTitle: string;
   workspaceDescription: string;
   loginRedirect: string;
+  initialSidebarCollapsed?: boolean;
   headerAccessory?: React.ReactNode;
 }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [desktopNavOpen, setDesktopNavOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(initialSidebarCollapsed);
   const workspace = useMemo(() => getWorkspaceForPath(pathname), [pathname]);
   const crumbs = useMemo(() => getBreadcrumbsForPath(pathname, workspace), [pathname, workspace]);
   const activeHref = useMemo(() => getActiveHref(pathname, navItems), [pathname, navItems]);
@@ -137,13 +140,9 @@ export function DashboardShell({
   }, [workspace]);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("dc:desktop-nav-open");
-    if (saved === "1") setDesktopNavOpen(true);
-  }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem("dc:desktop-nav-open", desktopNavOpen ? "1" : "0");
-  }, [desktopNavOpen]);
+    window.localStorage.setItem(DASHBOARD_SIDEBAR_COLLAPSED_KEY, collapsed ? "true" : "false");
+    document.cookie = `${DASHBOARD_SIDEBAR_COLLAPSED_KEY}=${collapsed ? "true" : "false"}; path=/; max-age=31536000; SameSite=Lax`;
+  }, [collapsed]);
 
   async function onLogout() {
     try {
@@ -155,67 +154,50 @@ export function DashboardShell({
 
   return (
     <div className="min-h-dvh bg-zinc-50">
-      <div className="mx-auto flex w-full max-w-[96rem]">
-        <aside className={`sticky top-0 hidden h-screen shrink-0 border-r border-zinc-200 bg-white transition-all duration-200 lg:block ${desktopNavOpen ? "w-80" : "w-20"}`}>
-          {desktopNavOpen ? (
-            <div className="border-b border-zinc-200 px-5 py-4">
-              <div className="flex items-center gap-3">
-                <Link href="/" className="inline-flex items-center" aria-label="Về trang chủ dCreator">
-                  <Image src="/uploads/dCreator-logo-new.png" alt="dCreator logo" width={120} height={32} className="h-8 w-auto" style={{ width: "auto" }} priority />
-                </Link>
-                <div>
-                  <p className="text-sm font-black text-zinc-900">{workspaceTitle}</p>
-                  <p className="mt-1 text-xs text-zinc-500">{workspaceDescription}</p>
-                </div>
-              </div>
+      <aside className={`fixed left-0 top-0 z-40 hidden h-dvh shrink-0 border-r border-zinc-200 bg-white transition-[width] duration-300 ease-in-out will-change-[width] lg:block ${collapsed ? "w-[72px]" : "w-[320px]"}`}>
+        <div className={`flex h-[73px] items-center border-b border-zinc-200 transition-[padding] duration-300 ease-in-out ${collapsed ? "justify-center px-2" : "px-5"}`}>
+          <div className="flex min-w-0 items-center gap-3">
+            <Link href="/" className="inline-flex shrink-0 items-center" aria-label="Về trang chủ dCreator">
+              <Image src="/uploads/dCreator-logo-new.png" alt="dCreator logo" width={120} height={32} className={collapsed ? "h-8 w-8 rounded-lg object-cover" : "h-8 w-auto"} style={collapsed ? undefined : { width: "auto" }} priority />
+            </Link>
+            <div className={`min-w-0 overflow-hidden transition-[width,opacity] duration-300 ease-in-out ${collapsed ? "w-0 opacity-0" : "w-48 opacity-100"}`}>
+              <p className="truncate text-sm font-black text-zinc-900">{workspaceTitle}</p>
+              <p className="mt-1 truncate text-xs text-zinc-500">{workspaceDescription}</p>
             </div>
-          ) : (
-            <div className="flex h-[73px] items-center justify-center border-b border-zinc-200 px-2">
-              <Link href="/" className="inline-flex items-center" aria-label="Về trang chủ dCreator">
-                <Image src="/uploads/dCreator-logo-new.png" alt="dCreator logo" width={32} height={32} className="h-8 w-8 rounded-lg object-cover" priority />
+          </div>
+        </div>
+        <nav className="h-[calc(100dvh-73px)] overflow-y-auto p-2">
+          {navItems.map((item) => {
+            const active = item.href === activeHref;
+            const label = item.label?.trim() || "Đi tới trang";
+            const Icon = iconMap[item.icon as keyof typeof iconMap] ?? House;
+            return (
+              <Link
+                key={`${item.href}-${item.label}`}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                title={collapsed ? label : undefined}
+                className={`dc-focus relative mb-1 flex min-h-11 items-center overflow-hidden rounded-2xl border transition-colors duration-200 ${collapsed ? "justify-center px-0 py-2" : "px-3 py-2.5"} ${active ? "border-zinc-900 bg-zinc-900 shadow-sm hover:bg-zinc-900" : "border-transparent bg-transparent hover:border-zinc-200 hover:bg-zinc-100"}`}
+              >
+                <Icon size={collapsed ? 20 : 18} weight={active ? "fill" : "regular"} className={`shrink-0 ${active ? "text-white" : "text-zinc-700"}`} />
+                <span className={`ml-2 min-w-0 overflow-hidden transition-[width,opacity] duration-300 ease-in-out ${collapsed ? "w-0 opacity-0" : "w-full opacity-100"}`}>
+                  <span className="flex min-w-0 items-center justify-between gap-2">
+                    <span className={`relative z-10 truncate text-sm font-semibold leading-5 ${active ? "text-white" : "text-zinc-900"}`}>{label}</span>
+                    {item.isComingSoon ? (
+                      <span className={`relative z-10 shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${active ? "border-white/20 bg-white/10 text-white" : "border-zinc-200 bg-zinc-200 text-zinc-700"}`}>
+                        SOON
+                      </span>
+                    ) : null}
+                  </span>
+                  {item.description ? <span className={`relative z-10 mt-0.5 block truncate text-xs leading-4 ${active ? "text-zinc-300" : "text-zinc-500"}`}>{item.description}</span> : null}
+                </span>
               </Link>
-            </div>
-          )}
-          <nav className={`overflow-y-auto p-2 ${desktopNavOpen ? "h-[calc(100vh-73px)]" : "h-[calc(100vh-73px)]"}`}>
-            {navItems.map((item) => {
-              const active = item.href === activeHref;
-              const label = item.label?.trim() || "Đi tới trang";
-              const Icon = iconMap[item.icon as keyof typeof iconMap] ?? House;
-              return (
-                <Link
-                  key={`${item.href}-${item.label}`}
-                  href={item.href}
-                  aria-current={active ? "page" : undefined}
-                  title={!desktopNavOpen ? label : undefined}
-                  className={`dc-focus relative mb-1 block min-h-11 rounded-2xl border transition ${desktopNavOpen ? "px-3 py-2.5" : "px-0 py-2"} ${active ? "border-zinc-900 bg-zinc-900 shadow-sm hover:bg-zinc-900" : "border-transparent bg-transparent hover:border-zinc-200 hover:bg-zinc-100"}`}
-                >
-                  {desktopNavOpen ? (
-                    <>
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <Icon size={18} weight={active ? "fill" : "regular"} className={active ? "text-white" : "text-zinc-700"} />
-                          <p className={`relative z-10 text-sm font-semibold leading-5 ${active ? "text-white" : "text-zinc-900"}`}>{label}</p>
-                        </div>
-                        {item.isComingSoon ? (
-                          <span className={`relative z-10 rounded-full border px-2 py-0.5 text-[10px] font-bold ${active ? "border-white/20 bg-white/10 text-white" : "border-zinc-200 bg-zinc-200 text-zinc-700"}`}>
-                            SOON
-                          </span>
-                        ) : null}
-                      </div>
-                      {item.description ? <p className={`relative z-10 mt-0.5 text-xs leading-4 ${active ? "text-zinc-300" : "text-zinc-500"}`}>{item.description}</p> : null}
-                    </>
-                  ) : (
-                    <span className="inline-flex w-full items-center justify-center">
-                      <Icon size={20} weight={active ? "fill" : "regular"} className={active ? "text-white" : "text-zinc-700"} />
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
-        </aside>
+            );
+          })}
+        </nav>
+      </aside>
 
-        <div className="min-w-0 flex-1 overflow-x-hidden">
+      <div className={`min-w-0 overflow-x-hidden transition-[padding-left] duration-300 ease-in-out ${collapsed ? "lg:pl-[72px]" : "lg:pl-[320px]"}`}>
           <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 backdrop-blur">
             <div className="px-4 py-3 md:px-6">
               <div className="flex items-center gap-3">
@@ -231,10 +213,11 @@ export function DashboardShell({
                   <button
                     type="button"
                     className="hidden h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-zinc-700 transition hover:bg-zinc-100 lg:inline-flex"
-                    onClick={() => setDesktopNavOpen((prev) => !prev)}
-                    aria-label={desktopNavOpen ? "Đóng thanh điều hướng" : "Mở thanh điều hướng"}
+                    onClick={() => setCollapsed((prev) => !prev)}
+                    aria-label={collapsed ? "Mở thanh điều hướng" : "Thu gọn thanh điều hướng"}
+                    aria-pressed={collapsed}
                   >
-                    {desktopNavOpen ? <X size={18} weight="bold" /> : <List size={18} weight="bold" />}
+                    {collapsed ? <List size={18} weight="bold" /> : <X size={18} weight="bold" />}
                   </button>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-bold text-zinc-900">{activeTitle}</p>
@@ -280,7 +263,6 @@ export function DashboardShell({
           </header>
           <main className="min-w-0 px-4 pb-[calc(2.5rem+env(safe-area-inset-bottom))] pt-5 md:px-6">{children}</main>
         </div>
-      </div>
 
       {mobileOpen ? (
         <div className="fixed inset-0 z-50 bg-black/40 lg:hidden" onClick={() => setMobileOpen(false)}>

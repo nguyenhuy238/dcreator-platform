@@ -397,7 +397,15 @@ export function MobileBottomNav({ items }: { items: NavItem[] }) {
   );
 }
 
-export function AppShell({ children, sidebarItems }: { children: React.ReactNode; sidebarItems?: NavItem[] }) {
+export function AppShell({
+  children,
+  sidebarItems,
+  initialSidebarCollapsed = false
+}: {
+  children: React.ReactNode;
+  sidebarItems?: NavItem[];
+  initialSidebarCollapsed?: boolean;
+}) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [roles, setRoles] = useState<Role[]>([]);
@@ -482,6 +490,7 @@ export function AppShell({ children, sidebarItems }: { children: React.ReactNode
       workspaceTitle={workspaceConfig.title}
       workspaceDescription={workspaceConfig.description}
       loginRedirect="/dashboard/user"
+      initialSidebarCollapsed={initialSidebarCollapsed}
     >
       {rolesLoading ? <div className="mb-4 h-10 w-56 animate-pulse rounded-xl bg-zinc-200" /> : null}
       {!rolesLoading && rolesError ? (
