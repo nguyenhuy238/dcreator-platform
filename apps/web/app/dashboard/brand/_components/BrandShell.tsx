@@ -19,11 +19,13 @@ type BrandShellUser = {
 export function BrandShell({
   children,
   navItems,
-  user
+  user,
+  initialSidebarCollapsed = false
 }: {
   children: React.ReactNode;
   navItems: readonly BrandNavItem[];
   user: BrandShellUser;
+  initialSidebarCollapsed?: boolean;
 }) {
   return (
     <DashboardShell
@@ -32,6 +34,7 @@ export function BrandShell({
       workspaceTitle="Bảng điều khiển Nhãn hàng"
       workspaceDescription="Quản lý onboarding, campaign, creator"
       loginRedirect="/dashboard/brand"
+      initialSidebarCollapsed={initialSidebarCollapsed}
     >
       <div className="mb-4 flex flex-wrap items-start gap-x-6 gap-y-3 rounded-xl border border-zinc-200 bg-white px-4 py-3">
         <DashboardSwitcher roles={user.roles} capabilities={user.capabilities} className="mb-0" />

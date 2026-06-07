@@ -19,11 +19,13 @@ type CreatorShellUser = {
 export function CreatorShell({
   children,
   navItems,
-  user
+  user,
+  initialSidebarCollapsed = false
 }: {
   children: React.ReactNode;
   navItems: readonly CreatorNavItem[];
   user: CreatorShellUser;
+  initialSidebarCollapsed?: boolean;
 }) {
   return (
     <DashboardShell
@@ -32,6 +34,7 @@ export function CreatorShell({
       workspaceTitle="Bảng điều khiển Creator"
       workspaceDescription="Quản lý nhiệm vụ, minh chứng và hoa hồng"
       loginRedirect="/dashboard/creator"
+      initialSidebarCollapsed={initialSidebarCollapsed}
       headerAccessory={<NotificationBell />}
     >
       <DashboardSwitcher roles={user.roles} capabilities={user.capabilities} />
