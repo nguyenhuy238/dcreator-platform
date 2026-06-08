@@ -186,6 +186,7 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
       campaignType: true,
       setupSource: true,
       benefits: true,
+      creatorBriefDescription: true,
       productName: true,
       productDescription: true,
       productImageUrl: true,
@@ -259,7 +260,6 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
 
   return {
     ...campaign,
-    requiredHashtags,
     statusView,
     brandProfile,
     productSubmissions,
@@ -436,8 +436,8 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
         setupSource: input.setupSource,
         objective: input.benefits || null,
         benefits: input.benefits || null,
-        creatorBriefTitle: null,
-        creatorBriefDescription: null,
+        creatorBriefTitle: "YÊU CẦU",
+        creatorBriefDescription: input.requirements || null,
         productName: input.productName,
         productDescription: input.productDescription,
         productImageUrl: input.productImageUrl,
@@ -577,7 +577,6 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
   
   const nextRoadmap = input.participationRoadmap ? input.participationRoadmap.map((step) => step.trim()).filter(Boolean) : undefined;
   const nextBenefits = input.benefits === undefined ? undefined : input.benefits?.trim() || null;
-  const nextRequiredHashtags = input.requiredHashtags === undefined ? undefined : normalizeRequiredHashtags(input.requiredHashtags);
 
   const updated = await prisma.$transaction(async (tx) => {
     const nextCampaign = await tx.campaign.update({
@@ -590,6 +589,8 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         campaignType: input.campaignType,
         setupSource: input.setupSource,
         benefits: nextBenefits,
+        creatorBriefTitle: nextRequirements === undefined ? undefined : nextRequirements ? "YÊU CẦU" : null,
+        creatorBriefDescription: nextRequirements,
         productName: input.productName?.trim(),
         productDescription: input.productDescription?.trim(),
         productImageUrl: input.productImageUrl?.trim(),
@@ -632,6 +633,7 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         participationRoadmap: campaign.participationRoadmap,
         requiredHashtags: beforeRequiredHashtags,
         benefits: campaign.benefits ?? null,
+        requirements: campaign.creatorBriefDescription ?? null,
         productName: campaign.productName ?? null,
         productDescription: campaign.productDescription ?? null,
         productImageUrl: campaign.productImageUrl ?? null,
@@ -655,6 +657,7 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         participationRoadmap: updated.participationRoadmap,
         requiredHashtags: afterRequiredHashtags,
         benefits: updated.benefits ?? null,
+        requirements: updated.creatorBriefDescription ?? null,
         productName: updated.productName ?? null,
         productDescription: updated.productDescription ?? null,
         productImageUrl: updated.productImageUrl ?? null,

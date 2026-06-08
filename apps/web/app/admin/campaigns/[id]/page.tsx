@@ -31,6 +31,7 @@ type FormState = {
   category: CampaignCategory;
   campaignType: CampaignType;
   setupSource: SetupSource;
+  requirements: string;
   benefits: string;
   participationRoadmap: string[];
   requiredHashtags: string[];
@@ -49,6 +50,7 @@ type CampaignDetail = {
   campaignType: CampaignType;
   setupSource: SetupSource;
   benefits: string | null;
+  requirements: string | null;
   productName: string | null;
   productDescription: string | null;
   productLink: string | null;
@@ -76,6 +78,7 @@ type CampaignDetail = {
 };
 
 const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
+const REQUIREMENTS_MARKER = "[[CAMPAIGN_REQUIREMENTS]]:";
 
 const DEFAULT_FORM: FormState = {
   slug: "",
@@ -84,6 +87,7 @@ const DEFAULT_FORM: FormState = {
   campaignType: "COMMUNITY",
   setupSource: "BRAND_REQUESTED",
   benefits: "",
+  requirements: "",
   participationRoadmap: [""],
   requiredHashtags: DEFAULT_REQUIRED_HASHTAGS,
   imageUrl: "",
@@ -113,6 +117,7 @@ const apiErrorMessageMap: Record<string, string> = {
 const fieldMessageMap: Record<string, string> = {
   slug: "Đường dẫn công khai chưa hợp lệ. Chỉ dùng chữ thường, số và dấu gạch ngang.",
   title: "Vui lòng nhập tên chiến dịch tối thiểu 3 ký tự.",
+  requirements: "Vui lòng nhập yêu cầu tối thiểu 3 ký tự.",
   benefits: "Vui lòng nhập quyền lợi tối thiểu 3 ký tự.",
   imageUrl: "Ảnh chưa hợp lệ. Vui lòng chọn file ảnh hoặc dùng URL /uploads, http, https.",
   ugcVideoQuota: "Số lượng video review phải lớn hơn 0.",
@@ -164,6 +169,17 @@ function getContentFileUrlFromBrief(brief: string) {
   return [firstValue, ...continuationParts].join("");
 }
 
+function getRequirementsFromBrief(brief: string) {
+  const line = brief.split("\n").find((item) => item.trim().startsWith(REQUIREMENTS_MARKER));
+  const value = line ? line.trim().slice(REQUIREMENTS_MARKER.length).trim() : "";
+  if (!value) return "";
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 function buildCreatorBriefForm(item: CampaignDetail): CreatorBriefForm {
   return {
     productName: item.productName ?? "",
@@ -180,6 +196,7 @@ function buildForm(item: CampaignDetail): FormState {
     category: item.category,
     campaignType: item.campaignType,
     setupSource: item.setupSource,
+    requirements: item.requirements ?? "",
     benefits: item.benefits ?? "",
     participationRoadmap: item.participationRoadmap.length > 0 ? item.participationRoadmap : [""],
     requiredHashtags: item.requiredHashtags ?? [],
@@ -325,6 +342,7 @@ export default function AdminCampaignDetailPage() {
     if (form.slug.trim().length < 3) nextErrors.slug = "Slug cần tối thiểu 3 ký tự.";
     else if (!slugPattern.test(form.slug.trim())) nextErrors.slug = "Slug chỉ gồm chữ thường, số và dấu gạch ngang (-).";
     if (form.title.trim().length < 3) nextErrors.title = "Tên chiến dịch cần tối thiểu 3 ký tự.";
+    if (form.requirements.trim().length < 3) nextErrors.requirements = "Yêu cầu cần tối thiểu 3 ký tự.";
     if (form.benefits.trim().length < 3) nextErrors.benefits = "Quyền lợi cần tối thiểu 3 ký tự.";
     if (imageUrl && !imageUrl.startsWith("/uploads/") && !/^https?:\/\//.test(imageUrl)) {
       nextErrors.imageUrl = "Ảnh phải là URL bắt đầu bằng /uploads/ hoặc http(s)://";
@@ -368,6 +386,7 @@ export default function AdminCampaignDetailPage() {
           category: form.category,
           campaignType: form.campaignType,
           setupSource: form.setupSource,
+          requirements: form.requirements,
           benefits: form.benefits,
           participationRoadmap: form.participationRoadmap.filter((step) => step.trim().length > 0),
           requiredHashtags: normalizeRequiredHashtags(form.requiredHashtags),
@@ -540,6 +559,11 @@ export default function AdminCampaignDetailPage() {
                         <span className="text-zinc-500">Chưa có file đính kèm</span>
                       )}
                     </p>
+                    {getRequirementsFromBrief(request.brief) ? (
+                      <p className="md:col-span-2">
+                        Yêu cầu: <span className="whitespace-pre-line">{getRequirementsFromBrief(request.brief)}</span>
+                      </p>
+                    ) : null}
                     {request.adminNote ? <p className="md:col-span-2">Ghi chú admin: <span className="whitespace-pre-line">{request.adminNote}</span></p> : null}
                     {request.brandFeedback ? <p className="md:col-span-2">Phản hồi Brand: <span className="whitespace-pre-line">{request.brandFeedback}</span></p> : null}
                   </div>
@@ -717,6 +741,12 @@ export default function AdminCampaignDetailPage() {
                 error={fieldErrors.requiredHashtags}
               />
             </div>
+
+            <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
+              <span>Yêu cầu</span>
+              <textarea className={`dc-input min-h-24 ${fieldErrors.requirements ? "border-red-500 ring-1 ring-red-300" : ""}`} value={form.requirements} onChange={(event) => setField("requirements", event.target.value)} />
+              {fieldErrors.requirements ? <span className="text-xs text-red-600">{fieldErrors.requirements}</span> : null}
+            </label>
 
             <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
               <span>Quyền lợi</span>

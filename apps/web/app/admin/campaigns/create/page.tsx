@@ -26,6 +26,7 @@ type FormState = {
   slug: string;
   title: string;
   brief: string;
+  requirements: string;
   category: CampaignCategory;
   campaignType: CampaignType;
   setupSource: SetupSource;
@@ -62,6 +63,7 @@ const defaultForm: FormState = {
   slug: "",
   title: "",
   brief: "",
+  requirements: "",
   category: "LIFESTYLE",
   campaignType: "COMMUNITY",
   setupSource: "BRAND_REQUESTED",
@@ -95,6 +97,7 @@ function toDateTimeLocalInput(value?: string | null) {
 
 const COVER_IMAGE_MARKER = "[[COVER_IMAGE_URL]]:";
 const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
+const REQUIREMENTS_MARKER = "[[CAMPAIGN_REQUIREMENTS]]:";
 
 function extractMarker(brief: string, marker: string) {
   const line = brief
@@ -102,6 +105,16 @@ function extractMarker(brief: string, marker: string) {
     .map((item) => item.trim())
     .find((item) => item.startsWith(marker));
   return line ? line.slice(marker.length).trim() : "";
+}
+
+function extractRequirements(brief: string) {
+  const value = extractMarker(brief, REQUIREMENTS_MARKER);
+  if (!value) return "";
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 const apiErrorFieldMap: Record<string, string> = {
@@ -126,6 +139,7 @@ const vietnameseErrorMessages: Record<string, string> = {
   brandAccountId: "Vui lòng chọn tài khoản Brand.",
   slug: "Đường dẫn công khai chưa hợp lệ. Chỉ dùng chữ thường, số và dấu gạch ngang.",
   title: "Vui lòng nhập tên chiến dịch tối thiểu 3 ký tự.",
+  requirements: "Vui lòng nhập yêu cầu tối thiểu 3 ký tự.",
   benefits: "Vui lòng nhập quyền lợi tối thiểu 3 ký tự.",
   imageUrl: "Ảnh chưa hợp lệ. Vui lòng chọn file ảnh hoặc dùng URL /uploads, http, https.",
   ugcVideoQuota: "Số lượng video review phải lớn hơn 0.",
@@ -236,6 +250,7 @@ export default function AdminCreateCampaignPage() {
           slug: request.requestedSlug || current.slug,
           title: request.title || current.title,
           brief: contentFileUrl ? `${request.brief}\n\nFile nội dung Brand gửi: ${contentFileUrl}` : request.brief || current.brief,
+          requirements: extractRequirements(request.brief) || current.requirements,
           setupSource: "BRAND_REQUESTED",
           participationRoadmap: normalizedRoadmap,
           benefits: request.objective ?? current.benefits,
@@ -305,6 +320,7 @@ export default function AdminCreateCampaignPage() {
     if (form.slug.trim().length < 3) nextErrors.slug = "Slug cần tối thiểu 3 ký tự.";
     else if (!slugPattern.test(form.slug.trim())) nextErrors.slug = "Slug chỉ gồm chữ thường, số và dấu gạch ngang (-).";
     if (form.title.trim().length < 3) nextErrors.title = "Tên chiến dịch cần tối thiểu 3 ký tự.";
+    if (form.requirements.trim().length < 3) nextErrors.requirements = "Yêu cầu cần tối thiểu 3 ký tự.";
     if (form.benefits.trim().length < 3) nextErrors.benefits = "Quyền lợi cần tối thiểu 3 ký tự.";
     if (imageUrl && !imageUrl.startsWith("/uploads/") && !/^https?:\/\//.test(imageUrl)) {
       nextErrors.imageUrl = "Ảnh phải là URL bắt đầu bằng /uploads/ hoặc http(s)://";
@@ -347,6 +363,7 @@ export default function AdminCreateCampaignPage() {
         body: JSON.stringify({
           ...form,
           brief: null,
+          requirements: form.requirements,
           publishNow: true,
           startsAt: toDateTime(form.startsAt),
           endsAt: toDateTime(form.endsAt),
@@ -502,6 +519,12 @@ export default function AdminCreateCampaignPage() {
               error={fieldErrors.requiredHashtags}
             />
           </div>
+
+          <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
+            <span>Yêu cầu</span>
+            <textarea className={`dc-input min-h-24 ${fieldErrors.requirements ? "border-red-500 ring-1 ring-red-300" : ""}`} value={form.requirements} onChange={(event) => setField("requirements", event.target.value)} required />
+            {fieldErrors.requirements ? <span className="text-xs text-red-600">{fieldErrors.requirements}</span> : null}
+          </label>
 
           <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
             <span>Quyền lợi</span>

@@ -190,12 +190,14 @@ export default async function BrandHomePage() {
               >
                 {primaryCtaLabel}
               </AnalyticsLink>
-              <BrandProcessScrollLink
-                targetId="service-packages"
+              <AnalyticsLink
+                href="/brand-get-started"
+                eventName={AnalyticsEvents.BRAND_UPGRADE_CLICK}
+                eventParams={{ role: "brand", page_source: "brand_landing_hero_get_started" }}
                 className="dc-btn-secondary w-full rounded-xl px-6 text-base font-semibold sm:w-auto sm:min-w-[220px]"
               >
                 Bắt đầu ngay hôm nay
-              </BrandProcessScrollLink>
+              </AnalyticsLink>
             </div>
           </div>
 
@@ -443,12 +445,14 @@ export default async function BrandHomePage() {
                 Hãy để dCreator giúp thương hiệu của bạn kết nối với hàng triệu khách hàng thông qua những người kể chuyện tài năng nhất.
               </p>
               <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <BrandProcessScrollLink
-                  targetId="service-packages"
+                <AnalyticsLink
+                  href="/brand-get-started"
+                  eventName={AnalyticsEvents.BRAND_UPGRADE_CLICK}
+                  eventParams={{ role: "brand", page_source: "brand_landing_footer_get_started" }}
                   className="inline-flex w-full items-center justify-center rounded-md bg-white px-8 py-3 text-sm font-black !text-black transition-colors duration-200 hover:bg-zinc-200 sm:w-auto"
                 >
                   Bắt đầu ngay hôm nay
-                </BrandProcessScrollLink>
+                </AnalyticsLink>
                 <BrandConsultationModal source="brand_landing_consultation" />
               </div>
             </div>
