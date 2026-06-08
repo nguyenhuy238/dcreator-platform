@@ -260,6 +260,7 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
 
   return {
     ...campaign,
+    requiredHashtags,
     statusView,
     brandProfile,
     productSubmissions,
@@ -577,6 +578,8 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
   
   const nextRoadmap = input.participationRoadmap ? input.participationRoadmap.map((step) => step.trim()).filter(Boolean) : undefined;
   const nextBenefits = input.benefits === undefined ? undefined : input.benefits?.trim() || null;
+  const nextRequirements = input.requirements === undefined ? undefined : input.requirements?.trim() || null;
+  const nextRequiredHashtags = input.requiredHashtags === undefined ? undefined : normalizeRequiredHashtags(input.requiredHashtags);
 
   const updated = await prisma.$transaction(async (tx) => {
     const nextCampaign = await tx.campaign.update({

@@ -12,6 +12,7 @@ export type BrandConsultationRecord = {
   phone: string;
   facebookUrl: string | null;
   source: string;
+  interestedPackage: string | null;
   note: string | null;
   status: BrandConsultationStatus;
   submittedByUserId: string | null;
@@ -27,6 +28,7 @@ type BrandConsultationInput = {
   phone: string;
   facebookUrl?: string;
   source?: string;
+  interestedPackage?: string;
   note?: string;
   submittedByUserId?: string | null;
   submittedByEmail?: string | null;
@@ -68,6 +70,7 @@ export async function createBrandConsultation(input: BrandConsultationInput) {
     phone: input.phone.trim(),
     facebookUrl: input.facebookUrl?.trim() || null,
     source: (input.source?.trim() || "brand_landing_consultation"),
+    interestedPackage: input.interestedPackage?.trim() || null,
     note: input.note?.trim() || null,
     status: "NEW",
     submittedByUserId: input.submittedByUserId ?? null,
@@ -87,7 +90,7 @@ export async function listBrandConsultationsForAdmin(input?: { query?: string })
   const query = input?.query?.trim().toLowerCase() ?? "";
   const filtered = query
     ? records.filter((record) =>
-        [record.name, record.email, record.phone, record.facebookUrl, record.source, record.note, record.submittedByEmail, record.submittedByName]
+        [record.name, record.email, record.phone, record.facebookUrl, record.source, record.interestedPackage, record.note, record.submittedByEmail, record.submittedByName]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(query))
       )
