@@ -7,6 +7,7 @@ import { BrandProcessScrollLink } from "@/app/brand/_components/BrandProcessScro
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { AnalyticsEvents } from "@/lib/analytics-events";
 import { getCurrentUserFromServer } from "@/lib/auth/current-user";
+import { BRAND_SUBSCRIPTION_PACKAGES, type BrandSubscriptionPackageDefinition } from "@/lib/constants/brand-subscription";
 import { prisma } from "@/lib/db";
 import { listCampaigns } from "@/lib/services/campaign.service";
 
@@ -58,48 +59,31 @@ const processSteps = [
   ["5", "DCREATOR THEO DÕI HIỆU QUẢ", "Theo dõi hiệu quả, hoàn thiện sản phẩm nếu có, cập nhật mã quảng cáo và giúp Brand tối ưu campaign cho các đợt sau.", "chart"]
 ] as const;
 
-const servicePackages = [
-  {
-    name: "Gói Free",
-    badge: "Khởi động",
-    price: "0 N-Point",
-    description: "Khởi động, test hiệu quả creator marketing với chi phí thấp.",
-    highlightTitle: "Ưu đãi gói Free",
+const HIDDEN_BRAND_LANDING_PACKAGE_FEATURES = new Set([
+  "Brand có thể dùng lại cho fanpage, website, ads"
+]);
+
+function formatPackagePrice(packageDefinition: BrandSubscriptionPackageDefinition) {
+  return `${packageDefinition.pricePoints.toLocaleString("vi-VN")} N-Point`;
+}
+
+const servicePackages = BRAND_SUBSCRIPTION_PACKAGES.map((packageDefinition) => {
+  const isFreePackage = packageDefinition.code === "FREE";
+  return {
+    code: packageDefinition.code,
+    name: packageDefinition.name,
+    badge: isFreePackage ? "Khởi động" : "UGC",
+    price: formatPackagePrice(packageDefinition),
+    description: packageDefinition.summary,
+    highlightTitle: isFreePackage ? "Ưu đãi đặc biệt" : null,
+    highlightIntro: packageDefinition.specialIntro ?? null,
     benefits: [
-      "Tặng miễn phí 20 video UGC / Brand",
-      "Tổng chương trình hỗ trợ lên đến 500 video",
-      "Creator phù hợp theo ngành hàng và sản phẩm"
+      ...packageDefinition.features.filter((feature) => !HIDDEN_BRAND_LANDING_PACKAGE_FEATURES.has(feature)),
+      ...(packageDefinition.specialFeatures ?? [])
     ],
-    tone: "emerald"
-  },
-  {
-    name: "UGC - Gói 15 Video",
-    badge: "UGC",
-    price: "5.000.000 N-Point",
-    description: "15 video review sản phẩm/dịch vụ với creator trên hệ thống.",
-    highlightTitle: null,
-    benefits: [
-      "Creator đăng ký tham gia và được lọc theo tiêu chí Brand",
-      "Mỗi video là nội dung UGC theo brief campaign",
-      "Đặt hàng tăng lượt bán shop"
-    ],
-    tone: "zinc"
-  },
-  {
-    name: "UGC - Gói 50 Video",
-    badge: "UGC",
-    price: "12.000.000 N-Point",
-    description: "Gói mở rộng cho chiến dịch phủ rộng nội dung UGC.",
-    highlightTitle: null,
-    benefits: [
-      "Bao gồm toàn bộ quyền lợi của gói UGC - Gói 15 Video",
-      "Bao gồm 50 video UGC cho sản phẩm/dịch vụ",
-      "Có thể kết hợp hàng/tiền hàng/voucher theo campaign",
-      "Phù hợp mục tiêu scale nhận diện và chuyển đổi."
-    ],
-    tone: "zinc"
-  }
-] as const;
+    tone: isFreePackage ? "emerald" : "zinc"
+  };
+});
 
 const formatCompactNumber = (value: number) =>
   new Intl.NumberFormat("vi-VN", {
@@ -429,7 +413,12 @@ export default async function BrandHomePage() {
 
                 <div className={servicePackage.tone === "emerald" ? "mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4" : "mt-6 rounded-2xl border border-zinc-200 bg-white p-4"}>
                   {servicePackage.highlightTitle ? (
-                    <p className="mb-3 text-sm font-black text-zinc-950">{servicePackage.highlightTitle}</p>
+                    <div className="mb-3">
+                      <p className="text-sm font-black text-zinc-950">{servicePackage.highlightTitle}</p>
+                      {servicePackage.highlightIntro ? (
+                        <p className="mt-1 text-sm font-semibold text-emerald-800">{servicePackage.highlightIntro}</p>
+                      ) : null}
+                    </div>
                   ) : null}
                   <ul className="space-y-3 text-sm leading-6 text-zinc-700">
                     {servicePackage.benefits.map((benefit) => (

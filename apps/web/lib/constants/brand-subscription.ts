@@ -18,7 +18,7 @@ export const BRAND_SUBSCRIPTION_PACKAGES: BrandSubscriptionPackageDefinition[] =
     pricePoints: 0,
     summary: "Khởi động, test hiệu quả creator marketing với chi phí thấp.",
     features: [],
-    specialTitle: "ĐẶC BIỆT(không khả dụng)",
+    specialTitle: "ĐẶC BIỆT (không khả dụng)",
     specialIntro: "25 Brands đầu tiên sẽ được:",
     specialFeatures: [
       "Tặng miễn phí 20 video UGC / Brand",
@@ -37,7 +37,7 @@ export const BRAND_SUBSCRIPTION_PACKAGES: BrandSubscriptionPackageDefinition[] =
       "Mỗi video là nội dung UGC theo brief campaign",
       "Brand có thể dùng lại cho fanpage, website, ads",
       "Đặt hàng tăng lượt bán shop",
-      "Đăng lên kênh cá nhân của creators",
+      "Đánh lên kênh cá nhân của creators",
       "Đánh giá 5 sao và viết nhận xét sản phẩm",
       "Cấp mã quảng cáo video để brand chạy quảng cáo",
       "4 giờ livestream bán hàng trên kênh của Brand"
