@@ -76,7 +76,7 @@ type HistoryDetailTab = "DETAILS" | "HISTORY";
 type TimelineStep = {
   key: string;
   label: string;
-  icon: "application" | "purchase" | "draftSubmit" | "videoSubmit" | "videoReview" | "publish" | "publishReview" | "completed";
+  icon: "application" | "purchase" | "draftSubmit" | "videoSubmit" | "videoReview" | "publish" | "publishReview" | "refund" | "completed";
   done: boolean;
   current: boolean;
   failed: boolean;
@@ -175,6 +175,7 @@ function TimelineStepIcon({ step }: { step: TimelineStep["icon"] }) {
   if (step === "videoReview") return <CheckCircle size={18} weight="duotone" />;
   if (step === "publish") return <Megaphone size={18} weight="duotone" />;
   if (step === "publishReview") return <CheckCircle size={18} weight="duotone" />;
+  if (step === "refund") return <Package size={18} weight="duotone" />;
   return <CheckCircle size={18} weight="fill" />;
 }
 
@@ -190,6 +191,7 @@ function buildTimeline(item: HistoryItem): TimelineStep[] {
       { key: "videoReview", label: "Duyệt video", icon: "videoReview", done: false, current: false, failed: false },
       { key: "publish", label: "Nộp link public", icon: "publish", done: false, current: false, failed: false },
       { key: "publishReview", label: "Duyệt link public", icon: "publishReview", done: false, current: false, failed: false },
+      ...(includePurchase ? [{ key: "refund", label: "Chờ hoàn tiền", icon: "refund" as const, done: false, current: false, failed: false }] : []),
       { key: "completed", label: "Hoàn thành", icon: "completed", done: false, current: false, failed: false }
     ];
   }
@@ -202,6 +204,7 @@ function buildTimeline(item: HistoryItem): TimelineStep[] {
     { key: "videoReview", label: "Duyệt video", icon: "videoReview", done: item.videoReviewStatus === "APPROVED" || item.status === "COMPLETED", current: false, failed: item.videoReviewStatus === "REJECTED" },
     { key: "publish", label: "Nộp link public", icon: "publish", done: Boolean(item.submission?.publicVideoUrl || item.submission?.socialPostUrl || item.publishSubmittedAt), current: false, failed: false },
     { key: "publishReview", label: "Duyệt link public", icon: "publishReview", done: item.publishStatus === "APPROVED" || item.status === "COMPLETED", current: false, failed: item.publishStatus === "REJECTED" || rejected },
+    ...(includePurchase ? [{ key: "refund", label: "Chờ hoàn tiền", icon: "refund" as const, done: item.status === "COMPLETED", current: item.reimbursementStatus === "PAYOUT_PENDING", failed: false }] : []),
     { key: "completed", label: "Hoàn thành", icon: "completed", done: item.status === "COMPLETED", current: false, failed: false }
   ];
 

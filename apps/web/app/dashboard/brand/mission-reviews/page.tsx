@@ -9,7 +9,7 @@ type ApiResult<T> = { success: boolean; data?: T; error?: string };
 type DetailTab = "ACTIONS" | "HISTORY";
 type FinalReviewResubmitField = "PUBLIC_URL" | "AD_CODE" | "SCREENSHOT" | "PURCHASE_BILL" | "PRODUCT_REVIEW_SCREENSHOT";
 
-export type MissionReviewsTabKey = "transcript-reviews" | "applications" | "video-reviews" | "final-reviews";
+export type MissionReviewsTabKey = "transcript-reviews" | "applications" | "video-reviews" | "final-reviews" | "refund-reviews";
 
 type MissionReviewsPageProps = {
   pageTitle: string;
@@ -24,7 +24,8 @@ const tabs: Array<{ key: MissionReviewsTabKey; label: string }> = [
   { key: "applications", label: "Đơn tham gia campaign" },
   { key: "transcript-reviews", label: "Duyệt kịch bản" },
   { key: "video-reviews", label: "Duyệt video" },
-  { key: "final-reviews", label: "Duyệt link public" }
+  { key: "final-reviews", label: "Duyệt link public" },
+  { key: "refund-reviews", label: "Duyệt hoàn tiền" }
 ];
 
 function fmtDate(value: string | null) {
@@ -109,7 +110,8 @@ function mapStatusVi(value: string | null | undefined) {
     NOT_SUBMITTED: "Chưa nộp",
     NOT_REQUIRED: "Không yêu cầu",
     WAITING_PURCHASE: "Chờ mua hàng",
-    WAITING_DEPOSIT: "Chờ đặt cọc"
+    WAITING_DEPOSIT: "Chờ đặt cọc",
+    PAYOUT_PENDING: "Chờ hoàn tiền"
   };
   return map[value] ?? value;
 }
@@ -146,6 +148,7 @@ function buildStaticReviewTimeline(activeKey: TimelineStep["key"], includePurcha
     { key: "videoReview", label: "Duyệt video", icon: "videoReview" },
     { key: "publish", label: "Nộp link public", icon: "publish" },
     { key: "publishReview", label: "Duyệt link public", icon: "publishReview" },
+    ...(includePurchase ? [{ key: "refund" as const, label: "Chờ hoàn tiền", icon: "refund" as const }] : []),
     { key: "completed", label: "Hoàn thành", icon: "completed" }
   ];
   const activeIndex = steps.findIndex((step) => step.key === activeKey);
@@ -162,7 +165,8 @@ function buildStaticReviewTimeline(activeKey: TimelineStep["key"], includePurcha
 function buildReviewTimelineForStage(
   stage: "application" | "transcript" | "video" | "publish",
   includePurchase: boolean,
-  status: string | null | undefined
+  status: string | null | undefined,
+  reimbursementStatus?: string | null
 ) {
   if (stage === "application") {
     if (status === "REJECTED") return buildStaticReviewTimeline("application", includePurchase).map((step) => ({ ...step, current: step.key === "application", failed: step.key === "application", done: false }));
@@ -201,6 +205,7 @@ function buildReviewTimelineForStage(
       failed: step.key === "publishReview"
     }));
   }
+  if (includePurchase && reimbursementStatus === "PAYOUT_PENDING") return buildStaticReviewTimeline("refund", includePurchase);
   if (status === "APPROVED" || status === "COMPLETED") {
     return buildStaticReviewTimeline("publishReview", includePurchase).map((step) => ({
       ...step,
@@ -290,7 +295,7 @@ function CampaignOverviewCard({
 type TimelineStep = {
   key: string;
   label: string;
-  icon: "application" | "purchase" | "draftSubmit" | "videoSubmit" | "videoReview" | "publish" | "publishReview" | "completed";
+  icon: "application" | "purchase" | "draftSubmit" | "videoSubmit" | "videoReview" | "publish" | "publishReview" | "refund" | "completed";
   done: boolean;
   current: boolean;
   failed: boolean;
@@ -304,6 +309,7 @@ function TimelineStepIcon({ step }: { step: TimelineStep["icon"] }) {
   if (step === "videoReview") return <CheckCircle size={18} weight="duotone" />;
   if (step === "publish") return <Megaphone size={18} weight="duotone" />;
   if (step === "publishReview") return <CheckCircle size={18} weight="duotone" />;
+  if (step === "refund") return <Package size={18} weight="duotone" />;
   return <CheckCircle size={18} weight="fill" />;
 }
 
@@ -403,17 +409,20 @@ export function MissionReviewsPage({
   embedded = false,
   fixedCampaignId
 }: MissionReviewsPageProps) {
+  const canReviewRefunds = apiBasePath === "/api/admin";
+  const visibleTabs = useMemo(() => tabs.filter((tab) => canReviewRefunds || tab.key !== "refund-reviews"), [canReviewRefunds]);
   const [activeTab, setActiveTab] = useState<MissionReviewsTabKey>(initialTab);
   const [tabCounts, setTabCounts] = useState<Record<MissionReviewsTabKey, number>>({
     applications: 0,
     "transcript-reviews": 0,
     "video-reviews": 0,
-    "final-reviews": 0
+    "final-reviews": 0,
+    "refund-reviews": 0
   });
 
   useEffect(() => {
-    setActiveTab(initialTab);
-  }, [initialTab]);
+    setActiveTab(canReviewRefunds || initialTab !== "refund-reviews" ? initialTab : "applications");
+  }, [canReviewRefunds, initialTab]);
 
   async function loadTabCounts() {
     const buildParams = (extra?: Record<string, string>) => {
@@ -423,30 +432,31 @@ export function MissionReviewsPage({
       return params.toString();
     };
 
-    const [applicationsRes, transcriptRes, videoRes, finalRes] = await Promise.all([
+    const requests = [
       fetch(`${apiBasePath}/mission-applications?${buildParams({ status: "PENDING_REVIEW" })}`, { cache: "no-store" }),
       fetch(`${apiBasePath}/mission-transcript-reviews?${buildParams({ status: "PENDING" })}`, { cache: "no-store" }),
       fetch(`${apiBasePath}/mission-video-reviews?${buildParams()}`, { cache: "no-store" }),
       fetch(`${apiBasePath}/mission-final-reviews?${buildParams({ publishStatus: "PENDING" })}`, { cache: "no-store" })
-    ]);
+    ];
+    if (canReviewRefunds) {
+      requests.push(fetch(`${apiBasePath}/mission-final-reviews?${buildParams({ publishStatus: "APPROVED", reimbursementStatus: "PAYOUT_PENDING", productReceiveOption: "PRODUCT_REQUIRED" })}`, { cache: "no-store" }));
+    }
+    const responses = await Promise.all(requests);
 
-    const [applicationsBody, transcriptBody, videoBody, finalBody] = await Promise.all([
-      applicationsRes.json(),
-      transcriptRes.json(),
-      videoRes.json(),
-      finalRes.json()
-    ]) as Array<ApiResult<{ pagination?: { total?: number } }>>;
+    const [applicationsBody, transcriptBody, videoBody, finalBody, refundBody] = await Promise.all(responses.map((response) => response.json())) as Array<ApiResult<{ pagination?: { total?: number } }>>;
 
     const applicationsTotal = applicationsBody?.data?.pagination?.total ?? 0;
     const transcriptTotal = transcriptBody?.data?.pagination?.total ?? 0;
     const videoTotal = videoBody?.data?.pagination?.total ?? 0;
     const finalTotal = finalBody?.data?.pagination?.total ?? 0;
+    const refundTotal = refundBody?.data?.pagination?.total ?? 0;
 
     setTabCounts({
       applications: applicationsTotal,
       "transcript-reviews": transcriptTotal,
       "video-reviews": videoTotal,
-      "final-reviews": finalTotal
+      "final-reviews": finalTotal,
+      "refund-reviews": refundTotal
     });
   }
 
@@ -462,7 +472,7 @@ export function MissionReviewsPage({
     return () => {
       cancelled = true;
     };
-  }, [apiBasePath, fixedCampaignId]);
+  }, [apiBasePath, canReviewRefunds, fixedCampaignId]);
 
   return (
     <>
@@ -470,7 +480,7 @@ export function MissionReviewsPage({
 
       <section className="dc-card p-3">
         <div className="flex flex-wrap gap-2">
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
@@ -487,6 +497,7 @@ export function MissionReviewsPage({
       {activeTab === "applications" ? <BrandMissionApplicationsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} onReviewUpdated={() => void loadTabCounts()} /> : null}
       {activeTab === "video-reviews" ? <BrandMissionVideoReviewsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} onReviewUpdated={() => void loadTabCounts()} /> : null}
       {activeTab === "final-reviews" ? <BrandMissionFinalReviewsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} onReviewUpdated={() => void loadTabCounts()} /> : null}
+      {activeTab === "refund-reviews" && canReviewRefunds ? <BrandMissionFinalReviewsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} mode="refund" onReviewUpdated={() => void loadTabCounts()} /> : null}
     </>
   );
 }
@@ -849,6 +860,7 @@ function missionStatusLabel(status: string) {
 function missionStatusTone(status: string) {
   if (status === "APPROVED" || status === "COMPLETED") return "bg-emerald-50 text-emerald-700";
   if (status === "REJECTED") return "bg-amber-50 text-amber-700";
+  if (status === "PAYOUT_PENDING") return "bg-amber-50 text-amber-700";
   return "bg-zinc-100 text-zinc-700";
 }
 
@@ -1365,7 +1377,19 @@ const finalProductOptions = [
   { value: "PRODUCT_REQUIRED", label: "Yêu cầu sản phẩm" }
 ];
 
-function BrandMissionFinalReviewsTab({ apiBasePath, fixedCampaignId, hideFilters = false, onReviewUpdated }: { apiBasePath: string; fixedCampaignId?: string; hideFilters?: boolean; onReviewUpdated?: () => void }) {
+function BrandMissionFinalReviewsTab({
+  apiBasePath,
+  fixedCampaignId,
+  hideFilters = false,
+  mode = "publish",
+  onReviewUpdated
+}: {
+  apiBasePath: string;
+  fixedCampaignId?: string;
+  hideFilters?: boolean;
+  mode?: "publish" | "refund";
+  onReviewUpdated?: () => void;
+}) {
   const [items, setItems] = useState<FinalItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1406,7 +1430,13 @@ function BrandMissionFinalReviewsTab({ apiBasePath, fixedCampaignId, hideFilters
       if (query.trim()) params.set("query", query.trim());
       if (campaign.trim()) params.set("campaign", campaign.trim());
       if (fixedCampaignId) params.set("campaignId", fixedCampaignId);
-      params.set("publishStatus", "PENDING");
+      if (mode === "refund") {
+        params.set("publishStatus", "APPROVED");
+        params.set("reimbursementStatus", "PAYOUT_PENDING");
+        params.set("productReceiveOption", "PRODUCT_REQUIRED");
+      } else {
+        params.set("publishStatus", "PENDING");
+      }
       params.set("page", String(targetPage));
       params.set("limit", "20");
       const res = await fetch(`${apiBasePath}/mission-final-reviews?${params.toString()}`, { cache: "no-store" });
@@ -1440,7 +1470,7 @@ function BrandMissionFinalReviewsTab({ apiBasePath, fixedCampaignId, hideFilters
     setNotice("");
     setError("");
     let reimbursementAmountVnd: number | undefined;
-    if (item.productReceiveOption === "PRODUCT_REQUIRED") {
+    if (mode === "refund" || (apiBasePath === "/api/admin" && item.productReceiveOption === "PRODUCT_REQUIRED")) {
       const raw = window.prompt("Nhập số tiền hoàn lại sản phẩm (VND):", "0")?.trim();
       if (!raw) return;
       const parsed = Number(raw);
@@ -1458,7 +1488,7 @@ function BrandMissionFinalReviewsTab({ apiBasePath, fixedCampaignId, hideFilters
       });
       const body = (await res.json()) as ApiResult<unknown>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Duyệt thất bại");
-      setNotice("Đã duyệt hoàn thành campaign và hoàn N-Points mua sản phẩm.");
+      setNotice(mode === "refund" ? "Đã hoàn N-Points mua sản phẩm cho Creator." : item.productReceiveOption === "PRODUCT_REQUIRED" && apiBasePath !== "/api/admin" ? "Đã duyệt link public. Đơn đã chuyển sang trạng thái chờ hoàn tiền." : "Đã duyệt hoàn thành campaign.");
       await load();
       onReviewUpdated?.();
       if (selectedId === item.id) await loadDetail(item.id);
@@ -1490,7 +1520,7 @@ function BrandMissionFinalReviewsTab({ apiBasePath, fixedCampaignId, hideFilters
 
   useEffect(() => {
     void load();
-  }, [page]);
+  }, [mode, page]);
 
   const rejectModal = rejectTarget ? (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-zinc-900/50 p-4" onClick={() => setRejectTarget(null)}>
@@ -1571,7 +1601,7 @@ function BrandMissionFinalReviewsTab({ apiBasePath, fixedCampaignId, hideFilters
         <section className="grid gap-4">
           <div className="grid gap-3">
             {items.length === 0 ? (
-              <EmptyState title="Không có item cần duyệt" description="Không có mission nào cho trạng thái lọc hiện tại." />
+              <EmptyState title={mode === "refund" ? "Không có đơn chờ hoàn tiền" : "Không có item cần duyệt"} description="Không có mission nào cho trạng thái lọc hiện tại." />
             ) : (
               items.map((item) => (
                 <article key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
@@ -1586,12 +1616,12 @@ function BrandMissionFinalReviewsTab({ apiBasePath, fixedCampaignId, hideFilters
                       <p className="text-xs text-zinc-500">Ngày nộp</p>
                     </div>
                     <div>
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${missionStatusTone(item.publishStatus)}`}>{missionStatusLabel(item.publishStatus)}</span>
+                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${missionStatusTone(mode === "refund" ? item.reimbursementStatus : item.publishStatus)}`}>{mode === "refund" ? mapStatusVi(item.reimbursementStatus) : missionStatusLabel(item.publishStatus)}</span>
                     </div>
                     <div className="flex flex-wrap gap-2 xl:justify-end">
-                      {item.publishStatus === "PENDING" ? (
+                      {(mode === "refund" ? item.reimbursementStatus === "PAYOUT_PENDING" : item.publishStatus === "PENDING") ? (
                         <button className="dc-btn-primary" onClick={() => void approve(item)}>
-                          Duyệt
+                          {mode === "refund" ? "Duyệt hoàn tiền" : "Duyệt"}
                         </button>
                       ) : null}
                       <button className="dc-btn-secondary" onClick={() => { setDetailTab("ACTIONS"); void loadDetail(item.id); }}>
@@ -1617,13 +1647,20 @@ function BrandMissionFinalReviewsTab({ apiBasePath, fixedCampaignId, hideFilters
             onClose={() => { setSelectedId(""); setDetail(null); setDetailLoading(false); }}
             detailTab={detailTab}
             setDetailTab={setDetailTab}
-            timelineSteps={buildReviewTimelineForStage("publish", detail?.productReceiveOption === "PRODUCT_REQUIRED", detail?.publishStatus)}
+            timelineSteps={buildReviewTimelineForStage("publish", detail?.productReceiveOption === "PRODUCT_REQUIRED", detail?.publishStatus, detail?.reimbursementStatus)}
             campaignNode={<CampaignOverviewCard campaign={detail?.campaign} mission={detail?.mission} loading={detailLoading} />}
             missionNode={<>{detail?.productReceiveOption === "PRODUCT_REQUIRED" ? <ProductInfoCard title={detail?.mission.productName} description={detail?.mission.productDescription} imageUrl={detail?.mission.productImageUrl} link={detail?.mission.productLink} /> : null}<CreatorSocialLinks name={detail?.account.displayName} profile={detail?.account.creatorProfile} /></>}
             historyNode={<div className="space-y-3"><p className="text-sm font-semibold text-zinc-900">Lịch sử các lần đã nộp</p>{(detail?.submission?.purchaseBillImageUrl || detail?.submission?.productReviewScreenshotUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước mua sản phẩm</summary><div className="mt-2 space-y-1"><p>Ảnh bill: <UrlValue value={detail?.submission?.purchaseBillImageUrl} label="Tải file ảnh" /></p><p>Ảnh đánh giá: <UrlValue value={detail?.submission?.productReviewScreenshotUrl} label="Tải file ảnh" /></p></div></details> : null}{detail?.submission?.videoUrl ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp video</summary><div className="mt-2 space-y-1"><p>Video review: <UrlValue value={detail?.submission?.videoUrl} /></p></div></details> : null}{(detail?.publishSubmittedAt || detail?.submission?.publicVideoUrl || detail?.submission?.socialPostUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp link social</summary><div className="mt-2 space-y-1"><p>Thời gian nộp: {fmtDate(detail?.publishSubmittedAt ?? null)}</p><p>Link public: <UrlValue value={detail?.submission?.publicVideoUrl ?? detail?.submission?.socialPostUrl} label="Mở liên kết public" /></p><p>Ảnh chụp màn hình minh chứng: <UrlValue value={detail?.submission?.screenshotUrl} label="Tải file ảnh" /></p><p>Mã quảng cáo: {detail?.submission?.adCode ?? "-"}</p>{hasText(detail?.submission?.finalProofNote) ? <p>Ghi chú: {detail?.submission?.finalProofNote}</p> : null}</div></details> : null}</div>}
             actionNode={
               <div className="grid gap-2 text-sm">
-                {(detail?.submission?.publicVideoUrl || detail?.submission?.socialPostUrl) ? (
+                {mode === "refund" ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                    <p className="font-semibold text-zinc-900">Bước duyệt hoàn tiền:</p>
+                    <p className="mt-2 text-zinc-700">Admin chỉ cần kiểm tra ảnh bill mua hàng và ảnh đánh giá 5 sao, sau đó nhập số tiền cần hoàn cho Creator.</p>
+                    <p className="mt-2">Ảnh bill mua hàng: <UrlValue value={detail?.submission?.purchaseBillImageUrl} label="Tải file ảnh" /></p>
+                    <p>Ảnh vote 5 sao: <UrlValue value={detail?.submission?.productReviewScreenshotUrl} label="Tải file ảnh" /></p>
+                  </div>
+                ) : (detail?.submission?.publicVideoUrl || detail?.submission?.socialPostUrl) ? (
                   <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
                     <p className="font-semibold text-zinc-900">Bước duyệt social public:</p>
                     <p className="mt-2">Link public: <UrlValue value={detail?.submission?.publicVideoUrl ?? detail?.submission?.socialPostUrl} label="Mở liên kết public" /></p>
@@ -1640,10 +1677,10 @@ function BrandMissionFinalReviewsTab({ apiBasePath, fixedCampaignId, hideFilters
                 ) : null}
                 {detail?.publishFeedback ? <p><strong>Lý do từ chối:</strong> {detail.publishFeedback}</p> : null}
                 {detail?.publishResubmitFields?.length ? <p><strong>Trường cần gửi lại:</strong> {detail.publishResubmitFields.map((field) => finalReviewFieldLabelMap[field]).join(", ")}</p> : null}
-                {detail?.publishStatus === "PENDING" ? (
+                {(mode === "refund" ? detail?.reimbursementStatus === "PAYOUT_PENDING" : detail?.publishStatus === "PENDING") ? (
                   <div className="flex flex-wrap gap-2">
-                    <button className="dc-btn-primary" onClick={() => void approve(detail)}>Duyệt</button>
-                    <button className="dc-btn-secondary" onClick={() => openRejectModal(detail)}>Từ chối</button>
+                    <button className="dc-btn-primary" onClick={() => { if (detail) void approve(detail); }}>{mode === "refund" ? "Nhập số tiền và hoàn" : "Duyệt"}</button>
+                    {mode === "publish" ? <button className="dc-btn-secondary" onClick={() => { if (detail) openRejectModal(detail); }}>Từ chối</button> : null}
                   </div>
                 ) : null}
               </div>
