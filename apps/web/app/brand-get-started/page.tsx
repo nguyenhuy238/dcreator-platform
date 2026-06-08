@@ -6,6 +6,8 @@ function formatPoints(value: number) {
   return `${value.toLocaleString("vi-VN")} N-Point`;
 }
 
+const hiddenFeature = "Brand có thể dùng lại cho fanpage, website, ads";
+
 export default function BrandGetStartedPage() {
   return (
     <>
@@ -27,8 +29,8 @@ export default function BrandGetStartedPage() {
           </div>
         </section>
 
-        <section className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.78fr)]">
-          <div className="grid gap-4">
+        <section className="mt-8 items-start gap-6 lg:grid lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.55fr)] lg:gap-8">
+          <div className="grid content-start gap-4">
             <div className="rounded-[2rem] border border-zinc-200 bg-white p-6 shadow-sm">
               <h2 className="text-2xl font-black text-zinc-950">Mục tiêu gói</h2>
               <p className="mt-2 text-sm leading-6 text-zinc-600">
@@ -36,9 +38,14 @@ export default function BrandGetStartedPage() {
               </p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
-              {BRAND_SUBSCRIPTION_PACKAGES.map((item) => (
-                <article key={item.code} className="dc-card flex h-full flex-col p-5">
+            <div className="grid items-start gap-4 md:grid-cols-3">
+              {BRAND_SUBSCRIPTION_PACKAGES.map((item) => {
+                const visibleFeatures = item.features
+                  .filter((feature) => feature !== hiddenFeature)
+                  .slice(0, 4);
+
+                return (
+                  <article key={item.code} className="dc-card flex h-full flex-col p-5">
                   <div className="flex items-start justify-between gap-2">
                     <h2 className="text-lg font-semibold text-zinc-900">{item.name}</h2>
                     <span className="inline-flex rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs font-semibold text-zinc-700">
@@ -49,34 +56,37 @@ export default function BrandGetStartedPage() {
                   <p className="mt-1 text-2xl font-bold text-zinc-900">{formatPoints(item.pricePoints)}</p>
                   <p className="mt-3 text-sm text-zinc-600">{item.summary}</p>
 
-                  {item.features.length > 0 ? (
-                    <ul className="mt-4 space-y-2 text-sm text-zinc-700">
-                      {item.features.slice(0, 4).map((feature) => (
-                        <li key={feature}>{feature}</li>
+                  {visibleFeatures.length > 0 ? (
+                    <ul className="mt-4 space-y-2.5 text-sm text-zinc-700">
+                      {visibleFeatures.map((feature) => (
+                        <li key={feature} className="flex items-start gap-2">
+                          <span className="mt-[0.45rem] h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-900" />
+                          <span>{feature}</span>
+                        </li>
                       ))}
                     </ul>
-                  ) : (
-                    <p className="mt-4 text-sm text-zinc-700">
-                      Phù hợp để bắt đầu test creator marketing với chi phí thấp.
-                    </p>
-                  )}
+                  ) : null}
 
                   {item.code === "FREE" && item.specialFeatures?.length ? (
                     <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
                       <p className="text-sm font-bold text-emerald-700">Ưu đãi gói Free</p>
-                      <ul className="mt-2 space-y-2 text-sm text-emerald-800">
+                      <ul className="mt-2 space-y-2.5 text-sm text-emerald-800">
                         {item.specialFeatures.slice(0, 3).map((feature) => (
-                          <li key={feature}>{feature}</li>
+                          <li key={feature} className="flex items-start gap-2">
+                            <span className="mt-[0.45rem] h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-600" />
+                            <span>{feature}</span>
+                          </li>
                         ))}
                       </ul>
                     </div>
                   ) : null}
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </div>
           </div>
 
-          <div className="lg:sticky lg:top-24 lg:self-start">
+          <div className="lg:sticky lg:top-24 lg:self-start lg:max-w-[360px]">
             <BrandConsultationPageForm source="brand_get_started_page" />
           </div>
         </section>
