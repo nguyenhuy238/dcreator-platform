@@ -901,7 +901,13 @@ export async function approvePublishReportByAdmin(actorId: string, creatorMissio
   const current = await getMissionById(creatorMissionId);
   if (!current) throw new AppError("Creator mission/submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
   if (current.publishStatus === "APPROVED" && current.status === "COMPLETED") return mapMission(current);
-  if (current.publishStatus !== "PENDING") throw new AppError("Invalid status", 409, "CREATOR_MISSION_INVALID_STATUS");
+  const isRefundPendingAfterBrandApproval =
+    current.publishStatus === "APPROVED" &&
+    current.productReceiveOption === "PRODUCT_REQUIRED" &&
+    current.reimbursementStatus === "PAYOUT_PENDING";
+  if (current.publishStatus !== "PENDING" && !isRefundPendingAfterBrandApproval) {
+    throw new AppError("Invalid status", 409, "CREATOR_MISSION_INVALID_STATUS");
+  }
   if (current.videoReviewStatus !== "APPROVED") throw new AppError("Video must be approved first", 409, "CREATOR_MISSION_VIDEO_NOT_APPROVED");
   if (current.productReceiveOption === "PRODUCT_REQUIRED" && purchaseAmountVnd <= 0) {
     throw new AppError("Reimbursement amount is required", 422, "REIMBURSEMENT_AMOUNT_REQUIRED");
@@ -947,6 +953,56 @@ export async function approvePublishReportByAdmin(actorId: string, creatorMissio
     });
   });
   await notifyCreator(updated.accountId, "CREATOR_MISSION_FINAL_APPROVED", "Campaign đã hoàn thành", "Campaign của bạn đã được duyệt hoàn thành và hoàn N-Points mua sản phẩm.", { creatorMissionId, actorId });
+  return mapMission(updated);
+}
+
+export async function approvePublishReportByBrand(actorId: string, creatorMissionId: string) {
+  const current = await getMissionById(creatorMissionId);
+  if (!current) throw new AppError("Creator mission/submission not found", 404, "MISSION_SUBMISSION_NOT_FOUND");
+  if (current.publishStatus === "APPROVED") return mapMission(current);
+  if (current.publishStatus !== "PENDING") throw new AppError("Invalid status", 409, "CREATOR_MISSION_INVALID_STATUS");
+  if (current.videoReviewStatus !== "APPROVED") throw new AppError("Video must be approved first", 409, "CREATOR_MISSION_VIDEO_NOT_APPROVED");
+
+  if (current.productReceiveOption !== "PRODUCT_REQUIRED") {
+    return approvePublishReportByAdmin(actorId, creatorMissionId, 0);
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
+      status: "APPROVED",
+      lifecycleStatus: "APPROVED",
+      rejectReason: null,
+      reviewedById: actorId,
+      reviewedAt: now(),
+      approvedAt: now()
+    });
+
+    return tx.creatorMission.update({
+      where: { id: creatorMissionId },
+      data: {
+        status: "IN_PROGRESS",
+        submissionStatus: "APPROVED",
+        submissionLifecycleStatus: "APPROVED",
+        submissionRejectReason: null,
+        submissionReviewedById: actorId,
+        submissionReviewedAt: now(),
+        submissionApprovedAt: now(),
+        publishStatus: "APPROVED",
+        publishFeedback: null,
+        publishReviewedAt: now(),
+        reimbursementStatus: "PAYOUT_PENDING"
+      },
+      include: creatorMissionInclude
+    });
+  });
+
+  await notifyCreator(
+    updated.accountId,
+    "CREATOR_MISSION_FINAL_APPROVED",
+    "Link public đã được Brand duyệt",
+    "Bài public của bạn đã được Brand duyệt. Admin sẽ kiểm tra bill mua hàng và ảnh đánh giá 5 sao để xử lý hoàn N-Points.",
+    { creatorMissionId, actorId }
+  );
   return mapMission(updated);
 }
 
@@ -1652,6 +1708,7 @@ export async function listMissionFinalReviewsForAdmin(input: {
   campaignId?: string;
   campaign?: string;
   productReceiveOption?: ProductReceiveOption;
+  reimbursementStatus?: ReimbursementStatus;
   publishStatus?: CreatorMissionPublishStatus;
   sort?: Sort;
   page?: number;
@@ -1663,6 +1720,7 @@ export async function listMissionFinalReviewsForAdmin(input: {
     where.campaign = { title: { contains: input.campaign.trim(), mode: "insensitive" } };
   }
   if (input.productReceiveOption) where.productReceiveOption = input.productReceiveOption;
+  if (input.reimbursementStatus) where.reimbursementStatus = input.reimbursementStatus;
   if (input.query?.trim()) {
     const q = input.query.trim();
     where.OR = [
@@ -2159,6 +2217,7 @@ export async function listMissionFinalReviewsForBrand(
     campaignId?: string;
     campaign?: string;
     productReceiveOption?: ProductReceiveOption;
+    reimbursementStatus?: ReimbursementStatus;
     publishStatus?: CreatorMissionPublishStatus;
     sort?: Sort;
     page?: number;
@@ -2178,6 +2237,7 @@ export async function listMissionFinalReviewsForBrand(
     };
   }
   if (input.productReceiveOption) where.productReceiveOption = input.productReceiveOption;
+  if (input.reimbursementStatus) where.reimbursementStatus = input.reimbursementStatus;
   if (input.query?.trim()) {
     const q = input.query.trim();
     where.OR = [
@@ -2211,7 +2271,8 @@ export async function getMissionFinalReviewDetailForBrand(accountId: string, id:
 
 export async function approveMissionFinalReviewByBrand(accountId: string, id: string, input?: { reimbursementAmountVnd?: number }) {
   await getMissionFinalReviewDetailForBrand(accountId, id);
-  return approveMissionFinalReviewByAdmin(accountId, id, input);
+  void input;
+  return approvePublishReportByBrand(accountId, id);
 }
 
 export async function rejectMissionFinalReviewByBrand(accountId: string, id: string, input: { feedback: string; requiredResubmitFields: FinalReviewResubmitField[] }) {

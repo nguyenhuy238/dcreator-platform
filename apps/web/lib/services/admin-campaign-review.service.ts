@@ -169,6 +169,22 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
       backerCount: true,
       brand: { select: { id: true, displayName: true, email: true } },
       creator: { select: { id: true, displayName: true, email: true } },
+      sourceBrandRequests: {
+        select: {
+          id: true,
+          title: true,
+          brief: true,
+          requestedSlug: true,
+          status: true,
+          budgetVnd: true,
+          targetAmountVnd: true,
+          adminNote: true,
+          brandFeedback: true,
+          createdAt: true,
+          updatedAt: true
+        },
+        orderBy: { createdAt: "desc" }
+      },
       rewards: true,
       contributions: { select: { id: true, amountVnd: true, status: true } }
     }

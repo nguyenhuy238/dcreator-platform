@@ -673,10 +673,10 @@ export default function BrandCampaignsPage() {
                             <p className="mt-1 text-xs text-zinc-500">Tiến độ video hoàn thành: {videoProgressPercent}%</p>
                           </div>
 
-                          <div className="mt-4 grid grid-cols-2 gap-1.5 lg:grid-cols-[1fr_1fr_1.2fr]">
+                          <div className="mt-4 grid grid-cols-3 gap-1">
                             <button
                               type="button"
-                              className="dc-btn-secondary min-w-0 px-2 py-2 text-xs leading-tight"
+                              className="dc-btn-secondary min-w-0 whitespace-nowrap px-2 py-2 text-xs leading-tight"
                               onClick={(event) => {
                                 event.stopPropagation();
                                 setHistoryCampaign({ id: campaign.id, title: campaign.title, slug: campaign.slug });
@@ -684,10 +684,10 @@ export default function BrandCampaignsPage() {
                             >
                               Xem lịch sử
                             </button>
-                            <button type="button" className="dc-btn-secondary min-w-0 px-2 py-2 text-xs leading-tight" disabled onClick={(event) => event.stopPropagation()}>KPI / Analytics</button>
+                            <button type="button" className="dc-btn-secondary min-w-0 whitespace-nowrap px-2 py-2 text-xs leading-tight" disabled onClick={(event) => event.stopPropagation()}>KPI / Analytics</button>
                             <button
                               type="button"
-                              className={`${campaign.reviewPendingCount ? "dc-btn-primary" : "dc-btn-secondary"} min-w-0 px-2 py-2 text-xs leading-tight`}
+                              className={`${campaign.reviewPendingCount ? "dc-btn-primary" : "dc-btn-secondary"} min-w-0 whitespace-nowrap px-2 py-2 text-xs leading-tight`}
                               onClick={(event) => {
                                 event.stopPropagation();
                                 openMissionReview(campaign);

@@ -17,6 +17,7 @@ type MissionItem = {
   status: string;
   productReceiveOption: string;
   productStatus: string;
+  reimbursementStatus?: string | null;
   purchaseProofSubmittedAt?: string | null;
   purchaseProofReviewedAt?: string | null;
   productPurchasedConfirmedAt?: string | null;
@@ -209,6 +210,7 @@ function workflowStatus(item: MissionItem) {
   if (item.status === "COMPLETED") return "Hoàn thành";
   if (item.status === "CANCELLED") return "Bị từ chối";
   if (isMissionOverdue(item)) return "Quá hạn";
+  if (item.reimbursementStatus === "PAYOUT_PENDING") return "Chờ hoàn tiền";
   if (item.publishStatus === "PENDING") return "Link public đang chờ duyệt";
   if (item.publishStatus === "REJECTED") return "Link public bị từ chối";
   if (item.videoReviewStatus === "PENDING") return "Video đang chờ duyệt";
@@ -257,6 +259,7 @@ function isApprovedAndUncompleted(item: MissionItem) {
 }
 
 function statusTone(item: MissionItem) {
+  if (item.reimbursementStatus === "PAYOUT_PENDING") return "bg-amber-50 text-amber-700";
   const group = missionGroup(item);
   if (group === "COMPLETED") return "bg-emerald-50 text-emerald-700";
   if (group === "REVISION") return "bg-red-50 text-red-700";
@@ -293,7 +296,7 @@ function missionStatusLabel(status: string) {
 type TimelineStep = {
   key: string;
   label: string;
-  icon: "application" | "purchase" | "draftChoice" | "draftSubmit" | "draftReview" | "videoSubmit" | "videoReview" | "publish" | "publishReview" | "completed";
+  icon: "application" | "purchase" | "draftChoice" | "draftSubmit" | "draftReview" | "videoSubmit" | "videoReview" | "publish" | "publishReview" | "refund" | "completed";
   done: boolean;
   current: boolean;
   failed: boolean;
@@ -309,6 +312,7 @@ function TimelineStepIcon({ step }: { step: TimelineStep["icon"] }) {
   if (step === "videoReview") return <CheckCircle size={18} weight="duotone" />;
   if (step === "publish") return <Megaphone size={18} weight="duotone" />;
   if (step === "publishReview") return <CheckCircle size={18} weight="duotone" />;
+  if (step === "refund") return <Package size={18} weight="duotone" />;
   return <CheckCircle size={18} weight="fill" />;
 }
 
@@ -754,6 +758,7 @@ export function CreatorMissionsPanel({
     const hasPublishSubmitted = item.publishStatus !== "NOT_SUBMITTED";
     const publishDone = item.publishStatus === "APPROVED";
     const completed = item.status === "COMPLETED";
+    const refundPending = item.productReceiveOption === "PRODUCT_REQUIRED" && item.reimbursementStatus === "PAYOUT_PENDING";
     const selectedFlow = preVideoChoiceMap[item.id];
     const hasChosenPreStep = Boolean(selectedFlow) || hasTranscriptSubmitted || hasVideoSubmitted;
 
@@ -846,12 +851,22 @@ export function CreatorMissionsPanel({
       current: item.publishStatus === "PENDING",
       failed: item.publishStatus === "REJECTED"
     });
+    if (item.productReceiveOption === "PRODUCT_REQUIRED") {
+      steps.push({
+        key: "refund",
+        label: "Chờ hoàn tiền",
+        icon: "refund",
+        done: completed,
+        current: refundPending,
+        failed: false
+      });
+    }
     steps.push({
       key: "completed",
       label: "Hoàn thành",
       icon: "completed",
       done: completed,
-      current: !completed && publishDone,
+      current: !completed && publishDone && !refundPending,
       failed: false
     });
 
@@ -878,7 +893,8 @@ export function CreatorMissionsPanel({
     const needsPreVideoChoice = canSubmitVideoCandidate && !isTranscriptFlow && !hasTranscript && !hasVideoSubmission;
     const showTranscriptComposer = !isOverdue && (isTranscriptFlow || (needsPreVideoChoice && selectedChoice === "TRANSCRIPT"));
     const showVideoComposer = !isOverdue && canSubmitVideoCandidate && !isTranscriptFlow && (!needsPreVideoChoice || selectedChoice === "VIDEO");
-    const canSubmitPublish = !isOverdue && !isApplicationPending && item.videoReviewStatus === "APPROVED" && item.status !== "COMPLETED" && item.publishStatus !== "PENDING";
+    const isRefundPending = item.productReceiveOption === "PRODUCT_REQUIRED" && item.reimbursementStatus === "PAYOUT_PENDING";
+    const canSubmitPublish = !isOverdue && !isApplicationPending && item.videoReviewStatus === "APPROVED" && item.status !== "COMPLETED" && item.publishStatus !== "PENDING" && !isRefundPending;
     const isWaitingPublishReview = !isApplicationPending && item.videoReviewStatus === "APPROVED" && item.publishStatus === "PENDING" && item.status !== "COMPLETED";
     const requestedPublishFields = getRequestedPublishResubmitFields(item);
     const shouldShowPublishField = (field: string) => !requestedPublishFields || requestedPublishFields.has(field);
@@ -939,25 +955,30 @@ export function CreatorMissionsPanel({
       <details className="rounded-xl border border-zinc-200 bg-white p-3" open>
         <summary className="cursor-pointer font-semibold text-zinc-900">Cách thực hiện</summary>
         <div className="mt-3 space-y-3">
-          {isApplicationPending && !isOverdue ? (
+          {isRefundPending ? (
+            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+              Link public đã được duyệt. Bạn không cần thao tác thêm, vui lòng chờ Admin kiểm tra bill mua hàng và ảnh đánh giá 5 sao để hoàn N-Points.
+            </p>
+          ) : null}
+          {isApplicationPending && !isOverdue && !isRefundPending ? (
             <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
               Campaign đang chờ duyệt. Bạn sẽ bắt đầu các bước thực hiện sau khi Brand/Admin duyệt đơn.
             </p>
           ) : null}
-          {isWaitingPublishReview && !isOverdue ? (
+          {isWaitingPublishReview && !isOverdue && !isRefundPending ? (
             <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
               Bạn đã nộp link public. Vui lòng chờ Admin/Brand duyệt bước này.
             </p>
           ) : null}
-          {isOverdue ? (
+          {isOverdue && !isRefundPending ? (
             <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               Campaign đã quá hạn. Bạn chỉ có thể xem lại thông tin và lịch sử đã nộp.
             </p>
           ) : null}
 
-          {rejectionNotices}
+          {!isRefundPending ? rejectionNotices : null}
 
-          {canSubmitPurchase && !isOverdue ? (
+          {canSubmitPurchase && !isOverdue && !isRefundPending ? (
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
               <p className="font-medium">Bước 1 - Mua sản phẩm</p>
               <p className="text-sm text-zinc-600">Đặt hàng đúng sản phẩm của campaign rồi bấm xác nhận đã mua để mở các bước tiếp theo. Ảnh bill và ảnh đánh giá 5 sao sẽ nộp ở bước link public.</p>
@@ -968,7 +989,7 @@ export function CreatorMissionsPanel({
             </div>
           ) : null}
 
-          {needsPreVideoChoice && !isOverdue ? (
+          {needsPreVideoChoice && !isOverdue && !isRefundPending ? (
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
               <p className="font-medium">Chọn quy trình trước video review</p>
               <p className="text-sm text-zinc-600">Bạn có thể nộp kịch bản trước để được duyệt, hoặc nộp video review trực tiếp.</p>
@@ -979,7 +1000,7 @@ export function CreatorMissionsPanel({
             </div>
           ) : null}
 
-          {showTranscriptComposer ? (
+          {showTranscriptComposer && !isRefundPending ? (
             <div className="rounded-xl border border-zinc-200 bg-white p-3">
               <p className="font-medium">Nộp kịch bản</p>
               {isTranscriptFlow && item.submission?.status === "SUBMITTED" ? <p className="mt-1 text-sm text-zinc-600">Kịch bản đã gửi, đang chờ duyệt.</p> : null}
@@ -1085,7 +1106,7 @@ export function CreatorMissionsPanel({
             </div>
           ) : null}
 
-          {showVideoComposer ? (
+          {showVideoComposer && !isRefundPending ? (
             <div className="rounded-xl border border-zinc-200 bg-white p-3">
               <p className="font-medium">Nộp video review</p>
               <div className="mt-2 grid gap-2">

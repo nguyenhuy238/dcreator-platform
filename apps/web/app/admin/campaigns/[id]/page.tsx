@@ -58,7 +58,20 @@ type CampaignDetail = {
   statusView: string;
   ugcVideoQuota: number | null;
   brand: { id: string; displayName: string; email: string };
+  sourceBrandRequests: Array<{
+    id: string;
+    title: string;
+    brief: string;
+    requestedSlug: string;
+    status: string;
+    adminNote: string | null;
+    brandFeedback: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
 };
+
+const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
 
 const DEFAULT_FORM: FormState = {
   slug: "",
@@ -119,6 +132,15 @@ function toDateTimeLocalInput(value?: string | null) {
 
 function fieldErrorsText(message?: string) {
   return message?.trim();
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString("vi-VN");
+}
+
+function getContentFileUrlFromBrief(brief: string) {
+  const line = brief.split("\n").find((item) => item.trim().startsWith(CONTENT_FILE_MARKER));
+  return line ? line.trim().slice(CONTENT_FILE_MARKER.length).trim() : "";
 }
 
 function buildCreatorBriefForm(item: CampaignDetail): CreatorBriefForm {
@@ -410,9 +432,6 @@ export default function AdminCampaignDetailPage() {
         subtitle={`Brand: ${item.brand.displayName} • ${item.slug}`}
         action={
           <div className="flex flex-wrap gap-2">
-            <button className="dc-btn-secondary" onClick={() => router.push(`/admin/campaigns/${item.id}/applications`)}>
-              Đơn đăng ký
-            </button>
             <button className="dc-btn-secondary" onClick={() => router.push("/admin/campaigns")}>
               Quay lại
             </button>
@@ -428,6 +447,50 @@ export default function AdminCampaignDetailPage() {
       {toast ? <ActionToast message={toast} /> : null}
 
       <section className="mt-4 grid gap-4">
+        {item.sourceBrandRequests.length > 0 ? (
+          <div className="dc-card p-4">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-zinc-500">Đơn yêu cầu tạo campaign</p>
+                <h2 className="text-lg font-semibold text-zinc-900">Campaign này được tạo từ đơn đăng ký của Brand</h2>
+              </div>
+              <StatusBadge status={item.sourceBrandRequests[0]?.status.toLowerCase() ?? "approved"} />
+            </div>
+            <div className="grid gap-3">
+              {item.sourceBrandRequests.map((request) => (
+                <article key={request.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-zinc-900">{request.title}</p>
+                      <p className="text-sm text-zinc-500">/{request.requestedSlug} • Gửi lúc {formatDateTime(request.createdAt)}</p>
+                    </div>
+                    <StatusBadge status={request.status.toLowerCase()} />
+                  </div>
+                  <div className="mt-3 grid gap-2 text-sm text-zinc-700 md:grid-cols-2">
+                    <p className="md:col-span-2">
+                      File campaign:{" "}
+                      {getContentFileUrlFromBrief(request.brief) ? (
+                        <a
+                          className="font-semibold text-zinc-900 underline underline-offset-2"
+                          href={`/api/uploads/onboarding-doc-download?url=${encodeURIComponent(getContentFileUrlFromBrief(request.brief))}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          tải file
+                        </a>
+                      ) : (
+                        <span className="text-zinc-500">chưa có file</span>
+                      )}
+                    </p>
+                    {request.adminNote ? <p className="md:col-span-2">Ghi chú admin: <span className="whitespace-pre-line">{request.adminNote}</span></p> : null}
+                    {request.brandFeedback ? <p className="md:col-span-2">Phản hồi Brand: <span className="whitespace-pre-line">{request.brandFeedback}</span></p> : null}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <div className="dc-card p-4">
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>

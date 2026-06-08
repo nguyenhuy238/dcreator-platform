@@ -104,6 +104,7 @@ export const missionFinalReviewAdminQuerySchema = z.object({
   campaignId: z.string().trim().min(3).optional(),
   campaign: z.string().trim().min(1).max(120).optional(),
   productReceiveOption: z.enum(["PRODUCT_REQUIRED", "NO_PRODUCT_REQUIRED"]).optional(),
+  reimbursementStatus: z.enum(["NOT_REQUIRED", "PENDING", "PURCHASE_SUBMITTED", "APPROVED", "PAYOUT_PENDING", "PAID", "REJECTED"]).optional(),
   publishStatus: z.enum(["NOT_SUBMITTED", "PENDING", "APPROVED", "REJECTED"]).optional(),
   sort: z.enum(["newest", "oldest"]).optional(),
   page: z.coerce.number().int().min(1).optional(),

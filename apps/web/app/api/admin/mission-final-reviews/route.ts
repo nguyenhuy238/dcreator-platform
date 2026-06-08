@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
       campaignId: qp(request, "campaignId"),
       campaign: qp(request, "campaign"),
       productReceiveOption: qp(request, "productReceiveOption"),
+      reimbursementStatus: qp(request, "reimbursementStatus"),
       publishStatus: qp(request, "publishStatus"),
       sort: qp(request, "sort"),
       page: request.nextUrl.searchParams.get("page") ?? undefined,
