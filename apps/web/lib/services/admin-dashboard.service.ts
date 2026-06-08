@@ -19,17 +19,28 @@ import { scanFraudRiskSignals } from "@/lib/services/fraud-flag.service";
 import { getAdminKpis } from "@/lib/services/analytics.service";
 
 const COVER_MARKER = "[[COVER_IMAGE_URL]]:";
+const REQUIREMENTS_MARKER = "[[CAMPAIGN_REQUIREMENTS]]:";
 
 function extractCoverImageMeta(brief: string) {
   const lines = brief.split("\n");
   const markerLine = lines.find((line) => line.trim().startsWith(COVER_MARKER));
   const coverImageUrl = markerLine ? markerLine.trim().slice(COVER_MARKER.length).trim() : null;
+  const requirementLine = lines.find((line) => line.trim().startsWith(REQUIREMENTS_MARKER));
+  const requirements = (() => {
+    const encoded = requirementLine ? requirementLine.trim().slice(REQUIREMENTS_MARKER.length).trim() : "";
+    if (!encoded) return null;
+    try {
+      return decodeURIComponent(encoded);
+    } catch {
+      return encoded;
+    }
+  })();
   const cleanBrief = lines
-    .filter((line) => !line.trim().startsWith(COVER_MARKER))
+    .filter((line) => !line.trim().startsWith(COVER_MARKER) && !line.trim().startsWith(REQUIREMENTS_MARKER))
     .join("\n")
     .trim();
 
-  return { coverImageUrl, cleanBrief };
+  return { coverImageUrl, cleanBrief, requirements };
 }
 
 async function createDefaultMissionsFromRequest(
@@ -531,13 +542,15 @@ export async function decideCampaignReview(actorId: string, campaignId: string, 
 
   const updated = await prisma.$transaction(async (tx) => {
     if (decision === "APPROVED") {
-      const { coverImageUrl, cleanBrief } = extractCoverImageMeta(request.brief);
+      const { coverImageUrl, cleanBrief, requirements } = extractCoverImageMeta(request.brief);
       const campaign = await tx.campaign.create({
         data: {
           brandId: request.brand.ownerAccountId,
           slug: request.requestedSlug,
           title: request.title,
           brief: cleanBrief,
+          creatorBriefTitle: requirements ? "YÊU CẦU" : null,
+          creatorBriefDescription: requirements,
           coverImageUrl: coverImageUrl || null,
           budgetVnd: request.budgetVnd,
           targetAmountVnd: request.targetAmountVnd,

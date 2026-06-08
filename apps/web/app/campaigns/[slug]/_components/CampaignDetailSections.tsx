@@ -57,7 +57,7 @@ function CampaignDealOverview({ data }: { data: CampaignDetailDTO }) {
   };
   const requirementCard = {
     eyebrow: "YÊU CẦU",
-    title: mission?.description || "01 Video + 01 Đánh giá sản phẩm",
+    title: data.hero.requirements || mission?.description || "01 Video + 01 Đánh giá sản phẩm",
     color: "from-sky-50 to-cyan-100"
   };
   const deadlineCard = {
@@ -80,7 +80,7 @@ function CampaignDealOverview({ data }: { data: CampaignDetailDTO }) {
           className={`rounded-[24px] border border-white/70 bg-gradient-to-br ${requirementCard.color} p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md`}
         >
           <p className="text-xs font-black tracking-[0.18em] text-zinc-500">{requirementCard.eyebrow}</p>
-          <p className="mt-3 break-words text-lg font-black text-zinc-900">{requirementCard.title}</p>
+          <p className="mt-3 whitespace-pre-line break-words text-lg font-black text-zinc-900">{requirementCard.title}</p>
         </article>
         <article
           className={`rounded-[24px] border border-white/70 bg-gradient-to-br ${deadlineCard.color} p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md`}

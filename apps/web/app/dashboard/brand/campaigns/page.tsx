@@ -45,6 +45,7 @@ type CampaignRequestItem = {
   requestedSlug: string;
   title: string;
   brief: string;
+  requirements?: string;
   setupSource: "JOIN_EXISTING_DCREATOR_CAMP" | "BRAND_REQUESTED";
   status: string;
   budgetVnd: number;
@@ -453,7 +454,12 @@ export default function BrandCampaignsPage() {
       const response = await fetch(campaignRequestApiPath, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestForm)
+        body: JSON.stringify({
+          ...requestForm,
+          title: requestForm.title.trim(),
+          imageUrl: requestForm.imageUrl.trim(),
+          contentFileUrl: requestForm.contentFileUrl.trim()
+        })
       });
       const payload = (await response.json()) as ApiResponse<CampaignRequestItem>;
       if (!response.ok || !payload.success) throw new Error(payload.success ? "Không thể gửi yêu cầu" : payload.error);
@@ -842,6 +848,12 @@ export default function BrandCampaignsPage() {
                             </button>
                           ) : null}
                         </div>
+                        {request.requirements ? (
+                          <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+                            <p className="text-xs font-bold uppercase tracking-[0.12em] text-zinc-500">Yêu cầu</p>
+                            <p className="mt-1 line-clamp-4 whitespace-pre-line text-sm text-zinc-700">{request.requirements}</p>
+                          </div>
+                        ) : null}
                         {request.createdCampaign ? (
                           <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
                             <p>Đã tạo campaign: {request.createdCampaign.title}</p>
