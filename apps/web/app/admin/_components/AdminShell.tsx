@@ -1,7 +1,10 @@
 "use client";
 
 import type { Role } from "@prisma/client";
-import type { AdminNavItem } from "@/app/admin/_components/admin-nav";
+import type {
+  AdminNavGroup,
+  AdminNavItem,
+} from "@/app/admin/_components/admin-nav";
 import { DashboardShell } from "@/app/components/dcreator/layout/dashboard-shell";
 
 type AdminShellUser = {
@@ -16,10 +19,10 @@ export function AdminShell({
   children,
   navItems,
   user,
-  initialSidebarCollapsed = false
+  initialSidebarCollapsed = false,
 }: {
   children: React.ReactNode;
-  navItems: readonly AdminNavItem[];
+  navItems: readonly (AdminNavItem | AdminNavGroup)[];
   user: AdminShellUser;
   initialSidebarCollapsed?: boolean;
 }) {
