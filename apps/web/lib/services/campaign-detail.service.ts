@@ -85,6 +85,7 @@ export async function getCampaignDetailBySlug(slug: string, viewerId?: string): 
       objective: campaign.objective,
       benefits: campaign.benefits ?? campaign.objective,
       participationRoadmap: normalizeRoadmap(campaign.participationRoadmap, campaign.priorityChannels),
+      requiredHashtags: campaign.requiredHashtags ?? [],
       status: campaign.status,
       deadline: campaign.endsAt?.toISOString() ?? null,
       product: {

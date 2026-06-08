@@ -152,10 +152,10 @@ export function OverviewTab({ data }: { data: CampaignDetailDTO }) {
   );
 }
 
-export function BriefTab() {
+export function BriefTab({ data }: { data: CampaignDetailDTO }) {
   return (
     <section className="grid gap-4">
-      <CampaignBriefRequirements />
+      <CampaignBriefRequirements hashtags={data.hero.requiredHashtags} />
       <CampaignJoinTimeline />
     </section>
   );

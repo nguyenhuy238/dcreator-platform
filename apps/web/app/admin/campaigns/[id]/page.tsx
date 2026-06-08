@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { RequiredHashtagInput } from "@/app/admin/campaigns/_components/RequiredHashtagInput";
 import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
+import { DEFAULT_REQUIRED_HASHTAGS, normalizeRequiredHashtags, validateRequiredHashtags } from "@/lib/hashtags";
 
 type CampaignCategory = "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
 type CampaignType = "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
@@ -31,6 +33,7 @@ type FormState = {
   setupSource: SetupSource;
   benefits: string;
   participationRoadmap: string[];
+  requiredHashtags: string[];
   imageUrl: string;
   startsAt: string;
   endsAt: string;
@@ -51,6 +54,7 @@ type CampaignDetail = {
   productLink: string | null;
   productImageUrl: string | null;
   participationRoadmap: string[];
+  requiredHashtags: string[];
   coverImageUrl: string | null;
   startsAt: string | null;
   endsAt: string | null;
@@ -81,6 +85,7 @@ const DEFAULT_FORM: FormState = {
   setupSource: "BRAND_REQUESTED",
   benefits: "",
   participationRoadmap: [""],
+  requiredHashtags: DEFAULT_REQUIRED_HASHTAGS,
   imageUrl: "",
   startsAt: "",
   endsAt: "",
@@ -95,12 +100,14 @@ const DEFAULT_FORM: FormState = {
 
 const apiErrorFieldMap: Record<string, string> = {
   CAMPAIGN_TIMELINE_INVALID: "endsAt",
-  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "ugcVideoQuota"
+  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "ugcVideoQuota",
+  CAMPAIGN_REQUIRED_HASHTAGS_MIGRATION_REQUIRED: "requiredHashtags"
 };
 
 const apiErrorMessageMap: Record<string, string> = {
   CAMPAIGN_TIMELINE_INVALID: "Ngày kết thúc phải sau ngày bắt đầu.",
-  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "Hệ thống chưa cập nhật quota video UGC. Vui lòng chạy migration trước khi lưu thay đổi."
+  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "Hệ thống chưa cập nhật quota video UGC. Vui lòng chạy migration trước khi lưu thay đổi.",
+  CAMPAIGN_REQUIRED_HASHTAGS_MIGRATION_REQUIRED: "Hệ thống chưa cập nhật hashtag bắt buộc. Vui lòng chạy migration trước khi lưu thay đổi."
 };
 
 const fieldMessageMap: Record<string, string> = {
@@ -112,6 +119,7 @@ const fieldMessageMap: Record<string, string> = {
   startsAt: "Ngày bắt đầu chưa hợp lệ.",
   endsAt: "Ngày kết thúc phải sau ngày bắt đầu.",
   participationRoadmap: "Vui lòng nhập ít nhất 1 bước lộ trình tham gia.",
+  requiredHashtags: "Hashtag bắt buộc chưa hợp lệ.",
   productName: "Vui lòng nhập tên sản phẩm.",
   productDescription: "Vui lòng nhập mô tả sản phẩm.",
   productLink: "Vui lòng nhập link sản phẩm.",
@@ -174,6 +182,7 @@ function buildForm(item: CampaignDetail): FormState {
     setupSource: item.setupSource,
     benefits: item.benefits ?? "",
     participationRoadmap: item.participationRoadmap.length > 0 ? item.participationRoadmap : [""],
+    requiredHashtags: item.requiredHashtags ?? [],
     imageUrl: item.coverImageUrl ?? "",
     startsAt: toDateTimeLocalInput(item.startsAt),
     endsAt: toDateTimeLocalInput(item.endsAt),
@@ -326,6 +335,8 @@ export default function AdminCampaignDetailPage() {
     if (!form.participationRoadmap.some((item) => item.trim().length > 0)) {
       nextErrors.participationRoadmap = "Cần ít nhất 1 bước lộ trình tham gia.";
     }
+    const hashtagError = validateRequiredHashtags(form.requiredHashtags);
+    if (hashtagError) nextErrors.requiredHashtags = hashtagError;
     if (form.startsAt && form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) {
       nextErrors.endsAt = "Ngày kết thúc phải sau ngày bắt đầu.";
     }
@@ -359,6 +370,7 @@ export default function AdminCampaignDetailPage() {
           setupSource: form.setupSource,
           benefits: form.benefits,
           participationRoadmap: form.participationRoadmap.filter((step) => step.trim().length > 0),
+          requiredHashtags: normalizeRequiredHashtags(form.requiredHashtags),
           imageUrl: form.imageUrl,
           startsAt: toDateTime(form.startsAt),
           endsAt: toDateTime(form.endsAt),
@@ -696,6 +708,14 @@ export default function AdminCampaignDetailPage() {
                 </button>
                 {fieldErrors.participationRoadmap ? <span className="text-xs text-red-600">{fieldErrors.participationRoadmap}</span> : null}
               </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <RequiredHashtagInput
+                value={form.requiredHashtags}
+                onChange={(value) => setField("requiredHashtags", value)}
+                error={fieldErrors.requiredHashtags}
+              />
             </div>
 
             <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">

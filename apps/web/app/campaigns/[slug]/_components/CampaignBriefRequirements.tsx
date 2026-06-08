@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CheckCircle, WarningCircle } from "@phosphor-icons/react";
 
-const fallbackHashtags = ["#dCreator", "#Kocogi.vn", "#Chiendich"];
-
 const submissionSteps = [
   "Quay video review theo brief phía trên",
   "Đăng lên tài khoản xã hội đã liên kết, không set private",
@@ -29,7 +27,7 @@ type CreatorChannel = {
 };
 
 export function CampaignBriefRequirements({
-  hashtags = fallbackHashtags,
+  hashtags = [],
 }: {
   hashtags?: string[];
 }) {
@@ -96,9 +94,9 @@ export function CampaignBriefRequirements({
 
   return (
     <div className="grid gap-5">
-      {visibleHashtags.length > 0 ? (
-        <article className="rounded-3xl border border-zinc-100 bg-white p-5 shadow-sm sm:p-6">
-          <h3 className="text-xl font-black text-zinc-900"># Hashtags Bắt Buộc</h3>
+      <article className="rounded-3xl border border-zinc-100 bg-white p-5 shadow-sm sm:p-6">
+        <h3 className="text-xl font-black text-zinc-900"># Hashtags Bắt Buộc</h3>
+        {visibleHashtags.length > 0 ? (
           <div className="mt-4 flex flex-wrap gap-2">
             {visibleHashtags.map((hashtag) => (
               <span
@@ -109,8 +107,10 @@ export function CampaignBriefRequirements({
               </span>
             ))}
           </div>
-        </article>
-      ) : null}
+        ) : (
+          <p className="mt-3 text-sm leading-6 text-zinc-500">Chiến dịch này chưa cấu hình hashtag bắt buộc.</p>
+        )}
+      </article>
 
       <article className="rounded-3xl border border-zinc-100 bg-white p-5 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">

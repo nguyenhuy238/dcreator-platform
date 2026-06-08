@@ -1,5 +1,17 @@
 import { z } from "zod";
 import { CAMPAIGN_STATUS } from "@/lib/constants/enums";
+import { DEFAULT_REQUIRED_HASHTAGS, MAX_REQUIRED_HASHTAGS, validateRequiredHashtags } from "@/lib/hashtags";
+
+const requiredHashtagsCreateSchema = z.array(z.string().trim()).max(MAX_REQUIRED_HASHTAGS).optional().default(DEFAULT_REQUIRED_HASHTAGS).superRefine((value, ctx) => {
+  const error = validateRequiredHashtags(value);
+  if (error) ctx.addIssue({ code: "custom", message: error });
+});
+
+const requiredHashtagsUpdateSchema = z.array(z.string().trim()).max(MAX_REQUIRED_HASHTAGS).optional().superRefine((value, ctx) => {
+  if (!value) return;
+  const error = validateRequiredHashtags(value);
+  if (error) ctx.addIssue({ code: "custom", message: error });
+});
 
 export const adminCampaignListQuerySchema = z.object({
   status: z.enum(CAMPAIGN_STATUS).optional(),
@@ -24,6 +36,7 @@ export const adminCampaignCreateSchema = z.object({
   campaignType: z.enum(["DONATION", "PREORDER", "SPONSORSHIP", "COMMUNITY"]),
   setupSource: z.enum(["JOIN_EXISTING_DCREATOR_CAMP", "BRAND_REQUESTED"]).default("BRAND_REQUESTED"),
   participationRoadmap: z.array(z.string().trim().min(1).max(300)).min(1),
+  requiredHashtags: requiredHashtagsCreateSchema,
   benefits: z.string().trim().min(3).max(2000),
   productName: z.string().trim().min(1).max(160),
   productDescription: z.string().trim().min(1).max(2000),
@@ -65,6 +78,7 @@ export const adminCampaignUpdateSchema = z.object({
   productImageUrl: z.string().trim().min(1).max(400).optional(),
   productLink: z.string().trim().min(1).max(400).optional(),
   participationRoadmap: z.array(z.string().trim().min(1).max(300)).min(1).optional(),
+  requiredHashtags: requiredHashtagsUpdateSchema,
   startsAt: z.string().datetime().nullable().optional(),
   endsAt: z.string().datetime().nullable().optional(),
   budgetVnd: z.number().int().positive().optional(),

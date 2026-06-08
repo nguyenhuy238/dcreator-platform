@@ -1,6 +1,7 @@
 import { CampaignStatus, NotificationEvent } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
+import { normalizeRequiredHashtags } from "@/lib/hashtags";
 import { normalizeImageUrlInput } from "@/lib/images/resolve-image-url";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
 import { createNotification } from "@/lib/services/notification.service";
@@ -15,11 +16,45 @@ type AdminCampaignCreateInput = z.infer<typeof adminCampaignCreateSchema>;
 type AdminCampaignUpdateInput = z.infer<typeof adminCampaignUpdateSchema>;
 type CampaignMissionInput = z.infer<typeof campaignMissionCreateSchema>;
 
-async function trySyncCampaignNewFields(campaignId: string, benefits: string | null, participationRoadmap: string[]) {
+async function trySyncCampaignNewFields(campaignId: string, benefits: string | null, participationRoadmap: string[], requiredHashtags?: string[]) {
   try {
-    await prisma.$executeRaw`UPDATE "Campaign" SET "benefits" = ${benefits}, "participationRoadmap" = ${participationRoadmap} WHERE "id" = ${campaignId}`;
+    await prisma.$executeRaw`
+      UPDATE "Campaign"
+      SET
+        "benefits" = ${benefits},
+        "participationRoadmap" = ${participationRoadmap},
+        "requiredHashtags" = ${requiredHashtags ?? []}
+      WHERE "id" = ${campaignId}
+    `;
   } catch {
     // Backward compatibility when DB has not applied migration yet.
+  }
+}
+
+async function getCampaignRequiredHashtags(campaignId: string) {
+  try {
+    const rows = await prisma.$queryRaw<Array<{ requiredHashtags: string[] }>>`
+      SELECT "requiredHashtags" FROM "Campaign" WHERE "id" = ${campaignId} LIMIT 1
+    `;
+    return rows[0]?.requiredHashtags ?? [];
+  } catch {
+    return [];
+  }
+}
+
+async function trySyncCampaignRequiredHashtags(campaignId: string, requiredHashtags: string[]) {
+  try {
+    await prisma.$executeRaw`
+      UPDATE "Campaign"
+      SET "requiredHashtags" = ${requiredHashtags}
+      WHERE "id" = ${campaignId}
+    `;
+  } catch {
+    throw new AppError(
+      "Hệ thống chưa cập nhật migration hashtag bắt buộc. Vui lòng chạy migration trước khi lưu thay đổi.",
+      500,
+      "CAMPAIGN_REQUIRED_HASHTAGS_MIGRATION_REQUIRED"
+    );
   }
 }
 
@@ -190,6 +225,7 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
     }
   });
   if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
+  const requiredHashtags = await getCampaignRequiredHashtags(campaign.id);
 
   const brandProfile = await prisma.brand.findFirst({
     where: { ownerAccountId: campaign.brandId },
@@ -223,6 +259,7 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
 
   return {
     ...campaign,
+    requiredHashtags,
     statusView,
     brandProfile,
     productSubmissions,
@@ -384,6 +421,7 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
 
   const startsAt = input.startsAt ? new Date(input.startsAt) : null;
   const endsAt = input.endsAt ? new Date(input.endsAt) : null;
+  const requiredHashtags = normalizeRequiredHashtags(input.requiredHashtags);
   const campaign = await prisma.$transaction(async (tx) => {
     const createdCampaign = await tx.campaign.create({
       data: {
@@ -436,7 +474,7 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
 
     return createdCampaign;
   });
-  await trySyncCampaignNewFields(campaign.id, input.benefits || null, input.participationRoadmap);
+  await trySyncCampaignNewFields(campaign.id, input.benefits || null, input.participationRoadmap, requiredHashtags);
   await syncCampaignUgcVideoQuota(campaign.id, ugcVideoQuota);
 
   await writeAuditLog({
@@ -445,7 +483,7 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
     targetType: "Campaign",
     targetId: campaign.id,
     newStatus: campaign.status,
-    metadata: { publishNow: true, brandAccountId: brandAccount.id, ugcVideoQuota }
+    metadata: { publishNow: true, brandAccountId: brandAccount.id, ugcVideoQuota, requiredHashtags }
   });
 
   await createNotification({
@@ -507,6 +545,7 @@ export async function addCampaignMissionByAdmin(actorId: string, campaignId: str
 export async function updateCampaignByAdmin(actorId: string, campaignId: string, input: AdminCampaignUpdateInput) {
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
   if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
+  const beforeRequiredHashtags = await getCampaignRequiredHashtags(campaignId);
 
   const nextStartsAt = input.startsAt === undefined ? undefined : input.startsAt ? new Date(input.startsAt) : null;
   const nextEndsAt = input.endsAt === undefined ? undefined : input.endsAt ? new Date(input.endsAt) : null;
@@ -538,6 +577,7 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
   
   const nextRoadmap = input.participationRoadmap ? input.participationRoadmap.map((step) => step.trim()).filter(Boolean) : undefined;
   const nextBenefits = input.benefits === undefined ? undefined : input.benefits?.trim() || null;
+  const nextRequiredHashtags = input.requiredHashtags === undefined ? undefined : normalizeRequiredHashtags(input.requiredHashtags);
 
   const updated = await prisma.$transaction(async (tx) => {
     const nextCampaign = await tx.campaign.update({
@@ -568,6 +608,10 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
 
     return nextCampaign;
   });
+  if (nextRequiredHashtags !== undefined) {
+    await trySyncCampaignRequiredHashtags(campaignId, nextRequiredHashtags);
+  }
+  const afterRequiredHashtags = nextRequiredHashtags ?? beforeRequiredHashtags;
 
   await writeAuditLog({
     actorId,
@@ -586,6 +630,7 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         campaignType: campaign.campaignType,
         setupSource: campaign.setupSource,
         participationRoadmap: campaign.participationRoadmap,
+        requiredHashtags: beforeRequiredHashtags,
         benefits: campaign.benefits ?? null,
         productName: campaign.productName ?? null,
         productDescription: campaign.productDescription ?? null,
@@ -608,6 +653,7 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         campaignType: updated.campaignType,
         setupSource: updated.setupSource,
         participationRoadmap: updated.participationRoadmap,
+        requiredHashtags: afterRequiredHashtags,
         benefits: updated.benefits ?? null,
         productName: updated.productName ?? null,
         productDescription: updated.productDescription ?? null,
@@ -625,7 +671,7 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
     }
   });
 
-  return updated;
+  return { ...updated, requiredHashtags: afterRequiredHashtags };
 }
 
 export async function deleteCampaignCascadeByAdmin(actorId: string, campaignId: string, reason: string) {
