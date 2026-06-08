@@ -1,0 +1,12 @@
+[browser] Image with src "/uploads/dCreator-logo-new.png" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio.
+[browser] Image with src "/uploads/brand-logo/1780911360621-ca2de04a-7bd0-4c0c-b041-e079a48cefcb-brand-logo.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "/uploads/brand-logo/1780663254833-749cf2ef-f8c7-46b2-a871-25dddef9b327-brand-logo.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+npm error Lifecycle script `dev` failed with error:
+npm error code 1
+npm error path D:\dCreator\dcreator-platform\apps\web
+npm error workspace web@0.1.0
+npm error location D:\dCreator\dcreator-platform\apps\web
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c next dev --port 3000

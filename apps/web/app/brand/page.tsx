@@ -163,8 +163,8 @@ export default async function BrandHomePage() {
               >
                 {primaryCtaLabel}
               </AnalyticsLink>
-              <Link href="/campaigns" className="dc-btn-secondary w-full rounded-xl px-6 text-base font-semibold sm:w-auto sm:min-w-[220px]">
-                Xem campaign đang hoạt động
+              <Link href="/brand/get-started" className="dc-btn-secondary w-full rounded-xl px-6 text-base font-semibold sm:w-auto sm:min-w-[220px]">
+                Bắt đầu ngay hôm nay
               </Link>
             </div>
           </div>
@@ -307,13 +307,13 @@ export default async function BrandHomePage() {
             </article>
 
             <article className="rounded-xl border border-white/10 bg-zinc-900 p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/25 hover:bg-zinc-800 hover:shadow-md lg:col-span-1">
-              <div className="rounded-xl border border-white/15 bg-white/[0.06] p-5">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-300">Trạng thái hệ thống</p>
-                <div className="mt-5 flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-white" />
-                  <p className="text-xs font-bold text-white">Creator đã được ghi nhận</p>
-                </div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-zinc-950">
+                <MonoIcon kind="doc" />
               </div>
+              <h3 className="mt-6 text-lg font-black text-white">Sẵn sàng triển khai cùng dCreator</h3>
+              <p className="mt-3 text-sm leading-6 text-zinc-300">
+                Quy trình rõ ràng, đội ngũ đồng hành và Creator phù hợp cho từng campaign.
+              </p>
             </article>
           </div>
         </section>
@@ -364,7 +364,7 @@ export default async function BrandHomePage() {
               </p>
               <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
                 <AnalyticsLink
-                  href={primaryCtaHref}
+                  href="/brand/get-started"
                   eventName={AnalyticsEvents.BRAND_UPGRADE_CLICK}
                   eventParams={{ role: "brand", page_source: "brand_landing_bottom" }}
                   className="inline-flex w-full items-center justify-center rounded-md bg-white px-8 py-3 text-sm font-black !text-black transition-colors duration-200 hover:bg-zinc-200 sm:w-auto"
