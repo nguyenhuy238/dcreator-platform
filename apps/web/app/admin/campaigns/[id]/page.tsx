@@ -139,8 +139,21 @@ function formatDateTime(value: string) {
 }
 
 function getContentFileUrlFromBrief(brief: string) {
-  const line = brief.split("\n").find((item) => item.trim().startsWith(CONTENT_FILE_MARKER));
-  return line ? line.trim().slice(CONTENT_FILE_MARKER.length).trim() : "";
+  const lines = brief.split("\n");
+  const markerIndex = lines.findIndex((item) => item.trim().startsWith(CONTENT_FILE_MARKER));
+  if (markerIndex < 0) return "";
+
+  const firstValue = lines[markerIndex]?.trim().slice(CONTENT_FILE_MARKER.length).trim() ?? "";
+  const continuationParts: string[] = [];
+
+  for (const line of lines.slice(markerIndex + 1)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("[[")) break;
+    if (!trimmed.startsWith("/")) break;
+    continuationParts.push(trimmed);
+  }
+
+  return [firstValue, ...continuationParts].join("");
 }
 
 function buildCreatorBriefForm(item: CampaignDetail): CreatorBriefForm {
@@ -201,6 +214,7 @@ export default function AdminCampaignDetailPage() {
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [coverImageState, setCoverImageState] = useState<ImageSelectionState>({ source: "none", fileName: "" });
   const [productImageState, setProductImageState] = useState<ImageSelectionState>({ source: "none", fileName: "" });
+  const [downloadingFileRequestId, setDownloadingFileRequestId] = useState("");
 
   const loadCampaign = useCallback(async () => {
     if (!id) return null;
@@ -408,6 +422,38 @@ export default function AdminCampaignDetailPage() {
     }
   }
 
+  async function downloadCampaignFile(requestId: string) {
+    if (!item) return;
+    setDownloadingFileRequestId(requestId);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/campaigns/${item.id}/content-file/download?requestId=${encodeURIComponent(requestId)}`, {
+        cache: "no-store"
+      });
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as ApiFailure | null;
+        throw new Error(payload?.error || "Không thể tải file campaign. Vui lòng kiểm tra quyền hoặc file đã bị xoá.");
+      }
+
+      const blob = await res.blob();
+      const disposition = res.headers.get("content-disposition") ?? "";
+      const fileNameMatch = disposition.match(/filename="([^"]+)"/);
+      const fileName = fileNameMatch?.[1] || "campaign-content";
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (downloadError) {
+      setError(downloadError instanceof Error ? downloadError.message : "Không thể tải file campaign. Vui lòng kiểm tra quyền hoặc file đã bị xoá.");
+    } finally {
+      setDownloadingFileRequestId("");
+    }
+  }
+
   if (loading) {
     return (
       <>
@@ -470,16 +516,16 @@ export default function AdminCampaignDetailPage() {
                     <p className="md:col-span-2">
                       File campaign:{" "}
                       {getContentFileUrlFromBrief(request.brief) ? (
-                        <a
-                          className="font-semibold text-zinc-900 underline underline-offset-2"
-                          href={`/api/uploads/onboarding-doc-download?url=${encodeURIComponent(getContentFileUrlFromBrief(request.brief))}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          className="font-semibold text-zinc-900 underline underline-offset-2 disabled:cursor-not-allowed disabled:text-zinc-400"
+                          disabled={downloadingFileRequestId === request.id}
+                          onClick={() => void downloadCampaignFile(request.id)}
                         >
-                          tải file
-                        </a>
+                          {downloadingFileRequestId === request.id ? "đang tải..." : "Tải file campaign"}
+                        </button>
                       ) : (
-                        <span className="text-zinc-500">chưa có file</span>
+                        <span className="text-zinc-500">Chưa có file đính kèm</span>
                       )}
                     </p>
                     {request.adminNote ? <p className="md:col-span-2">Ghi chú admin: <span className="whitespace-pre-line">{request.adminNote}</span></p> : null}
