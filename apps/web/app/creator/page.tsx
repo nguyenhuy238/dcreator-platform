@@ -38,7 +38,7 @@ const creatorProcessSteps = [
   ["2", "CHỌN CAMPAIGN", "Khám phá chiến dịch phù hợp và gửi đăng ký tham gia.", "users"],
   ["3", "NHẬN SẢN PHẨM", "Được Brand phê duyệt và nhận sản phẩm hoặc reward trải nghiệm.", "package"],
   ["4", "TẠO & ĐĂNG NỘI DUNG", "Sản xuất video review và đăng tải lên nền tảng Social Commerce.", "play"],
-  ["5", "NHẬN THU NHẬP", "Nhận phí nội dung, hoa hồng affiliate và theo dõi hiệu suất chiến dịch.", "chart"]
+  ["5", "NHẬN THU NHẬP", "Nhận tiền hoa hồng affiliate lên tới 12% cho mỗi đơn hàng", "chart"]
 ] as const;
 
 function MonoIcon({ kind }: { kind: "box" | "users" | "video" | "eye" | "chart" | "rocket" | "target" | "gauge" | "coins" | "doc" | "package" | "play" }) {

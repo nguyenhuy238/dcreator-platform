@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { ReactNode } from "react";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
@@ -9,17 +9,34 @@ import { CampaignBriefRequirements } from "./CampaignBriefRequirements";
 import { CampaignReviewProducts } from "./CampaignReviewProducts";
 import { formatDateTime } from "./campaign-detail.utils";
 
-const fallbackRoadmap = [
-  "Đọc brief và đăng ký tham gia campaign.",
-  "Brand/Admin xét duyệt creator phù hợp.",
-  "Creator nhận yêu cầu nội dung và quay video review/seeding.",
-  "Creator gửi video để Brand/Admin kiểm duyệt.",
-  "Sau khi được duyệt, creator đăng video công khai theo đúng yêu cầu.",
-  "Brand/Admin kiểm tra bài đăng và hoàn tất nghiệm thu."
+const DEFAULT_PARTICIPATION_STEPS = [
+  {
+    title: "ĐĂNG KÝ THAM GIA",
+    description: "Tạo hồ sơ Creator và kết nối kênh mạng xã hội."
+  },
+  {
+    title: "CHỌN CAMPAIGN",
+    description: "Khám phá chiến dịch phù hợp và gửi đăng ký tham gia."
+  },
+  {
+    title: "NHẬN SẢN PHẨM",
+    description: "Được Brand phê duyệt và nhận sản phẩm hoặc reward trải nghiệm."
+  },
+  {
+    title: "TẠO & ĐĂNG NỘI DUNG",
+    description: "Sản xuất video review và đăng tải lên nền tảng Social Commerce."
+  },
+  {
+    title: "NHẬN THU NHẬP",
+    description: "Nhận tiền hoa hồng affiliate lên tới 12% cho mỗi đơn hàng"
+  }
 ];
 
-function stripStepPrefix(step: string) {
-  return step.replace(/^\s*(bước|step)\s*\d+\s*[:.)-]?\s*/i, "").trim();
+function getDisplayLines(value: string) {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*[-•]\s*/, "").trim())
+    .filter(Boolean);
 }
 
 export function HeroSection({ data, applyCard }: { data: CampaignDetailDTO; applyCard: ReactNode }) {
@@ -65,52 +82,57 @@ function CampaignDealOverview({ data }: { data: CampaignDetailDTO }) {
     title: formatDateTime(mission?.deadline ?? data.hero.deadline),
     color: "from-amber-50 to-orange-100"
   };
+  const benefitLines = getDisplayLines(benefitCard.title);
 
   return (
     <section className="dc-card p-5 md:p-6">
-      <h3 className="text-2xl font-black text-zinc-900">Tổng Quan Deal</h3>
+      <h3 className="text-[26px] font-extrabold text-zinc-950 md:text-3xl">Tổng Quan Deal</h3>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <article
           className={`rounded-[24px] border border-white/70 bg-gradient-to-br ${benefitCard.color} p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md md:col-span-2`}
         >
-          <p className="text-xs font-black tracking-[0.18em] text-zinc-500">{benefitCard.eyebrow}</p>
-          <p className="mt-3 whitespace-pre-line break-words text-lg font-black text-zinc-900">{benefitCard.title}</p>
+          <p className="text-[11px] font-bold uppercase text-zinc-500">{benefitCard.eyebrow}</p>
+          <ul className="mt-4 grid gap-2.5">
+            {benefitLines.map((line) => (
+              <li key={line} className="flex gap-3 text-base font-medium leading-7 text-zinc-900 md:text-lg">
+                <span className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                <span className="min-w-0 break-words">{line}</span>
+              </li>
+            ))}
+          </ul>
         </article>
         <article
           className={`rounded-[24px] border border-white/70 bg-gradient-to-br ${requirementCard.color} p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md`}
         >
-          <p className="text-xs font-black tracking-[0.18em] text-zinc-500">{requirementCard.eyebrow}</p>
-          <p className="mt-3 whitespace-pre-line break-words text-lg font-black text-zinc-900">{requirementCard.title}</p>
+          <p className="text-[11px] font-bold uppercase text-zinc-500">{requirementCard.eyebrow}</p>
+          <p className="mt-4 break-words text-lg font-semibold leading-7 text-zinc-950 md:text-xl">{requirementCard.title}</p>
         </article>
         <article
           className={`rounded-[24px] border border-white/70 bg-gradient-to-br ${deadlineCard.color} p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md`}
         >
-          <p className="text-xs font-black tracking-[0.18em] text-zinc-500">{deadlineCard.eyebrow}</p>
-          <p className="mt-3 break-words text-lg font-black text-zinc-900">{deadlineCard.title}</p>
+          <p className="text-[11px] font-bold uppercase text-zinc-500">{deadlineCard.eyebrow}</p>
+          <p className="mt-4 break-words text-lg font-semibold leading-7 text-zinc-950 md:text-xl">{deadlineCard.title}</p>
         </article>
       </div>
     </section>
   );
 }
 
-function CampaignJoinTimeline({ data }: { data: CampaignDetailDTO }) {
-  const roadmap = (data.hero.participationRoadmap.length > 0 ? data.hero.participationRoadmap : fallbackRoadmap)
-    .map(stripStepPrefix)
-    .filter(Boolean);
-
+function CampaignJoinTimeline() {
   return (
     <section>
       <h3 className="text-2xl font-black text-zinc-900">Lộ trình tham gia</h3>
-      <ol className="mt-4 grid gap-3 lg:grid-cols-3">
-        {roadmap.map((step, index) => (
+      <ol className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {DEFAULT_PARTICIPATION_STEPS.map((step, index) => (
           <li
-            key={`${index}-${step}`}
-            className="relative rounded-[24px] border border-zinc-200 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+            key={step.title}
+            className="relative min-h-[180px] rounded-[24px] border border-zinc-200 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
           >
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900 text-sm font-black text-white">
               {index + 1}
             </span>
-            <p className="mt-3 text-sm leading-6 text-zinc-700">{step}</p>
+            <p className="mt-4 break-words text-sm font-black leading-5 text-zinc-900">{step.title}</p>
+            <p className="mt-2 break-words text-sm leading-6 text-zinc-600">{step.description}</p>
           </li>
         ))}
       </ol>
@@ -125,16 +147,16 @@ export function OverviewTab({ data }: { data: CampaignDetailDTO }) {
         <CampaignDealOverview data={data} />
         <CampaignReviewProducts data={data} />
       </div>
-      <CampaignJoinTimeline data={data} />
+      <CampaignJoinTimeline />
     </section>
   );
 }
 
-export function BriefTab({ data }: { data: CampaignDetailDTO }) {
+export function BriefTab() {
   return (
     <section className="grid gap-4">
       <CampaignBriefRequirements />
-      <CampaignJoinTimeline data={data} />
+      <CampaignJoinTimeline />
     </section>
   );
 }

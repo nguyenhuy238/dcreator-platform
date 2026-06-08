@@ -635,29 +635,188 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
   return updated;
 }
 
-export async function archiveCampaignByAdmin(actorId: string, campaignId: string, reason: string) {
-  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
-  if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
-  if (campaign.status === "ACTIVE") {
-    throw new AppError("Campaign đang ACTIVE, hãy tạm dừng trước khi xóa.", 409, "CAMPAIGN_ACTIVE_CANNOT_ARCHIVE");
-  }
+export async function deleteCampaignCascadeByAdmin(actorId: string, campaignId: string, reason: string) {
+  const normalizedCampaignId = campaignId.trim();
+  if (!normalizedCampaignId) throw new AppError("Campaign id is required", 422, "CAMPAIGN_ID_REQUIRED");
 
-  const updated = await prisma.campaign.update({
-    where: { id: campaignId },
-    data: { status: "ARCHIVED" }
+  const result = await prisma.$transaction(async (tx) => {
+    const campaign = await tx.campaign.findUnique({
+      where: { id: normalizedCampaignId },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        status: true,
+        brandId: true,
+        creatorId: true
+      }
+    });
+    if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
+
+    const missions = await tx.mission.findMany({
+      where: { campaignId: campaign.id },
+      select: { id: true }
+    });
+    const missionIds = missions.map((mission) => mission.id);
+
+    const rewards = await tx.reward.findMany({
+      where: { campaignId: campaign.id },
+      select: { id: true }
+    });
+    const rewardIds = rewards.map((reward) => reward.id);
+
+    const contributions = await tx.contribution.findMany({
+      where: { campaignId: campaign.id },
+      select: { id: true, paymentTransactionId: true }
+    });
+    const contributionIds = contributions.map((contribution) => contribution.id);
+    const paymentTransactionIds = contributions
+      .map((contribution) => contribution.paymentTransactionId)
+      .filter((id): id is string => Boolean(id));
+
+    const submissions = missionIds.length
+      ? await tx.missionSubmission.findMany({
+          where: { missionId: { in: missionIds } },
+          select: { id: true }
+        })
+      : [];
+    const submissionIds = submissions.map((submission) => submission.id);
+
+    const deletionCounts: Record<string, number> = {};
+
+    const track = (key: string, count: number) => {
+      deletionCounts[key] = count;
+    };
+
+    if (submissionIds.length || missionIds.length) {
+      const deleted = await tx.proofReview.deleteMany({
+        where: {
+          OR: [
+            ...(submissionIds.length ? [{ submissionId: { in: submissionIds } }] : []),
+            ...(missionIds.length ? [{ missionId: { in: missionIds } }] : [])
+          ]
+        }
+      });
+      track("proofReviews", deleted.count);
+    } else {
+      track("proofReviews", 0);
+    }
+
+    const creatorMissions = await tx.creatorMission.deleteMany({
+      where: { campaignId: campaign.id }
+    });
+    track("creatorMissions", creatorMissions.count);
+
+    const missionSubmissions = missionIds.length
+      ? await tx.missionSubmission.deleteMany({
+          where: { missionId: { in: missionIds } }
+        })
+      : { count: 0 };
+    track("missionSubmissions", missionSubmissions.count);
+
+    const missionApplications = await tx.missionApplication.deleteMany({
+      where: { campaignId: campaign.id }
+    });
+    track("missionApplications", missionApplications.count);
+
+    const rewardClaims = rewardIds.length || contributionIds.length
+      ? await tx.rewardClaim.deleteMany({
+          where: {
+            OR: [
+              ...(rewardIds.length ? [{ rewardId: { in: rewardIds } }] : []),
+              ...(contributionIds.length ? [{ contributionId: { in: contributionIds } }] : [])
+            ]
+          }
+        })
+      : { count: 0 };
+    track("rewardClaims", rewardClaims.count);
+
+    const contributionsDeleted = await tx.contribution.deleteMany({
+      where: { campaignId: campaign.id }
+    });
+    track("contributions", contributionsDeleted.count);
+
+    const rewardsDeleted = await tx.reward.deleteMany({
+      where: { campaignId: campaign.id }
+    });
+    track("rewards", rewardsDeleted.count);
+
+    const missionsDeleted = await tx.mission.deleteMany({
+      where: { campaignId: campaign.id }
+    });
+    track("missions", missionsDeleted.count);
+
+    const paymentOrders = await tx.paymentOrder.deleteMany({
+      where: { campaignId: campaign.id }
+    });
+    track("paymentOrders", paymentOrders.count);
+
+    const analyticsDaily = await tx.analyticsDaily.deleteMany({
+      where: { campaignId: campaign.id }
+    });
+    track("analyticsDaily", analyticsDaily.count);
+
+    const analyticsEvents = await tx.analyticsEvent.deleteMany({
+      where: { campaignId: campaign.id }
+    });
+    track("analyticsEvents", analyticsEvents.count);
+
+    const brandCampaignRequests = await tx.brandCampaignRequest.updateMany({
+      where: { createdCampaignId: campaign.id },
+      data: { createdCampaignId: null }
+    });
+    track("brandCampaignRequestsDetached", brandCampaignRequests.count);
+
+    const productSubmissions = await tx.productSubmission.updateMany({
+      where: { campaignId: campaign.id },
+      data: { campaignId: null }
+    });
+    track("productSubmissionsDetached", productSubmissions.count);
+
+    const fulfillmentOrders = await tx.fulfillmentOrder.updateMany({
+      where: { campaignId: campaign.id },
+      data: { campaignId: null }
+    });
+    track("fulfillmentOrdersDetached", fulfillmentOrders.count);
+
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: "ADMIN_CAMPAIGN_HARD_DELETED",
+        targetType: "Campaign",
+        targetId: campaign.id,
+        oldStatus: campaign.status,
+        reason,
+        metadata: {
+          campaign: {
+            id: campaign.id,
+            slug: campaign.slug,
+            title: campaign.title,
+            brandId: campaign.brandId,
+            creatorId: campaign.creatorId ?? null
+          },
+          deletionCounts,
+          preservedFinancialReferences: {
+            paymentTransactionIds,
+            walletTransactions: "preserved"
+          }
+        }
+      }
+    });
+
+    await tx.campaign.delete({
+      where: { id: campaign.id }
+    });
+
+    return {
+      id: campaign.id,
+      title: campaign.title,
+      message: "Đã xóa campaign và dữ liệu liên quan.",
+      deletionCounts
+    };
   });
 
-  await writeAuditLog({
-    actorId,
-    action: "ADMIN_CAMPAIGN_ARCHIVED",
-    targetType: "Campaign",
-    targetId: campaignId,
-    oldStatus: campaign.status,
-    newStatus: updated.status,
-    reason
-  });
-
-  return updated;
+  return result;
 }
 
 export async function listCampaignMissionsByAdmin(campaignId: string) {
