@@ -3,6 +3,7 @@ import Image from "next/image";
 import { CampaignStatus } from "@prisma/client";
 import { AnalyticsLink } from "@/app/components/analytics/AnalyticsLink";
 import { TrackPageEvent } from "@/app/components/analytics/TrackPageEvent";
+import { BrandProcessScrollLink } from "@/app/brand/_components/BrandProcessScrollLink";
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { AnalyticsEvents } from "@/lib/analytics-events";
 import { getCurrentUserFromServer } from "@/lib/auth/current-user";
@@ -31,6 +32,14 @@ const trustedBrands = [
   { name: "Tiki", initials: "T" },
   { name: "belif", initials: "b" }
 ];
+
+const creatorProcessSteps = [
+  ["1", "ĐĂNG KÝ THAM GIA", "Tạo hồ sơ Creator và kết nối kênh mạng xã hội.", "doc"],
+  ["2", "CHỌN CAMPAIGN", "Khám phá chiến dịch phù hợp và gửi đăng ký tham gia.", "users"],
+  ["3", "NHẬN SẢN PHẨM", "Được Brand phê duyệt và nhận sản phẩm hoặc reward trải nghiệm.", "package"],
+  ["4", "TẠO & ĐĂNG NỘI DUNG", "Sản xuất video review và đăng tải lên nền tảng Social Commerce.", "play"],
+  ["5", "NHẬN THU NHẬP", "Nhận phí nội dung, hoa hồng affiliate và theo dõi hiệu suất chiến dịch.", "chart"]
+] as const;
 
 function MonoIcon({ kind }: { kind: "box" | "users" | "video" | "eye" | "chart" | "rocket" | "target" | "gauge" | "coins" | "doc" | "package" | "play" }) {
   if (kind === "box") {
@@ -163,9 +172,12 @@ export default async function CreatorLandingPage() {
                 >
                   Bắt Đầu Nhận Job UGC
                 </AnalyticsLink>
-                <Link href="#creator-how-it-works" className="dc-btn-secondary w-full rounded-xl px-6 text-base font-semibold sm:w-auto sm:min-w-[220px]">
+                <BrandProcessScrollLink
+                  targetId="creator-process"
+                  className="dc-btn-secondary w-full rounded-xl px-6 text-base font-semibold sm:w-auto sm:min-w-[220px]"
+                >
                   Xem Cách dCreator Hoạt Động
-                </Link>
+                </BrandProcessScrollLink>
               </div>
             </div>
 
@@ -236,7 +248,7 @@ export default async function CreatorLandingPage() {
               </div>
               <h3 className="mt-7 text-xl font-black text-zinc-950">Nhận tiền affiliate lên tới 12%</h3>
               <p className="mt-3 text-sm leading-6 text-zinc-600">
-                Xem được hiệu quả từng video: click, đơn hàng, hoa hồng… ngay trong hệ thống dCreator, biết rõ nội dung nào chốt đơn tốt nhất.
+                Kết nối với thương hiệu, nhận sản phẩm trải nghiệm và kiếm thu nhập từ cả phí nội dung lẫn hoa hồng affiliate lên tới 12%.
               </p>
             </article>
 
@@ -263,7 +275,7 @@ export default async function CreatorLandingPage() {
           </div>
         </section>
 
-        <section className="mt-8 rounded-[2rem] border border-zinc-200 bg-gradient-to-br from-zinc-50 via-white to-zinc-100 p-5 shadow-sm md:p-8">
+        <section id="creator-process" className="mt-8 scroll-mt-24 rounded-[2rem] border border-zinc-200 bg-gradient-to-br from-zinc-50 via-white to-zinc-100 p-5 shadow-sm md:p-8">
           <div className="mx-auto max-w-3xl text-center">
             <span className="inline-flex rounded-full bg-zinc-900 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-white">Quy trình</span>
             <h2 className="mt-4 text-3xl font-black leading-tight text-zinc-900 md:text-4xl">Quy trình triển khai</h2>
@@ -273,13 +285,7 @@ export default async function CreatorLandingPage() {
             <div className="relative min-w-[860px] lg:min-w-[980px]">
               <div className="absolute left-20 right-20 top-12 h-px bg-zinc-300" />
               <div className="grid grid-cols-5 gap-4">
-                {[
-                  ["1", "Tạo Campaign", "Đăng sản phẩm và mục tiêu chiến dịch.", "doc"],
-                  ["2", "Creator Ứng Tuyển", "Nhận hồ sơ từ Creator phù hợp.", "users"],
-                  ["3", "Duyệt & Gửi Sản Phẩm", "Phân phối reward hoặc sản phẩm tài trợ.", "package"],
-                  ["4", "Nhận Nội Dung", "Creator sản xuất và đăng tải nội dung.", "play"],
-                  ["5", "Đo Lường Hiệu Quả", "Theo dõi hiệu suất và tối ưu doanh thu.", "chart"]
-                ].map(([step, title, description, kind], index, steps) => (
+                {creatorProcessSteps.map(([step, title, description, kind], index, steps) => (
                   <article key={title} className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 text-center shadow-[0_16px_42px_-28px_rgba(24,24,27,0.55)] ring-1 ring-white transition-all duration-300 hover:-translate-y-1 hover:border-zinc-300 hover:shadow-[0_24px_58px_-32px_rgba(24,24,27,0.45)]">
                     <div className="absolute inset-x-0 top-0 h-1 bg-zinc-900" />
                     {index < steps.length - 1 ? (
@@ -379,7 +385,12 @@ export default async function CreatorLandingPage() {
               >
                 Trở Thành Creator
               </AnalyticsLink>
-              <Link href="#creator-how-it-works" className="inline-flex w-full items-center justify-center rounded-xl border border-white/20 px-6 py-3 text-sm font-black text-white transition-colors hover:bg-white hover:text-zinc-950 sm:w-auto">
+              <Link
+                href="https://www.facebook.com/profile.php?id=61590739340712"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex w-full items-center justify-center rounded-xl border border-white/20 px-6 py-3 text-sm font-black text-white transition-colors hover:bg-white hover:text-zinc-950 sm:w-auto"
+              >
                 Khám Phá Cộng Đồng
               </Link>
             </div>
