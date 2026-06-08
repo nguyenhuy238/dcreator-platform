@@ -12,6 +12,7 @@ export type CampaignDetailDTO = {
     category: "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
     objective: string | null;
     benefits: string | null;
+    requirements: string | null;
     participationRoadmap: string[];
     status: "DRAFT" | "ACTIVE" | "PAUSED" | "COMPLETED" | "CANCELLED" | "ARCHIVED";
     deadline: string | null;

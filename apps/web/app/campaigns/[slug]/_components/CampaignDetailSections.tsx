@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { ReactNode } from "react";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
@@ -74,7 +74,7 @@ function CampaignDealOverview({ data }: { data: CampaignDetailDTO }) {
   };
   const requirementCard = {
     eyebrow: "YÊU CẦU",
-    title: mission?.description || "01 Video + 01 Đánh giá sản phẩm",
+    title: data.hero.requirements || mission?.description || "01 Video + 01 Đánh giá sản phẩm",
     color: "from-sky-50 to-cyan-100"
   };
   const deadlineCard = {

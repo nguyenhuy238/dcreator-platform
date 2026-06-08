@@ -20,6 +20,7 @@ export async function findPublicCampaignDetailBySlug(slug: string, viewerId?: st
       campaignType: true,
       category: true,
       benefits: true,
+      creatorBriefDescription: true,
       participationRoadmap: true,
       objective: true,
       priorityChannels: true,

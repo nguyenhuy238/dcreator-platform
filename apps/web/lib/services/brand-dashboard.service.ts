@@ -49,6 +49,7 @@ type BrandMemberRoleUpdateInput = z.infer<typeof brandMemberRoleUpdateSchema>;
 type BrandMemberRemoveInput = z.infer<typeof brandMemberRemoveSchema>;
 const COVER_MARKER = "[[COVER_IMAGE_URL]]:";
 const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
+const REQUIREMENTS_MARKER = "[[CAMPAIGN_REQUIREMENTS]]:";
 
 function sanitizeCampaignImageUrl(input?: string | null) {
   const value = normalizeImageUrlInput(input);
@@ -59,6 +60,25 @@ function extractMarkerValue(text: string | null | undefined, marker: string) {
   if (!text) return "";
   const line = text.split("\n").find((item) => item.startsWith(marker));
   return line?.slice(marker.length).trim() ?? "";
+}
+
+function extractRequirementsValue(text: string | null | undefined) {
+  const encoded = extractMarkerValue(text, REQUIREMENTS_MARKER);
+  if (!encoded) return "";
+  try {
+    return decodeURIComponent(encoded);
+  } catch {
+    return encoded;
+  }
+}
+
+function buildCampaignRequestBrief(input: { title: string; imageUrl?: string | null; contentFileUrl?: string | null; requirements?: string | null }) {
+  return [
+    `Yêu cầu tạo campaign từ Brand: ${input.title}`,
+    input.imageUrl ? `${COVER_MARKER}${input.imageUrl}` : "",
+    input.contentFileUrl ? `${CONTENT_FILE_MARKER}${input.contentFileUrl}` : "",
+    input.requirements?.trim() ? `${REQUIREMENTS_MARKER}${encodeURIComponent(input.requirements.trim())}` : ""
+  ].filter(Boolean).join("\n");
 }
 
 async function trySyncCampaignNewFields(campaignId: string, benefits: string | null, participationRoadmap: string[]) {
@@ -1097,7 +1117,8 @@ export async function listBrandCampaignRequests(accountId: string, currentBrandI
   return requests.map((request) => ({
     ...request,
     createdCampaign: request.createdCampaign ?? campaignBySlug.get(request.requestedSlug) ?? null,
-    coverImageUrl: sanitizeCampaignImageUrl(extractMarkerValue(request.brief, COVER_MARKER))
+    coverImageUrl: sanitizeCampaignImageUrl(extractMarkerValue(request.brief, COVER_MARKER)),
+    requirements: extractRequirementsValue(request.brief)
   }));
 }
 
@@ -1114,11 +1135,12 @@ export async function createBrandCampaignRequest(accountId: string, input: Campa
     .replace(/-{2,}/g, "-")
     .slice(0, 80) || "campaign-request";
   const requestedSlug = `${slugBase}-${Date.now().toString().slice(-6)}`;
-  const briefWithMeta = [
-    `Yêu cầu tạo campaign từ Brand: ${input.title}`,
-    input.imageUrl ? `${COVER_MARKER}${input.imageUrl}` : "",
-    `${CONTENT_FILE_MARKER}${input.contentFileUrl}`
-  ].filter(Boolean).join("\n");
+  const briefWithMeta = buildCampaignRequestBrief({
+    title: input.title,
+    imageUrl: input.imageUrl,
+    contentFileUrl: input.contentFileUrl,
+    requirements: input.requirements
+  });
 
   const created = await prisma.brandCampaignRequest.create({
     data: {
@@ -1171,11 +1193,13 @@ export async function respondBrandCampaignRequest(accountId: string, requestId: 
   const nextTitle = input.title?.trim() || request.title;
   const nextImageUrl = input.imageUrl === undefined ? extractMarkerValue(request.brief, COVER_MARKER) : input.imageUrl;
   const nextContentFileUrl = input.contentFileUrl ?? extractMarkerValue(request.brief, CONTENT_FILE_MARKER);
-  const nextBrief = [
-    `Yêu cầu tạo campaign từ Brand: ${nextTitle}`,
-    nextImageUrl ? `${COVER_MARKER}${nextImageUrl}` : "",
-    nextContentFileUrl ? `${CONTENT_FILE_MARKER}${nextContentFileUrl}` : ""
-  ].filter(Boolean).join("\n");
+  const nextRequirements = input.requirements === undefined ? extractRequirementsValue(request.brief) : input.requirements;
+  const nextBrief = buildCampaignRequestBrief({
+    title: nextTitle,
+    imageUrl: nextImageUrl,
+    contentFileUrl: nextContentFileUrl,
+    requirements: nextRequirements
+  });
 
   return prisma.brandCampaignRequest.update({
     where: { id: requestId },

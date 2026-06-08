@@ -5,10 +5,18 @@ import { AnalyticsEvents } from "@/lib/analytics-events";
 import { trackEvent } from "@/lib/analytics";
 
 type ApiResult<T> = { success: boolean; data?: T; error?: string };
+type FieldErrors = {
+  name?: string;
+  email?: string;
+  phone?: string;
+  note?: string;
+};
 
 type BrandConsultationPageFormProps = {
   source: string;
 };
+
+const emailPattern = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
 export function BrandConsultationPageForm({ source }: BrandConsultationPageFormProps) {
   const [name, setName] = useState("");
@@ -18,12 +26,37 @@ export function BrandConsultationPageForm({ source }: BrandConsultationPageFormP
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
+  function validateForm() {
+    const nextErrors: FieldErrors = {};
+    const normalizedEmail = email.trim();
+    const normalizedPhone = phone.trim();
+
+    if (name.trim().length < 2) nextErrors.name = "Nhập tên liên hệ.";
+    if (!normalizedEmail) nextErrors.email = "Nhập email.";
+    else if (!emailPattern.test(normalizedEmail)) nextErrors.email = "Email chưa đúng.";
+    if (!normalizedPhone) nextErrors.phone = "Nhập số điện thoại.";
+    else if (normalizedPhone.replace(/\D/g, "").length < 8) nextErrors.phone = "Số điện thoại chưa đúng.";
+    if (note.trim().length > 500) nextErrors.note = "Nội dung quá dài.";
+
+    return nextErrors;
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const nextErrors = validateForm();
+    if (Object.values(nextErrors).some(Boolean)) {
+      setFieldErrors(nextErrors);
+      setError("");
+      setSuccess("");
+      return;
+    }
+
     setLoading(true);
     setError("");
     setSuccess("");
+    setFieldErrors({});
 
     trackEvent(AnalyticsEvents.BRAND_UPGRADE_SUBMIT, {
       page_source: source,
@@ -35,16 +68,21 @@ export function BrandConsultationPageForm({ source }: BrandConsultationPageFormP
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name,
-          email,
-          phone,
-          note,
+          name: name.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          note: note.trim(),
           source
         })
       });
       const payload = (await response.json()) as ApiResult<unknown>;
       if (!response.ok || !payload.success) {
-        throw new Error(payload.error ?? "Không thể gửi thông tin tư vấn.");
+        const apiMessage = payload.error?.trim() || "";
+        if (apiMessage.toLowerCase().includes("email")) {
+          setFieldErrors((current) => ({ ...current, email: "Email chưa đúng." }));
+          throw new Error("");
+        }
+        throw new Error(apiMessage || "Không gửi được. Thử lại.");
       }
 
       trackEvent(AnalyticsEvents.BRAND_UPGRADE_SUCCESS, {
@@ -61,7 +99,8 @@ export function BrandConsultationPageForm({ source }: BrandConsultationPageFormP
         page_source: source,
         role: "brand"
       });
-      setError(submitError instanceof Error ? submitError.message : "Không thể gửi thông tin tư vấn.");
+      const message = submitError instanceof Error ? submitError.message : "Không gửi được. Thử lại.";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -81,48 +120,64 @@ export function BrandConsultationPageForm({ source }: BrandConsultationPageFormP
         <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
           Tên thương hiệu hoặc người liên hệ
           <input
-            className="dc-input"
+            className={`dc-input ${fieldErrors.name ? "border-red-500 ring-1 ring-red-300" : ""}`}
             value={name}
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) => {
+              setName(event.target.value);
+              setFieldErrors((current) => ({ ...current, name: undefined }));
+            }}
             placeholder="Ví dụ: NONE O2O / Nguyễn An"
             required
             minLength={2}
           />
+          {fieldErrors.name ? <span className="text-xs text-red-600">{fieldErrors.name}</span> : null}
         </label>
 
         <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
           Email
           <input
             type="email"
-            className="dc-input"
+            className={`dc-input ${fieldErrors.email ? "border-red-500 ring-1 ring-red-300" : ""}`}
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            onChange={(event) => {
+              setEmail(event.target.value);
+              setFieldErrors((current) => ({ ...current, email: undefined }));
+            }}
             placeholder="brand@company.vn"
             required
           />
+          {fieldErrors.email ? <span className="text-xs text-red-600">{fieldErrors.email}</span> : null}
         </label>
 
         <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
           Số điện thoại
           <input
-            className="dc-input"
+            className={`dc-input ${fieldErrors.phone ? "border-red-500 ring-1 ring-red-300" : ""}`}
             value={phone}
-            onChange={(event) => setPhone(event.target.value)}
+            onChange={(event) => {
+              setPhone(event.target.value);
+              setFieldErrors((current) => ({ ...current, phone: undefined }));
+            }}
             placeholder="09xx xxx xxx"
             required
             minLength={6}
           />
+          {fieldErrors.phone ? <span className="text-xs text-red-600">{fieldErrors.phone}</span> : null}
         </label>
 
         <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
           Thông tin thêm
           <textarea
-            className="dc-input min-h-28 resize-y py-3"
+            className={`dc-input min-h-28 resize-y py-3 ${fieldErrors.note ? "border-red-500 ring-1 ring-red-300" : ""}`}
             value={note}
-            onChange={(event) => setNote(event.target.value)}
+            onChange={(event) => {
+              setNote(event.target.value);
+              setFieldErrors((current) => ({ ...current, note: undefined }));
+            }}
             placeholder="Ngành hàng, mục tiêu campaign hoặc gói bạn đang quan tâm."
             maxLength={500}
           />
+          {fieldErrors.note ? <span className="text-xs text-red-600">{fieldErrors.note}</span> : null}
         </label>
       </div>
 
