@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { BrandCampaignRequestStatus, BrandStatus } from "@prisma/client";
 import { AnalyticsLink } from "@/app/components/analytics/AnalyticsLink";
 import { TrackPageEvent } from "@/app/components/analytics/TrackPageEvent";
 import { ExploreCampaignsButton } from "@/app/components/dcreator/home/ExploreCampaignsButton";
@@ -9,6 +10,8 @@ import { PartnerLogo } from "@/app/components/dcreator/home/PartnerLogo";
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { getCurrentUserFromServer } from "@/lib/auth/current-user";
 import { deriveCapabilities } from "@/lib/auth/capabilities";
+import { getBrandDisplay } from "@/lib/display-identity";
+import { prisma } from "@/lib/db";
 import { AnalyticsEvents } from "@/lib/analytics-events";
 import { listCampaigns } from "@/lib/services/campaign.service";
 
@@ -44,7 +47,7 @@ const faqs = [
 ];
 
 export default async function HomePage() {
-  const [featuredCampaigns, campaignStatsSource, currentUser] = await Promise.all([
+  const [featuredCampaigns, campaignStatsSource, currentUser, collaboratedBrandRows] = await Promise.all([
     listCampaigns({
       sort: "trending",
       page: 1,
@@ -57,7 +60,28 @@ export default async function HomePage() {
       limit: 24,
       status: "ACTIVE"
     }),
-    getCurrentUserFromServer()
+    getCurrentUserFromServer(),
+    prisma.brand.findMany({
+      where: {
+        status: BrandStatus.ACTIVE,
+        campaignRequests: {
+          some: {
+            OR: [
+              { createdCampaignId: { not: null } },
+              { status: BrandCampaignRequestStatus.APPROVED }
+            ]
+          }
+        }
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 12,
+      select: {
+        id: true,
+        name: true,
+        logoUrl: true,
+        legalName: true
+      }
+    })
   ]);
   const roles = currentUser?.roles ?? [];
   const isLoggedIn = Boolean(currentUser);
@@ -87,23 +111,14 @@ export default async function HomePage() {
       ? fundedRatioSamples.reduce((sum, ratio) => sum + ratio, 0) / fundedRatioSamples.length
       : 0;
   const averageFundedRatioDisplay = `${averageFundedRatio.toFixed(2)}x`;
-  const brandMap = new Map<string, { name: string; logoUrl: string | null }>();
-  for (const item of campaignStatsSource.items) {
-    const brandName = item.brand?.trim();
-    if (!brandName) continue;
-    if (!brandMap.has(brandName)) {
-      brandMap.set(brandName, {
-        name: brandName,
-        logoUrl: item.brandLogoUrl ?? null
-      });
-      continue;
-    }
-    const current = brandMap.get(brandName);
-    if (current && !current.logoUrl && item.brandLogoUrl) {
-      brandMap.set(brandName, { ...current, logoUrl: item.brandLogoUrl });
-    }
-  }
-  const partneredBrands = Array.from(brandMap.values()).slice(0, 12);
+  const partneredBrands = collaboratedBrandRows.map((brand) => {
+    const display = getBrandDisplay(brand);
+    return {
+      id: brand.id,
+      name: display.name,
+      logoUrl: brand.logoUrl ?? null
+    };
+  });
   return (
     <>
       <TrackPageEvent eventName={AnalyticsEvents.LANDING_PAGE_VIEW} />
@@ -332,7 +347,7 @@ export default async function HomePage() {
           {partneredBrands.length > 0 ? (
             <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
               {partneredBrands.map((brand) => (
-                <article key={brand.name} className="rounded-2xl border border-zinc-200 bg-gradient-to-b from-white to-zinc-50 px-4 py-5 text-center shadow-sm">
+                <article key={brand.id} className="rounded-2xl border border-zinc-200 bg-gradient-to-b from-white to-zinc-50 px-4 py-5 text-center shadow-sm">
                   <div className="mx-auto mb-3 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm">
                     <PartnerLogo brandName={brand.name} logoUrl={brand.logoUrl} />
                   </div>

@@ -35,8 +35,19 @@ export async function findPublicCampaignDetailBySlug(slug: string, viewerId?: st
       fundedAmountVnd: true,
       ugcVideoQuota: true,
       ugcVideoApprovedCount: true,
-      brand: { select: { displayName: true } },
-      creator: { select: { displayName: true } },
+      brand: { select: { displayName: true, avatarUrl: true } },
+      creator: {
+        select: {
+          displayName: true,
+          avatarUrl: true,
+          creatorProfile: { select: { displayName: true, avatarUrl: true } }
+        }
+      },
+      sourceBrandRequests: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { brand: { select: { name: true, logoUrl: true, legalName: true } } }
+      },
       rewards: {
         where: { isActive: true },
         orderBy: { pointsCost: "asc" },
