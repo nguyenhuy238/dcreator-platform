@@ -1,4 +1,3 @@
-import Link from "next/link";
 import Image from "next/image";
 import { CampaignStatus } from "@prisma/client";
 import { AnalyticsLink } from "@/app/components/analytics/AnalyticsLink";
@@ -59,6 +58,49 @@ const processSteps = [
   ["5", "DCREATOR THEO DÕI HIỆU QUẢ", "Theo dõi hiệu quả, hoàn thiện sản phẩm nếu có, cập nhật mã quảng cáo và giúp Brand tối ưu campaign cho các đợt sau.", "chart"]
 ] as const;
 
+const servicePackages = [
+  {
+    name: "Gói Free",
+    badge: "Khởi động",
+    price: "0 N-Point",
+    description: "Khởi động, test hiệu quả creator marketing với chi phí thấp.",
+    highlightTitle: "Ưu đãi gói Free",
+    benefits: [
+      "Tặng miễn phí 20 video UGC / Brand",
+      "Tổng chương trình hỗ trợ lên đến 500 video",
+      "Creator phù hợp theo ngành hàng và sản phẩm"
+    ],
+    tone: "emerald"
+  },
+  {
+    name: "UGC - Gói 15 Video",
+    badge: "UGC",
+    price: "5.000.000 N-Point",
+    description: "15 video review sản phẩm/dịch vụ với creator trên hệ thống.",
+    highlightTitle: null,
+    benefits: [
+      "Creator đăng ký tham gia và được lọc theo tiêu chí Brand",
+      "Mỗi video là nội dung UGC theo brief campaign",
+      "Đặt hàng tăng lượt bán shop"
+    ],
+    tone: "zinc"
+  },
+  {
+    name: "UGC - Gói 50 Video",
+    badge: "UGC",
+    price: "12.000.000 N-Point",
+    description: "Gói mở rộng cho chiến dịch phủ rộng nội dung UGC.",
+    highlightTitle: null,
+    benefits: [
+      "Bao gồm toàn bộ quyền lợi của gói UGC - Gói 15 Video",
+      "Bao gồm 50 video UGC cho sản phẩm/dịch vụ",
+      "Có thể kết hợp hàng/tiền hàng/voucher theo campaign",
+      "Phù hợp mục tiêu scale nhận diện và chuyển đổi."
+    ],
+    tone: "zinc"
+  }
+] as const;
+
 const formatCompactNumber = (value: number) =>
   new Intl.NumberFormat("vi-VN", {
     notation: "compact",
@@ -107,7 +149,8 @@ export default async function BrandHomePage() {
     })
   ]);
 
-  const primaryCtaHref = currentUser ? "/campaigns" : "/auth/register";
+  const brandCtaHref = !currentUser ? "/auth/register/brand" : currentUser.capabilities.brand ? "/dashboard/brand" : "/dashboard/user/upgrade";
+  const primaryCtaHref = currentUser ? "/campaigns" : "/auth/register/brand";
   const primaryCtaLabel = currentUser ? "Xem campaign" : "Đăng ký Brand";
   const activeCampaignCount = campaignData.pagination.total ?? 0;
   const stats = creatorStats.map(([value, label]) => [label === "Campaign active" ? String(activeCampaignCount) : value, label]);
@@ -163,9 +206,12 @@ export default async function BrandHomePage() {
               >
                 {primaryCtaLabel}
               </AnalyticsLink>
-              <Link href="/brand/get-started" className="dc-btn-secondary w-full rounded-xl px-6 text-base font-semibold sm:w-auto sm:min-w-[220px]">
+              <BrandProcessScrollLink
+                targetId="service-packages"
+                className="dc-btn-secondary w-full rounded-xl px-6 text-base font-semibold sm:w-auto sm:min-w-[220px]"
+              >
                 Bắt đầu ngay hôm nay
-              </Link>
+              </BrandProcessScrollLink>
             </div>
           </div>
 
@@ -286,17 +332,7 @@ export default async function BrandHomePage() {
               </BrandProcessScrollLink>
             </article>
 
-            <article className="rounded-xl border border-white/10 bg-zinc-900 p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/25 hover:bg-zinc-800 hover:shadow-md lg:col-span-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-zinc-950">
-                <MonoIcon kind="chart" />
-              </div>
-              <h3 className="mt-6 text-lg font-black text-white">Đo lường bằng doanh thu</h3>
-              <p className="mt-3 text-sm leading-6 text-zinc-300">
-                Kết nối hiệu quả nội dung với đơn hàng, GMV và kết quả campaign để tối ưu các đợt triển khai tiếp theo.
-              </p>
-            </article>
-
-            <article className="rounded-xl border border-white/10 bg-zinc-900 p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/25 hover:bg-zinc-800 hover:shadow-md lg:col-span-2">
+            <article className="rounded-xl border border-white/10 bg-zinc-900 p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/25 hover:bg-zinc-800 hover:shadow-md lg:col-span-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-zinc-950">
                 <MonoIcon kind="target" />
               </div>
@@ -306,14 +342,22 @@ export default async function BrandHomePage() {
               </p>
             </article>
 
-            <article className="rounded-xl border border-white/10 bg-zinc-900 p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/25 hover:bg-zinc-800 hover:shadow-md lg:col-span-1">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-zinc-950">
+            <article className="rounded-xl border border-white bg-white p-6 text-zinc-950 shadow-[0_18px_45px_-28px_rgba(255,255,255,0.9)] transition-all duration-300 hover:-translate-y-1 hover:bg-zinc-50 hover:shadow-[0_24px_55px_-32px_rgba(255,255,255,0.95)] lg:col-span-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-950 text-white">
                 <MonoIcon kind="doc" />
               </div>
-              <h3 className="mt-6 text-lg font-black text-white">Sẵn sàng triển khai cùng dCreator</h3>
-              <p className="mt-3 text-sm leading-6 text-zinc-300">
-                Quy trình rõ ràng, đội ngũ đồng hành và Creator phù hợp cho từng campaign.
+              <h3 className="mt-6 text-lg font-black text-zinc-950">Tham gia ngay</h3>
+              <p className="mt-3 text-sm leading-6 text-zinc-600">
+                Bắt đầu luồng Brand hiện có để tạo hồ sơ, nâng cấp vai trò hoặc quay lại dashboard vận hành.
               </p>
+              <AnalyticsLink
+                href={brandCtaHref}
+                eventName={AnalyticsEvents.BRAND_UPGRADE_CLICK}
+                eventParams={{ role: "brand", page_source: "brand_landing_benefit_cta" }}
+                className="dc-btn-primary mt-8 w-full rounded-xl px-5 py-3 text-sm font-black !text-white hover:bg-zinc-800 sm:w-auto sm:min-w-[138px]"
+              >
+                Tham gia ngay
+              </AnalyticsLink>
             </article>
           </div>
         </section>
@@ -354,6 +398,53 @@ export default async function BrandHomePage() {
           </div>
         </section>
 
+        <section id="service-packages" className="mt-8 scroll-mt-24 rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-sm md:p-8">
+          <div className="mx-auto max-w-3xl text-center">
+            <span className="inline-flex rounded-full bg-zinc-900 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-white">Gói dịch vụ</span>
+            <h2 className="mt-4 text-3xl font-black leading-tight text-zinc-900 md:text-4xl">Chọn gói UGC phù hợp với mục tiêu Brand</h2>
+            <p className="mt-3 text-sm leading-6 text-zinc-600">
+              Từ thử nghiệm chi phí thấp đến chiến dịch phủ rộng, dCreator chuẩn hóa Creator, brief và nội dung UGC trong cùng một quy trình.
+            </p>
+          </div>
+
+          <div className="mt-9 grid gap-5 lg:grid-cols-3">
+            {servicePackages.map((servicePackage) => (
+              <article
+                key={servicePackage.name}
+                className="flex h-full flex-col rounded-2xl border border-zinc-200 bg-zinc-50 p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-zinc-300 hover:bg-white hover:shadow-md"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <span className={servicePackage.tone === "emerald" ? "inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-emerald-700" : "inline-flex rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-zinc-700"}>
+                      {servicePackage.badge}
+                    </span>
+                    <h3 className="mt-4 text-xl font-black text-zinc-950">{servicePackage.name}</h3>
+                  </div>
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-950 text-white">
+                    <MonoIcon kind={servicePackage.tone === "emerald" ? "rocket" : "video"} />
+                  </div>
+                </div>
+                <p className="mt-5 text-3xl font-black tracking-tight text-zinc-950">{servicePackage.price}</p>
+                <p className="mt-3 min-h-12 text-sm leading-6 text-zinc-600">{servicePackage.description}</p>
+
+                <div className={servicePackage.tone === "emerald" ? "mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4" : "mt-6 rounded-2xl border border-zinc-200 bg-white p-4"}>
+                  {servicePackage.highlightTitle ? (
+                    <p className="mb-3 text-sm font-black text-zinc-950">{servicePackage.highlightTitle}</p>
+                  ) : null}
+                  <ul className="space-y-3 text-sm leading-6 text-zinc-700">
+                    {servicePackage.benefits.map((benefit) => (
+                      <li key={benefit} className="flex gap-2">
+                        <span className={servicePackage.tone === "emerald" ? "mt-2 h-2 w-2 shrink-0 rounded-full bg-emerald-600" : "mt-2 h-2 w-2 shrink-0 rounded-full bg-zinc-950"} />
+                        <span>{benefit}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
         <section className="mt-8 bg-zinc-50 py-5 md:py-8">
           <div className="relative overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 px-6 py-12 text-center text-white shadow-[0_24px_70px_-35px_rgba(0,0,0,0.9)] md:px-10 md:py-16">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(255,255,255,0.08),transparent_28%),radial-gradient(circle_at_12%_75%,rgba(255,255,255,0.06),transparent_26%)]" />
@@ -363,14 +454,12 @@ export default async function BrandHomePage() {
                 Hãy để dCreator giúp thương hiệu của bạn kết nối với hàng triệu khách hàng thông qua những người kể chuyện tài năng nhất.
               </p>
               <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <AnalyticsLink
-                  href="/brand/get-started"
-                  eventName={AnalyticsEvents.BRAND_UPGRADE_CLICK}
-                  eventParams={{ role: "brand", page_source: "brand_landing_bottom" }}
+                <BrandProcessScrollLink
+                  targetId="service-packages"
                   className="inline-flex w-full items-center justify-center rounded-md bg-white px-8 py-3 text-sm font-black !text-black transition-colors duration-200 hover:bg-zinc-200 sm:w-auto"
                 >
                   Bắt đầu ngay hôm nay
-                </AnalyticsLink>
+                </BrandProcessScrollLink>
                 <BrandConsultationModal source="brand_landing_consultation" />
               </div>
             </div>
