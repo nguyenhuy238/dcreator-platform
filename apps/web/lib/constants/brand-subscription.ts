@@ -35,7 +35,6 @@ export const BRAND_SUBSCRIPTION_PACKAGES: BrandSubscriptionPackageDefinition[] =
     features: [
       "Creator đăng ký tham gia và được lọc theo tiêu chí Brand",
       "Mỗi video là nội dung UGC theo brief campaign",
-      "Brand có thể dùng lại cho fanpage, website, ads",
       "Đặt hàng tăng lượt bán shop",
       "Đăng lên kênh cá nhân của creators",
       "Đánh giá 5 sao và viết nhận xét sản phẩm",
