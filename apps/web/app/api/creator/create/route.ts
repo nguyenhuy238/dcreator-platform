@@ -12,6 +12,7 @@ import { createNotification } from "@/lib/services/notification.service";
 
 const createCreatorProfileSchema = z.object({
   displayName: z.string().trim().min(2).max(120),
+  avatarUrl: z.string().trim().max(400).optional().or(z.literal("")),
   bio: z.string().trim().max(1000).optional(),
   creatorLinks: z.array(z.object({
     platform: z.enum(["tiktok", "facebook", "instagram", "shopee"]),
@@ -34,6 +35,7 @@ export async function POST(request: NextRequest) {
         create: {
           accountId: user.id,
           displayName: payload.displayName,
+          avatarUrl: payload.avatarUrl?.trim() || null,
           bio: payload.bio?.trim() || null,
           mainPlatform: payload.creatorLinks[0]?.platform.toUpperCase() as "TIKTOK" | "FACEBOOK" | "INSTAGRAM" | "SHOPEE" | undefined,
           socialUrl: payload.creatorLinks[0]?.url,
@@ -42,6 +44,7 @@ export async function POST(request: NextRequest) {
         },
         update: {
           displayName: payload.displayName,
+          avatarUrl: payload.avatarUrl?.trim() || null,
           bio: payload.bio?.trim() || null,
           ...(payload.creatorLinks[0] ? {
             mainPlatform: payload.creatorLinks[0].platform.toUpperCase() as "TIKTOK" | "FACEBOOK" | "INSTAGRAM" | "SHOPEE",
@@ -95,6 +98,7 @@ export async function POST(request: NextRequest) {
     return ok({
       id: profile.id,
       displayName: profile.displayName,
+      avatarUrl: profile.avatarUrl,
       role: Role.CREATOR,
       roles: [Role.CREATOR],
       hasCreatorProfile: true

@@ -273,16 +273,29 @@ export async function getCreatorCommission(accountId: string) {
 export async function getCreatorProfile(accountId: string) {
   const account = await prisma.account.findUniqueOrThrow({
     where: { id: accountId },
-    include: { profile: true }
+    include: {
+      profile: true,
+      creatorProfile: {
+        select: {
+          displayName: true,
+          avatarUrl: true,
+          bio: true,
+          contentCategory: true
+        }
+      }
+    }
   });
 
   const profileMeta = parseProfileMeta(account.profile?.socialLinks);
+  const categories = account.creatorProfile?.contentCategory
+    ? [account.creatorProfile.contentCategory]
+    : profileMeta.categories;
 
   return {
-    displayName: account.displayName,
-    avatarUrl: account.avatarUrl,
-    bio: account.profile?.bio ?? "",
-    categories: profileMeta.categories,
+    displayName: account.creatorProfile?.displayName ?? account.displayName,
+    avatarUrl: account.creatorProfile?.avatarUrl ?? "",
+    bio: account.creatorProfile?.bio ?? account.profile?.bio ?? "",
+    categories,
     socialLinks: profileMeta.socialLinks
   };
 }
@@ -291,35 +304,44 @@ export async function updateCreatorProfile(accountId: string, input: CreatorProf
   const current = await prisma.profile.findUnique({ where: { accountId } });
   const currentMeta = parseProfileMeta(current?.socialLinks);
 
-  await prisma.account.update({
-    where: { id: accountId },
-    data: {
-      displayName: input.displayName,
-      avatarUrl: input.avatarUrl || null
-    }
-  });
+  await prisma.$transaction(async (tx) => {
+    await tx.creatorProfile.upsert({
+      where: { accountId },
+      create: {
+        accountId,
+        displayName: input.displayName,
+        avatarUrl: input.avatarUrl || null,
+        bio: input.bio || null,
+        contentCategory: input.categories[0] ?? null
+      },
+      update: {
+        displayName: input.displayName,
+        avatarUrl: input.avatarUrl || null,
+        bio: input.bio || null,
+        contentCategory: input.categories[0] ?? null
+      }
+    });
 
-  await prisma.profile.upsert({
-    where: { accountId },
-    create: {
-      accountId,
-      bio: input.bio,
-      socialLinks: {
-        categories: input.categories,
-        socialLinks: input.socialLinks,
-        channels: currentMeta.channels,
-        kycVerified: currentMeta.kycVerified
+    await tx.profile.upsert({
+      where: { accountId },
+      create: {
+        accountId,
+        socialLinks: {
+          categories: input.categories,
+          socialLinks: input.socialLinks,
+          channels: currentMeta.channels,
+          kycVerified: currentMeta.kycVerified
+        }
+      },
+      update: {
+        socialLinks: {
+          categories: input.categories,
+          socialLinks: input.socialLinks,
+          channels: currentMeta.channels,
+          kycVerified: currentMeta.kycVerified
+        }
       }
-    },
-    update: {
-      bio: input.bio,
-      socialLinks: {
-        categories: input.categories,
-        socialLinks: input.socialLinks,
-        channels: currentMeta.channels,
-        kycVerified: currentMeta.kycVerified
-      }
-    }
+    });
   });
 
   await createNotification({
