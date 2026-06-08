@@ -163,7 +163,7 @@ export default async function BrandHomePage() {
               >
                 {primaryCtaLabel}
               </AnalyticsLink>
-              <Link href="/brand/get-started" className="dc-btn-secondary w-full rounded-xl px-6 text-base font-semibold sm:w-auto sm:min-w-[220px]">
+              <Link href="/brand-get-started" className="dc-btn-secondary w-full rounded-xl px-6 text-base font-semibold sm:w-auto sm:min-w-[220px]">
                 Bắt đầu ngay hôm nay
               </Link>
             </div>
@@ -364,7 +364,7 @@ export default async function BrandHomePage() {
               </p>
               <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
                 <AnalyticsLink
-                  href="/brand/get-started"
+                  href="/brand-get-started"
                   eventName={AnalyticsEvents.BRAND_UPGRADE_CLICK}
                   eventParams={{ role: "brand", page_source: "brand_landing_bottom" }}
                   className="inline-flex w-full items-center justify-center rounded-md bg-white px-8 py-3 text-sm font-black !text-black transition-colors duration-200 hover:bg-zinc-200 sm:w-auto"
