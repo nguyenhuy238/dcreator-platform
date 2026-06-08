@@ -4,6 +4,7 @@ import { CampaignStatus } from "@prisma/client";
 import { AnalyticsLink } from "@/app/components/analytics/AnalyticsLink";
 import { TrackPageEvent } from "@/app/components/analytics/TrackPageEvent";
 import { BrandConsultationModal } from "@/app/brand/_components/BrandConsultationModal";
+import { BrandProcessScrollLink } from "@/app/brand/_components/BrandProcessScrollLink";
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { AnalyticsEvents } from "@/lib/analytics-events";
 import { getCurrentUserFromServer } from "@/lib/auth/current-user";
@@ -147,7 +148,7 @@ export default async function BrandHomePage() {
             </p>
 
             <h2 className="mx-auto mt-6 max-w-5xl break-words text-2xl font-semibold leading-tight text-zinc-600 sm:text-3xl md:text-5xl">
-              Biến nội dung thành <span className="font-black text-zinc-900">doanh thu thực tế.</span>
+              Biến nội dung thành <span className="font-black text-zinc-900">doanh thu.</span>
             </h2>
             <p className="mx-auto mt-4 max-w-5xl text-base text-zinc-600 sm:text-lg md:text-xl lg:text-[25px] lg:leading-tight">
               Kết nối thương hiệu với mạng lưới Massive Creators (1k - 100k followers) để tạo nội dung UGC, thúc đẩy Social Commerce và tăng trưởng doanh thu.
@@ -277,9 +278,12 @@ export default async function BrandHomePage() {
               <p className="mt-3 text-sm leading-6 text-zinc-600">
                 Brand theo dõi brief, duyệt Creator, quản lý nhiệm vụ và cập nhật trạng thái nội dung trong một luồng làm việc rõ ràng.
               </p>
-              <Link href="#quy-trinh-trien-khai" className="mt-10 inline-flex text-xs font-bold text-zinc-950 underline decoration-zinc-300 decoration-2 underline-offset-4 transition-colors hover:decoration-zinc-950">
+              <BrandProcessScrollLink
+                targetId="quy-trinh-trien-khai"
+                className="mt-10 inline-flex text-xs font-bold text-zinc-950 underline decoration-zinc-300 decoration-2 underline-offset-4 transition-colors hover:decoration-zinc-950"
+              >
                 Xem quy trình triển khai
-              </Link>
+              </BrandProcessScrollLink>
             </article>
 
             <article className="rounded-xl border border-white/10 bg-zinc-900 p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/25 hover:bg-zinc-800 hover:shadow-md lg:col-span-2">
