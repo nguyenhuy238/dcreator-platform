@@ -28,7 +28,7 @@ const DEFAULT_PARTICIPATION_STEPS = [
   },
   {
     title: "NHẬN THU NHẬP",
-    description: "Nhận phí nội dung, hoa hồng affiliate và theo dõi hiệu suất chiến dịch."
+    description: "Nhận tiền hoa hồng affiliate lên tới 12% cho mỗi đơn hàng"
   }
 ];
 
