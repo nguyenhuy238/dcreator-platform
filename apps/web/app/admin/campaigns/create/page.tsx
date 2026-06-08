@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { RequiredHashtagInput } from "@/app/admin/campaigns/_components/RequiredHashtagInput";
 import { ErrorState, PageHeader } from "@/app/components/dcreator/ui/base";
 import { getCampaignTypeLabel } from "@/lib/constants/campaign-type";
+import { DEFAULT_REQUIRED_HASHTAGS, normalizeRequiredHashtags, validateRequiredHashtags } from "@/lib/hashtags";
 
 type CampaignCategory = "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
 type CampaignType = "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
@@ -29,6 +31,7 @@ type FormState = {
   campaignType: CampaignType;
   setupSource: SetupSource;
   participationRoadmap: string[];
+  requiredHashtags: string[];
   benefits: string;
   imageUrl: string;
   ugcVideoQuota: number;
@@ -65,6 +68,7 @@ const defaultForm: FormState = {
   campaignType: "COMMUNITY",
   setupSource: "BRAND_REQUESTED",
   participationRoadmap: [""],
+  requiredHashtags: DEFAULT_REQUIRED_HASHTAGS,
   benefits: "",
   imageUrl: "",
   ugcVideoQuota: 1,
@@ -118,7 +122,8 @@ const apiErrorFieldMap: Record<string, string> = {
   BRAND_ACCOUNT_INACTIVE: "brandAccountId",
   BRAND_PROFILE_NOT_FOUND: "brandAccountId",
   CAMPAIGN_TIMELINE_INVALID: "endsAt",
-  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "ugcVideoQuota"
+  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "ugcVideoQuota",
+  CAMPAIGN_REQUIRED_HASHTAGS_MIGRATION_REQUIRED: "requiredHashtags"
 };
 
 const apiErrorMessageMap: Record<string, string> = {
@@ -126,7 +131,8 @@ const apiErrorMessageMap: Record<string, string> = {
   BRAND_ACCOUNT_INACTIVE: "Tài khoản Brand đang bị vô hiệu hóa.",
   BRAND_PROFILE_NOT_FOUND: "Brand chưa hoàn tất onboarding.",
   CAMPAIGN_TIMELINE_INVALID: "Ngày kết thúc phải sau ngày bắt đầu.",
-  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "Hệ thống chưa cập nhật quota video UGC. Vui lòng chạy migration trước khi tạo chiến dịch."
+  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "Hệ thống chưa cập nhật quota video UGC. Vui lòng chạy migration trước khi tạo chiến dịch.",
+  CAMPAIGN_REQUIRED_HASHTAGS_MIGRATION_REQUIRED: "Hệ thống chưa cập nhật hashtag bắt buộc. Vui lòng chạy migration trước khi tạo chiến dịch."
 };
 
 const vietnameseErrorMessages: Record<string, string> = {
@@ -140,6 +146,7 @@ const vietnameseErrorMessages: Record<string, string> = {
   startsAt: "Ngày bắt đầu chưa hợp lệ.",
   endsAt: "Ngày kết thúc phải sau ngày bắt đầu.",
   participationRoadmap: "Vui lòng nhập ít nhất 1 bước lộ trình tham gia.",
+  requiredHashtags: "Hashtag bắt buộc chưa hợp lệ.",
   productName: "Vui lòng nhập tên sản phẩm.",
   productDescription: "Vui lòng nhập mô tả sản phẩm.",
   productLink: "Vui lòng nhập link sản phẩm.",
@@ -324,6 +331,8 @@ export default function AdminCreateCampaignPage() {
     if (!form.participationRoadmap.some((item) => item.trim().length > 0)) {
       nextErrors.participationRoadmap = "Cần ít nhất 1 bước lộ trình tham gia.";
     }
+    const hashtagError = validateRequiredHashtags(form.requiredHashtags);
+    if (hashtagError) nextErrors.requiredHashtags = hashtagError;
     if (form.startsAt && form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) {
       nextErrors.endsAt = "Ngày kết thúc phải sau ngày bắt đầu.";
     }
@@ -359,6 +368,7 @@ export default function AdminCreateCampaignPage() {
           startsAt: toDateTime(form.startsAt),
           endsAt: toDateTime(form.endsAt),
           participationRoadmap: form.participationRoadmap.filter((item) => item.trim().length > 0),
+          requiredHashtags: normalizeRequiredHashtags(form.requiredHashtags),
           productName: form.creatorBrief.productName,
           productDescription: form.creatorBrief.productDescription,
           productLink: form.creatorBrief.productLink,
@@ -500,6 +510,14 @@ export default function AdminCreateCampaignPage() {
             ))}
             <button type="button" className="dc-btn-secondary w-fit" onClick={addRoadmapStep}>+ Thêm bước</button>
             {fieldErrors.participationRoadmap ? <span className="text-xs text-red-600">{fieldErrors.participationRoadmap}</span> : null}
+          </div>
+
+          <div className="md:col-span-2">
+            <RequiredHashtagInput
+              value={form.requiredHashtags}
+              onChange={(value) => setField("requiredHashtags", value)}
+              error={fieldErrors.requiredHashtags}
+            />
           </div>
 
           <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">

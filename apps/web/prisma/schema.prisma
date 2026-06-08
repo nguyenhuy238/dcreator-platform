@@ -890,6 +890,7 @@ model Campaign {
   setupSource              CampaignSetupSource         @default(BRAND_REQUESTED)
   benefits                 String?
   participationRoadmap     String[]                    @default([])
+  requiredHashtags         String[]                    @default([])
   objective                String?
   priorityChannels         String?
   missionTypes             String?

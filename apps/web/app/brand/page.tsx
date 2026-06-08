@@ -81,7 +81,8 @@ const servicePackages = BRAND_SUBSCRIPTION_PACKAGES.map((packageDefinition) => {
       ...packageDefinition.features.filter((feature) => !HIDDEN_BRAND_LANDING_PACKAGE_FEATURES.has(feature)),
       ...(packageDefinition.specialFeatures ?? [])
     ],
-    tone: isFreePackage ? "emerald" : "zinc"
+    tone: isFreePackage ? "emerald" : "zinc",
+    isFreePackage
   };
 });
 
@@ -401,9 +402,16 @@ export default async function BrandHomePage() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <span className={servicePackage.tone === "emerald" ? "inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-emerald-700" : "inline-flex rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-zinc-700"}>
-                      {servicePackage.badge}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={servicePackage.tone === "emerald" ? "inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-emerald-700" : "inline-flex rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-zinc-700"}>
+                        {servicePackage.badge}
+                      </span>
+                      {servicePackage.isFreePackage ? (
+                        <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700 shadow-sm">
+                          Chỉ còn 2 slot cuối cùng
+                        </span>
+                      ) : null}
+                    </div>
                     <h3 className="mt-4 text-xl font-black text-zinc-950">{servicePackage.name}</h3>
                   </div>
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-950 text-white">
@@ -413,7 +421,7 @@ export default async function BrandHomePage() {
                 <p className="mt-5 text-3xl font-black tracking-tight text-zinc-950">{servicePackage.price}</p>
                 <p className="mt-3 min-h-12 text-sm leading-6 text-zinc-600">{servicePackage.description}</p>
 
-                <div className={servicePackage.tone === "emerald" ? "mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4" : "mt-6 rounded-2xl border border-zinc-200 bg-white p-4"}>
+                <div className={servicePackage.tone === "emerald" ? "mt-6 flex-1 rounded-2xl border border-emerald-200 bg-emerald-50 p-4" : "mt-6 flex-1 rounded-2xl border border-zinc-200 bg-white p-4"}>
                   {servicePackage.highlightTitle ? (
                     <div className="mb-3">
                       <p className="text-sm font-black text-zinc-950">{servicePackage.highlightTitle}</p>
@@ -433,6 +441,16 @@ export default async function BrandHomePage() {
                 </div>
               </article>
             ))}
+          </div>
+          <div className="mt-7 flex justify-center">
+            <BrandConsultationModal
+              source="brand_landing_package_detail"
+              triggerLabel="Tìm hiểu thêm"
+              title="Tư vấn chọn gói UGC"
+              description="Để lại thông tin, dCreator sẽ tư vấn gói UGC phù hợp với mục tiêu, ngân sách và sản phẩm của Brand."
+              submitLabel="Nhận tư vấn gói"
+              triggerClassName="inline-flex w-full max-w-xs items-center justify-center rounded-2xl bg-zinc-950 px-6 py-3 text-sm font-black text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-zinc-800 hover:shadow-md"
+            />
           </div>
         </section>
 

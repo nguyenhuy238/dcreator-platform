@@ -12,6 +12,7 @@ type BrandConsultation = {
   phone: string;
   facebookUrl: string | null;
   source: string;
+  interestedPackage: string | null;
   note: string | null;
   status: "NEW" | "CONTACTED" | "ARCHIVED";
   submittedByUserId: string | null;
@@ -119,6 +120,7 @@ export default function AdminBrandConsultationsPage() {
                       </a>
                     </p>
                   ) : null}
+                  {item.interestedPackage ? <p><span className="font-semibold">Gói quan tâm:</span> {item.interestedPackage}</p> : null}
                   {item.note ? <p><span className="font-semibold">Thông tin:</span> {item.note}</p> : null}
                 </div>
 

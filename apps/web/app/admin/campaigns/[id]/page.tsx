@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { RequiredHashtagInput } from "@/app/admin/campaigns/_components/RequiredHashtagInput";
 import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
+import { DEFAULT_REQUIRED_HASHTAGS, normalizeRequiredHashtags, validateRequiredHashtags } from "@/lib/hashtags";
 
 type CampaignCategory = "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
 type CampaignType = "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
@@ -32,6 +34,7 @@ type FormState = {
   requirements: string;
   benefits: string;
   participationRoadmap: string[];
+  requiredHashtags: string[];
   imageUrl: string;
   startsAt: string;
   endsAt: string;
@@ -53,6 +56,7 @@ type CampaignDetail = {
   productLink: string | null;
   productImageUrl: string | null;
   participationRoadmap: string[];
+  requiredHashtags: string[];
   coverImageUrl: string | null;
   startsAt: string | null;
   endsAt: string | null;
@@ -85,6 +89,7 @@ const DEFAULT_FORM: FormState = {
   benefits: "",
   requirements: "",
   participationRoadmap: [""],
+  requiredHashtags: DEFAULT_REQUIRED_HASHTAGS,
   imageUrl: "",
   startsAt: "",
   endsAt: "",
@@ -99,12 +104,14 @@ const DEFAULT_FORM: FormState = {
 
 const apiErrorFieldMap: Record<string, string> = {
   CAMPAIGN_TIMELINE_INVALID: "endsAt",
-  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "ugcVideoQuota"
+  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "ugcVideoQuota",
+  CAMPAIGN_REQUIRED_HASHTAGS_MIGRATION_REQUIRED: "requiredHashtags"
 };
 
 const apiErrorMessageMap: Record<string, string> = {
   CAMPAIGN_TIMELINE_INVALID: "Ngày kết thúc phải sau ngày bắt đầu.",
-  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "Hệ thống chưa cập nhật quota video UGC. Vui lòng chạy migration trước khi lưu thay đổi."
+  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "Hệ thống chưa cập nhật quota video UGC. Vui lòng chạy migration trước khi lưu thay đổi.",
+  CAMPAIGN_REQUIRED_HASHTAGS_MIGRATION_REQUIRED: "Hệ thống chưa cập nhật hashtag bắt buộc. Vui lòng chạy migration trước khi lưu thay đổi."
 };
 
 const fieldMessageMap: Record<string, string> = {
@@ -117,6 +124,7 @@ const fieldMessageMap: Record<string, string> = {
   startsAt: "Ngày bắt đầu chưa hợp lệ.",
   endsAt: "Ngày kết thúc phải sau ngày bắt đầu.",
   participationRoadmap: "Vui lòng nhập ít nhất 1 bước lộ trình tham gia.",
+  requiredHashtags: "Hashtag bắt buộc chưa hợp lệ.",
   productName: "Vui lòng nhập tên sản phẩm.",
   productDescription: "Vui lòng nhập mô tả sản phẩm.",
   productLink: "Vui lòng nhập link sản phẩm.",
@@ -144,8 +152,21 @@ function formatDateTime(value: string) {
 }
 
 function getContentFileUrlFromBrief(brief: string) {
-  const line = brief.split("\n").find((item) => item.trim().startsWith(CONTENT_FILE_MARKER));
-  return line ? line.trim().slice(CONTENT_FILE_MARKER.length).trim() : "";
+  const lines = brief.split("\n");
+  const markerIndex = lines.findIndex((item) => item.trim().startsWith(CONTENT_FILE_MARKER));
+  if (markerIndex < 0) return "";
+
+  const firstValue = lines[markerIndex]?.trim().slice(CONTENT_FILE_MARKER.length).trim() ?? "";
+  const continuationParts: string[] = [];
+
+  for (const line of lines.slice(markerIndex + 1)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("[[")) break;
+    if (!trimmed.startsWith("/")) break;
+    continuationParts.push(trimmed);
+  }
+
+  return [firstValue, ...continuationParts].join("");
 }
 
 function getRequirementsFromBrief(brief: string) {
@@ -178,6 +199,7 @@ function buildForm(item: CampaignDetail): FormState {
     requirements: item.requirements ?? "",
     benefits: item.benefits ?? "",
     participationRoadmap: item.participationRoadmap.length > 0 ? item.participationRoadmap : [""],
+    requiredHashtags: item.requiredHashtags ?? [],
     imageUrl: item.coverImageUrl ?? "",
     startsAt: toDateTimeLocalInput(item.startsAt),
     endsAt: toDateTimeLocalInput(item.endsAt),
@@ -218,6 +240,7 @@ export default function AdminCampaignDetailPage() {
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [coverImageState, setCoverImageState] = useState<ImageSelectionState>({ source: "none", fileName: "" });
   const [productImageState, setProductImageState] = useState<ImageSelectionState>({ source: "none", fileName: "" });
+  const [downloadingFileRequestId, setDownloadingFileRequestId] = useState("");
 
   const loadCampaign = useCallback(async () => {
     if (!id) return null;
@@ -330,6 +353,8 @@ export default function AdminCampaignDetailPage() {
     if (!form.participationRoadmap.some((item) => item.trim().length > 0)) {
       nextErrors.participationRoadmap = "Cần ít nhất 1 bước lộ trình tham gia.";
     }
+    const hashtagError = validateRequiredHashtags(form.requiredHashtags);
+    if (hashtagError) nextErrors.requiredHashtags = hashtagError;
     if (form.startsAt && form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) {
       nextErrors.endsAt = "Ngày kết thúc phải sau ngày bắt đầu.";
     }
@@ -364,6 +389,7 @@ export default function AdminCampaignDetailPage() {
           requirements: form.requirements,
           benefits: form.benefits,
           participationRoadmap: form.participationRoadmap.filter((step) => step.trim().length > 0),
+          requiredHashtags: normalizeRequiredHashtags(form.requiredHashtags),
           imageUrl: form.imageUrl,
           startsAt: toDateTime(form.startsAt),
           endsAt: toDateTime(form.endsAt),
@@ -424,6 +450,38 @@ export default function AdminCampaignDetailPage() {
       setError(actError instanceof Error ? actError.message : "Thao tác thất bại");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function downloadCampaignFile(requestId: string) {
+    if (!item) return;
+    setDownloadingFileRequestId(requestId);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/campaigns/${item.id}/content-file/download?requestId=${encodeURIComponent(requestId)}`, {
+        cache: "no-store"
+      });
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as ApiFailure | null;
+        throw new Error(payload?.error || "Không thể tải file campaign. Vui lòng kiểm tra quyền hoặc file đã bị xoá.");
+      }
+
+      const blob = await res.blob();
+      const disposition = res.headers.get("content-disposition") ?? "";
+      const fileNameMatch = disposition.match(/filename="([^"]+)"/);
+      const fileName = fileNameMatch?.[1] || "campaign-content";
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (downloadError) {
+      setError(downloadError instanceof Error ? downloadError.message : "Không thể tải file campaign. Vui lòng kiểm tra quyền hoặc file đã bị xoá.");
+    } finally {
+      setDownloadingFileRequestId("");
     }
   }
 
@@ -489,16 +547,16 @@ export default function AdminCampaignDetailPage() {
                     <p className="md:col-span-2">
                       File campaign:{" "}
                       {getContentFileUrlFromBrief(request.brief) ? (
-                        <a
-                          className="font-semibold text-zinc-900 underline underline-offset-2"
-                          href={`/api/uploads/onboarding-doc-download?url=${encodeURIComponent(getContentFileUrlFromBrief(request.brief))}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          className="font-semibold text-zinc-900 underline underline-offset-2 disabled:cursor-not-allowed disabled:text-zinc-400"
+                          disabled={downloadingFileRequestId === request.id}
+                          onClick={() => void downloadCampaignFile(request.id)}
                         >
-                          tải file
-                        </a>
+                          {downloadingFileRequestId === request.id ? "đang tải..." : "Tải file campaign"}
+                        </button>
                       ) : (
-                        <span className="text-zinc-500">chưa có file</span>
+                        <span className="text-zinc-500">Chưa có file đính kèm</span>
                       )}
                     </p>
                     {getRequirementsFromBrief(request.brief) ? (
@@ -674,6 +732,14 @@ export default function AdminCampaignDetailPage() {
                 </button>
                 {fieldErrors.participationRoadmap ? <span className="text-xs text-red-600">{fieldErrors.participationRoadmap}</span> : null}
               </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <RequiredHashtagInput
+                value={form.requiredHashtags}
+                onChange={(value) => setField("requiredHashtags", value)}
+                error={fieldErrors.requiredHashtags}
+              />
             </div>
 
             <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">

@@ -101,10 +101,19 @@ export async function findPublicCampaignDetailBySlug(slug: string, viewerId?: st
   });
 
   if (!campaign) return null;
+  let requiredHashtags: string[] = [];
+  try {
+    const rows = await prisma.$queryRaw<Array<{ requiredHashtags: string[] }>>`
+      SELECT "requiredHashtags" FROM "Campaign" WHERE "id" = ${campaign.id} LIMIT 1
+    `;
+    requiredHashtags = rows[0]?.requiredHashtags ?? [];
+  } catch {
+    requiredHashtags = [];
+  }
 
   const viewerHasSupported = viewerId
     ? campaign.contributions.some((contribution) => contribution.supporterId === viewerId)
     : false;
 
-  return { campaign, viewerHasSupported };
+  return { campaign: { ...campaign, requiredHashtags }, viewerHasSupported };
 }

@@ -14,6 +14,7 @@ export type CampaignDetailDTO = {
     benefits: string | null;
     requirements: string | null;
     participationRoadmap: string[];
+    requiredHashtags: string[];
     status: "DRAFT" | "ACTIVE" | "PAUSED" | "COMPLETED" | "CANCELLED" | "ARCHIVED";
     deadline: string | null;
     product: {

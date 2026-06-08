@@ -142,7 +142,7 @@ export function CampaignDetailContainer({ slug }: Props) {
           </div>
         </section>
         <section id="apply-mobile" className="lg:hidden"><CampaignRegisterCard data={data} /></section>
-        <div className="mx-auto w-full max-w-[1180px]">{activeTab === "overview" ? <OverviewTab data={data} /> : <BriefTab />}</div>
+        <div className="mx-auto w-full max-w-[1180px]">{activeTab === "overview" ? <OverviewTab data={data} /> : <BriefTab data={data} />}</div>
       </div>
     </main>
   );
