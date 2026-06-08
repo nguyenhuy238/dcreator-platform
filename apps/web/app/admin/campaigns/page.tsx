@@ -439,8 +439,10 @@ export default function AdminCampaignsPage() {
       <ReviewActionDialog
         open={Boolean(action)}
         title={action?.type === "delete" ? "Xác nhận xóa campaign" : "Xác nhận action campaign"}
-        description={action?.type === "delete" ? "Campaign sẽ bị chuyển sang trạng thái archived." : "Bắt buộc nhập lý do để ghi audit log."}
+        description={action?.type === "delete" ? "Bạn có chắc muốn xóa campaign này? Hành động này sẽ xóa campaign và toàn bộ dữ liệu liên quan, không thể hoàn tác." : "Bắt buộc nhập lý do để ghi audit log."}
+        confirmLabel={action?.type === "delete" ? "Xóa campaign" : "Xác nhận"}
         requireReason
+        reasonPlaceholder={action?.type === "delete" ? "Nhập lý do xóa campaign..." : "Nhập lý do..."}
         submitting={acting}
         onCancel={() => !acting && setAction(null)}
         onConfirm={async (reason) => {
@@ -460,7 +462,12 @@ export default function AdminCampaignsPage() {
             });
             const body = await res.json();
             if (!res.ok || !body.success) throw new Error(body.error ?? "Thao tác thất bại");
-            setToast("Đã cập nhật campaign");
+            if (action.type === "delete") {
+              setItems((current) => current.filter((item) => item.id !== action.id));
+              setToast(body.data?.message ?? "Đã xóa campaign và dữ liệu liên quan.");
+            } else {
+              setToast("Đã cập nhật campaign");
+            }
             setTimeout(() => setToast(""), 2000);
             setAction(null);
             await load();
