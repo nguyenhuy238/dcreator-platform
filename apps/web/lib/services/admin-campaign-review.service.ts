@@ -260,6 +260,7 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
 
   return {
     ...campaign,
+    requirements: campaign.creatorBriefDescription ?? null,
     requiredHashtags,
     statusView,
     brandProfile,
@@ -677,7 +678,7 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
     }
   });
 
-  return { ...updated, requiredHashtags: afterRequiredHashtags };
+  return { ...updated, requirements: updated.creatorBriefDescription ?? null, requiredHashtags: afterRequiredHashtags };
 }
 
 export async function deleteCampaignCascadeByAdmin(actorId: string, campaignId: string, reason: string) {
