@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { uploadPathOrHttpUrlSchema } from "./brand-dashboard.ts";
 
 const applicationStatus = {
   APPROVED: "APPROVED",
@@ -8,10 +9,11 @@ const applicationStatus = {
 const socialPlatforms = ["TIKTOK", "INSTAGRAM", "YOUTUBE", "FACEBOOK", "SHOPEE", "OTHER"] as const;
 
 const optionalUrl = z.url().trim().max(400).optional().or(z.literal(""));
+const optionalUploadPathOrHttpUrl = uploadPathOrHttpUrlSchema.optional().or(z.literal(""));
 
 export const creatorApplicationSchema = z.object({
   displayName: z.string().trim().min(2).max(120),
-  avatarUrl: optionalUrl,
+  avatarUrl: optionalUploadPathOrHttpUrl,
   bio: z.string().trim().max(2000).optional(),
   mainPlatform: z.enum(socialPlatforms),
   socialUrl: z.url().trim().max(400),
@@ -25,9 +27,9 @@ export const creatorApplicationSchema = z.object({
   realName: z.string().trim().max(120).optional(),
   phone: z.string().trim().max(40).optional(),
   identityNumber: z.string().trim().max(40).optional(),
-  identityFrontUrl: optionalUrl,
-  identityBackUrl: optionalUrl,
-  selfieUrl: optionalUrl,
+  identityFrontUrl: optionalUploadPathOrHttpUrl,
+  identityBackUrl: optionalUploadPathOrHttpUrl,
+  selfieUrl: optionalUploadPathOrHttpUrl,
   bankAccountName: z.string().trim().max(120).optional(),
   bankAccountNumber: z.string().trim().max(60).optional(),
   bankName: z.string().trim().max(120).optional(),
@@ -36,7 +38,7 @@ export const creatorApplicationSchema = z.object({
 
 export const brandApplicationSchema = z.object({
   brandName: z.string().trim().min(2).max(160),
-  logoUrl: optionalUrl,
+  logoUrl: optionalUploadPathOrHttpUrl,
   legalName: z.string().trim().max(160).optional(),
   industry: z.string().trim().max(120).optional(),
   website: optionalUrl,

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeCreatorLinks, resolveSelectedIndustries } from "../lib/profile-upgrade-form.ts";
+import { brandApplicationSchema, creatorApplicationSchema } from "../lib/validators/role-upgrade.ts";
 import { uploadPathOrHttpUrlSchema } from "../lib/validators/brand-dashboard.ts";
 
 test("creator upgrade rejects empty links", () => {
@@ -41,4 +42,41 @@ test("brand logo accepts local uploads and deployed storage URLs", () => {
   assert.equal(uploadPathOrHttpUrlSchema.safeParse("/uploads/brand-logo/demo.png").success, true);
   assert.equal(uploadPathOrHttpUrlSchema.safeParse("https://project.supabase.co/storage/v1/object/public/uploads/brand-logo/demo.png").success, true);
   assert.equal(uploadPathOrHttpUrlSchema.safeParse("ftp://example.com/demo.png").success, false);
+});
+
+test("brand application logo accepts uploaded local and deployed URLs", () => {
+  const basePayload = {
+    brandName: "Demo Brand",
+    contactName: "Nguyen Van A",
+    contactPhone: "0912345678",
+    contactEmail: "brand@example.com"
+  };
+
+  assert.equal(brandApplicationSchema.safeParse({ ...basePayload, logoUrl: "/uploads/brand-logo/demo.png" }).success, true);
+  assert.equal(
+    brandApplicationSchema.safeParse({
+      ...basePayload,
+      logoUrl: "https://project.supabase.co/storage/v1/object/public/uploads/brand-logo/demo.png"
+    }).success,
+    true
+  );
+  assert.equal(brandApplicationSchema.safeParse({ ...basePayload, logoUrl: "ftp://example.com/demo.png" }).success, false);
+});
+
+test("creator application avatar accepts uploaded local and deployed URLs", () => {
+  const basePayload = {
+    displayName: "Demo Creator",
+    mainPlatform: "TIKTOK",
+    socialUrl: "https://www.tiktok.com/@demo"
+  };
+
+  assert.equal(creatorApplicationSchema.safeParse({ ...basePayload, avatarUrl: "/uploads/creator-avatar/demo.png" }).success, true);
+  assert.equal(
+    creatorApplicationSchema.safeParse({
+      ...basePayload,
+      avatarUrl: "https://project.supabase.co/storage/v1/object/public/uploads/creator-avatar/demo.png"
+    }).success,
+    true
+  );
+  assert.equal(creatorApplicationSchema.safeParse({ ...basePayload, avatarUrl: "ftp://example.com/demo.png" }).success, false);
 });
