@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeCreatorLinks, resolveSelectedIndustries } from "../lib/profile-upgrade-form.ts";
+import { uploadPathOrHttpUrlSchema } from "../lib/validators/brand-dashboard.ts";
 
 test("creator upgrade rejects empty links", () => {
   assert.throws(
@@ -34,4 +35,10 @@ test("brand upgrade accepts multiple industries", () => {
     "Công nghệ",
     "Du lịch"
   ]);
+});
+
+test("brand logo accepts local uploads and deployed storage URLs", () => {
+  assert.equal(uploadPathOrHttpUrlSchema.safeParse("/uploads/brand-logo/demo.png").success, true);
+  assert.equal(uploadPathOrHttpUrlSchema.safeParse("https://project.supabase.co/storage/v1/object/public/uploads/brand-logo/demo.png").success, true);
+  assert.equal(uploadPathOrHttpUrlSchema.safeParse("ftp://example.com/demo.png").success, false);
 });

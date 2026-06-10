@@ -7,7 +7,7 @@ const campaignSlugSchema = z
   .max(120)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug chỉ gồm chữ thường, số và dấu gạch ngang (-), không có khoảng trắng.");
 
-const uploadPathOrHttpUrlSchema = z
+export const uploadPathOrHttpUrlSchema = z
   .string()
   .trim()
   .min(1)
