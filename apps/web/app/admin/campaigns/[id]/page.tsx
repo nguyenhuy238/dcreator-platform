@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { RequiredHashtagInput } from "@/app/admin/campaigns/_components/RequiredHashtagInput";
 import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
+import { campaignRequestMarkers, extractCampaignRequestMarkerValue } from "@/lib/campaign-request-meta";
 import { DEFAULT_REQUIRED_HASHTAGS, normalizeRequiredHashtags, validateRequiredHashtags } from "@/lib/hashtags";
 
 type CampaignCategory = "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
@@ -77,8 +78,8 @@ type CampaignDetail = {
   }>;
 };
 
-const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
-const REQUIREMENTS_MARKER = "[[CAMPAIGN_REQUIREMENTS]]:";
+const CONTENT_FILE_MARKER = campaignRequestMarkers.content;
+const REQUIREMENTS_MARKER = campaignRequestMarkers.requirements;
 
 const DEFAULT_FORM: FormState = {
   slug: "",
@@ -152,26 +153,11 @@ function formatDateTime(value: string) {
 }
 
 function getContentFileUrlFromBrief(brief: string) {
-  const lines = brief.split("\n");
-  const markerIndex = lines.findIndex((item) => item.trim().startsWith(CONTENT_FILE_MARKER));
-  if (markerIndex < 0) return "";
-
-  const firstValue = lines[markerIndex]?.trim().slice(CONTENT_FILE_MARKER.length).trim() ?? "";
-  const continuationParts: string[] = [];
-
-  for (const line of lines.slice(markerIndex + 1)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("[[")) break;
-    if (!trimmed.startsWith("/")) break;
-    continuationParts.push(trimmed);
-  }
-
-  return [firstValue, ...continuationParts].join("");
+  return extractCampaignRequestMarkerValue(brief, CONTENT_FILE_MARKER);
 }
 
 function getRequirementsFromBrief(brief: string) {
-  const line = brief.split("\n").find((item) => item.trim().startsWith(REQUIREMENTS_MARKER));
-  const value = line ? line.trim().slice(REQUIREMENTS_MARKER.length).trim() : "";
+  const value = extractCampaignRequestMarkerValue(brief, REQUIREMENTS_MARKER);
   if (!value) return "";
   try {
     return decodeURIComponent(value);

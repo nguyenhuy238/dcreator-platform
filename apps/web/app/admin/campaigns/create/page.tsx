@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { RequiredHashtagInput } from "@/app/admin/campaigns/_components/RequiredHashtagInput";
 import { ErrorState, PageHeader } from "@/app/components/dcreator/ui/base";
+import { campaignRequestMarkers, extractCampaignRequestMarkerValue } from "@/lib/campaign-request-meta";
 import { getCampaignTypeLabel } from "@/lib/constants/campaign-type";
 import { DEFAULT_REQUIRED_HASHTAGS, normalizeRequiredHashtags, validateRequiredHashtags } from "@/lib/hashtags";
 
@@ -95,16 +96,12 @@ function toDateTimeLocalInput(value?: string | null) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-const COVER_IMAGE_MARKER = "[[COVER_IMAGE_URL]]:";
-const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
-const REQUIREMENTS_MARKER = "[[CAMPAIGN_REQUIREMENTS]]:";
+const COVER_IMAGE_MARKER = campaignRequestMarkers.cover;
+const CONTENT_FILE_MARKER = campaignRequestMarkers.content;
+const REQUIREMENTS_MARKER = campaignRequestMarkers.requirements;
 
 function extractMarker(brief: string, marker: string) {
-  const line = brief
-    .split("\n")
-    .map((item) => item.trim())
-    .find((item) => item.startsWith(marker));
-  return line ? line.slice(marker.length).trim() : "";
+  return extractCampaignRequestMarkerValue(brief, marker);
 }
 
 function extractRequirements(brief: string) {

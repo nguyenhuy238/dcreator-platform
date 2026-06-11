@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Brand, BrandInventoryBatch, BrandMemberRole, BrandProduct, CampaignStatus, MissionAudience, Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { APPLICATION_STATUS } from "@/lib/constants/enums";
+import { campaignRequestMarkers, extractCampaignRequestMarkerValue, extractCampaignRequestMeta } from "@/lib/campaign-request-meta";
 import { AppError } from "@/lib/errors";
 import { normalizeImageUrlInput } from "@/lib/images/resolve-image-url";
 import { approveProof, rejectProof } from "@/lib/services/mission.service";
@@ -47,9 +48,9 @@ type ProductSubmissionInput = z.infer<typeof productSubmissionSchema>;
 type BrandMemberInviteInput = z.infer<typeof brandMemberInviteSchema>;
 type BrandMemberRoleUpdateInput = z.infer<typeof brandMemberRoleUpdateSchema>;
 type BrandMemberRemoveInput = z.infer<typeof brandMemberRemoveSchema>;
-const COVER_MARKER = "[[COVER_IMAGE_URL]]:";
-const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
-const REQUIREMENTS_MARKER = "[[CAMPAIGN_REQUIREMENTS]]:";
+const COVER_MARKER = campaignRequestMarkers.cover;
+const CONTENT_FILE_MARKER = campaignRequestMarkers.content;
+const REQUIREMENTS_MARKER = campaignRequestMarkers.requirements;
 
 function sanitizeCampaignImageUrl(input?: string | null) {
   const value = normalizeImageUrlInput(input);
@@ -58,8 +59,7 @@ function sanitizeCampaignImageUrl(input?: string | null) {
 
 function extractMarkerValue(text: string | null | undefined, marker: string) {
   if (!text) return "";
-  const line = text.split("\n").find((item) => item.startsWith(marker));
-  return line?.slice(marker.length).trim() ?? "";
+  return extractCampaignRequestMarkerValue(text, marker);
 }
 
 function extractRequirementsValue(text: string | null | undefined) {
@@ -1114,12 +1114,15 @@ export async function listBrandCampaignRequests(accountId: string, currentBrandI
     })
   ]);
   const campaignBySlug = new Map(matchingCampaigns.map((campaign) => [campaign.slug, campaign]));
-  return requests.map((request) => ({
-    ...request,
-    createdCampaign: request.createdCampaign ?? campaignBySlug.get(request.requestedSlug) ?? null,
-    coverImageUrl: sanitizeCampaignImageUrl(extractMarkerValue(request.brief, COVER_MARKER)),
-    requirements: extractRequirementsValue(request.brief)
-  }));
+  return requests.map((request) => {
+    const meta = extractCampaignRequestMeta(request.brief);
+    return {
+      ...request,
+      createdCampaign: request.createdCampaign ?? campaignBySlug.get(request.requestedSlug) ?? null,
+      coverImageUrl: sanitizeCampaignImageUrl(meta.coverImageUrl),
+      requirements: meta.requirements
+    };
+  });
 }
 
 export async function createBrandCampaignRequest(accountId: string, input: CampaignRequestInput, currentBrandId?: string | null) {

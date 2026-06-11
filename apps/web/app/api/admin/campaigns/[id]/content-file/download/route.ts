@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { NextRequest } from "next/server";
 import { requireAdminOps } from "@/lib/auth/admin-guard";
+import { campaignRequestMarkers, extractCampaignRequestMarkerValue } from "@/lib/campaign-request-meta";
 import { prisma } from "@/lib/db";
 import { AppError, toErrorResponse } from "@/lib/errors";
 
@@ -9,7 +10,7 @@ export const runtime = "nodejs";
 
 type Props = { params: Promise<{ id: string }> };
 
-const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
+const CONTENT_FILE_MARKER = campaignRequestMarkers.content;
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const MIME_BY_EXT: Record<string, string> = {
   pdf: "application/pdf",
@@ -24,21 +25,7 @@ const ALLOWED_STORAGE_FOLDERS = new Set(["onboarding-doc", "campaign-content", "
 const FALLBACK_ALLOWED_BUCKETS = new Set(["onboarding-docs", "campaign-content", "campaign-briefs", "campaign-files"]);
 
 function extractContentFileUrl(brief: string) {
-  const lines = brief.split("\n");
-  const markerIndex = lines.findIndex((item) => item.trim().startsWith(CONTENT_FILE_MARKER));
-  if (markerIndex < 0) return "";
-
-  const firstValue = lines[markerIndex]?.trim().slice(CONTENT_FILE_MARKER.length).trim() ?? "";
-  const continuationParts: string[] = [];
-
-  for (const line of lines.slice(markerIndex + 1)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("[[")) break;
-    if (!trimmed.startsWith("/")) break;
-    continuationParts.push(trimmed);
-  }
-
-  return [firstValue, ...continuationParts].join("");
+  return extractCampaignRequestMarkerValue(brief, CONTENT_FILE_MARKER);
 }
 
 function sanitizeFileName(name: string) {

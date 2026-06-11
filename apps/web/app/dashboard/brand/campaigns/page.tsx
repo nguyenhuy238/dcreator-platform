@@ -12,6 +12,7 @@ import { useCurrentBrand } from "@/app/dashboard/brand/_hooks/use-brand-context"
 import { MissionReviewsPage, type MissionReviewsTabKey } from "@/app/dashboard/brand/mission-reviews/page";
 import { trackEvent } from "@/lib/analytics";
 import { AnalyticsEvents } from "@/lib/analytics-events";
+import { extractCampaignRequestMarkerValue, campaignRequestMarkers } from "@/lib/campaign-request-meta";
 
 type CampaignItem = {
   id: string;
@@ -76,11 +77,10 @@ const defaultRequestForm: RequestForm = {
   contentFileUrl: ""
 };
 
-const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
+const CONTENT_FILE_MARKER = campaignRequestMarkers.content;
 
 function getContentFileUrlFromBrief(brief: string) {
-  const line = brief.split("\n").find((item) => item.trim().startsWith(CONTENT_FILE_MARKER));
-  return line ? line.trim().slice(CONTENT_FILE_MARKER.length).trim() : "";
+  return extractCampaignRequestMarkerValue(brief, CONTENT_FILE_MARKER);
 }
 
 function getRevisionDefaultForm(request: CampaignRequestItem): RequestForm {

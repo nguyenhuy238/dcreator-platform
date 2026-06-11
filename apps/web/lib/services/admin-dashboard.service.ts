@@ -1,4 +1,5 @@
 import { BrandMemberRole, BrandMemberStatus, BrandStatus, CampaignStatus, CreatorChannelVerificationStatus, CreatorSocialLinkStatus, MissionAudience, MissionLifecycleStatus, Prisma, Role, RoleRequestStatus, RoleRequestType } from "@prisma/client";
+import { extractCampaignRequestMeta } from "@/lib/campaign-request-meta";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { approveProof, rejectProof } from "@/lib/services/mission.service";
@@ -18,32 +19,8 @@ import { listAdminVouchers } from "@/lib/services/voucher.service";
 import { scanFraudRiskSignals } from "@/lib/services/fraud-flag.service";
 import { getAdminKpis } from "@/lib/services/analytics.service";
 
-const COVER_MARKER = "[[COVER_IMAGE_URL]]:";
-const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
-const REQUIREMENTS_MARKER = "[[CAMPAIGN_REQUIREMENTS]]:";
-
 function extractCoverImageMeta(brief: string) {
-  const lines = brief.split("\n");
-  const markerLine = lines.find((line) => line.trim().startsWith(COVER_MARKER));
-  const coverImageUrl = markerLine ? markerLine.trim().slice(COVER_MARKER.length).trim() : null;
-  const contentFileLine = lines.find((line) => line.trim().startsWith(CONTENT_FILE_MARKER));
-  const contentFileUrl = contentFileLine ? contentFileLine.trim().slice(CONTENT_FILE_MARKER.length).trim() : null;
-  const requirementLine = lines.find((line) => line.trim().startsWith(REQUIREMENTS_MARKER));
-  const requirements = (() => {
-    const encoded = requirementLine ? requirementLine.trim().slice(REQUIREMENTS_MARKER.length).trim() : "";
-    if (!encoded) return null;
-    try {
-      return decodeURIComponent(encoded);
-    } catch {
-      return encoded;
-    }
-  })();
-  const cleanBrief = lines
-    .filter((line) => !line.trim().startsWith(COVER_MARKER) && !line.trim().startsWith(CONTENT_FILE_MARKER) && !line.trim().startsWith(REQUIREMENTS_MARKER))
-    .join("\n")
-    .trim();
-
-  return { coverImageUrl, contentFileUrl, cleanBrief, requirements };
+  return extractCampaignRequestMeta(brief);
 }
 
 async function createDefaultMissionsFromRequest(
