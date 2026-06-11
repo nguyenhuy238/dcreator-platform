@@ -8,6 +8,7 @@ export type ApiSuccess<T> = {
 export type ApiFailure = {
   success: false;
   error: string;
+  message: string;
   code?: string;
   details?: unknown;
 };
@@ -17,5 +18,5 @@ export function ok<T>(data: T, status = 200) {
 }
 
 export function fail(error: string, status = 400, code?: string, details?: unknown) {
-  return NextResponse.json<ApiFailure>({ success: false, error, code, details }, { status });
+  return NextResponse.json<ApiFailure>({ success: false, error, message: error, code, details }, { status });
 }

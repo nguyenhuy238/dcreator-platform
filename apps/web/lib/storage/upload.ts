@@ -3,10 +3,12 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { AppError } from "@/lib/errors";
 
-type UploadFolder =
+export type UploadFolder =
   | "creator-kyc"
   | "brand-kyc"
   | "onboarding-doc"
+  | "campaign-image"
+  | "campaign-file"
   | "brand-logo"
   | "avatar"
   | "creator-avatar"
@@ -19,6 +21,7 @@ type UploadInput = {
   folder: UploadFolder;
   suffix: string;
   ext?: string;
+  ownerId?: string;
 };
 
 type TextUploadInput = {
@@ -26,7 +29,18 @@ type TextUploadInput = {
   folder: UploadFolder;
   suffix: string;
   ext?: string;
+  ownerId?: string;
 };
+
+export type StoredUpload = {
+  url: string;
+  path: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+};
+
+const DEFAULT_STORAGE_BUCKET = "dcreator-uploads";
 
 const MIME_EXTENSION_MAP: Record<string, string> = {
   "application/pdf": "pdf",
@@ -47,6 +61,22 @@ function extensionFromFileName(name: string) {
   const parsed = path.parse(name);
   const rawExt = parsed.ext.replace(/^\./, "").trim().toLowerCase();
   return rawExt || null;
+}
+
+function safeSegment(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80)
+    .toLowerCase();
+}
+
+function safeOriginalName(name: string, fallback: string, extension: string) {
+  const parsed = path.parse(name);
+  const baseName = safeSegment(parsed.name || fallback) || fallback;
+  return `${baseName}.${extension}`;
 }
 
 function resolveFileExtension(file: File, ext?: string) {
@@ -74,41 +104,67 @@ function resolveFileExtension(file: File, ext?: string) {
 
 function makeFileName(file: File, suffix: string, ext?: string) {
   const extension = resolveFileExtension(file, ext);
-  return `${Date.now()}-${randomUUID()}-${suffix}.${extension}`;
+  const safeSuffix = safeSegment(suffix) || "upload";
+  const originalName = safeOriginalName(file.name, safeSuffix, extension);
+  return `${Date.now()}-${randomUUID()}-${safeSuffix}-${originalName}`;
 }
 
 function makeTextFileName(suffix: string, ext = "txt") {
-  return `${Date.now()}-${randomUUID()}-${suffix}.${ext}`;
+  const safeSuffix = safeSegment(suffix) || "text-upload";
+  const extension = sanitizeExt(ext || "txt") || "txt";
+  return `${Date.now()}-${randomUUID()}-${safeSuffix}.${extension}`;
 }
 
-async function saveToLocalPublic(input: UploadInput) {
-  const { file, folder, suffix, ext } = input;
+function makeObjectPath(folder: UploadFolder, ownerId: string | undefined, fileName: string) {
+  const safeOwnerId = ownerId ? safeSegment(ownerId) : "";
+  return [folder, safeOwnerId, fileName].filter(Boolean).join("/");
+}
+
+function getStorageConfig() {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const bucket = process.env.SUPABASE_STORAGE_BUCKET || DEFAULT_STORAGE_BUCKET;
+  return {
+    supabaseUrl: supabaseUrl?.replace(/\/$/, "") ?? "",
+    serviceRoleKey,
+    bucket
+  };
+}
+
+async function saveToLocalPublic(input: UploadInput): Promise<StoredUpload> {
+  const { file, folder, suffix, ext, ownerId } = input;
   const buffer = Buffer.from(await file.arrayBuffer());
   const fileName = makeFileName(file, suffix, ext);
-  const relativeDir = path.join("uploads", folder);
+  const objectPath = makeObjectPath(folder, ownerId, fileName);
+  const relativeDir = path.join("uploads", path.dirname(objectPath));
   const absoluteDir = path.join(process.cwd(), "public", relativeDir);
   await mkdir(absoluteDir, { recursive: true });
   await writeFile(path.join(absoluteDir, fileName), buffer);
-  return `/${relativeDir.replace(/\\/g, "/")}/${fileName}`;
+  const localPath = `/uploads/${objectPath.replace(/\\/g, "/")}`;
+  return {
+    url: localPath,
+    path: localPath,
+    filename: fileName,
+    mimeType: file.type || "application/octet-stream",
+    size: file.size
+  };
 }
 
-async function saveToSupabaseStorage(input: UploadInput) {
-  const { file, folder, suffix, ext } = input;
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const bucket = process.env.SUPABASE_STORAGE_BUCKET;
+async function saveToSupabaseStorage(input: UploadInput): Promise<StoredUpload> {
+  const { file, folder, suffix, ext, ownerId } = input;
+  const { supabaseUrl, serviceRoleKey, bucket } = getStorageConfig();
 
-  if (!supabaseUrl || !serviceRoleKey || !bucket) {
+  if (!supabaseUrl || !serviceRoleKey) {
     throw new AppError(
-      "Missing SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, or SUPABASE_STORAGE_BUCKET for production upload",
+      "Missing NEXT_PUBLIC_SUPABASE_URL/SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for storage upload",
       500,
       "UPLOAD_STORAGE_CONFIG_MISSING"
     );
   }
 
   const fileName = makeFileName(file, suffix, ext);
-  const objectPath = `${folder}/${fileName}`;
-  const uploadUrl = `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/${bucket}/${objectPath}`;
+  const objectPath = makeObjectPath(folder, ownerId, fileName);
+  const uploadUrl = `${supabaseUrl}/storage/v1/object/${bucket}/${objectPath}`;
   const body = Buffer.from(await file.arrayBuffer());
 
   const response = await fetch(uploadUrl, {
@@ -127,36 +183,48 @@ async function saveToSupabaseStorage(input: UploadInput) {
     throw new AppError("Failed to upload file to storage", 502, "UPLOAD_STORAGE_FAILED", details);
   }
 
-  return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/${bucket}/${objectPath}`;
+  return {
+    url: `${supabaseUrl}/storage/v1/object/public/${bucket}/${objectPath}`,
+    path: objectPath,
+    filename: fileName,
+    mimeType: file.type || "application/octet-stream",
+    size: file.size
+  };
 }
 
-async function saveTextToLocalPublic(input: TextUploadInput) {
-  const { content, folder, suffix, ext } = input;
+async function saveTextToLocalPublic(input: TextUploadInput): Promise<StoredUpload> {
+  const { content, folder, suffix, ext, ownerId } = input;
   const fileName = makeTextFileName(suffix, ext ?? "txt");
-  const relativeDir = path.join("uploads", folder);
+  const objectPath = makeObjectPath(folder, ownerId, fileName);
+  const relativeDir = path.join("uploads", path.dirname(objectPath));
   const absoluteDir = path.join(process.cwd(), "public", relativeDir);
   await mkdir(absoluteDir, { recursive: true });
   await writeFile(path.join(absoluteDir, fileName), content, "utf8");
-  return `/${relativeDir.replace(/\\/g, "/")}/${fileName}`;
+  const localPath = `/uploads/${objectPath.replace(/\\/g, "/")}`;
+  return {
+    url: localPath,
+    path: localPath,
+    filename: fileName,
+    mimeType: "text/plain",
+    size: Buffer.byteLength(content, "utf8")
+  };
 }
 
-async function saveTextToSupabaseStorage(input: TextUploadInput) {
-  const { content, folder, suffix, ext } = input;
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const bucket = process.env.SUPABASE_STORAGE_BUCKET;
+async function saveTextToSupabaseStorage(input: TextUploadInput): Promise<StoredUpload> {
+  const { content, folder, suffix, ext, ownerId } = input;
+  const { supabaseUrl, serviceRoleKey, bucket } = getStorageConfig();
 
-  if (!supabaseUrl || !serviceRoleKey || !bucket) {
+  if (!supabaseUrl || !serviceRoleKey) {
     throw new AppError(
-      "Missing SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, or SUPABASE_STORAGE_BUCKET for production upload",
+      "Missing NEXT_PUBLIC_SUPABASE_URL/SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for storage upload",
       500,
       "UPLOAD_STORAGE_CONFIG_MISSING"
     );
   }
 
   const fileName = makeTextFileName(suffix, ext ?? "txt");
-  const objectPath = `${folder}/${fileName}`;
-  const uploadUrl = `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/${bucket}/${objectPath}`;
+  const objectPath = makeObjectPath(folder, ownerId, fileName);
+  const uploadUrl = `${supabaseUrl}/storage/v1/object/${bucket}/${objectPath}`;
   const body = Buffer.from(content, "utf8");
 
   const response = await fetch(uploadUrl, {
@@ -175,29 +243,44 @@ async function saveTextToSupabaseStorage(input: TextUploadInput) {
     throw new AppError("Failed to upload text file to storage", 502, "UPLOAD_STORAGE_FAILED", details);
   }
 
-  return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/${bucket}/${objectPath}`;
+  return {
+    url: `${supabaseUrl}/storage/v1/object/public/${bucket}/${objectPath}`,
+    path: objectPath,
+    filename: fileName,
+    mimeType: "text/plain",
+    size: body.byteLength
+  };
 }
 
-export async function saveUpload(input: UploadInput) {
-  const hasSupabaseStorageConfig = Boolean(
-    (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) &&
-      process.env.SUPABASE_SERVICE_ROLE_KEY &&
-      process.env.SUPABASE_STORAGE_BUCKET
-  );
-  if (hasSupabaseStorageConfig || process.env.NODE_ENV === "production") {
+function shouldUseSupabaseStorage() {
+  const { supabaseUrl, serviceRoleKey } = getStorageConfig();
+  return Boolean(supabaseUrl && serviceRoleKey) || process.env.NODE_ENV === "production";
+}
+
+export async function saveUploadAsset(input: UploadInput) {
+  if (shouldUseSupabaseStorage()) {
     return saveToSupabaseStorage(input);
   }
   return saveToLocalPublic(input);
 }
 
-export async function saveTextUpload(input: TextUploadInput) {
-  const hasSupabaseStorageConfig = Boolean(
-    (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) &&
-      process.env.SUPABASE_SERVICE_ROLE_KEY &&
-      process.env.SUPABASE_STORAGE_BUCKET
-  );
-  if (hasSupabaseStorageConfig || process.env.NODE_ENV === "production") {
+export async function saveTextUploadAsset(input: TextUploadInput) {
+  if (shouldUseSupabaseStorage()) {
     return saveTextToSupabaseStorage(input);
   }
   return saveTextToLocalPublic(input);
+}
+
+export async function saveUpload(input: UploadInput) {
+  const upload = await saveUploadAsset(input);
+  return upload.url;
+}
+
+export async function saveTextUpload(input: TextUploadInput) {
+  const upload = await saveTextUploadAsset(input);
+  return upload.url;
+}
+
+export function getDefaultStorageBucket() {
+  return process.env.SUPABASE_STORAGE_BUCKET || DEFAULT_STORAGE_BUCKET;
 }

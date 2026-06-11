@@ -63,6 +63,16 @@ type CampaignRequestItem = {
 
 type ApiResponse<T> = { success: boolean; data?: T; error?: string; message?: string };
 
+type UploadResult = {
+  url: string;
+  filename: string;
+  imageUrl?: string;
+  coverImageUrl?: string;
+  fileUrl?: string;
+  contentFileUrl?: string;
+  contractDocumentUrl?: string;
+};
+
 type RequestForm = {
   title: string;
   imageUrl: string;
@@ -95,6 +105,14 @@ function getFileNameFromUrl(value: string, fallback: string) {
   const cleaned = value.split("?")[0] ?? "";
   const lastSegment = cleaned.split("/").pop()?.trim();
   return lastSegment || fallback;
+}
+
+function getUploadUrl(upload: UploadResult, preferredKeys: Array<keyof UploadResult>) {
+  for (const key of preferredKeys) {
+    const value = upload[key];
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return upload.url;
 }
 
 function getRequestRejectionReason(request: CampaignRequestItem) {
@@ -322,11 +340,11 @@ export default function BrandCampaignsPage() {
     setError("");
     try {
       const formData = new FormData();
-      formData.append("logo", file);
-      const response = await fetch("/api/uploads/brand-logo", { method: "POST", body: formData });
-      const payload = (await response.json()) as ApiResponse<{ logoUrl: string }>;
-      if (!response.ok || !payload.success || !payload.data?.logoUrl) throw new Error(payload.success ? "Không thể tải ảnh campaign" : payload.error);
-      setRequestField("imageUrl", payload.data.logoUrl);
+      formData.append("image", file);
+      const response = await fetch("/api/uploads/campaign-image", { method: "POST", body: formData });
+      const payload = (await response.json()) as ApiResponse<UploadResult>;
+      if (!response.ok || !payload.success || !payload.data?.url) throw new Error(payload.success ? "Không thể tải ảnh campaign" : payload.error);
+      setRequestField("imageUrl", getUploadUrl(payload.data, ["imageUrl", "coverImageUrl"]));
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Không thể tải ảnh campaign");
     } finally {
@@ -339,11 +357,11 @@ export default function BrandCampaignsPage() {
     setError("");
     try {
       const formData = new FormData();
-      formData.append("contractDocument", file);
-      const response = await fetch("/api/uploads/onboarding-doc", { method: "POST", body: formData });
-      const payload = (await response.json()) as ApiResponse<{ contractDocumentUrl: string }>;
-      if (!response.ok || !payload.success || !payload.data?.contractDocumentUrl) throw new Error(payload.success ? "Không thể tải file nội dung campaign" : payload.error);
-      setRequestField("contentFileUrl", payload.data.contractDocumentUrl);
+      formData.append("file", file);
+      const response = await fetch("/api/uploads/campaign-file", { method: "POST", body: formData });
+      const payload = (await response.json()) as ApiResponse<UploadResult>;
+      if (!response.ok || !payload.success || !payload.data?.url) throw new Error(payload.success ? "Không thể tải file nội dung campaign" : payload.error);
+      setRequestField("contentFileUrl", getUploadUrl(payload.data, ["contentFileUrl", "fileUrl", "contractDocumentUrl"]));
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Không thể tải file nội dung campaign");
     } finally {
@@ -356,11 +374,11 @@ export default function BrandCampaignsPage() {
     setError("");
     try {
       const formData = new FormData();
-      formData.append("logo", file);
-      const response = await fetch("/api/uploads/brand-logo", { method: "POST", body: formData });
-      const payload = (await response.json()) as ApiResponse<{ logoUrl: string }>;
-      if (!response.ok || !payload.success || !payload.data?.logoUrl) throw new Error(payload.success ? "Không thể tải ảnh campaign" : payload.error);
-      setRevisionField(requestId, "imageUrl", payload.data.logoUrl);
+      formData.append("image", file);
+      const response = await fetch("/api/uploads/campaign-image", { method: "POST", body: formData });
+      const payload = (await response.json()) as ApiResponse<UploadResult>;
+      if (!response.ok || !payload.success || !payload.data?.url) throw new Error(payload.success ? "Không thể tải ảnh campaign" : payload.error);
+      setRevisionField(requestId, "imageUrl", getUploadUrl(payload.data, ["imageUrl", "coverImageUrl"]));
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Không thể tải ảnh campaign");
     } finally {
@@ -373,11 +391,11 @@ export default function BrandCampaignsPage() {
     setError("");
     try {
       const formData = new FormData();
-      formData.append("contractDocument", file);
-      const response = await fetch("/api/uploads/onboarding-doc", { method: "POST", body: formData });
-      const payload = (await response.json()) as ApiResponse<{ contractDocumentUrl: string }>;
-      if (!response.ok || !payload.success || !payload.data?.contractDocumentUrl) throw new Error(payload.success ? "Không thể tải file nội dung campaign" : payload.error);
-      setRevisionField(requestId, "contentFileUrl", payload.data.contractDocumentUrl);
+      formData.append("file", file);
+      const response = await fetch("/api/uploads/campaign-file", { method: "POST", body: formData });
+      const payload = (await response.json()) as ApiResponse<UploadResult>;
+      if (!response.ok || !payload.success || !payload.data?.url) throw new Error(payload.success ? "Không thể tải file nội dung campaign" : payload.error);
+      setRevisionField(requestId, "contentFileUrl", getUploadUrl(payload.data, ["contentFileUrl", "fileUrl", "contractDocumentUrl"]));
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Không thể tải file nội dung campaign");
     } finally {
@@ -720,21 +738,31 @@ export default function BrandCampaignsPage() {
             </label>
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">
               Ảnh campaign
-              <input ref={requestImageInputRef} className="dc-input bg-white" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(event) => {
+              <input ref={requestImageInputRef} className="dc-input bg-white" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => {
                 const file = event.target.files?.[0] ?? null;
                 if (file) void uploadCoverImage(file);
               }} disabled={uploadingCover} />
               {requestFieldErrors.imageUrl ? <span className="text-xs text-red-600">{requestFieldErrors.imageUrl}</span> : null}
               {uploadingCover ? <span className="text-xs font-semibold text-amber-700">Đang tải ảnh campaign...</span> : null}
+              {requestForm.imageUrl ? (
+                <div className="relative h-32 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50">
+                  <CampaignRequestCover src={requestForm.imageUrl} title={requestForm.title || "Ảnh campaign"} />
+                </div>
+              ) : null}
             </label>
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">
               File nội dung campaign
-              <input ref={requestContentFileInputRef} className="dc-input bg-white" type="file" accept=".pdf,.doc,.docx,.txt,image/png,image/jpeg" onChange={(event) => {
+              <input ref={requestContentFileInputRef} className="dc-input bg-white" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onChange={(event) => {
                 const file = event.target.files?.[0] ?? null;
                 if (file) void uploadCampaignContentFile(file);
               }} disabled={uploadingContentFile} required={!requestForm.contentFileUrl} />
               {requestFieldErrors.contentFileUrl ? <span className="text-xs text-red-600">{requestFieldErrors.contentFileUrl}</span> : null}
               {uploadingContentFile ? <span className="text-xs font-semibold text-amber-700">Đang tải file nội dung campaign...</span> : null}
+              {requestForm.contentFileUrl ? (
+                <span className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                  Đã tải: {getFileNameFromUrl(requestForm.contentFileUrl, "campaign-file")}
+                </span>
+              ) : null}
             </label>
             <div className="mx-auto w-full max-w-5xl rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:col-span-2">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -891,13 +919,18 @@ export default function BrandCampaignsPage() {
                   ref={revisionImageInputRef}
                   className="dc-input bg-white"
                   type="file"
-                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  accept="image/png,image/jpeg,image/webp"
                   onChange={(event) => {
                     const file = event.target.files?.[0] ?? null;
                     if (file) void uploadRevisionCoverImage(revisionTarget.id, file);
                   }}
                   disabled={uploadingCover}
                 />
+                {currentRevisionForm.imageUrl ? (
+                  <div className="relative h-28 overflow-hidden rounded-xl border border-amber-200 bg-white">
+                    <CampaignRequestCover src={currentRevisionForm.imageUrl} title={currentRevisionForm.title || revisionTarget.title} />
+                  </div>
+                ) : null}
               </label>
               <label className="grid gap-2 text-sm font-semibold text-amber-800">
                 <span className="flex items-center justify-between gap-2">
@@ -912,18 +945,23 @@ export default function BrandCampaignsPage() {
                   ref={revisionContentFileInputRef}
                   className="dc-input bg-white"
                   type="file"
-                  accept=".pdf,.doc,.docx,.txt,image/png,image/jpeg"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
                   onChange={(event) => {
                     const file = event.target.files?.[0] ?? null;
                     if (file) void uploadRevisionCampaignContentFile(revisionTarget.id, file);
                   }}
                   disabled={uploadingContentFile}
                 />
+                {currentRevisionForm.contentFileUrl ? (
+                  <span className="rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700">
+                    Đã tải: {getFileNameFromUrl(currentRevisionForm.contentFileUrl, "campaign-file")}
+                  </span>
+                ) : null}
               </label>
               <button
                 type="button"
                 className="dc-btn-primary w-fit md:col-span-2"
-                disabled={submittingRevisionId === revisionTarget.id}
+                disabled={submittingRevisionId === revisionTarget.id || uploadingCover || uploadingContentFile}
                 onClick={() => void submitRevisionFeedback(revisionTarget.id)}
               >
                 {submittingRevisionId === revisionTarget.id ? "Đang gửi..." : "Gửi bổ sung"}

@@ -21,8 +21,8 @@ const MIME_BY_EXT: Record<string, string> = {
   jpg: "image/jpeg",
   jpeg: "image/jpeg"
 };
-const ALLOWED_STORAGE_FOLDERS = new Set(["onboarding-doc", "campaign-content", "campaign-briefs", "campaign-files"]);
-const FALLBACK_ALLOWED_BUCKETS = new Set(["onboarding-docs", "campaign-content", "campaign-briefs", "campaign-files"]);
+const ALLOWED_STORAGE_FOLDERS = new Set(["onboarding-doc", "campaign-file", "campaign-content", "campaign-briefs", "campaign-files"]);
+const FALLBACK_ALLOWED_BUCKETS = new Set(["dcreator-uploads", "onboarding-docs", "campaign-content", "campaign-briefs", "campaign-files"]);
 
 function extractContentFileUrl(brief: string) {
   return extractCampaignRequestMarkerValue(brief, CONTENT_FILE_MARKER);
