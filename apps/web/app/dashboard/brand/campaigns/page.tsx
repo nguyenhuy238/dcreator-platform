@@ -744,7 +744,7 @@ export default function BrandCampaignsPage() {
               {requestFieldErrors.contentFileUrl ? <span className="text-xs text-red-600">{requestFieldErrors.contentFileUrl}</span> : null}
               {uploadingContentFile ? <span className="text-xs font-semibold text-amber-700">Đang tải file nội dung campaign...</span> : null}
             </label>
-            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:col-span-2">
+            <div className="mx-auto w-full max-w-5xl rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:col-span-2">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex gap-3">
                   <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-700">
