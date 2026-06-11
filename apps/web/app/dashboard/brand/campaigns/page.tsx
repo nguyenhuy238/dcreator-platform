@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DownloadSimple, FileArrowDown, ImageSquare } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
@@ -158,6 +158,7 @@ function CampaignRequestCover({ src, title }: { src: string | null; title: strin
 
 export default function BrandCampaignsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { currentBrandId } = useCurrentBrand();
   const [activeTab, setActiveTab] = useState<"campaigns" | "requests" | "packages">("campaigns");
   const [requestListTab, setRequestListTab] = useState<"pending" | "approved">("pending");
@@ -240,6 +241,13 @@ export default function BrandCampaignsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "campaigns" || tab === "requests" || tab === "packages") {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (activeTab !== "requests") return;
@@ -615,7 +623,7 @@ export default function BrandCampaignsPage() {
                 <EmptyState
                   title="Chưa có campaign"
                   description="Gửi yêu cầu để Admin tạo campaign đầu tiên cho brand của bạn."
-                  action={<Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Gửi yêu cầu tạo campaign</Link>}
+                  action={<Link href="/dashboard/brand/campaigns?tab=requests" className="dc-btn-primary">Gửi yêu cầu tạo campaign</Link>}
                 />
               ) : (
                 <div className="grid gap-4 xl:grid-cols-3">
@@ -818,7 +826,7 @@ export default function BrandCampaignsPage() {
                 <EmptyState
                   title="Chưa có yêu cầu tạo campaign"
                   description="Gửi yêu cầu mới để Admin tạo campaign phù hợp cho brand của bạn."
-                  action={<Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Gửi yêu cầu tạo campaign</Link>}
+                  action={<Link href="/dashboard/brand/campaigns?tab=requests" className="dc-btn-primary">Gửi yêu cầu tạo campaign</Link>}
                 />
               ) : (
                 <div className="mt-5 grid gap-4 xl:grid-cols-3">
