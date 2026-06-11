@@ -34,7 +34,9 @@ const CREATOR_PLATFORM_LABELS: Record<CreatorLink["platform"], string> = {
   tiktok: "TikTok",
   facebook: "Facebook",
   instagram: "Instagram",
-  shopee: "Shopee"
+  youtube: "YouTube",
+  shopee: "Shopee",
+  other: "Khác"
 };
 const BRAND_LINK_LABELS: Record<BrandLinkPlatform, string> = {
   website: "Website chính thức",
