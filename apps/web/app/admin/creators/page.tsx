@@ -274,14 +274,12 @@ export default function AdminCreatorsPage() {
                           <Link className="dc-btn-primary" href={`/admin/creators/${item.id}`}>Chi tiết</Link>
                           <ManagementActionMenu
                             items={[
-                              { key: "proofs", label: "Xem proofs" },
                               { key: "campaigns", label: "Xem campaigns" },
                               { key: "wallet", label: "Xem ví/hoa hồng" },
                               { key: "suspend", label: "Suspend", danger: true },
                               { key: "unsuspend", label: "Unsuspend" }
                             ]}
                             onSelect={(key) => {
-                              if (key === "proofs") window.location.href = "/admin/proofs";
                               if (key === "campaigns") window.location.href = "/admin/campaigns";
                               if (key === "wallet") window.location.href = "/admin/finance";
                               if (key === "suspend") setAction({ type: "suspend", id: item.id });

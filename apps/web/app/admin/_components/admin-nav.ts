@@ -45,13 +45,6 @@ export const adminNav: readonly AdminNavGroup[] = [
         activePrefixes: ["/admin/campaign-applications"],
       },
       {
-        href: "/admin/proofs",
-        label: "Nhiệm vụ và bằng chứng",
-        description: "Quy trình bằng chứng và tranh chấp",
-        icon: "ClipboardText",
-        activePrefixes: ["/admin/proofs", "/admin/content-review"],
-      },
-      {
         href: "/admin/mission-reviews",
         label: "Duyệt nhiệm vụ nhà sáng tạo",
         description: "Nhận nhiệm vụ, video, hoàn thành",
@@ -64,12 +57,6 @@ export const adminNav: readonly AdminNavGroup[] = [
           "/admin/mission-final-reviews",
           "/admin/creator-missions",
         ],
-      },
-      {
-        href: "/admin/vouchers",
-        label: "Voucher / Quà tặng",
-        description: "Giám sát phát hành và sử dụng",
-        icon: "Gift",
       },
       {
         href: "/admin/payouts",
