@@ -35,17 +35,17 @@ const userNavItems: readonly NavItem[] = [
 
 const creatorNavItems: readonly NavItem[] = [
   { href: "/dashboard/creator", label: "Tổng quan nhà sáng tạo", description: "Tiến độ nhiệm vụ và hoa hồng", icon: "Gauge" },
-  { href: "/dashboard/creator/analytics", label: "Phân tích nhà sáng tạo", description: "Chỉ số nhiệm vụ, bằng chứng, doanh thu và hoa hồng", icon: "ClipboardText" },
   { href: "/dashboard/creator/jobs", label: "Chiến dịch / Nhiệm vụ", description: "Chiến dịch có thể tham gia", icon: "Briefcase" },
   { href: "/dashboard/creator/wallet", label: "Ví nhà sáng tạo", description: "Hoa hồng và chi trả", icon: "Wallet" },
+  { href: "/dashboard/creator/analytics", label: "Thống kê nhà sáng tạo", description: "Chỉ số nhiệm vụ, bằng chứng, doanh thu và hoa hồng", icon: "ClipboardText" },
   { href: "/dashboard/creator/profile", label: "Cài đặt nhà sáng tạo", description: "Hồ sơ, kênh xã hội và thông tin nhà sáng tạo", icon: "UserCircle" }
 ];
 
 const brandNavItems: readonly NavItem[] = [
   { href: "/dashboard/brand", label: "Tổng quan nhãn hàng", description: "Toàn cảnh vận hành nhãn hàng", icon: "Gauge" },
-  { href: "/dashboard/brand/analytics", label: "Phân tích nhãn hàng", description: "Chỉ số nhà sáng tạo, bằng chứng, doanh thu và hoa hồng", icon: "ClipboardText" },
   { href: "/dashboard/brand/campaigns", label: "Chiến dịch / Nhiệm vụ", description: "Tạo và quản lý chiến dịch", icon: "Megaphone" },
   { href: "/dashboard/brand/mission-history", label: "Lịch sử nhiệm vụ của nhà sáng tạo", description: "Toàn bộ nhiệm vụ nhà sáng tạo theo chiến dịch", icon: "Scroll" },
+  { href: "/dashboard/brand/analytics", label: "Thống kê nhãn hàng", description: "Chỉ số nhà sáng tạo, bằng chứng, doanh thu và hoa hồng", icon: "ClipboardText" },
   {
     href: "/dashboard/brand/settings",
     label: "Cài đặt nhãn hàng",
@@ -176,7 +176,7 @@ const breadcrumbLabelMap: Record<string, string> = {
   "/dashboard/user/upgrade": "\u0110\u0103ng k\u00fd n\u00e2ng c\u1ea5p vai tr\u00f2",
   "/dashboard/user/settings": "C\u00e0i \u0111\u1eb7t t\u00e0i kho\u1ea3n",
   "/dashboard/creator": "Bảng điều khiển nhà sáng tạo",
-  "/dashboard/creator/analytics": "Phân tích nhà sáng tạo",
+  "/dashboard/creator/analytics": "Thống kê nhà sáng tạo",
   "/dashboard/creator/jobs": "Chiến dịch / Nhiệm vụ",
   "/dashboard/creator/missions": "Nhi\u1ec7m v\u1ee5 c\u1ee7a t\u00f4i",
   "/dashboard/creator/proofs": "Bằng chứng / Video",
@@ -196,7 +196,7 @@ const breadcrumbLabelMap: Record<string, string> = {
   "/dashboard/brand/proofs": "Duyệt bằng chứng / video",
   "/dashboard/brand/products": "S\u1ea3n ph\u1ea9m",
   "/dashboard/brand/finance": "Tài chính",
-  "/dashboard/brand/analytics": "Phân tích chỉ số",
+  "/dashboard/brand/analytics": "Thống kê nhãn hàng",
   "/dashboard/brand/wallet": "V\u00ed N-Point",
   "/dashboard/brand/members": "Thành viên nhãn hàng",
   "/dashboard/brand/upgrade": "\u0110\u0103ng k\u00fd n\u00e2ng c\u1ea5p vai tr\u00f2",

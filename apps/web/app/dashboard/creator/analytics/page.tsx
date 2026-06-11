@@ -39,11 +39,11 @@ export default function CreatorAnalyticsPage() {
       const response = await fetch("/api/creator/dashboard/analytics", { cache: "no-store" });
       const payload = (await response.json()) as ApiResponse<AnalyticsData>;
       if (!response.ok || !payload.success || !payload.data) {
-        throw new Error(payload.error ?? "Không thể tải analytics");
+        throw new Error(payload.error ?? "Không thể tải dữ liệu thống kê");
       }
       setData(payload.data);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Không thể tải analytics");
+      setError(requestError instanceof Error ? requestError.message : "Không thể tải dữ liệu thống kê");
     } finally {
       setLoading(false);
     }
@@ -57,8 +57,8 @@ export default function CreatorAnalyticsPage() {
 
   return (
     <>
-      <PageHeader title="Phân tích chỉ số" subtitle="Theo dõi hiệu suất chiến dịch, tỷ lệ duyệt bằng chứng và thu nhập nhà sáng tạo." />
-      {error ? <ErrorState title="Không thể tải dữ liệu phân tích" description={error} onRetry={() => void load()} /> : null}
+      <PageHeader title="Thống kê nhà sáng tạo" subtitle="Theo dõi hiệu suất chiến dịch, tỷ lệ duyệt bằng chứng và thu nhập nhà sáng tạo." />
+      {error ? <ErrorState title="Không thể tải dữ liệu thống kê" description={error} onRetry={() => void load()} /> : null}
       {loading ? <LoadingSkeleton rows={4} /> : null}
 
       {!loading && data ? (
@@ -100,7 +100,7 @@ export default function CreatorAnalyticsPage() {
         </>
       ) : null}
 
-      {!loading && !data && !error ? <EmptyState title="Chưa có dữ liệu phân tích" description="Dữ liệu sẽ xuất hiện sau khi bạn tham gia và hoàn thành nhiệm vụ." /> : null}
+      {!loading && !data && !error ? <EmptyState title="Chưa có dữ liệu thống kê" description="Dữ liệu sẽ xuất hiện sau khi bạn tham gia và hoàn thành nhiệm vụ." /> : null}
     </>
   );
 }

@@ -61,10 +61,10 @@ export default function BrandAnalyticsPage() {
     try {
       const response = await fetch("/api/brand/dashboard/analytics", { cache: "no-store" });
       const payload = (await response.json()) as ApiResponse<AnalyticsPayload>;
-      if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error ?? "Không thể tải analytics");
+      if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error ?? "Không thể tải dữ liệu thống kê");
       setData(payload.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Không thể tải analytics");
+      setError(e instanceof Error ? e.message : "Không thể tải dữ liệu thống kê");
     } finally {
       setLoading(false);
     }
@@ -78,9 +78,9 @@ export default function BrandAnalyticsPage() {
 
   return (
     <>
-      <PageHeader title="Phân tích chỉ số" subtitle="Theo dõi hiệu suất chiến dịch, nhà sáng tạo, bằng chứng và chuyển đổi." />
+      <PageHeader title="Thống kê nhãn hàng" subtitle="Theo dõi hiệu suất chiến dịch, nhà sáng tạo, bằng chứng và chuyển đổi." />
 
-      {error ? <ErrorState title="Không thể tải dữ liệu phân tích" description={error} onRetry={() => void load()} /> : null}
+      {error ? <ErrorState title="Không thể tải dữ liệu thống kê" description={error} onRetry={() => void load()} /> : null}
       {loading ? <LoadingSkeleton rows={5} /> : null}
 
       {!loading && data ? (
