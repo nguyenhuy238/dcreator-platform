@@ -98,7 +98,7 @@ export async function getAdminOverview() {
     totalBrands,
     activeCampaigns,
     pendingReviews,
-    totalContributions,
+    totalRevenue,
     fraudAlerts,
     pendingBrandRequests,
     pendingCreatorRequests,
@@ -119,7 +119,7 @@ export async function getAdminOverview() {
     prisma.brand.count(),
     prisma.campaign.count({ where: { status: CampaignStatus.ACTIVE } }),
     prisma.roleRequest.count({ where: { status: RoleRequestStatus.PENDING } }),
-    prisma.contribution.aggregate({ _sum: { amountVnd: true }, where: { status: "SUCCESS" } }),
+    prisma.paymentOrder.aggregate({ _sum: { amountVnd: true }, where: { status: "SUCCESS" } }),
     prisma.riskFlag.count(),
     prisma.brand.count({
       where: {
@@ -201,7 +201,7 @@ export async function getAdminOverview() {
     totalBrands,
     activeCampaigns,
     pendingReviews,
-    totalContributions: totalContributions._sum.amountVnd ?? 0,
+    totalContributions: totalRevenue._sum.amountVnd ?? 0,
     fraudAlerts,
     queues: {
       brandPendingReview: pendingBrandRequests,
@@ -221,7 +221,7 @@ export async function getAdminOverview() {
       activeCampaigns,
       activeBrands,
       activeCreators,
-      grossRevenueVnd: totalContributions._sum.amountVnd ?? 0,
+      grossRevenueVnd: totalRevenue._sum.amountVnd ?? 0,
       commissionPayoutVnd: Math.abs(totalCommissionPaid._sum.cashDeltaVnd ?? 0)
     },
     systemAlerts

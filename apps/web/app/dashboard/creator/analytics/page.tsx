@@ -5,12 +5,15 @@ import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, Sta
 
 type AnalyticsData = {
   jobAccepted: number;
+  jobsDoing: number;
+  jobsCompleted: number;
   proofSubmitted: number;
   proofApproved: number;
+  proofRejected: number;
+  revenueGeneratedVnd: number;
   commissionEarnedVnd: number;
-  contributionDriven: number;
-  contributionDrivenVnd: number;
-  salesConversions: number;
+  commissionPendingVnd: number;
+  topCampaign?: { id: string; title: string; commissionVnd: number } | null;
 };
 
 type ApiResponse<T> = { success: boolean; data?: T; error?: string };
@@ -54,27 +57,32 @@ export default function CreatorAnalyticsPage() {
 
   return (
     <>
-      <PageHeader title="KPI / Analytics" subtitle="Theo dõi hiệu suất campaign, tỷ lệ duyệt proof và thu nhập Creator." />
-      {error ? <ErrorState title="Không thể tải analytics" description={error} onRetry={() => void load()} /> : null}
+      <PageHeader title="Phân tích chỉ số" subtitle="Theo dõi hiệu suất chiến dịch, tỷ lệ duyệt bằng chứng và thu nhập nhà sáng tạo." />
+      {error ? <ErrorState title="Không thể tải dữ liệu phân tích" description={error} onRetry={() => void load()} /> : null}
       {loading ? <LoadingSkeleton rows={4} /> : null}
 
       {!loading && data ? (
         <>
           <section className="dc-grid-dashboard">
-            <StatsCard title="Tổng campaign tham gia" value={`${data.jobAccepted}`} />
-            <StatsCard title="Tổng nhiệm vụ hoàn thành" value={`${data.proofApproved}`} />
-            <StatsCard title="Tổng proof đã nộp" value={`${data.proofSubmitted}`} />
-            <StatsCard title="Tổng hoa hồng" value={formatVnd(data.commissionEarnedVnd)} />
-            <StatsCard title="Tỷ lệ duyệt proof" value={approvalRate} />
-            <StatsCard title="Đóng góp chuyển đổi" value={`${data.salesConversions}`} hint={formatVnd(data.contributionDrivenVnd)} />
+            <StatsCard title="Tổng chiến dịch tham gia" value={`${data.jobAccepted}`} />
+            <StatsCard title="Nhiệm vụ đang làm" value={`${data.jobsDoing}`} />
+            <StatsCard title="Nhiệm vụ hoàn thành" value={`${data.jobsCompleted}`} />
+            <StatsCard title="Tổng bằng chứng đã nộp" value={`${data.proofSubmitted}`} />
+            <StatsCard title="Bằng chứng được duyệt" value={`${data.proofApproved}`} />
+            <StatsCard title="Bằng chứng bị từ chối" value={`${data.proofRejected}`} />
+            <StatsCard title="Doanh thu tạo ra" value={formatVnd(data.revenueGeneratedVnd)} />
+            <StatsCard title="Hoa hồng đã nhận" value={formatVnd(data.commissionEarnedVnd)} />
+            <StatsCard title="Hoa hồng chờ đối soát" value={formatVnd(data.commissionPendingVnd)} />
+            <StatsCard title="Tỷ lệ duyệt bằng chứng" value={approvalRate} />
           </section>
 
           <section className="mt-6 grid gap-4 md:grid-cols-2">
             <article className="dc-card p-4">
-              <SectionHeader title="Hiệu suất proof" />
+              <SectionHeader title="Hiệu suất bằng chứng" />
               <div className="grid gap-2 text-sm text-zinc-600">
-                <p>Proof đã nộp: <span className="font-semibold text-zinc-900">{data.proofSubmitted}</span></p>
-                <p>Proof được duyệt: <span className="font-semibold text-zinc-900">{data.proofApproved}</span></p>
+                <p>Bằng chứng đã nộp: <span className="font-semibold text-zinc-900">{data.proofSubmitted}</span></p>
+                <p>Bằng chứng được duyệt: <span className="font-semibold text-zinc-900">{data.proofApproved}</span></p>
+                <p>Bằng chứng bị từ chối: <span className="font-semibold text-zinc-900">{data.proofRejected}</span></p>
                 <p>Tỷ lệ duyệt: <span className="font-semibold text-zinc-900">{approvalRate}</span></p>
               </div>
             </article>
@@ -82,16 +90,17 @@ export default function CreatorAnalyticsPage() {
             <article className="dc-card p-4">
               <SectionHeader title="Hiệu suất doanh thu" />
               <div className="grid gap-2 text-sm text-zinc-600">
-                <p>Hoa hồng tích luỹ: <span className="font-semibold text-zinc-900">{formatVnd(data.commissionEarnedVnd)}</span></p>
-                <p>Giá trị đóng góp campaign: <span className="font-semibold text-zinc-900">{formatVnd(data.contributionDrivenVnd)}</span></p>
-                <p>Số chuyển đổi: <span className="font-semibold text-zinc-900">{data.contributionDriven}</span></p>
+                <p>Doanh thu tạo ra: <span className="font-semibold text-zinc-900">{formatVnd(data.revenueGeneratedVnd)}</span></p>
+                <p>Hoa hồng đã nhận: <span className="font-semibold text-zinc-900">{formatVnd(data.commissionEarnedVnd)}</span></p>
+                <p>Hoa hồng chờ đối soát: <span className="font-semibold text-zinc-900">{formatVnd(data.commissionPendingVnd)}</span></p>
+                <p>Chiến dịch hiệu quả nhất: <span className="font-semibold text-zinc-900">{data.topCampaign?.title ?? "Chưa có"}</span></p>
               </div>
             </article>
           </section>
         </>
       ) : null}
 
-      {!loading && !data && !error ? <EmptyState title="Chưa có dữ liệu analytics" description="Dữ liệu sẽ xuất hiện sau khi bạn tham gia và hoàn thành nhiệm vụ." /> : null}
+      {!loading && !data && !error ? <EmptyState title="Chưa có dữ liệu phân tích" description="Dữ liệu sẽ xuất hiện sau khi bạn tham gia và hoàn thành nhiệm vụ." /> : null}
     </>
   );
 }

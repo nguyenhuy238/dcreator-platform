@@ -24,7 +24,7 @@ export function DashboardSwitcher({
   return (
     <div className={`flex flex-wrap items-center gap-3 ${className}`}>
       <label htmlFor="workspace-switcher" className="text-sm font-semibold text-zinc-700">
-        Chuyển workspace
+        Chuyển khu vực
       </label>
       <select
         id="workspace-switcher"

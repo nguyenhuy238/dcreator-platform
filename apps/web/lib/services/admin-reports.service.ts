@@ -72,7 +72,7 @@ export async function getAdminReportsSummary(period: "7d" | "30d" | "month") {
     prisma.missionSubmission.count({ where: { mission: { audience: "CREATOR" }, lifecycleStatus: { in: ["ACCEPTED", "DOING"] } } }),
     prisma.payoutRequest.count({ where: { status: "PENDING" } }),
     prismaAny.fulfillmentOrder.count({ where: { status: { in: ["PENDING", "FAILED"] } } }),
-    prisma.contribution.aggregate({ _sum: { amountVnd: true }, where: { status: "SUCCESS", createdAt: { gte: from } } }),
+    prisma.paymentOrder.aggregate({ _sum: { amountVnd: true }, where: { status: "SUCCESS", createdAt: { gte: from } } }),
     prisma.missionSubmission.count({
       where: {
         mission: { audience: "CREATOR" },
@@ -101,7 +101,7 @@ export async function getAdminReportsSummary(period: "7d" | "30d" | "month") {
       },
       select: { accountId: true }
     }),
-    prisma.contribution.groupBy({
+    prisma.paymentOrder.groupBy({
       by: ["campaignId"],
       where: { status: "SUCCESS", createdAt: { gte: from } },
       _sum: { amountVnd: true },
@@ -171,7 +171,7 @@ export async function getAdminReportsSummary(period: "7d" | "30d" | "month") {
       campaignId: item.campaignId,
       title: campaignMap.get(item.campaignId)?.title ?? "Unknown",
       status: campaignMap.get(item.campaignId)?.status ?? "DRAFT",
-      contributionCount: item._count._all,
+      orderCount: item._count._all,
       revenueVnd: item._sum.amountVnd ?? 0
     }))
   };
