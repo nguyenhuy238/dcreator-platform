@@ -19,12 +19,15 @@ import { scanFraudRiskSignals } from "@/lib/services/fraud-flag.service";
 import { getAdminKpis } from "@/lib/services/analytics.service";
 
 const COVER_MARKER = "[[COVER_IMAGE_URL]]:";
+const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
 const REQUIREMENTS_MARKER = "[[CAMPAIGN_REQUIREMENTS]]:";
 
 function extractCoverImageMeta(brief: string) {
   const lines = brief.split("\n");
   const markerLine = lines.find((line) => line.trim().startsWith(COVER_MARKER));
   const coverImageUrl = markerLine ? markerLine.trim().slice(COVER_MARKER.length).trim() : null;
+  const contentFileLine = lines.find((line) => line.trim().startsWith(CONTENT_FILE_MARKER));
+  const contentFileUrl = contentFileLine ? contentFileLine.trim().slice(CONTENT_FILE_MARKER.length).trim() : null;
   const requirementLine = lines.find((line) => line.trim().startsWith(REQUIREMENTS_MARKER));
   const requirements = (() => {
     const encoded = requirementLine ? requirementLine.trim().slice(REQUIREMENTS_MARKER.length).trim() : "";
@@ -36,11 +39,11 @@ function extractCoverImageMeta(brief: string) {
     }
   })();
   const cleanBrief = lines
-    .filter((line) => !line.trim().startsWith(COVER_MARKER) && !line.trim().startsWith(REQUIREMENTS_MARKER))
+    .filter((line) => !line.trim().startsWith(COVER_MARKER) && !line.trim().startsWith(CONTENT_FILE_MARKER) && !line.trim().startsWith(REQUIREMENTS_MARKER))
     .join("\n")
     .trim();
 
-  return { coverImageUrl, cleanBrief, requirements };
+  return { coverImageUrl, contentFileUrl, cleanBrief, requirements };
 }
 
 async function createDefaultMissionsFromRequest(
@@ -500,7 +503,7 @@ export async function rejectRoleRequestByAdmin(actorId: string, requestId: strin
 }
 
 export async function listPendingCampaignReviews() {
-  return prisma.brandCampaignRequest.findMany({
+  const requests = await prisma.brandCampaignRequest.findMany({
     where: { status: { in: ["PENDING_REVIEW", "NEEDS_REVISION"] } },
     select: {
       id: true,
@@ -529,6 +532,16 @@ export async function listPendingCampaignReviews() {
       createdCampaign: { select: { id: true, slug: true, title: true, status: true } }
     },
     orderBy: { updatedAt: "asc" }
+  });
+
+  return requests.map((request) => {
+    const { coverImageUrl, contentFileUrl, cleanBrief } = extractCoverImageMeta(request.brief);
+    return {
+      ...request,
+      brief: cleanBrief,
+      coverImageUrl,
+      contentFileUrl
+    };
   });
 }
 

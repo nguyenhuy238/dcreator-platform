@@ -425,6 +425,22 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
   const endsAt = input.endsAt ? new Date(input.endsAt) : null;
   const requiredHashtags = normalizeRequiredHashtags(input.requiredHashtags);
   const campaign = await prisma.$transaction(async (tx) => {
+    const linkedRequest = input.requestId
+      ? await tx.brandCampaignRequest.findFirst({
+          where: {
+            id: input.requestId,
+            brandId: brandProfile.id,
+            createdCampaignId: null,
+            status: { in: ["PENDING_REVIEW", "NEEDS_REVISION"] }
+          },
+          select: { id: true }
+        })
+      : null;
+
+    if (input.requestId && !linkedRequest) {
+      throw new AppError("Campaign request not found or cannot be linked", 404, "CAMPAIGN_REQUEST_NOT_FOUND");
+    }
+
     const createdCampaign = await tx.campaign.create({
       data: {
         brandId: brandAccount.id,
@@ -459,20 +475,32 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
       }
     });
 
-    await tx.brandCampaignRequest.updateMany({
-      where: {
-        brandId: brandProfile.id,
-        requestedSlug: input.slug,
-        createdCampaignId: null,
-        status: { in: ["PENDING_REVIEW", "NEEDS_REVISION"] }
-      },
-      data: {
-        status: "APPROVED",
-        reviewedById: actorId,
-        reviewedAt: new Date(),
-        createdCampaignId: createdCampaign.id
-      }
-    });
+    if (linkedRequest) {
+      await tx.brandCampaignRequest.update({
+        where: { id: linkedRequest.id },
+        data: {
+          status: "APPROVED",
+          reviewedById: actorId,
+          reviewedAt: new Date(),
+          createdCampaignId: createdCampaign.id
+        }
+      });
+    } else {
+      await tx.brandCampaignRequest.updateMany({
+        where: {
+          brandId: brandProfile.id,
+          requestedSlug: input.slug,
+          createdCampaignId: null,
+          status: { in: ["PENDING_REVIEW", "NEEDS_REVISION"] }
+        },
+        data: {
+          status: "APPROVED",
+          reviewedById: actorId,
+          reviewedAt: new Date(),
+          createdCampaignId: createdCampaign.id
+        }
+      });
+    }
 
     return createdCampaign;
   });

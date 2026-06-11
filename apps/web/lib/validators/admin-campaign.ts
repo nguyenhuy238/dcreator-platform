@@ -23,6 +23,7 @@ export const adminCampaignDecisionSchema = z.object({
 });
 
 export const adminCampaignCreateSchema = z.object({
+  requestId: z.string().trim().min(1).max(128).optional(),
   brandAccountId: z.string().trim().min(3).max(128),
   slug: z
     .string()

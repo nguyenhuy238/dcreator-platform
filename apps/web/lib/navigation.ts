@@ -44,7 +44,6 @@ const creatorNavItems: readonly NavItem[] = [
 const brandNavItems: readonly NavItem[] = [
   { href: "/dashboard/brand", label: "Tổng quan nhãn hàng", description: "Toàn cảnh vận hành nhãn hàng", icon: "Gauge" },
   { href: "/dashboard/brand/campaigns", label: "Chiến dịch / Nhiệm vụ", description: "Tạo và quản lý chiến dịch", icon: "Megaphone" },
-  { href: "/dashboard/brand/mission-history", label: "Lịch sử nhiệm vụ của nhà sáng tạo", description: "Toàn bộ nhiệm vụ nhà sáng tạo theo chiến dịch", icon: "Scroll" },
   { href: "/dashboard/brand/analytics", label: "Thống kê nhãn hàng", description: "Chỉ số nhà sáng tạo, bằng chứng, doanh thu và hoa hồng", icon: "ClipboardText" },
   {
     href: "/dashboard/brand/settings",
@@ -192,7 +191,6 @@ const breadcrumbLabelMap: Record<string, string> = {
   "/dashboard/brand/campaigns": "Chiến dịch / Nhiệm vụ",
   "/dashboard/brand/applications": "Nhà sáng tạo ứng tuyển",
   "/dashboard/brand/mission-reviews": "Duyệt nhiệm vụ nhà sáng tạo",
-  "/dashboard/brand/mission-history": "L\u1ecbch s\u1eed nhi\u1ec7m v\u1ee5",
   "/dashboard/brand/proofs": "Duyệt bằng chứng / video",
   "/dashboard/brand/products": "S\u1ea3n ph\u1ea9m",
   "/dashboard/brand/finance": "Tài chính",
