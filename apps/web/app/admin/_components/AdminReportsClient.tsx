@@ -27,7 +27,7 @@ type ReportData = {
   opsStatus: { payoutPending: number; fulfillmentPendingIssues: number };
   contentReview: { reviewed: number; approved: number; rejected: number; approvalRate: number };
   topCreatorPerformance: Array<{ accountId: string; name: string; email: string; submissions: number }>;
-  topCampaignPerformance: Array<{ campaignId: string; title: string; status: string; contributionCount: number; revenueVnd: number }>;
+  topCampaignPerformance: Array<{ campaignId: string; title: string; status: string; orderCount: number; revenueVnd: number }>;
 };
 
 export function AdminReportsClient({ source = "reports" }: { source?: "reports" | "analytics" }) {
@@ -76,57 +76,57 @@ export function AdminReportsClient({ source = "reports" }: { source?: "reports" 
       {!loading && !error && data ? (
         <>
           <section className="mt-4 dc-grid-dashboard">
-            <StatsCard title="Total campaigns" value={`${data.totals.totalCampaigns}`} />
-            <StatsCard title="Active campaigns" value={`${data.totals.activeCampaigns}`} />
-            <StatsCard title="Pending campaigns" value={`${data.totals.pendingCampaigns}`} />
-            <StatsCard title="Total brands" value={`${data.totals.totalBrands}`} />
-            <StatsCard title="Active brands" value={`${data.totals.activeBrands}`} />
-            <StatsCard title="Total creators" value={`${data.totals.totalCreators}`} />
-            <StatsCard title="Active creators" value={`${data.totals.activeCreators}`} />
-            <StatsCard title="Total revenue" value={`${data.totals.totalRevenueVnd.toLocaleString("vi-VN")} VND`} />
+            <StatsCard title="Tổng chiến dịch" value={`${data.totals.totalCampaigns}`} />
+            <StatsCard title="Chiến dịch đang hoạt động" value={`${data.totals.activeCampaigns}`} />
+            <StatsCard title="Chiến dịch chờ xử lý" value={`${data.totals.pendingCampaigns}`} />
+            <StatsCard title="Tổng nhãn hàng" value={`${data.totals.totalBrands}`} />
+            <StatsCard title="Nhãn hàng đang hoạt động" value={`${data.totals.activeBrands}`} />
+            <StatsCard title="Tổng nhà sáng tạo" value={`${data.totals.totalCreators}`} />
+            <StatsCard title="Nhà sáng tạo đang hoạt động" value={`${data.totals.activeCreators}`} />
+            <StatsCard title="Tổng doanh thu" value={`${data.totals.totalRevenueVnd.toLocaleString("vi-VN")} VNĐ`} />
           </section>
 
           <section className="mt-8">
-            <SectionHeader title="Risk / Verification Operations" subtitle="Theo loại nghiệp vụ cần giám sát." />
+            <SectionHeader title="Rủi ro và xác minh" subtitle="Theo loại nghiệp vụ cần giám sát." />
             <div className="grid gap-3 md:grid-cols-3">
-              <StatsCard title="Brand cần giám sát" value={`${data.pendingReviewsByType.brand}`} />
-              <StatsCard title="Creator cần giám sát" value={`${data.pendingReviewsByType.creator}`} />
+              <StatsCard title="Nhãn hàng cần giám sát" value={`${data.pendingReviewsByType.brand}`} />
+              <StatsCard title="Nhà sáng tạo cần giám sát" value={`${data.pendingReviewsByType.creator}`} />
               <StatsCard title="Chiến dịch" value={`${data.pendingReviewsByType.campaign}`} />
-              <StatsCard title="Creator missions đang chạy" value={`${data.pendingReviewsByType.creatorApplications}`} />
-              <StatsCard title="Content" value={`${data.pendingReviewsByType.content}`} />
-              <StatsCard title="Product/Inventory" value={`${data.pendingReviewsByType.productInventory}`} />
+              <StatsCard title="Nhiệm vụ nhà sáng tạo đang chạy" value={`${data.pendingReviewsByType.creatorApplications}`} />
+              <StatsCard title="Nội dung" value={`${data.pendingReviewsByType.content}`} />
+              <StatsCard title="Sản phẩm / tồn kho" value={`${data.pendingReviewsByType.productInventory}`} />
             </div>
           </section>
 
           <section className="mt-8">
-            <SectionHeader title="Ops Status" subtitle="Fulfillment và payout queue." />
+            <SectionHeader title="Trạng thái vận hành" subtitle="Đơn xử lý và yêu cầu chi trả đang chờ." />
             <div className="grid gap-3 md:grid-cols-2">
-              <StatsCard title="Payout pending" value={`${data.opsStatus.payoutPending}`} />
-              <StatsCard title="Fulfillment pending/issues" value={`${data.opsStatus.fulfillmentPendingIssues}`} />
+              <StatsCard title="Chi trả đang chờ" value={`${data.opsStatus.payoutPending}`} />
+              <StatsCard title="Đơn xử lý chờ / có lỗi" value={`${data.opsStatus.fulfillmentPendingIssues}`} />
             </div>
           </section>
 
           <section className="mt-8">
-            <SectionHeader title="Content Review Health" subtitle="Approval rate trên submissions đã review." />
+            <SectionHeader title="Tình trạng duyệt nội dung" subtitle="Tỷ lệ duyệt trên các nội dung đã được kiểm tra." />
             <div className="grid gap-3 md:grid-cols-4">
-              <StatsCard title="Reviewed" value={`${data.contentReview.reviewed}`} />
-              <StatsCard title="Approved" value={`${data.contentReview.approved}`} />
-              <StatsCard title="Rejected" value={`${data.contentReview.rejected}`} />
-              <StatsCard title="Approval rate" value={`${data.contentReview.approvalRate}%`} />
+              <StatsCard title="Đã kiểm tra" value={`${data.contentReview.reviewed}`} />
+              <StatsCard title="Đã duyệt" value={`${data.contentReview.approved}`} />
+              <StatsCard title="Bị từ chối" value={`${data.contentReview.rejected}`} />
+              <StatsCard title="Tỷ lệ duyệt" value={`${data.contentReview.approvalRate}%`} />
             </div>
           </section>
 
           <section className="mt-8">
-            <SectionHeader title="Top Creator Performance" />
+            <SectionHeader title="Hiệu suất nhà sáng tạo nổi bật" />
             {data.topCreatorPerformance.length === 0 ? (
-              <EmptyState title="Chưa có dữ liệu hiệu suất Creator" description="Chưa có dữ liệu trong kỳ lọc." />
+              <EmptyState title="Chưa có dữ liệu hiệu suất nhà sáng tạo" description="Chưa có dữ liệu trong kỳ lọc." />
             ) : (
               <div className="grid gap-3">
                 {data.topCreatorPerformance.map((item) => (
                   <article key={item.accountId} className="dc-card p-4">
                     <p className="font-semibold">{item.name}</p>
                     <p className="text-xs text-zinc-500">{item.email}</p>
-                    <p className="mt-1 text-sm text-zinc-700">Completed submissions: {item.submissions}</p>
+                    <p className="mt-1 text-sm text-zinc-700">Nội dung hoàn thành: {item.submissions}</p>
                   </article>
                 ))}
               </div>
@@ -134,17 +134,17 @@ export function AdminReportsClient({ source = "reports" }: { source?: "reports" 
           </section>
 
           <section className="mt-8">
-            <SectionHeader title="Top Campaign Performance" />
+            <SectionHeader title="Hiệu suất chiến dịch nổi bật" />
             {data.topCampaignPerformance.length === 0 ? (
-              <EmptyState title="Chưa có dữ liệu hiệu suất chiến dịch" description="Chưa có dữ liệu doanh thu campaign trong kỳ lọc." />
+              <EmptyState title="Chưa có dữ liệu hiệu suất chiến dịch" description="Chưa có dữ liệu doanh thu chiến dịch trong kỳ lọc." />
             ) : (
               <div className="grid gap-3">
                 {data.topCampaignPerformance.map((item) => (
                   <article key={item.campaignId} className="dc-card p-4">
                     <p className="font-semibold">{item.title}</p>
-                    <p className="text-xs text-zinc-500">Status: {item.status}</p>
-                    <p className="mt-1 text-sm text-zinc-700">Contribution count: {item.contributionCount}</p>
-                    <p className="text-sm text-zinc-700">Revenue: {item.revenueVnd.toLocaleString("vi-VN")} VND</p>
+                    <p className="text-xs text-zinc-500">Trạng thái: {item.status === "ACTIVE" ? "Đang hoạt động" : item.status}</p>
+                    <p className="mt-1 text-sm text-zinc-700">Số đơn hàng: {item.orderCount}</p>
+                    <p className="text-sm text-zinc-700">Doanh thu: {item.revenueVnd.toLocaleString("vi-VN")} VNĐ</p>
                   </article>
                 ))}
               </div>

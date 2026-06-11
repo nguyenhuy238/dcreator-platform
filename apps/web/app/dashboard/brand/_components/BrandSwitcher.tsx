@@ -5,6 +5,13 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { setCurrentBrandInContext, useCurrentBrand, useSetCurrentBrand } from "@/app/dashboard/brand/_hooks/use-brand-context";
 
+function brandRoleLabel(role: string) {
+  if (role === "OWNER") return "Chủ sở hữu";
+  if (role === "MANAGER") return "Quản lý";
+  if (role === "STAFF") return "Nhân sự";
+  return role;
+}
+
 export function BrandSwitcher({ className = "mb-4", inline = false }: { className?: string; inline?: boolean }) {
   const router = useRouter();
   const { currentBrandId, brands, isLoading, error } = useCurrentBrand();
@@ -21,9 +28,9 @@ export function BrandSwitcher({ className = "mb-4", inline = false }: { classNam
   if (brands.length === 0) {
     return (
       <div className={`${className} rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700`}>
-        <p>Bạn chưa thuộc Brand nào.</p>
+        <p>Bạn chưa thuộc nhãn hàng nào.</p>
         <Link href="/brand/register" className="mt-2 inline-flex rounded-lg bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800">
-          Tạo Brand mới
+          Tạo nhãn hàng mới
         </Link>
       </div>
     );
@@ -32,7 +39,7 @@ export function BrandSwitcher({ className = "mb-4", inline = false }: { classNam
   return (
     <div className={inline ? className : `${className} rounded-xl border border-zinc-200 bg-white px-4 py-3`}>
       <div className="flex flex-wrap items-center gap-3">
-        <label htmlFor="brand-switcher" className="text-sm font-semibold text-zinc-700">Brand hiện tại</label>
+        <label htmlFor="brand-switcher" className="text-sm font-semibold text-zinc-700">Nhãn hàng hiện tại</label>
         <select
           id="brand-switcher"
           className="dc-input max-w-xs"
@@ -47,7 +54,7 @@ export function BrandSwitcher({ className = "mb-4", inline = false }: { classNam
               setCurrentBrandInContext(nextBrandId);
               router.refresh();
             } catch (switchError) {
-              setLocalError(switchError instanceof Error ? switchError.message : "Không thể chuyển Brand");
+              setLocalError(switchError instanceof Error ? switchError.message : "Không thể chuyển nhãn hàng");
             } finally {
               setIsSaving(false);
             }
@@ -55,7 +62,7 @@ export function BrandSwitcher({ className = "mb-4", inline = false }: { classNam
         >
           {brands.map((brand) => (
             <option key={brand.id} value={brand.id}>
-              {brand.name} ({brand.role})
+              {brand.name} ({brandRoleLabel(brand.role)})
             </option>
           ))}
         </select>

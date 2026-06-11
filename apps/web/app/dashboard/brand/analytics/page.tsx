@@ -7,28 +7,41 @@ type AnalyticsPayload = {
   kpis?: {
     totalCampaigns: number;
     activeCampaigns: number;
-    totalFundingVnd: number;
-    totalBackers: number;
-    totalCreatorParticipated: number;
-    totalProofApproved: number;
-    totalProofRejected: number;
-    totalVoucherIssued: number;
-    totalVoucherUsed: number;
+    creatorApplicationCount: number;
+    approvedCreatorCount: number;
+    proofSubmitted: number;
+    proofApproved: number;
+    totalOrders: number;
+    totalRevenueVnd: number;
+    totalCommissionPaidVnd: number;
     conversionRatePercent: number;
   };
   campaignPerformance?: Array<{
     id: string;
     title: string;
-    fundedAmountVnd: number;
-    backerCount: number;
-    status?: string;
-    targetAmountVnd?: number;
+    status: string;
+    creatorApplied: number;
+    creatorApproved: number;
+    proofSubmitted: number;
+    proofApproved: number;
+    orderCount: number;
+    revenueVnd: number;
+    commissionPaidVnd: number;
+    createdAt: string;
+    deadline?: string | null;
   }>;
   topCreator?: { id: string; displayName: string } | null;
-  topProduct?: { id: string; title: string; stockTotal: number; stockRemaining: number } | null;
+  topProduct?: { id: string; name: string; stockQty: number; voucherStock: number; priceVnd: number } | null;
   voucherRedemption?: number;
   conversionRate?: number;
-  topCampaign?: { id: string; title: string; fundedAmountVnd: number; backerCount: number } | null;
+  topCampaign?: {
+    id: string;
+    title: string;
+    proofApproved: number;
+    orderCount: number;
+    revenueVnd: number;
+    commissionPaidVnd: number;
+  } | null;
 };
 
 type ApiResponse<T> = { success: boolean; data?: T; error?: string };
@@ -48,10 +61,10 @@ export default function BrandAnalyticsPage() {
     try {
       const response = await fetch("/api/brand/dashboard/analytics", { cache: "no-store" });
       const payload = (await response.json()) as ApiResponse<AnalyticsPayload>;
-      if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error ?? "Không thể tải analytics");
+      if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error ?? "Không thể tải dữ liệu thống kê");
       setData(payload.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Không thể tải analytics");
+      setError(e instanceof Error ? e.message : "Không thể tải dữ liệu thống kê");
     } finally {
       setLoading(false);
     }
@@ -65,44 +78,48 @@ export default function BrandAnalyticsPage() {
 
   return (
     <>
-      <PageHeader title="KPI / Analytics" subtitle="Theo dõi hiệu suất campaign, creator, proof và chuyển đổi." />
+      <PageHeader title="Thống kê nhãn hàng" subtitle="Theo dõi hiệu suất chiến dịch, nhà sáng tạo, bằng chứng và chuyển đổi." />
 
-      {error ? <ErrorState title="Không thể tải analytics" description={error} onRetry={() => void load()} /> : null}
+      {error ? <ErrorState title="Không thể tải dữ liệu thống kê" description={error} onRetry={() => void load()} /> : null}
       {loading ? <LoadingSkeleton rows={5} /> : null}
 
       {!loading && data ? (
         <>
           <section className="dc-grid-dashboard">
-            <StatsCard title="Tổng campaign" value={`${data.kpis?.totalCampaigns ?? 0}`} />
-            <StatsCard title="Campaign active" value={`${data.kpis?.activeCampaigns ?? 0}`} />
-            <StatsCard title="Tổng funding" value={formatVnd(data.kpis?.totalFundingVnd ?? 0)} />
-            <StatsCard title="Tổng creator tham gia" value={`${data.kpis?.totalCreatorParticipated ?? 0}`} />
-            <StatsCard title="Tổng applications/proof duyệt" value={`${(data.kpis?.totalProofApproved ?? 0) + (data.kpis?.totalProofRejected ?? 0)}`} />
-            <StatsCard title="Voucher đã redeem" value={`${data.voucherRedemption ?? data.kpis?.totalVoucherUsed ?? 0}`} />
-            <StatsCard title="Conversion rate" value={`${(data.kpis?.conversionRatePercent ?? 0).toFixed(2)}%`} />
-            <StatsCard title="Giá trị TB/conversion" value={formatVnd(Number(data.conversionRate ?? 0))} />
+            <StatsCard title="Tổng chiến dịch" value={`${data.kpis?.totalCampaigns ?? 0}`} />
+            <StatsCard title="Chiến dịch đang hoạt động" value={`${data.kpis?.activeCampaigns ?? 0}`} />
+            <StatsCard title="Nhà sáng tạo ứng tuyển" value={`${data.kpis?.creatorApplicationCount ?? 0}`} />
+            <StatsCard title="Nhà sáng tạo được duyệt" value={`${data.kpis?.approvedCreatorCount ?? 0}`} />
+            <StatsCard title="Bằng chứng đã nộp" value={`${data.kpis?.proofSubmitted ?? 0}`} />
+            <StatsCard title="Bằng chứng được duyệt" value={`${data.kpis?.proofApproved ?? 0}`} />
+            <StatsCard title="Tổng đơn hàng" value={`${data.kpis?.totalOrders ?? 0}`} />
+            <StatsCard title="Tổng doanh thu" value={formatVnd(data.kpis?.totalRevenueVnd ?? 0)} />
+            <StatsCard title="Hoa hồng nhà sáng tạo" value={formatVnd(data.kpis?.totalCommissionPaidVnd ?? 0)} />
+            <StatsCard title="Voucher đã sử dụng" value={`${data.voucherRedemption ?? 0}`} />
+            <StatsCard title="Tỷ lệ chuyển đổi" value={`${(data.kpis?.conversionRatePercent ?? 0).toFixed(2)}%`} />
+            <StatsCard title="Giá trị đơn hàng trung bình" value={formatVnd(Number(data.conversionRate ?? 0))} />
           </section>
 
           <section className="mt-6 grid gap-4 lg:grid-cols-3">
             <article className="dc-card p-4">
-              <SectionHeader title="Top campaign" />
+              <SectionHeader title="Chiến dịch nổi bật" />
               {data.topCampaign ? (
                 <div className="text-sm text-zinc-700">
                   <p className="font-semibold text-zinc-900">{data.topCampaign.title}</p>
-                  <p>Funding: {formatVnd(data.topCampaign.fundedAmountVnd)}</p>
-                  <p>Backer: {data.topCampaign.backerCount.toLocaleString("vi-VN")}</p>
+                  <p>Doanh thu: {formatVnd(data.topCampaign.revenueVnd)}</p>
+                  <p>Bằng chứng duyệt: {data.topCampaign.proofApproved.toLocaleString("vi-VN")}</p>
                 </div>
               ) : (
-                <p className="text-sm text-zinc-500">Chưa có dữ liệu campaign.</p>
+                <p className="text-sm text-zinc-500">Chưa có dữ liệu chiến dịch.</p>
               )}
             </article>
 
             <article className="dc-card p-4">
-              <SectionHeader title="Top creator" />
+              <SectionHeader title="Nhà sáng tạo nổi bật" />
               {data.topCreator ? (
                 <div className="text-sm text-zinc-700">
                   <p className="font-semibold text-zinc-900">{data.topCreator.displayName}</p>
-                  <p>ID: {data.topCreator.id}</p>
+                  <p>Mã nhà sáng tạo: {data.topCreator.id}</p>
                 </div>
               ) : (
                 <p className="text-sm text-zinc-500">Chưa có dữ liệu creator.</p>
@@ -110,12 +127,12 @@ export default function BrandAnalyticsPage() {
             </article>
 
             <article className="dc-card p-4">
-              <SectionHeader title="Top product" />
+              <SectionHeader title="Sản phẩm nổi bật" />
               {data.topProduct ? (
                 <div className="text-sm text-zinc-700">
-                  <p className="font-semibold text-zinc-900">{data.topProduct.title}</p>
-                  <p>Stock total: {data.topProduct.stockTotal.toLocaleString("vi-VN")}</p>
-                  <p>Stock remaining: {data.topProduct.stockRemaining.toLocaleString("vi-VN")}</p>
+                  <p className="font-semibold text-zinc-900">{data.topProduct.name}</p>
+                  <p>Tồn kho: {data.topProduct.stockQty.toLocaleString("vi-VN")}</p>
+                  <p>Tồn kho voucher: {data.topProduct.voucherStock.toLocaleString("vi-VN")}</p>
                 </div>
               ) : (
                 <p className="text-sm text-zinc-500">Chưa có dữ liệu sản phẩm.</p>
@@ -124,26 +141,27 @@ export default function BrandAnalyticsPage() {
           </section>
 
           <section className="mt-6">
-            <SectionHeader title="Campaign performance" subtitle="Funding progress theo từng campaign" />
+            <SectionHeader title="Hiệu suất chiến dịch / nhiệm vụ" subtitle="Nhà sáng tạo, bằng chứng, đơn hàng và doanh thu theo từng chiến dịch." />
             {perf.length === 0 ? (
-              <EmptyState title="Chưa có dữ liệu performance" description="Performance campaign sẽ xuất hiện khi có campaign hoạt động." />
+              <EmptyState title="Chưa có dữ liệu hiệu suất" description="Hiệu suất chiến dịch sẽ xuất hiện khi có chiến dịch hoạt động." />
             ) : (
               <div className="grid gap-3">
-                {perf.map((item) => {
-                  const target = item.targetAmountVnd ?? item.fundedAmountVnd;
-                  const percent = target > 0 ? Math.min(100, Math.round((item.fundedAmountVnd / target) * 100)) : 0;
-                  return (
-                    <article key={item.id} className="dc-card p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="font-semibold text-zinc-900">{item.title}</p>
-                        <p className="text-sm text-zinc-600">Backer: {item.backerCount.toLocaleString("vi-VN")}</p>
-                      </div>
-                      <p className="mt-1 text-sm text-zinc-600">Funding: {formatVnd(item.fundedAmountVnd)}</p>
-                      <div className="mt-2 h-2 rounded-full bg-zinc-200"><div className="h-2 rounded-full bg-zinc-900" style={{ width: `${percent}%` }} /></div>
-                      <p className="mt-1 text-xs text-zinc-500">{percent}%</p>
-                    </article>
-                  );
-                })}
+                {perf.map((item) => (
+                  <article key={item.id} className="dc-card p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-semibold text-zinc-900">{item.title}</p>
+                      <p className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600">{item.status === "ACTIVE" ? "Đang hoạt động" : item.status}</p>
+                    </div>
+                    <div className="mt-3 grid gap-2 text-sm text-zinc-600 sm:grid-cols-2 lg:grid-cols-4">
+                      <p>Ứng tuyển: <span className="font-semibold text-zinc-900">{item.creatorApplied}</span></p>
+                      <p>Được duyệt: <span className="font-semibold text-zinc-900">{item.creatorApproved}</span></p>
+                      <p>Bằng chứng: <span className="font-semibold text-zinc-900">{item.proofSubmitted}/{item.proofApproved}</span></p>
+                      <p>Đơn hàng: <span className="font-semibold text-zinc-900">{item.orderCount}</span></p>
+                      <p>Doanh thu: <span className="font-semibold text-zinc-900">{formatVnd(item.revenueVnd)}</span></p>
+                      <p>Hoa hồng: <span className="font-semibold text-zinc-900">{formatVnd(item.commissionPaidVnd)}</span></p>
+                    </div>
+                  </article>
+                ))}
               </div>
             )}
           </section>

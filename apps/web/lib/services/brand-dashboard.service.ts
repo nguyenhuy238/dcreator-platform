@@ -1561,33 +1561,53 @@ export async function getBrandAnalytics(accountId: string, currentBrandId?: stri
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const campaigns = await prisma.campaign.findMany({
     where: { id: { in: await getScopedCampaignIds(ctx.brand.id, ctx.brandOwnerAccountId) } },
-    select: { id: true, title: true }
+    select: { id: true, title: true, status: true, createdAt: true, endsAt: true }
   });
   const campaignIds = campaigns.map((x) => x.id);
 
-  const [topCreatorRaw, topProductRaw, voucherRedemption, conversionRaw, campaignPerformance] = await Promise.all([
-    prisma.missionSubmission.groupBy({
+  const [topCreatorRaw, topProductRaw, voucherRedemption, paymentSummary, campaignPayments, creatorMissions, applications] = await Promise.all([
+    prisma.creatorMission.groupBy({
       by: ["accountId"],
-      where: { mission: { campaignId: { in: campaignIds } }, lifecycleStatus: { in: ["APPROVED", "DONE"] } },
+      where: { campaignId: { in: campaignIds }, applicationStatus: "APPROVED" },
       _count: { _all: true },
       orderBy: { _count: { accountId: "desc" } },
       take: 1
     }),
-    prisma.reward.findMany({
-      where: { campaignId: { in: campaignIds } },
-      orderBy: { stockRemaining: "asc" },
+    prisma.brandProduct.findMany({
+      where: { brandId: ctx.brand.id },
+      orderBy: [{ stockQty: "asc" }, { updatedAt: "desc" }],
       take: 1,
-      select: { id: true, title: true, stockTotal: true, stockRemaining: true }
+      select: { id: true, name: true, stockQty: true, voucherStock: true, priceVnd: true }
     }),
     prisma.rewardClaim.count({ where: { reward: { campaignId: { in: campaignIds } }, status: "USED" } }),
-    prisma.contribution.aggregate({
+    prisma.paymentOrder.aggregate({
       _count: { _all: true },
       _sum: { amountVnd: true },
       where: { campaignId: { in: campaignIds }, status: "SUCCESS" }
     }),
-    prisma.campaign.findMany({
-      where: { id: { in: campaignIds } },
-      select: { id: true, title: true, fundedAmountVnd: true, backerCount: true }
+    prisma.paymentOrder.groupBy({
+      by: ["campaignId"],
+      where: { campaignId: { in: campaignIds }, status: "SUCCESS" },
+      _count: { _all: true },
+      _sum: { amountVnd: true }
+    }),
+    prisma.creatorMission.findMany({
+      where: { campaignId: { in: campaignIds } },
+      select: {
+        campaignId: true,
+        accountId: true,
+        applicationStatus: true,
+        videoReviewStatus: true,
+        publishStatus: true,
+        submissionLifecycleStatus: true,
+        submissionFinalSubmittedAt: true,
+        mission: { select: { rewardCommissionVnd: true } }
+      }
+    }),
+    prisma.missionApplication.groupBy({
+      by: ["campaignId"],
+      where: { campaignId: { in: campaignIds } },
+      _count: { _all: true }
     })
   ]);
 
@@ -1597,16 +1617,47 @@ export async function getBrandAnalytics(accountId: string, currentBrandId?: stri
 
   const kpis = await getBrandKpis(ctx.brandOwnerAccountId);
 
+  const paymentByCampaign = new Map(campaignPayments.map((item) => [item.campaignId, item]));
+  const applicationByCampaign = new Map(applications.map((item) => [item.campaignId, item._count._all]));
+  const campaignPerformance = campaigns.map((campaign) => {
+    const relatedMissions = creatorMissions.filter((item) => item.campaignId === campaign.id);
+    const proofSubmitted = relatedMissions.filter((item) =>
+      item.videoReviewStatus !== "NOT_SUBMITTED" || item.publishStatus !== "NOT_SUBMITTED" || item.submissionFinalSubmittedAt
+    ).length;
+    const proofApproved = relatedMissions.filter((item) =>
+      item.videoReviewStatus === "APPROVED" || item.publishStatus === "APPROVED" || ["APPROVED", "DONE"].includes(item.submissionLifecycleStatus)
+    ).length;
+    const commissionPaidVnd = relatedMissions
+      .filter((item) => item.videoReviewStatus === "APPROVED" || item.publishStatus === "APPROVED" || ["APPROVED", "DONE"].includes(item.submissionLifecycleStatus))
+      .reduce((sum, item) => sum + (item.mission?.rewardCommissionVnd ?? 0), 0);
+    const payment = paymentByCampaign.get(campaign.id);
+
+    return {
+      id: campaign.id,
+      title: campaign.title,
+      status: campaign.status,
+      creatorApplied: applicationByCampaign.get(campaign.id) ?? 0,
+      creatorApproved: new Set(relatedMissions.filter((item) => item.applicationStatus === "APPROVED").map((item) => item.accountId)).size,
+      proofSubmitted,
+      proofApproved,
+      orderCount: payment?._count._all ?? 0,
+      revenueVnd: payment?._sum.amountVnd ?? 0,
+      commissionPaidVnd,
+      createdAt: campaign.createdAt,
+      deadline: campaign.endsAt
+    };
+  });
+
   const topCampaign = campaignPerformance
     .slice()
-    .sort((a, b) => b.fundedAmountVnd - a.fundedAmountVnd)[0] ?? null;
+    .sort((a, b) => b.revenueVnd - a.revenueVnd || b.proofApproved - a.proofApproved)[0] ?? null;
 
   return {
     campaignPerformance,
     topCreator,
     topProduct: topProductRaw[0] ?? null,
     voucherRedemption,
-    conversionRate: conversionRaw._count._all > 0 ? Number(((conversionRaw._sum.amountVnd ?? 0) / conversionRaw._count._all).toFixed(2)) : 0,
+    conversionRate: paymentSummary._count._all > 0 ? Number(((paymentSummary._sum.amountVnd ?? 0) / paymentSummary._count._all).toFixed(2)) : 0,
     topCampaign,
     kpis
   };
