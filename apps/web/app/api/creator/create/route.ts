@@ -15,7 +15,7 @@ const createCreatorProfileSchema = z.object({
   avatarUrl: z.string().trim().max(400).optional().or(z.literal("")),
   bio: z.string().trim().max(1000).optional(),
   creatorLinks: z.array(z.object({
-    platform: z.enum(["tiktok", "facebook", "instagram", "shopee"]),
+    platform: z.enum(["tiktok", "facebook", "instagram", "youtube", "shopee", "other"]),
     url: z.url().max(400),
     handle: z.string().trim().min(1).max(120),
     followerCount: z.number().int().min(0)
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
           displayName: payload.displayName,
           avatarUrl: payload.avatarUrl?.trim() || null,
           bio: payload.bio?.trim() || null,
-          mainPlatform: payload.creatorLinks[0]?.platform.toUpperCase() as "TIKTOK" | "FACEBOOK" | "INSTAGRAM" | "SHOPEE" | undefined,
+          mainPlatform: payload.creatorLinks[0]?.platform.toUpperCase() as "TIKTOK" | "FACEBOOK" | "INSTAGRAM" | "YOUTUBE" | "SHOPEE" | "OTHER" | undefined,
           socialUrl: payload.creatorLinks[0]?.url,
           handle: payload.creatorLinks[0]?.handle?.trim() || null,
           followerCount: payload.creatorLinks[0]?.followerCount ?? null
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
           avatarUrl: payload.avatarUrl?.trim() || null,
           bio: payload.bio?.trim() || null,
           ...(payload.creatorLinks[0] ? {
-            mainPlatform: payload.creatorLinks[0].platform.toUpperCase() as "TIKTOK" | "FACEBOOK" | "INSTAGRAM" | "SHOPEE",
+            mainPlatform: payload.creatorLinks[0].platform.toUpperCase() as "TIKTOK" | "FACEBOOK" | "INSTAGRAM" | "YOUTUBE" | "SHOPEE" | "OTHER",
             socialUrl: payload.creatorLinks[0].url,
             handle: payload.creatorLinks[0].handle.trim(),
             followerCount: payload.creatorLinks[0].followerCount
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
         await tx.creatorSocialLink.createMany({
           data: payload.creatorLinks.map((item) => ({
             creatorProfileId: creatorProfile.id,
-            platform: item.platform.toUpperCase() as "TIKTOK" | "FACEBOOK" | "INSTAGRAM" | "SHOPEE",
+            platform: item.platform.toUpperCase() as "TIKTOK" | "FACEBOOK" | "INSTAGRAM" | "YOUTUBE" | "SHOPEE" | "OTHER",
             socialUrl: item.url,
             handle: item.handle.trim().replace(/^@+/, ""),
             followers: item.followerCount,

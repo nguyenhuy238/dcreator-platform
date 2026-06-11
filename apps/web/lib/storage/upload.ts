@@ -54,6 +54,7 @@ function resolveFileExtension(file: File, ext?: string) {
   if (safeExt) {
     if (safeExt === "jpeg") return "jpg";
     if (safeExt === "plain") return "txt";
+    if (safeExt === "svg+xml") return "svg";
     if (safeExt === "vnd.openxmlformats-officedocument.wordprocessingml.document") return "docx";
     return safeExt;
   }
@@ -93,7 +94,7 @@ async function saveToLocalPublic(input: UploadInput) {
 
 async function saveToSupabaseStorage(input: UploadInput) {
   const { file, folder, suffix, ext } = input;
-  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const bucket = process.env.SUPABASE_STORAGE_BUCKET;
 
@@ -141,7 +142,7 @@ async function saveTextToLocalPublic(input: TextUploadInput) {
 
 async function saveTextToSupabaseStorage(input: TextUploadInput) {
   const { content, folder, suffix, ext } = input;
-  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const bucket = process.env.SUPABASE_STORAGE_BUCKET;
 
@@ -178,13 +179,25 @@ async function saveTextToSupabaseStorage(input: TextUploadInput) {
 }
 
 export async function saveUpload(input: UploadInput) {
-  const isProduction = process.env.NODE_ENV === "production";
-  if (isProduction) return saveToSupabaseStorage(input);
+  const hasSupabaseStorageConfig = Boolean(
+    (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+      process.env.SUPABASE_SERVICE_ROLE_KEY &&
+      process.env.SUPABASE_STORAGE_BUCKET
+  );
+  if (hasSupabaseStorageConfig || process.env.NODE_ENV === "production") {
+    return saveToSupabaseStorage(input);
+  }
   return saveToLocalPublic(input);
 }
 
 export async function saveTextUpload(input: TextUploadInput) {
-  const isProduction = process.env.NODE_ENV === "production";
-  if (isProduction) return saveTextToSupabaseStorage(input);
+  const hasSupabaseStorageConfig = Boolean(
+    (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+      process.env.SUPABASE_SERVICE_ROLE_KEY &&
+      process.env.SUPABASE_STORAGE_BUCKET
+  );
+  if (hasSupabaseStorageConfig || process.env.NODE_ENV === "production") {
+    return saveTextToSupabaseStorage(input);
+  }
   return saveTextToLocalPublic(input);
 }
