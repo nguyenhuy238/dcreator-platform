@@ -6,7 +6,6 @@ import { DownloadSimple, FileArrowDown, ImageSquare } from "@phosphor-icons/reac
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
-import { ClickableUrl } from "@/app/components/dcreator/ui/clickable-url";
 import { BrandMissionHistoryPanel } from "@/app/dashboard/brand/_components/BrandMissionHistoryPanel";
 import { BrandSubscriptionPanel } from "@/app/dashboard/brand/_components/BrandSubscriptionPanel";
 import { useCurrentBrand } from "@/app/dashboard/brand/_hooks/use-brand-context";
@@ -166,6 +165,8 @@ export default function BrandCampaignsPage() {
   const [revisionTarget, setRevisionTarget] = useState<CampaignRequestItem | null>(null);
   const [submittingRevisionId, setSubmittingRevisionId] = useState("");
   const [templateUrl, setTemplateUrl] = useState("");
+  const requestImageInputRef = useRef<HTMLInputElement | null>(null);
+  const requestContentFileInputRef = useRef<HTMLInputElement | null>(null);
   const revisionImageInputRef = useRef<HTMLInputElement | null>(null);
   const revisionContentFileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -471,6 +472,8 @@ export default function BrandCampaignsPage() {
       });
       setRequestForm(defaultRequestForm);
       setRequestFieldErrors({});
+      if (requestImageInputRef.current) requestImageInputRef.current.value = "";
+      if (requestContentFileInputRef.current) requestContentFileInputRef.current.value = "";
       setNotice("Đã gửi yêu cầu tạo campaign cho Admin.");
       setActiveTab("requests");
       await load();
@@ -725,35 +728,21 @@ export default function BrandCampaignsPage() {
             </label>
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">
               Ảnh campaign
-              <input className="dc-input bg-white" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(event) => {
+              <input ref={requestImageInputRef} className="dc-input bg-white" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(event) => {
                 const file = event.target.files?.[0] ?? null;
                 if (file) void uploadCoverImage(file);
-                event.currentTarget.value = "";
               }} disabled={uploadingCover} />
-              <input className={`dc-input ${requestFieldErrors.imageUrl ? "border-red-500 ring-1 ring-red-300" : ""}`} value={requestForm.imageUrl} onChange={(event) => setRequestField("imageUrl", event.target.value.trim())} placeholder="/uploads/... hoặc https://..." />
               {requestFieldErrors.imageUrl ? <span className="text-xs text-red-600">{requestFieldErrors.imageUrl}</span> : null}
               {uploadingCover ? <span className="text-xs font-semibold text-amber-700">Đang tải ảnh campaign...</span> : null}
-              {requestForm.imageUrl ? (
-                <span className="text-xs font-medium text-emerald-700">
-                  Đã chọn ảnh: <ClickableUrl url={requestForm.imageUrl} label={getFileNameFromUrl(requestForm.imageUrl, "campaign-image")} className="break-all underline decoration-emerald-300 underline-offset-4" />
-                </span>
-              ) : null}
             </label>
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">
               File nội dung campaign
-              <input className="dc-input bg-white" type="file" accept=".pdf,.doc,.docx,.txt,image/png,image/jpeg" onChange={(event) => {
+              <input ref={requestContentFileInputRef} className="dc-input bg-white" type="file" accept=".pdf,.doc,.docx,.txt,image/png,image/jpeg" onChange={(event) => {
                 const file = event.target.files?.[0] ?? null;
                 if (file) void uploadCampaignContentFile(file);
-                event.currentTarget.value = "";
-              }} disabled={uploadingContentFile} />
-              <input className={`dc-input ${requestFieldErrors.contentFileUrl ? "border-red-500 ring-1 ring-red-300" : ""}`} value={requestForm.contentFileUrl} onChange={(event) => setRequestField("contentFileUrl", event.target.value.trim())} placeholder="/uploads/... hoặc https://..." required />
+              }} disabled={uploadingContentFile} required={!requestForm.contentFileUrl} />
               {requestFieldErrors.contentFileUrl ? <span className="text-xs text-red-600">{requestFieldErrors.contentFileUrl}</span> : null}
               {uploadingContentFile ? <span className="text-xs font-semibold text-amber-700">Đang tải file nội dung campaign...</span> : null}
-              {requestForm.contentFileUrl ? (
-                <span className="text-xs font-medium text-emerald-700">
-                  Đã chọn file: <ClickableUrl url={requestForm.contentFileUrl} label={getFileNameFromUrl(requestForm.contentFileUrl, "campaign-content")} className="break-all underline decoration-emerald-300 underline-offset-4" />
-                </span>
-              ) : null}
             </label>
             <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:col-span-2">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
