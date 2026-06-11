@@ -97,6 +97,10 @@ function getFileNameFromUrl(value: string, fallback: string) {
   return lastSegment || fallback;
 }
 
+function getRequestRejectionReason(request: CampaignRequestItem) {
+  return request.adminNote?.trim() || request.brandFeedback?.trim() || "Chưa có lý do từ chối được cung cấp.";
+}
+
 function formatDate(value: string | null) {
   if (!value) return "Chưa đặt";
   return new Date(value).toLocaleDateString("vi-VN");
@@ -106,16 +110,6 @@ function progress(current: number, target: number) {
   if (target <= 0) return 0;
   return Math.min(100, Math.round((current / target) * 100));
 }
-
-const REQUEST_STATUS_OPTIONS = [
-  { value: "", label: "Tất cả trạng thái" },
-  { value: "PENDING_REVIEW", label: "Chờ duyệt" },
-  { value: "APPROVED", label: "Đã duyệt" },
-  { value: "REJECTED", label: "Từ chối" },
-  { value: "NEEDS_REVISION", label: "Đang xử lý" },
-  { value: "DRAFT", label: "Nháp" },
-  { value: "CAMPAIGN_CREATED", label: "Đã tạo campaign" }
-];
 
 const CAMPAIGN_STATUS_OPTIONS = [
   { value: "", label: "Tất cả trạng thái" },
@@ -148,8 +142,10 @@ export default function BrandCampaignsPage() {
   const router = useRouter();
   const { currentBrandId } = useCurrentBrand();
   const [activeTab, setActiveTab] = useState<"campaigns" | "requests" | "packages">("campaigns");
+  const [requestListTab, setRequestListTab] = useState<"pending" | "approved">("pending");
   const [reviewCampaign, setReviewCampaign] = useState<Pick<CampaignItem, "id" | "title" | "slug"> | null>(null);
   const [historyCampaign, setHistoryCampaign] = useState<Pick<CampaignItem, "id" | "title" | "slug"> | null>(null);
+  const [rejectedReasonTarget, setRejectedReasonTarget] = useState<CampaignRequestItem | null>(null);
   const [reviewInitialTab, setReviewInitialTab] = useState<MissionReviewsTabKey>("applications");
   const [items, setItems] = useState<CampaignItem[]>([]);
   const [requests, setRequests] = useState<CampaignRequestItem[]>([]);
@@ -261,17 +257,13 @@ export default function BrandCampaignsPage() {
   }, [items, query, statusFilter, typeFilter, setupSourceFilter, sortBy]);
 
   const filteredRequests = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    const list = requests.filter((request) => {
-      if (normalized && !(`${request.title} ${request.requestedSlug}`.toLowerCase().includes(normalized))) return false;
-      if (statusFilter === "CAMPAIGN_CREATED" && !request.createdCampaign) return false;
-      if (statusFilter && statusFilter !== "CAMPAIGN_CREATED" && request.status !== statusFilter) return false;
-      if (typeFilter && request.campaignType !== typeFilter) return false;
-      if (setupSourceFilter && request.setupSource !== setupSourceFilter) return false;
-      return true;
-    });
+    const list = requests.filter((request) => (
+      requestListTab === "approved"
+        ? request.status === "APPROVED"
+        : request.status !== "APPROVED"
+    ));
     return list.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  }, [requests, query, statusFilter, typeFilter, setupSourceFilter]);
+  }, [requests, requestListTab]);
 
   const campaignCount = filtered.length;
   const requestCount = filteredRequests.length;
@@ -765,7 +757,7 @@ export default function BrandCampaignsPage() {
                 )}
               </div>
             </div>
-            <div className="md:col-span-2">
+            <div className="flex justify-center md:col-span-2">
               <button className="dc-btn-primary" type="submit" disabled={creatingRequest || uploadingCover || uploadingContentFile}>
                 {creatingRequest ? "Đang gửi..." : "Gửi yêu cầu tạo campaign"}
               </button>
@@ -778,27 +770,21 @@ export default function BrandCampaignsPage() {
           {!loading ? (
             <section className="mt-6">
               <SectionHeader title="Yêu cầu tạo campaign của tôi" subtitle={`${requestCount} yêu cầu`} />
-              <div className="mt-4 rounded-2xl border border-zinc-100 bg-white/80 p-4">
-                <div className="grid gap-2 md:grid-cols-4">
-                  <input className="dc-input" placeholder="Tìm theo tên campaign" value={query} onChange={(event) => setQuery(event.target.value)} />
-                  <select className="dc-input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                    {REQUEST_STATUS_OPTIONS.map((option) => (
-                      <option key={option.value || "all"} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                  <select className="dc-input" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
-                    <option value="">Tất cả loại campaign</option>
-                    <option value="DONATION">Ủng hộ</option>
-                    <option value="PREORDER">Đặt trước</option>
-                    <option value="SPONSORSHIP">Tài trợ</option>
-                    <option value="COMMUNITY">Cộng đồng</option>
-                  </select>
-                  <select className="dc-input" value={setupSourceFilter} onChange={(event) => setSetupSourceFilter(event.target.value)}>
-                    <option value="">Tất cả nguồn tạo</option>
-                    <option value="BRAND_REQUESTED">Brand gửi yêu cầu</option>
-                    <option value="JOIN_EXISTING_DCREATOR_CAMP">Tham gia campaign dCreator</option>
-                  </select>
-                </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRequestListTab("pending")}
+                  className={`rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 ${requestListTab === "pending" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:bg-zinc-100"}`}
+                >
+                  Chưa duyệt
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRequestListTab("approved")}
+                  className={`rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 ${requestListTab === "approved" ? "bg-zinc-900 text-white" : "text-zinc-500 hover:bg-zinc-100"}`}
+                >
+                  Đã duyệt
+                </button>
               </div>
               {requestCount === 0 ? (
                 <EmptyState
@@ -807,7 +793,7 @@ export default function BrandCampaignsPage() {
                   action={<Link href="/dashboard/brand/campaign-setup" className="dc-btn-primary">Gửi yêu cầu tạo campaign</Link>}
                 />
               ) : (
-                <div className="grid gap-4 xl:grid-cols-3">
+                <div className="mt-5 grid gap-4 xl:grid-cols-3">
                   {filteredRequests.map((request) => (
                     <article key={request.id} className="dc-card overflow-hidden p-0">
                       <div className="relative flex h-40 items-end overflow-hidden bg-zinc-100">
@@ -830,6 +816,11 @@ export default function BrandCampaignsPage() {
                             <a className="inline-flex rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100" href={`/api/uploads/onboarding-doc-download?url=${encodeURIComponent(getContentFileUrlFromBrief(request.brief))}`} target="_blank" rel="noopener noreferrer">
                               Mở file nội dung đã gửi
                             </a>
+                          ) : null}
+                          {request.status === "REJECTED" ? (
+                            <button type="button" className="dc-btn-secondary" onClick={() => setRejectedReasonTarget(request)}>
+                              Xem lý do
+                            </button>
                           ) : null}
                           {request.status === "NEEDS_REVISION" ? (
                             <button type="button" className="dc-btn-primary" onClick={() => openRevisionModal(request)}>
@@ -937,6 +928,24 @@ export default function BrandCampaignsPage() {
               >
                 {submittingRevisionId === revisionTarget.id ? "Đang gửi..." : "Gửi bổ sung"}
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {rejectedReasonTarget ? (
+        <div className="fixed inset-0 z-[90] bg-zinc-900/50 p-3 md:p-6" onClick={() => setRejectedReasonTarget(null)}>
+          <div className="mx-auto w-full max-w-xl rounded-2xl border border-zinc-200 bg-white p-4 md:p-6" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-semibold text-zinc-900">Lý do từ chối</h3>
+                <p className="text-sm text-zinc-600">{rejectedReasonTarget.title} • /{rejectedReasonTarget.requestedSlug}</p>
+              </div>
+              <button type="button" className="dc-btn-secondary" onClick={() => setRejectedReasonTarget(null)}>Đóng</button>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+              {getRequestRejectionReason(rejectedReasonTarget)}
             </div>
           </div>
         </div>
