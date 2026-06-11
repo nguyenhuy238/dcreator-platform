@@ -361,6 +361,7 @@ export default function AdminCreateCampaignPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          requestId: requestId || undefined,
           ...form,
           brief: null,
           requirements: form.requirements,
