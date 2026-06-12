@@ -236,5 +236,5 @@ export const brandMemberRemoveSchema = z.object({
 });
 
 export const brandSubscriptionPurchaseSchema = z.object({
-  packageCode: z.enum(["FREE", "UGC_15_VIDEO", "UGC_50_VIDEO"])
+  packageCode: z.enum(["FREE", "UGC_20_VIDEO", "UGC_60_VIDEO"])
 });
