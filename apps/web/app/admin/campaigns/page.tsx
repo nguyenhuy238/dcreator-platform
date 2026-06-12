@@ -11,7 +11,7 @@ import { ClickableUrl, LinkifiedText } from "@/app/components/dcreator/ui/clicka
 import { parseCampaignRequestContent, type CampaignRequestLink } from "./_lib/parseCampaignRequestContent";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
-type CampaignItem = { id: string; slug: string; title: string; brief: string; status: string; statusView?: string; budgetVnd: number; targetAmountVnd: number; fundedAmountVnd: number; brand: { displayName: string; email: string }; endsAt?: string | null };
+type CampaignItem = { id: string; slug: string; title: string; brief: string; status: string; statusView?: string; budgetVnd: number; targetAmountVnd: number; fundedAmountVnd: number; brand: { displayName: string; ownerDisplayName?: string; email: string }; endsAt?: string | null };
 type CampaignRequestItem = {
   id: string;
   requestedSlug: string;
@@ -296,7 +296,8 @@ export default function AdminCampaignsPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="font-semibold text-zinc-900">{campaign.title}</p>
-                    <p className="text-sm text-zinc-600">/{campaign.slug} • {campaign.brand.displayName}</p>
+                    <p className="text-sm text-zinc-600">/{campaign.slug} • Brand: {campaign.brand.displayName}</p>
+                    {campaign.brand.ownerDisplayName ? <p className="text-xs text-zinc-500">Chủ tài khoản: {campaign.brand.ownerDisplayName}</p> : null}
                   </div>
                   <StatusBadge status={(campaign.statusView ?? campaign.status).toLowerCase()} />
                 </div>

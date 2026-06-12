@@ -10,6 +10,7 @@ import {
   ReimbursementStatus
 } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { cleanDisplayUrl, getBrandDisplayName } from "@/lib/display-identity";
 import { AppError } from "@/lib/errors";
 import { createNotification } from "@/lib/services/notification.service";
 
@@ -51,7 +52,18 @@ const creatorMissionInclude = {
       productImageUrl: true,
       productLink: true,
       endsAt: true,
-      brand: { select: { displayName: true } }
+      brand: {
+        select: {
+          id: true,
+          displayName: true,
+          avatarUrl: true,
+          ownedBrands: {
+            select: { name: true, legalName: true, logoUrl: true },
+            orderBy: { updatedAt: "desc" },
+            take: 1
+          }
+        }
+      }
     }
   },
   account: {
@@ -276,7 +288,15 @@ function mapMission(item: CreatorMissionEntity) {
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
     mission: buildMissionView(item),
-    campaign: item.campaign,
+    campaign: {
+      ...item.campaign,
+      brand: {
+        ...item.campaign.brand,
+        ownerDisplayName: item.campaign.brand.displayName,
+        displayName: getBrandDisplayName({ brand: item.campaign.brand.ownedBrands[0] ?? null }),
+        avatarUrl: resolveBrandAvatar(item.campaign.brand)
+      }
+    },
     account: item.account,
     submission: {
       ...submission,
@@ -1364,9 +1384,9 @@ function buildApplicationMissionSummary(input: {
 }
 
 function resolveBrandAvatar(input: { avatarUrl: string | null; ownedBrands: Array<{ logoUrl: string | null }> }) {
-  const logoUrl = input.ownedBrands.find((item) => Boolean(item.logoUrl?.trim()))?.logoUrl?.trim();
+  const logoUrl = input.ownedBrands.map((item) => cleanDisplayUrl(item.logoUrl)).find(Boolean);
   if (logoUrl) return logoUrl;
-  return input.avatarUrl;
+  return cleanDisplayUrl(input.avatarUrl) || null;
 }
 
 async function resolveBrandOwnerAccountId(accountId: string) {
@@ -1447,7 +1467,7 @@ export async function listMissionApplicationsForAdmin(input: {
                 displayName: true,
                 avatarUrl: true,
                 ownedBrands: {
-                  select: { logoUrl: true },
+                  select: { name: true, legalName: true, logoUrl: true },
                   orderBy: { updatedAt: "desc" },
                   take: 1
                 }
@@ -1494,6 +1514,8 @@ export async function listMissionApplicationsForAdmin(input: {
       ...item.campaign,
       brand: {
         ...item.campaign.brand,
+        ownerDisplayName: item.campaign.brand.displayName,
+        displayName: getBrandDisplayName({ brand: item.campaign.brand.ownedBrands[0] ?? null }),
         avatarUrl: resolveBrandAvatar(item.campaign.brand)
       }
     },
@@ -1542,7 +1564,7 @@ export async function getMissionApplicationDetailForAdmin(id: string) {
               displayName: true,
               avatarUrl: true,
               ownedBrands: {
-                select: { logoUrl: true },
+                select: { name: true, legalName: true, logoUrl: true },
                 orderBy: { updatedAt: "desc" },
                 take: 1
               }
@@ -1590,6 +1612,8 @@ export async function getMissionApplicationDetailForAdmin(id: string) {
       ...item.campaign,
       brand: {
         ...item.campaign.brand,
+        ownerDisplayName: item.campaign.brand.displayName,
+        displayName: getBrandDisplayName({ brand: item.campaign.brand.ownedBrands[0] ?? null }),
         avatarUrl: resolveBrandAvatar(item.campaign.brand)
       }
     }

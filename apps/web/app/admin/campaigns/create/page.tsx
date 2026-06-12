@@ -12,7 +12,7 @@ import { DEFAULT_REQUIRED_HASHTAGS, normalizeRequiredHashtags, validateRequiredH
 type CampaignCategory = "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
 type CampaignType = "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
 type SetupSource = "JOIN_EXISTING_DCREATOR_CAMP" | "BRAND_REQUESTED";
-type BrandOption = { id: string; displayName: string; email: string };
+type BrandOption = { id: string; brandId?: string; displayName: string; ownerDisplayName?: string; email: string };
 
 type CreatorBriefForm = {
   productName: string;
@@ -431,6 +431,7 @@ export default function AdminCreateCampaignPage() {
                     }}
                   >
                     {option.displayName} - {option.email}
+                    {option.ownerDisplayName ? <span className="block text-xs opacity-75">Chủ tài khoản: {option.ownerDisplayName}</span> : null}
                   </button>
                 ))}
               </div>

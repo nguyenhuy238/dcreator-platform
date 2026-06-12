@@ -1,5 +1,6 @@
 import { CampaignStatus, NotificationEvent } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { getBrandDisplayName } from "@/lib/display-identity";
 import { AppError } from "@/lib/errors";
 import { normalizeRequiredHashtags } from "@/lib/hashtags";
 import { normalizeImageUrlInput } from "@/lib/images/resolve-image-url";
@@ -153,9 +154,29 @@ export async function listCampaignsForAdmin(input: { status?: CampaignStatus; qu
     }
   });
 
+  const brandOwnerAccountIds = [...new Set(campaigns.map((campaign) => campaign.brand.id))];
+  const brandProfiles = brandOwnerAccountIds.length
+    ? await prisma.brand.findMany({
+        where: { ownerAccountId: { in: brandOwnerAccountIds } },
+        orderBy: { updatedAt: "desc" },
+        select: { ownerAccountId: true, name: true, legalName: true, logoUrl: true }
+      })
+    : [];
+  const brandProfileByOwnerAccountId = new Map<string, (typeof brandProfiles)[number]>();
+  for (const brand of brandProfiles) {
+    if (!brandProfileByOwnerAccountId.has(brand.ownerAccountId)) {
+      brandProfileByOwnerAccountId.set(brand.ownerAccountId, brand);
+    }
+  }
+
   const tagMap = await getCampaignReviewTag(campaigns.map((c) => c.id));
   const normalized = campaigns.map((campaign) => ({
     ...campaign,
+    brand: {
+      ...campaign.brand,
+      ownerDisplayName: campaign.brand.displayName,
+      displayName: getBrandDisplayName({ brand: brandProfileByOwnerAccountId.get(campaign.brand.id) ?? null })
+    },
     statusView: normalizeStatusView({ status: campaign.status, reviewTag: tagMap.get(campaign.id) ?? null })
   }));
 
@@ -234,6 +255,9 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
     select: {
       id: true,
       name: true,
+      legalName: true,
+      logoUrl: true,
+      contactName: true,
       status: true,
       commissionRatePercent: true,
       revenueSharePercent: true
@@ -261,6 +285,11 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
 
   return {
     ...campaign,
+    brand: {
+      ...campaign.brand,
+      ownerDisplayName: campaign.brand.displayName,
+      displayName: getBrandDisplayName({ brand: brandProfile })
+    },
     requirementsSummary: campaign.requirementsSummary ?? null,
     requirements: campaign.creatorBriefDescription ?? null,
     requiredHashtags,

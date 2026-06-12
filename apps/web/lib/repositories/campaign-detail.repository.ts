@@ -37,7 +37,7 @@ export async function findPublicCampaignDetailBySlug(slug: string, viewerId?: st
       fundedAmountVnd: true,
       ugcVideoQuota: true,
       ugcVideoApprovedCount: true,
-      brand: { select: { displayName: true, avatarUrl: true } },
+      brand: { select: { id: true, displayName: true, avatarUrl: true } },
       creator: {
         select: {
           displayName: true,
@@ -102,6 +102,11 @@ export async function findPublicCampaignDetailBySlug(slug: string, viewerId?: st
   });
 
   if (!campaign) return null;
+  const ownerBrand = await prisma.brand.findFirst({
+    where: { ownerAccountId: campaign.brand.id },
+    orderBy: { updatedAt: "desc" },
+    select: { name: true, legalName: true, logoUrl: true }
+  });
   let requiredHashtags: string[] = [];
   try {
     const rows = await prisma.$queryRaw<Array<{ requiredHashtags: string[] }>>`
@@ -116,5 +121,5 @@ export async function findPublicCampaignDetailBySlug(slug: string, viewerId?: st
     ? campaign.contributions.some((contribution) => contribution.supporterId === viewerId)
     : false;
 
-  return { campaign: { ...campaign, requiredHashtags }, viewerHasSupported };
+  return { campaign: { ...campaign, ownerBrand, requiredHashtags }, viewerHasSupported };
 }
