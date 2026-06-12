@@ -881,6 +881,7 @@ model Campaign {
   brief                    String
   creatorBriefTitle        String?
   creatorBriefDescription  String?
+  requirementsSummary      String?
   productName              String?
   productLink              String?
   productImageUrl          String?

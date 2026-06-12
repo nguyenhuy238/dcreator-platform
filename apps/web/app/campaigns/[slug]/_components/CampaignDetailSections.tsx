@@ -39,6 +39,28 @@ function getDisplayLines(value: string) {
     .filter(Boolean);
 }
 
+function truncateText(value: string, maxLength = 120) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength).trim()}...`;
+}
+
+function buildRequirementSummary(data: CampaignDetailDTO) {
+  const explicitSummary = data.hero.requirementsSummary?.trim();
+  if (explicitSummary) return explicitSummary;
+
+  const targetVideos = data.videoStats.targetVideos;
+  if (targetVideos > 0) {
+    const countLabel = targetVideos < 10 ? String(targetVideos).padStart(2, "0") : String(targetVideos);
+    return `${countLabel} Video Review Sản Phẩm`;
+  }
+
+  const detailedRequirement = data.hero.requirements?.trim();
+  if (detailedRequirement) return truncateText(detailedRequirement);
+
+  return "Xem chi tiết trong tab Yêu cầu & brief";
+}
+
 export function HeroSection({ data, applyCard }: { data: CampaignDetailDTO; applyCard: ReactNode }) {
   const coverMediaUrl = resolveImageUrl(data.hero.coverMediaUrl);
   const showVideo = data.hero.coverMediaType === "video" && coverMediaUrl !== CAMPAIGN_IMAGE_FALLBACK;
@@ -74,7 +96,7 @@ function CampaignDealOverview({ data }: { data: CampaignDetailDTO }) {
   };
   const requirementCard = {
     eyebrow: "YÊU CẦU",
-    title: data.hero.requirements || mission?.description || "01 Video + 01 Đánh giá sản phẩm",
+    title: buildRequirementSummary(data),
     color: "from-sky-50 to-cyan-100"
   };
   const deadlineCard = {
@@ -155,7 +177,7 @@ export function OverviewTab({ data }: { data: CampaignDetailDTO }) {
 export function BriefTab({ data }: { data: CampaignDetailDTO }) {
   return (
     <section className="grid gap-4">
-      <CampaignBriefRequirements hashtags={data.hero.requiredHashtags} />
+      <CampaignBriefRequirements hashtags={data.hero.requiredHashtags} requirements={data.hero.requirements} />
       <CampaignJoinTimeline />
     </section>
   );

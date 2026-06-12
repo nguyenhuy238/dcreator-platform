@@ -84,6 +84,7 @@ export async function getCampaignDetailBySlug(slug: string, viewerId?: string): 
       category: campaign.category,
       objective: campaign.objective,
       benefits: campaign.benefits ?? campaign.objective,
+      requirementsSummary: campaign.requirementsSummary ?? null,
       requirements: campaign.creatorBriefDescription ?? null,
       participationRoadmap: normalizeRoadmap(campaign.participationRoadmap, campaign.priorityChannels),
       requiredHashtags: campaign.requiredHashtags ?? [],
