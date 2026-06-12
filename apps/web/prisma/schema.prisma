@@ -68,8 +68,8 @@ enum BrandStatus {
 
 enum BrandSubscriptionPackageCode {
   FREE
-  UGC_15_VIDEO
-  UGC_50_VIDEO
+  UGC_20_VIDEO
+  UGC_60_VIDEO
 }
 
 enum FulfillmentType {
