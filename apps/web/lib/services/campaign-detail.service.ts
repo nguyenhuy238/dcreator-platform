@@ -1,5 +1,5 @@
 import type { CampaignDetailDTO } from "@/lib/dto/campaign-detail";
-import { getBrandDisplay, getCreatorDisplay } from "@/lib/display-identity";
+import { getCampaignBrandDisplay, getCreatorDisplay } from "@/lib/display-identity";
 import { AppError } from "@/lib/errors";
 import { resolveImageUrl } from "@/lib/images/resolve-image-url";
 import { findPublicCampaignDetailBySlug } from "@/lib/repositories/campaign-detail.repository";
@@ -59,9 +59,9 @@ export async function getCampaignDetailBySlug(slug: string, viewerId?: string): 
   const remainingSlots = targetVideos > 0 ? Math.max(0, targetVideos - approvedVideos) : 0;
   const isQuotaReached = targetVideos > 0 && remainingSlots <= 0;
   const sourceBrand = campaign.sourceBrandRequests[0]?.brand;
-  const brandDisplay = sourceBrand
-    ? getBrandDisplay(sourceBrand)
-    : getBrandDisplay({ displayName: campaign.brand.displayName, avatarUrl: campaign.brand.avatarUrl });
+  const brandDisplay = getCampaignBrandDisplay({
+    brand: sourceBrand ?? campaign.ownerBrand ?? null
+  });
   const creatorDisplay = campaign.creator
     ? getCreatorDisplay({
         displayName: campaign.creator.creatorProfile?.displayName,

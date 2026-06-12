@@ -15,7 +15,7 @@ function getSupabaseUrl() {
 }
 
 export function normalizeImageUrlInput(input?: string | null): string {
-  return input?.replace(/\s+/g, "") ?? "";
+  return input?.replace(/[\r\n\s]/g, "").trim() ?? "";
 }
 
 export function resolveImageUrl(

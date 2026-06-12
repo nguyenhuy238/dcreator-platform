@@ -66,7 +66,7 @@ type CampaignDetail = {
   status: string;
   statusView: string;
   ugcVideoQuota: number | null;
-  brand: { id: string; displayName: string; email: string };
+  brand: { id: string; displayName: string; ownerDisplayName?: string; email: string };
   sourceBrandRequests: Array<{
     id: string;
     title: string;
@@ -572,6 +572,7 @@ export default function AdminCampaignDetailPage() {
               <p className="text-sm font-semibold text-zinc-500">Chỉnh sửa chiến dịch</p>
               <h2 className="text-lg font-semibold text-zinc-900">Thông tin chiến dịch</h2>
               <p className="mt-1 text-sm text-zinc-600">Brand: {item.brand.displayName}</p>
+              {item.brand.ownerDisplayName ? <p className="mt-1 text-sm text-zinc-500">Chủ tài khoản: {item.brand.ownerDisplayName}</p> : null}
             </div>
             <div className="shrink-0">
               <StatusBadge status={item.statusView.toLowerCase()} />
@@ -580,14 +581,14 @@ export default function AdminCampaignDetailPage() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-              <span>Tài khoản Brand</span>
+              <span>Brand</span>
               <input
                 className="dc-input !bg-zinc-200 !border-zinc-300 !text-zinc-500 opacity-100 cursor-not-allowed"
                 value={item.brand.displayName}
                 readOnly
                 disabled
               />
-              <span className="invisible text-xs">Giữ dòng cân với Slug</span>
+              <span className="text-xs text-zinc-500">Chủ tài khoản: {item.brand.ownerDisplayName ?? item.brand.email}</span>
             </label>
 
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">

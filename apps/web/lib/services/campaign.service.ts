@@ -1,6 +1,6 @@
 import { CampaignStatus, Prisma } from "@prisma/client";
 import { prisma } from "../db";
-import { getBrandDisplay, getCreatorDisplay } from "../display-identity";
+import { getCampaignBrandDisplay, getCreatorDisplay } from "../display-identity";
 import { resolveImageUrl } from "../images/resolve-image-url";
 
 export type ListCampaignsInput = {
@@ -75,7 +75,7 @@ export async function listCampaigns(input: ListCampaignsInput) {
         ugcVideoApprovedCount: true,
         endsAt: true,
         createdAt: true,
-        brand: { select: { displayName: true, avatarUrl: true } },
+        brand: { select: { id: true, displayName: true, avatarUrl: true } },
         creator: {
           select: {
             displayName: true,
@@ -91,6 +91,21 @@ export async function listCampaigns(input: ListCampaignsInput) {
       }
     })
   ]);
+
+  const brandOwnerAccountIds = [...new Set(campaigns.map((campaign) => campaign.brand.id))];
+  const brandProfiles = brandOwnerAccountIds.length
+    ? await prisma.brand.findMany({
+        where: { ownerAccountId: { in: brandOwnerAccountIds } },
+        orderBy: { updatedAt: "desc" },
+        select: { ownerAccountId: true, name: true, legalName: true, logoUrl: true }
+      })
+    : [];
+  const brandProfileByOwnerAccountId = new Map<string, (typeof brandProfiles)[number]>();
+  for (const brand of brandProfiles) {
+    if (!brandProfileByOwnerAccountId.has(brand.ownerAccountId)) {
+      brandProfileByOwnerAccountId.set(brand.ownerAccountId, brand);
+    }
+  }
 
   const campaignIds = campaigns.map((campaign) => campaign.id);
   const rewardSums =
@@ -151,9 +166,9 @@ export async function listCampaigns(input: ListCampaignsInput) {
       const missionSlotsRemaining = videoTarget > 0 ? Math.max(0, videoTarget - approvedVideos) : 0;
 
       const sourceBrand = campaign.sourceBrandRequests[0]?.brand;
-      const brandDisplay = sourceBrand
-        ? getBrandDisplay(sourceBrand)
-        : getBrandDisplay({ displayName: campaign.brand.displayName, avatarUrl: campaign.brand.avatarUrl });
+      const brandDisplay = getCampaignBrandDisplay({
+        brand: sourceBrand ?? brandProfileByOwnerAccountId.get(campaign.brand.id) ?? null
+      });
       const creatorDisplay = campaign.creator
         ? getCreatorDisplay({
             displayName: campaign.creator.creatorProfile?.displayName,
