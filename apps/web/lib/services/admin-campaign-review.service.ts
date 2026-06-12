@@ -186,6 +186,7 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
       campaignType: true,
       setupSource: true,
       benefits: true,
+      requirementsSummary: true,
       creatorBriefDescription: true,
       productName: true,
       productDescription: true,
@@ -260,6 +261,7 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
 
   return {
     ...campaign,
+    requirementsSummary: campaign.requirementsSummary ?? null,
     requirements: campaign.creatorBriefDescription ?? null,
     requiredHashtags,
     statusView,
@@ -454,6 +456,7 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
         setupSource: input.setupSource,
         objective: input.benefits || null,
         benefits: input.benefits || null,
+        requirementsSummary: input.requirementsSummary?.trim() || null,
         creatorBriefTitle: "YÊU CẦU",
         creatorBriefDescription: input.requirements || null,
         productName: input.productName,
@@ -607,6 +610,7 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
   
   const nextRoadmap = input.participationRoadmap ? input.participationRoadmap.map((step) => step.trim()).filter(Boolean) : undefined;
   const nextBenefits = input.benefits === undefined ? undefined : input.benefits?.trim() || null;
+  const nextRequirementsSummary = input.requirementsSummary === undefined ? undefined : input.requirementsSummary?.trim() || null;
   const nextRequirements = input.requirements === undefined ? undefined : input.requirements?.trim() || null;
   const nextRequiredHashtags = input.requiredHashtags === undefined ? undefined : normalizeRequiredHashtags(input.requiredHashtags);
 
@@ -621,6 +625,7 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         campaignType: input.campaignType,
         setupSource: input.setupSource,
         benefits: nextBenefits,
+        requirementsSummary: nextRequirementsSummary,
         creatorBriefTitle: nextRequirements === undefined ? undefined : nextRequirements ? "YÊU CẦU" : null,
         creatorBriefDescription: nextRequirements,
         productName: input.productName?.trim(),
@@ -665,6 +670,7 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         participationRoadmap: campaign.participationRoadmap,
         requiredHashtags: beforeRequiredHashtags,
         benefits: campaign.benefits ?? null,
+        requirementsSummary: campaign.requirementsSummary ?? null,
         requirements: campaign.creatorBriefDescription ?? null,
         productName: campaign.productName ?? null,
         productDescription: campaign.productDescription ?? null,
@@ -689,6 +695,7 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         participationRoadmap: updated.participationRoadmap,
         requiredHashtags: afterRequiredHashtags,
         benefits: updated.benefits ?? null,
+        requirementsSummary: updated.requirementsSummary ?? null,
         requirements: updated.creatorBriefDescription ?? null,
         productName: updated.productName ?? null,
         productDescription: updated.productDescription ?? null,
@@ -706,7 +713,7 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
     }
   });
 
-  return { ...updated, requirements: updated.creatorBriefDescription ?? null, requiredHashtags: afterRequiredHashtags };
+  return { ...updated, requirementsSummary: updated.requirementsSummary ?? null, requirements: updated.creatorBriefDescription ?? null, requiredHashtags: afterRequiredHashtags };
 }
 
 export async function deleteCampaignCascadeByAdmin(actorId: string, campaignId: string, reason: string) {

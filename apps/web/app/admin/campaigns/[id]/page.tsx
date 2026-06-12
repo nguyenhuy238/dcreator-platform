@@ -32,6 +32,7 @@ type FormState = {
   category: CampaignCategory;
   campaignType: CampaignType;
   setupSource: SetupSource;
+  requirementsSummary: string;
   requirements: string;
   benefits: string;
   participationRoadmap: string[];
@@ -51,6 +52,7 @@ type CampaignDetail = {
   campaignType: CampaignType;
   setupSource: SetupSource;
   benefits: string | null;
+  requirementsSummary: string | null;
   requirements: string | null;
   productName: string | null;
   productDescription: string | null;
@@ -88,6 +90,7 @@ const DEFAULT_FORM: FormState = {
   campaignType: "COMMUNITY",
   setupSource: "BRAND_REQUESTED",
   benefits: "",
+  requirementsSummary: "",
   requirements: "",
   participationRoadmap: [""],
   requiredHashtags: DEFAULT_REQUIRED_HASHTAGS,
@@ -118,6 +121,7 @@ const apiErrorMessageMap: Record<string, string> = {
 const fieldMessageMap: Record<string, string> = {
   slug: "Đường dẫn công khai chưa hợp lệ. Chỉ dùng chữ thường, số và dấu gạch ngang.",
   title: "Vui lòng nhập tên chiến dịch tối thiểu 3 ký tự.",
+  requirementsSummary: "Yêu cầu ngắn tối đa 160 ký tự.",
   requirements: "Vui lòng nhập yêu cầu tối thiểu 3 ký tự.",
   benefits: "Vui lòng nhập quyền lợi tối thiểu 3 ký tự.",
   imageUrl: "Ảnh chưa hợp lệ. Vui lòng chọn file ảnh hoặc dùng URL /uploads, http, https.",
@@ -182,6 +186,7 @@ function buildForm(item: CampaignDetail): FormState {
     category: item.category,
     campaignType: item.campaignType,
     setupSource: item.setupSource,
+    requirementsSummary: item.requirementsSummary ?? "",
     requirements: item.requirements ?? "",
     benefits: item.benefits ?? "",
     participationRoadmap: item.participationRoadmap.length > 0 ? item.participationRoadmap : [""],
@@ -328,6 +333,7 @@ export default function AdminCampaignDetailPage() {
     if (form.slug.trim().length < 3) nextErrors.slug = "Slug cần tối thiểu 3 ký tự.";
     else if (!slugPattern.test(form.slug.trim())) nextErrors.slug = "Slug chỉ gồm chữ thường, số và dấu gạch ngang (-).";
     if (form.title.trim().length < 3) nextErrors.title = "Tên chiến dịch cần tối thiểu 3 ký tự.";
+    if (form.requirementsSummary.trim().length > 160) nextErrors.requirementsSummary = "Yêu cầu ngắn tối đa 160 ký tự.";
     if (form.requirements.trim().length < 3) nextErrors.requirements = "Yêu cầu cần tối thiểu 3 ký tự.";
     if (form.benefits.trim().length < 3) nextErrors.benefits = "Quyền lợi cần tối thiểu 3 ký tự.";
     if (imageUrl && !imageUrl.startsWith("/uploads/") && !/^https?:\/\//.test(imageUrl)) {
@@ -372,6 +378,7 @@ export default function AdminCampaignDetailPage() {
           category: form.category,
           campaignType: form.campaignType,
           setupSource: form.setupSource,
+          requirementsSummary: form.requirementsSummary,
           requirements: form.requirements,
           benefits: form.benefits,
           participationRoadmap: form.participationRoadmap.filter((step) => step.trim().length > 0),
@@ -729,7 +736,20 @@ export default function AdminCampaignDetailPage() {
             </div>
 
             <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
-              <span>Yêu cầu</span>
+              <span>Yêu cầu ngắn hiển thị ở Tổng quan</span>
+              <input
+                className={`dc-input ${fieldErrors.requirementsSummary ? "border-red-500 ring-1 ring-red-300" : ""}`}
+                value={form.requirementsSummary}
+                onChange={(event) => setField("requirementsSummary", event.target.value)}
+                placeholder="Ví dụ: 01 Video Review Sản Phẩm"
+                maxLength={160}
+              />
+              <span className="text-xs font-medium text-zinc-500">Có thể để trống, hệ thống sẽ tự rút gọn từ yêu cầu chi tiết hoặc số lượng video review.</span>
+              {fieldErrors.requirementsSummary ? <span className="text-xs text-red-600">{fieldErrors.requirementsSummary}</span> : null}
+            </label>
+
+            <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
+              <span>Yêu cầu chi tiết từ Brand</span>
               <textarea className={`dc-input min-h-24 ${fieldErrors.requirements ? "border-red-500 ring-1 ring-red-300" : ""}`} value={form.requirements} onChange={(event) => setField("requirements", event.target.value)} />
               {fieldErrors.requirements ? <span className="text-xs text-red-600">{fieldErrors.requirements}</span> : null}
             </label>
