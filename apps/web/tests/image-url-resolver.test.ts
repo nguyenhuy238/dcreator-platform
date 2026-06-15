@@ -36,6 +36,14 @@ test("keeps legacy public upload paths relative", () => {
   assert.equal(resolveImageUrl("/uploads/brand-logo/example.png"), "/uploads/brand-logo/example.png");
 });
 
+test("strips localhost from legacy public upload URLs", () => {
+  assert.equal(resolveImageUrl("http://localhost:3000/uploads/creator-avatar/demo.png"), "/uploads/creator-avatar/demo.png");
+});
+
+test("rejects localhost URLs outside public image paths", () => {
+  assert.equal(resolveImageUrl("http://localhost:3000/api/private/avatar.png"), CAMPAIGN_IMAGE_FALLBACK);
+});
+
 test("resolves canonical object paths against the upload bucket", () => {
   assert.equal(
     resolveImageUrl("brand-logo/example.png"),

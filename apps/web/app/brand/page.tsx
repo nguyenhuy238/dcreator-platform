@@ -1,10 +1,10 @@
-import Image from "next/image";
 import { CampaignStatus } from "@prisma/client";
 import { AnalyticsLink } from "@/app/components/analytics/AnalyticsLink";
 import { TrackPageEvent } from "@/app/components/analytics/TrackPageEvent";
 import { BrandConsultationModal } from "@/app/brand/_components/BrandConsultationModal";
 import { BrandProcessScrollLink } from "@/app/brand/_components/BrandProcessScrollLink";
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
+import { AvatarImage } from "@/app/components/dcreator/ui/AvatarImage";
 import { AnalyticsEvents } from "@/lib/analytics-events";
 import { getCurrentUserFromServer } from "@/lib/auth/current-user";
 import { BRAND_SUBSCRIPTION_PACKAGES, type BrandSubscriptionPackageDefinition } from "@/lib/constants/brand-subscription";
@@ -91,14 +91,6 @@ const formatCompactNumber = (value: number) =>
     notation: "compact",
     maximumFractionDigits: 1
   }).format(value);
-
-const getInitials = (name: string) =>
-  name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("") || "DC";
 
 export default async function BrandHomePage() {
   const [campaignData, currentUser, systemCreators, creatorCount, videoCount] = await Promise.all([
@@ -239,19 +231,12 @@ export default async function BrandHomePage() {
                 <div className="dc-creator-marquee-track flex w-max gap-3">
                   {[...communityCreators, ...communityCreators].map((creator, index) => (
                     <article key={`${creator.handle}-${index}`} className="w-44 shrink-0 rounded-2xl border border-zinc-200 bg-white p-4 text-center shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
-                      <div className="mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-zinc-200 text-lg font-black text-zinc-700 shadow-sm ring-1 ring-zinc-200">
-                        {creator.avatar ? (
-                          <Image
-                            src={creator.avatar}
-                            alt={creator.name}
-                            width={64}
-                            height={64}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          getInitials(creator.name)
-                        )}
-                      </div>
+                      <AvatarImage
+                        src={creator.avatar}
+                        name={creator.name}
+                        className="mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-zinc-200 text-lg font-black text-zinc-700 shadow-sm ring-1 ring-zinc-200"
+                        fallbackClassName="text-lg font-black text-zinc-700"
+                      />
                       <h3 className="mt-3 truncate text-sm font-black text-zinc-950">{creator.name}</h3>
                       <p className="mt-1 truncate text-xs text-zinc-500">{creator.handle}</p>
                       <p className="mt-3 inline-flex items-center justify-center gap-1 text-xs font-black text-zinc-900">
@@ -291,11 +276,12 @@ export default async function BrandHomePage() {
                 <div className="flex -space-x-2">
                   {communityCreators.slice(0, 3).map((creator) => (
                     <span key={creator.handle} className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-zinc-800 text-[10px] font-black text-zinc-200 ring-2 ring-zinc-950">
-                      {creator.avatar ? (
-                        <Image src={creator.avatar} alt={creator.name} width={32} height={32} className="h-full w-full object-cover" />
-                      ) : (
-                        getInitials(creator.name)
-                      )}
+                      <AvatarImage
+                        src={creator.avatar}
+                        name={creator.name}
+                        className="flex h-full w-full items-center justify-center overflow-hidden bg-zinc-800"
+                        fallbackClassName="text-[10px] font-black text-zinc-200"
+                      />
                     </span>
                   ))}
                 </div>
