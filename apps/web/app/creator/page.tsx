@@ -5,6 +5,7 @@ import { AnalyticsLink } from "@/app/components/analytics/AnalyticsLink";
 import { TrackPageEvent } from "@/app/components/analytics/TrackPageEvent";
 import { BrandProcessScrollLink } from "@/app/brand/_components/BrandProcessScrollLink";
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
+import { AvatarImage } from "@/app/components/dcreator/ui/AvatarImage";
 import { AnalyticsEvents } from "@/lib/analytics-events";
 import { getCurrentUserFromServer } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/db";
@@ -15,14 +16,6 @@ const formatCompactNumber = (value: number) =>
     notation: "compact",
     maximumFractionDigits: 1
   }).format(value);
-
-const getInitials = (name: string) =>
-  name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("") || "DC";
 
 const trustedBrands = [
   { name: "L'ORÉAL", initials: "L'O" },
@@ -329,11 +322,7 @@ export default async function CreatorLandingPage() {
               {featuredCreators.map((creator) => (
                 <article key={creator.id} className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
                   <div className="relative aspect-[4/3] bg-zinc-100">
-                    {creator.avatar ? (
-                      <Image src={creator.avatar} alt={creator.name} fill sizes="(min-width: 1024px) 25vw, 50vw" className="object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-4xl font-black text-zinc-300">{getInitials(creator.name)}</div>
-                    )}
+                    <AvatarImage src={creator.avatar} name={creator.name} />
                     <span className="absolute left-3 top-3 rounded-full bg-zinc-950 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white">Live</span>
                   </div>
                   <div className="p-4">
