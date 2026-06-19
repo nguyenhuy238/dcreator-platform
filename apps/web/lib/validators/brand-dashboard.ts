@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CAMPAIGN_FULFILLMENT_MODES } from "../constants/campaign-fulfillment.ts";
 
 const campaignSlugSchema = z
   .string()
@@ -116,6 +117,7 @@ export const campaignCreateSchema = z.object({
   category: z.enum(["TECH", "FASHION", "FOOD", "BEAUTY", "LIFESTYLE", "EDUCATION"]),
   campaignType: z.enum(["DONATION", "PREORDER", "SPONSORSHIP", "COMMUNITY"]),
   setupSource: z.enum(["JOIN_EXISTING_DCREATOR_CAMP", "BRAND_REQUESTED"]).default("BRAND_REQUESTED"),
+  fulfillmentMode: z.enum(CAMPAIGN_FULFILLMENT_MODES).default("BRAND_SHIP"),
   benefits: z.string().trim().min(3).max(2000),
   participationRoadmap: z.array(z.string().trim().min(1).max(300)).min(1),
   imageUrl: uploadPathOrHttpUrlSchema.optional().or(z.literal("")),

@@ -81,6 +81,8 @@ export async function getCampaignDetailBySlug(slug: string, viewerId?: string): 
       brand: brandDisplay.name,
       creator: creatorDisplay?.name ?? null,
       campaignType: campaign.campaignType,
+      fulfillmentMode: campaign.fulfillmentMode ?? "BRAND_SHIP",
+      creatorDepositRequired: campaign.creatorDepositRequired ?? true,
       category: campaign.category,
       objective: campaign.objective,
       benefits: campaign.benefits ?? campaign.objective,

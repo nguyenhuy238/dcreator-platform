@@ -52,6 +52,8 @@ const creatorMissionInclude = {
       productImageUrl: true,
       productLink: true,
       endsAt: true,
+      fulfillmentMode: true,
+      creatorDepositRequired: true,
       brand: {
         select: {
           id: true,
@@ -609,9 +611,21 @@ export async function getMissionHistoryDetailForAdmin(id: string) {
 export async function confirmDepositPaid(creatorMissionId: string, accountId: string) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
   if (current.productReceiveOption !== "PRODUCT_REQUIRED") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
+  if (current.campaign.fulfillmentMode === "BRAND_SHIP") {
+    throw new AppError(
+      "Tiền cọc cần được Admin xác nhận sau khi đối soát.",
+      409,
+      "CREATOR_DEPOSIT_ADMIN_CONFIRMATION_REQUIRED"
+    );
+  }
   const updated = await prisma.creatorMission.update({
     where: { id: creatorMissionId },
-    data: { status: "IN_PROGRESS", productStatus: "RECEIVED", depositStatus: "PAID", startedAt: current.startedAt ?? now() },
+    data: {
+      status: "IN_PROGRESS",
+      productStatus: "RECEIVED",
+      depositStatus: "PAID",
+      startedAt: current.startedAt ?? now()
+    },
     include: creatorMissionInclude
   });
   await notifyCreator(accountId, "PROOF_SUBMITTED", "Đã gửi xác nhận mua sản phẩm", "Bước xác nhận mua sản phẩm của bạn đã được ghi nhận.", { creatorMissionId });
@@ -706,7 +720,7 @@ export async function confirmDepositAndProductReceivedByAdmin(actorId: string, c
     data: {
       status: "IN_PROGRESS",
       productStatus: "RECEIVED",
-      depositStatus: "PAID",
+      depositStatus: current.campaign.fulfillmentMode === "BRAND_SHIP" ? "HELD" : "PAID",
       purchaseProofReviewedAt: now(),
       purchaseProofRejectReason: null,
       startedAt: current.startedAt ?? now()
@@ -967,7 +981,13 @@ export async function approvePublishReportByAdmin(actorId: string, creatorMissio
         rewardCreditedAt: current.rewardCreditedAt ?? now(),
         publishPurchaseAmountVnd: reimbursementVnd > 0 ? reimbursementVnd : current.publishPurchaseAmountVnd,
         reimbursementAmountVnd: reimbursementVnd > 0 ? reimbursementVnd : current.reimbursementAmountVnd,
-        reimbursementStatus: current.productReceiveOption === "PRODUCT_REQUIRED" ? "PAID" : current.reimbursementStatus
+        reimbursementStatus: current.productReceiveOption === "PRODUCT_REQUIRED" ? "PAID" : current.reimbursementStatus,
+        depositStatus:
+          current.campaign.fulfillmentMode === "BRAND_SHIP" &&
+          current.campaign.creatorDepositRequired &&
+          current.depositStatus !== "FORFEITED"
+            ? "REFUNDED"
+            : current.depositStatus
       },
       include: creatorMissionInclude
     });
@@ -1070,6 +1090,7 @@ export async function listCreatorMissionApplicationsByAccount(accountId: string)
       applicationRejectReason: true,
       applicationReviewedAt: true,
       appliedAt: true,
+      depositStatus: true,
       mission: { select: { id: true, title: true, rewardPoints: true, productReceiveOption: true, productLink: true } },
       campaign: { select: { id: true, title: true, slug: true } }
     },
@@ -1080,6 +1101,7 @@ export async function listCreatorMissionApplicationsByAccount(accountId: string)
       missionId: row.missionId,
       campaignId: row.campaignId,
       status: row.applicationStatus,
+      depositStatus: row.depositStatus,
       note: row.applicationNote,
       rejectReason: row.applicationRejectReason,
       reviewedAt: row.applicationReviewedAt,
@@ -1447,6 +1469,7 @@ export async function listMissionApplicationsForAdmin(input: {
         applicationReviewedById: true,
         applicationReviewedAt: true,
         appliedAt: true,
+        depositStatus: true,
         account: { select: { id: true, displayName: true, email: true, creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true } } } },
         campaign: {
           select: {
@@ -1461,6 +1484,8 @@ export async function listMissionApplicationsForAdmin(input: {
             productImageUrl: true,
             productLink: true,
             endsAt: true,
+            fulfillmentMode: true,
+            creatorDepositRequired: true,
             brand: {
               select: {
                 id: true,
@@ -1502,6 +1527,7 @@ export async function listMissionApplicationsForAdmin(input: {
     campaignId: item.campaignId,
     accountId: item.accountId,
     status: item.applicationStatus,
+    depositStatus: item.depositStatus,
     note: item.applicationNote,
     rejectReason: item.applicationRejectReason,
     reviewedAt: item.applicationReviewedAt,
@@ -1544,6 +1570,7 @@ export async function getMissionApplicationDetailForAdmin(id: string) {
       applicationReviewedAt: true,
       appliedAt: true,
       productReceiveOption: true,
+      depositStatus: true,
       account: { select: { id: true, displayName: true, email: true, creatorProfile: { select: { mainPlatform: true, socialUrl: true, followerCount: true, bio: true, socialLinks: { where: { isActive: true }, select: { id: true, platform: true, socialUrl: true, followers: true, handle: true, isActive: true, status: true } } } } } },
       campaign: {
         select: {
@@ -1558,6 +1585,8 @@ export async function getMissionApplicationDetailForAdmin(id: string) {
           productImageUrl: true,
           productLink: true,
           endsAt: true,
+          fulfillmentMode: true,
+          creatorDepositRequired: true,
           brand: {
             select: {
               id: true,
@@ -1596,6 +1625,7 @@ export async function getMissionApplicationDetailForAdmin(id: string) {
     accountId: item.accountId,
     missionApplicationId: item.missionApplicationId,
     status: item.applicationStatus,
+    depositStatus: item.depositStatus,
     note: item.applicationNote,
     rejectReason: item.applicationRejectReason,
     reviewedById: item.applicationReviewedById,
@@ -1623,14 +1653,22 @@ export async function getMissionApplicationDetailForAdmin(id: string) {
 export async function approveMissionApplicationByAdmin(actorId: string, id: string) {
   const current = await getMissionApplicationDetailForAdmin(id);
   if (current.status !== "PENDING_REVIEW") throw new AppError("Mission application is not pending review", 409, "MISSION_APPLICATION_INVALID_STATUS");
+  const requiresCreatorDeposit =
+    current.campaign.fulfillmentMode === "BRAND_SHIP" &&
+    current.campaign.creatorDepositRequired;
   const approvedStatus = current.mission.productReceiveOption === "NO_PRODUCT_REQUIRED" ? "IN_PROGRESS" : "PRODUCT_PENDING";
   const approvedProductStatus =
     current.mission.productReceiveOption === "NO_PRODUCT_REQUIRED"
       ? "NOT_REQUIRED"
-      : "WAITING_PURCHASE";
-  const approvedDepositStatus = "NOT_REQUIRED";
+      : requiresCreatorDeposit
+        ? "WAITING_DEPOSIT"
+        : "WAITING_PURCHASE";
+  const approvedDepositStatus = requiresCreatorDeposit ? "REQUIRED" : "NOT_REQUIRED";
   const approvedReimbursementStatus =
-    current.mission.productReceiveOption === "PRODUCT_REQUIRED" ? "PENDING" : "NOT_REQUIRED";
+    current.mission.productReceiveOption === "PRODUCT_REQUIRED" &&
+    current.campaign.fulfillmentMode === "CREATOR_ORDER"
+      ? "PENDING"
+      : "NOT_REQUIRED";
   const updated = await prisma.$transaction(async (tx) => {
     const claimPending = await tx.creatorMission.updateMany({
       where: { id, applicationStatus: "PENDING_REVIEW" },

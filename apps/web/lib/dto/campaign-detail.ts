@@ -9,6 +9,8 @@ export type CampaignDetailDTO = {
     brand: string;
     creator: string | null;
     campaignType: "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
+    fulfillmentMode: "BRAND_SHIP" | "CREATOR_ORDER";
+    creatorDepositRequired: boolean;
     category: "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
     objective: string | null;
     benefits: string | null;

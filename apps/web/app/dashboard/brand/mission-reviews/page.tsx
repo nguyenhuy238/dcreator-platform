@@ -807,6 +807,7 @@ function BrandMissionTranscriptReviewsTab({ apiBasePath, fixedCampaignId, hideFi
 type ApplicationListItem = {
   id: string;
   status: string;
+  depositStatus: string;
   note: string | null;
   rejectReason: string | null;
   createdAt: string;
@@ -817,7 +818,13 @@ type ApplicationListItem = {
     email: string;
     creatorProfile: { mainPlatform: string | null; socialUrl: string | null; followerCount: number | null; socialLinks?: Array<{ id: string; platform: string; socialUrl: string; followers: number | null; handle: string | null }> } | null;
   };
-  campaign: { id: string; title: string; slug: string };
+  campaign: {
+    id: string;
+    title: string;
+    slug: string;
+    fulfillmentMode: "BRAND_SHIP" | "CREATOR_ORDER";
+    creatorDepositRequired: boolean;
+  };
   mission: { id: string; title: string; rewardPoints: number; productReceiveOption: string; productLink: string | null; productName?: string | null; productDescription?: string | null; productImageUrl?: string | null };
 };
 
@@ -1114,6 +1121,12 @@ function BrandMissionApplicationsTab({ apiBasePath, fixedCampaignId, hideFilters
             actionNode={
               <div className="grid gap-2 text-sm">
                 <p><strong>Trạng thái:</strong> {detail ? missionStatusLabel(detail.status) : "-"}</p>
+                <p>
+                  <strong>Tiền cọc Creator:</strong>{" "}
+                  {detail?.campaign.creatorDepositRequired && detail.campaign.fulfillmentMode === "BRAND_SHIP"
+                    ? mapStatusVi(detail.depositStatus)
+                    : "Không yêu cầu"}
+                </p>
                 {hasText(detail?.note) && !detail?.note?.includes("[CREATOR_CAMPAIGN_APPLICATION]") ? <p><strong>Ghi chú Creator:</strong> {detail?.note}</p> : null}
                 {detail?.rejectReason ? <p><strong>Lý do từ chối:</strong> {detail.rejectReason}</p> : null}
                 <div className="flex flex-wrap gap-2">
