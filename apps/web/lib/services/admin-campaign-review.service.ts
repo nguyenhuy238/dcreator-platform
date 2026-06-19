@@ -206,6 +206,8 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
       coverImageUrl: true,
       campaignType: true,
       setupSource: true,
+      fulfillmentMode: true,
+      creatorDepositRequired: true,
       benefits: true,
       requirementsSummary: true,
       creatorBriefDescription: true,
@@ -483,6 +485,8 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
         category: input.category,
         campaignType: input.campaignType,
         setupSource: input.setupSource,
+        fulfillmentMode: input.fulfillmentMode,
+        creatorDepositRequired: input.fulfillmentMode === "BRAND_SHIP",
         objective: input.benefits || null,
         benefits: input.benefits || null,
         requirementsSummary: input.requirementsSummary?.trim() || null,
@@ -492,8 +496,8 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
         productDescription: input.productDescription,
         productImageUrl: input.productImageUrl,
         productLink: input.productLink,
-        participationRoadmap: input.participationRoadmap,
-        priorityChannels: input.participationRoadmap.join("\n"),
+        participationRoadmap: input.participationRoadmap ?? [],
+        priorityChannels: input.participationRoadmap?.join("\n") || null,
         missionTypes: null,
         creatorCommissionPercent: 0,
         userCommissionPercent: 0,
@@ -536,7 +540,7 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
 
     return createdCampaign;
   });
-  await trySyncCampaignNewFields(campaign.id, input.benefits || null, input.participationRoadmap, requiredHashtags);
+  await trySyncCampaignNewFields(campaign.id, input.benefits || null, input.participationRoadmap ?? [], requiredHashtags);
   await syncCampaignUgcVideoQuota(campaign.id, ugcVideoQuota);
 
   await writeAuditLog({
@@ -545,7 +549,14 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
     targetType: "Campaign",
     targetId: campaign.id,
     newStatus: campaign.status,
-    metadata: { publishNow: true, brandAccountId: brandAccount.id, ugcVideoQuota, requiredHashtags }
+    metadata: {
+      publishNow: true,
+      brandAccountId: brandAccount.id,
+      ugcVideoQuota,
+      requiredHashtags,
+      fulfillmentMode: input.fulfillmentMode,
+      creatorDepositRequired: input.fulfillmentMode === "BRAND_SHIP"
+    }
   });
 
   await createNotification({
@@ -627,11 +638,6 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
     }
   }
 
-  const nextParticipationRoadmap = input.participationRoadmap?.map((item) => item.trim()).filter(Boolean);
-  if (input.participationRoadmap && (!nextParticipationRoadmap || nextParticipationRoadmap.length === 0)) {
-    throw new AppError("Lộ trình tham gia cần ít nhất 1 bước.", 422, "CAMPAIGN_PARTICIPATION_ROADMAP_INVALID");
-  }
-
   const nextImageUrl =
     input.imageUrl === undefined
       ? undefined
@@ -653,6 +659,9 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         category: input.category,
         campaignType: input.campaignType,
         setupSource: input.setupSource,
+        fulfillmentMode: input.fulfillmentMode,
+        creatorDepositRequired:
+          input.fulfillmentMode === undefined ? undefined : input.fulfillmentMode === "BRAND_SHIP",
         benefits: nextBenefits,
         requirementsSummary: nextRequirementsSummary,
         creatorBriefTitle: nextRequirements === undefined ? undefined : nextRequirements ? "YÊU CẦU" : null,
@@ -696,6 +705,8 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         category: campaign.category,
         campaignType: campaign.campaignType,
         setupSource: campaign.setupSource,
+        fulfillmentMode: campaign.fulfillmentMode,
+        creatorDepositRequired: campaign.creatorDepositRequired,
         participationRoadmap: campaign.participationRoadmap,
         requiredHashtags: beforeRequiredHashtags,
         benefits: campaign.benefits ?? null,
@@ -721,6 +732,8 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         category: updated.category,
         campaignType: updated.campaignType,
         setupSource: updated.setupSource,
+        fulfillmentMode: updated.fulfillmentMode,
+        creatorDepositRequired: updated.creatorDepositRequired,
         participationRoadmap: updated.participationRoadmap,
         requiredHashtags: afterRequiredHashtags,
         benefits: updated.benefits ?? null,

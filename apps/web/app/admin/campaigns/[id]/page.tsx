@@ -7,6 +7,10 @@ import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } fro
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
 import { campaignRequestMarkers, extractCampaignRequestMarkerValue } from "@/lib/campaign-request-meta";
 import { DEFAULT_REQUIRED_HASHTAGS, normalizeRequiredHashtags, validateRequiredHashtags } from "@/lib/hashtags";
+import {
+  CAMPAIGN_FULFILLMENT_OPTIONS,
+  type CampaignFulfillmentMode
+} from "@/lib/constants/campaign-fulfillment";
 
 type CampaignCategory = "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
 type CampaignType = "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
@@ -32,10 +36,10 @@ type FormState = {
   category: CampaignCategory;
   campaignType: CampaignType;
   setupSource: SetupSource;
+  fulfillmentMode: CampaignFulfillmentMode;
   requirementsSummary: string;
   requirements: string;
   benefits: string;
-  participationRoadmap: string[];
   requiredHashtags: string[];
   imageUrl: string;
   startsAt: string;
@@ -51,6 +55,8 @@ type CampaignDetail = {
   category: CampaignCategory;
   campaignType: CampaignType;
   setupSource: SetupSource;
+  fulfillmentMode: CampaignFulfillmentMode;
+  creatorDepositRequired: boolean;
   benefits: string | null;
   requirementsSummary: string | null;
   requirements: string | null;
@@ -58,7 +64,6 @@ type CampaignDetail = {
   productDescription: string | null;
   productLink: string | null;
   productImageUrl: string | null;
-  participationRoadmap: string[];
   requiredHashtags: string[];
   coverImageUrl: string | null;
   startsAt: string | null;
@@ -89,10 +94,10 @@ const DEFAULT_FORM: FormState = {
   category: "LIFESTYLE",
   campaignType: "COMMUNITY",
   setupSource: "BRAND_REQUESTED",
+  fulfillmentMode: "BRAND_SHIP",
   benefits: "",
   requirementsSummary: "",
   requirements: "",
-  participationRoadmap: [""],
   requiredHashtags: DEFAULT_REQUIRED_HASHTAGS,
   imageUrl: "",
   startsAt: "",
@@ -128,7 +133,6 @@ const fieldMessageMap: Record<string, string> = {
   ugcVideoQuota: "Số lượng video review phải lớn hơn 0.",
   startsAt: "Ngày bắt đầu chưa hợp lệ.",
   endsAt: "Ngày kết thúc phải sau ngày bắt đầu.",
-  participationRoadmap: "Vui lòng nhập ít nhất 1 bước lộ trình tham gia.",
   requiredHashtags: "Hashtag bắt buộc chưa hợp lệ.",
   productName: "Vui lòng nhập tên sản phẩm.",
   productDescription: "Vui lòng nhập mô tả sản phẩm.",
@@ -186,10 +190,10 @@ function buildForm(item: CampaignDetail): FormState {
     category: item.category,
     campaignType: item.campaignType,
     setupSource: item.setupSource,
+    fulfillmentMode: item.fulfillmentMode ?? "BRAND_SHIP",
     requirementsSummary: item.requirementsSummary ?? "",
     requirements: item.requirements ?? "",
     benefits: item.benefits ?? "",
-    participationRoadmap: item.participationRoadmap.length > 0 ? item.participationRoadmap : [""],
     requiredHashtags: item.requiredHashtags ?? [],
     imageUrl: item.coverImageUrl ?? "",
     startsAt: toDateTimeLocalInput(item.startsAt),
@@ -204,8 +208,7 @@ function getApiFieldErrors(payload: ApiFailure) {
   const details = payload.details as { fieldErrors?: Record<string, string[]>; formErrors?: string[] } | undefined;
   if (details?.fieldErrors) {
     for (const [field, messages] of Object.entries(details.fieldErrors)) {
-      const targetField = field === "mission" ? "participationRoadmap" : field;
-      nextErrors[targetField] = fieldMessageMap[targetField] ?? fieldErrorsText(messages[0]);
+      nextErrors[field] = fieldMessageMap[field] ?? fieldErrorsText(messages[0]);
     }
   }
   const mappedField = payload.code ? apiErrorFieldMap[payload.code] : undefined;
@@ -279,25 +282,6 @@ export default function AdminCampaignDetailPage() {
     setFieldErrors((current) => ({ ...current, [fieldName]: undefined }));
   }
 
-  function setRoadmapStep(index: number, value: string) {
-    setForm((current) => ({
-      ...current,
-      participationRoadmap: current.participationRoadmap.map((item, idx) => (idx === index ? value : item))
-    }));
-    setFieldErrors((current) => ({ ...current, participationRoadmap: undefined }));
-  }
-
-  function addRoadmapStep() {
-    setForm((current) => ({ ...current, participationRoadmap: [...current.participationRoadmap, ""] }));
-  }
-
-  function removeRoadmapStep(index: number) {
-    setForm((current) => ({
-      ...current,
-      participationRoadmap: current.participationRoadmap.filter((_, idx) => idx !== index)
-    }));
-  }
-
   async function uploadImage(file: File, target: "cover" | "product" = "cover") {
     if (target === "cover") setUploadingCover(true);
     else setUploadingProductImage(true);
@@ -342,9 +326,6 @@ export default function AdminCampaignDetailPage() {
     if (!Number.isInteger(form.ugcVideoQuota) || form.ugcVideoQuota <= 0) {
       nextErrors.ugcVideoQuota = "Số lượng video review phải lớn hơn 0.";
     }
-    if (!form.participationRoadmap.some((item) => item.trim().length > 0)) {
-      nextErrors.participationRoadmap = "Cần ít nhất 1 bước lộ trình tham gia.";
-    }
     const hashtagError = validateRequiredHashtags(form.requiredHashtags);
     if (hashtagError) nextErrors.requiredHashtags = hashtagError;
     if (form.startsAt && form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) {
@@ -378,10 +359,10 @@ export default function AdminCampaignDetailPage() {
           category: form.category,
           campaignType: form.campaignType,
           setupSource: form.setupSource,
+          fulfillmentMode: form.fulfillmentMode,
           requirementsSummary: form.requirementsSummary,
           requirements: form.requirements,
           benefits: form.benefits,
-          participationRoadmap: form.participationRoadmap.filter((step) => step.trim().length > 0),
           requiredHashtags: normalizeRequiredHashtags(form.requiredHashtags),
           imageUrl: form.imageUrl,
           startsAt: toDateTime(form.startsAt),
@@ -638,6 +619,43 @@ export default function AdminCampaignDetailPage() {
             </label>
             <div />
 
+            <fieldset className="grid gap-3 md:col-span-2">
+              <legend className="text-sm font-semibold text-zinc-700">Hình thức xử lý hàng mẫu / đơn hàng</legend>
+              <div className="grid gap-3 md:grid-cols-2">
+                {CAMPAIGN_FULFILLMENT_OPTIONS.map((option) => {
+                  const selected = form.fulfillmentMode === option.value;
+                  return (
+                    <label
+                      key={option.value}
+                      className={`cursor-pointer rounded-2xl border p-4 transition ${
+                        selected ? "border-zinc-900 bg-zinc-50 ring-1 ring-zinc-900" : "border-zinc-200 bg-white hover:border-zinc-300"
+                      }`}
+                    >
+                      <span className="flex items-start gap-3">
+                        <input
+                          className="mt-1"
+                          type="radio"
+                          name="fulfillmentMode"
+                          value={option.value}
+                          checked={selected}
+                          onChange={() => setField("fulfillmentMode", option.value)}
+                        />
+                        <span>
+                          <span className="block text-sm font-bold text-zinc-900">{option.label}</span>
+                          <span className="mt-2 block text-sm font-normal leading-6 text-zinc-600">{option.description}</span>
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              {form.fulfillmentMode === "BRAND_SHIP" ? (
+                <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
+                  Creator được duyệt sẽ có trạng thái yêu cầu tiền cọc. Hệ thống chưa tự động trừ ví.
+                </p>
+              ) : null}
+            </fieldset>
+
             <div className="md:col-span-2">
               <div className="mb-2">
                 <p className="text-sm font-semibold text-zinc-500">Sản phẩm campaign</p>
@@ -704,28 +722,6 @@ export default function AdminCampaignDetailPage() {
                 <textarea className="dc-input min-h-24" value={form.creatorBrief.productDescription} onChange={(event) => setCreatorBriefField("productDescription", event.target.value)} />
                 {fieldErrors.productDescription ? <span className="text-xs text-red-600">{fieldErrors.productDescription}</span> : null}
               </label>
-            </div>
-
-            <div className="md:col-span-2">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-semibold text-zinc-700">Lộ trình tham gia</span>
-              </div>
-              <div className="grid gap-2">
-                {form.participationRoadmap.map((step, index) => (
-                  <div key={`roadmap-${index}`} className="flex gap-2">
-                    <input className="dc-input" value={step} onChange={(event) => setRoadmapStep(index, event.target.value)} placeholder={`Bước ${index + 1}: ...`} />
-                    {form.participationRoadmap.length > 1 ? (
-                      <button type="button" className="dc-btn-secondary" onClick={() => removeRoadmapStep(index)}>
-                        Xóa
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-                <button type="button" className="dc-btn-secondary w-fit" onClick={addRoadmapStep}>
-                  + Thêm bước
-                </button>
-                {fieldErrors.participationRoadmap ? <span className="text-xs text-red-600">{fieldErrors.participationRoadmap}</span> : null}
-              </div>
             </div>
 
             <div className="md:col-span-2">

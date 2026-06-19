@@ -3,34 +3,12 @@
 import type { ReactNode } from "react";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 import type { CampaignDetailDTO } from "@/lib/dto/campaign-detail";
+import { getCampaignParticipationSteps } from "@/lib/constants/campaign-fulfillment";
 import { getCampaignTypeLabel } from "@/lib/constants/campaign-type";
 import { CAMPAIGN_IMAGE_FALLBACK, resolveImageUrl } from "@/lib/images/resolve-image-url";
 import { CampaignBriefRequirements } from "./CampaignBriefRequirements";
 import { CampaignReviewProducts } from "./CampaignReviewProducts";
 import { formatDateTime } from "./campaign-detail.utils";
-
-const DEFAULT_PARTICIPATION_STEPS = [
-  {
-    title: "ĐĂNG KÝ THAM GIA",
-    description: "Tạo hồ sơ Creator và kết nối kênh mạng xã hội."
-  },
-  {
-    title: "CHỌN CAMPAIGN",
-    description: "Khám phá chiến dịch phù hợp và gửi đăng ký tham gia."
-  },
-  {
-    title: "NHẬN SẢN PHẨM",
-    description: "Được Brand phê duyệt và nhận sản phẩm hoặc reward trải nghiệm."
-  },
-  {
-    title: "TẠO & ĐĂNG NỘI DUNG",
-    description: "Sản xuất video review và đăng tải lên nền tảng Social Commerce."
-  },
-  {
-    title: "NHẬN THU NHẬP",
-    description: "Nhận tiền hoa hồng affiliate lên tới 12% cho mỗi đơn hàng"
-  }
-];
 
 function getDisplayLines(value: string) {
   return value
@@ -140,12 +118,14 @@ function CampaignDealOverview({ data }: { data: CampaignDetailDTO }) {
   );
 }
 
-function CampaignJoinTimeline() {
+function CampaignJoinTimeline({ data }: { data: CampaignDetailDTO }) {
+  const participationSteps = getCampaignParticipationSteps(data.hero.fulfillmentMode);
+
   return (
     <section>
       <h3 className="text-2xl font-black text-zinc-900">Lộ trình tham gia</h3>
       <ol className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {DEFAULT_PARTICIPATION_STEPS.map((step, index) => (
+        {participationSteps.map((step, index) => (
           <li
             key={step.title}
             className="relative min-h-[180px] rounded-[24px] border border-zinc-200 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
@@ -169,7 +149,7 @@ export function OverviewTab({ data }: { data: CampaignDetailDTO }) {
         <CampaignDealOverview data={data} />
         <CampaignReviewProducts data={data} />
       </div>
-      <CampaignJoinTimeline />
+      <CampaignJoinTimeline data={data} />
     </section>
   );
 }
@@ -178,7 +158,7 @@ export function BriefTab({ data }: { data: CampaignDetailDTO }) {
   return (
     <section className="grid gap-4">
       <CampaignBriefRequirements hashtags={data.hero.requiredHashtags} requirements={data.hero.requirements} />
-      <CampaignJoinTimeline />
+      <CampaignJoinTimeline data={data} />
     </section>
   );
 }

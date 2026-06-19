@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { CAMPAIGN_STATUS } from "@/lib/constants/enums";
 import { DEFAULT_REQUIRED_HASHTAGS, MAX_REQUIRED_HASHTAGS, validateRequiredHashtags } from "@/lib/hashtags";
+import { CAMPAIGN_FULFILLMENT_MODES } from "../constants/campaign-fulfillment.ts";
 
 const requiredHashtagsCreateSchema = z.array(z.string().trim()).max(MAX_REQUIRED_HASHTAGS).optional().default(DEFAULT_REQUIRED_HASHTAGS).superRefine((value, ctx) => {
   const error = validateRequiredHashtags(value);
@@ -36,9 +37,10 @@ export const adminCampaignCreateSchema = z.object({
   category: z.enum(["TECH", "FASHION", "FOOD", "BEAUTY", "LIFESTYLE", "EDUCATION"]),
   campaignType: z.enum(["DONATION", "PREORDER", "SPONSORSHIP", "COMMUNITY"]),
   setupSource: z.enum(["JOIN_EXISTING_DCREATOR_CAMP", "BRAND_REQUESTED"]).default("BRAND_REQUESTED"),
+  fulfillmentMode: z.enum(CAMPAIGN_FULFILLMENT_MODES).default("BRAND_SHIP"),
   requirementsSummary: z.string().trim().max(160).nullable().optional(),
   requirements: z.string().trim().min(3).max(2000),
-  participationRoadmap: z.array(z.string().trim().min(1).max(300)).min(1),
+  participationRoadmap: z.array(z.string().trim().min(1).max(300)).optional(),
   requiredHashtags: requiredHashtagsCreateSchema,
   benefits: z.string().trim().min(3).max(2000),
   productName: z.string().trim().min(1).max(160),
@@ -75,6 +77,7 @@ export const adminCampaignUpdateSchema = z.object({
   category: z.enum(["TECH", "FASHION", "FOOD", "BEAUTY", "LIFESTYLE", "EDUCATION"]).optional(),
   campaignType: z.enum(["DONATION", "PREORDER", "SPONSORSHIP", "COMMUNITY"]).optional(),
   setupSource: z.enum(["JOIN_EXISTING_DCREATOR_CAMP", "BRAND_REQUESTED"]).optional(),
+  fulfillmentMode: z.enum(CAMPAIGN_FULFILLMENT_MODES).optional(),
   requirementsSummary: z.string().trim().max(160).nullable().optional(),
   requirements: z.string().trim().min(3).max(2000).nullable().optional(),
   benefits: z.string().trim().min(3).max(2000).nullable().optional(),
@@ -100,8 +103,5 @@ export const adminCampaignUpdateSchema = z.object({
 }).superRefine((value, ctx) => {
   if (value.startsAt && value.endsAt && new Date(value.endsAt) <= new Date(value.startsAt)) {
     ctx.addIssue({ code: "custom", path: ["endsAt"], message: "Ngày kết thúc phải sau ngày bắt đầu." });
-  }
-  if (value.participationRoadmap && value.participationRoadmap.filter((step) => step.trim().length > 0).length === 0) {
-    ctx.addIssue({ code: "custom", path: ["participationRoadmap"], message: "Vui lòng nhập ít nhất 1 bước lộ trình tham gia." });
   }
 });

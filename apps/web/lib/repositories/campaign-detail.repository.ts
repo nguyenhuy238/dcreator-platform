@@ -18,6 +18,8 @@ export async function findPublicCampaignDetailBySlug(slug: string, viewerId?: st
       productImageUrl: true,
       productLink: true,
       campaignType: true,
+      fulfillmentMode: true,
+      creatorDepositRequired: true,
       category: true,
       benefits: true,
       requirementsSummary: true,

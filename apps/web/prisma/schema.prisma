@@ -177,6 +177,11 @@ enum ProductReceiveOption {
   NO_PRODUCT_REQUIRED
 }
 
+enum CampaignFulfillmentMode {
+  BRAND_SHIP
+  CREATOR_ORDER
+}
+
 enum MissionLifecycleStatus {
   OPEN
   ACCEPTED
@@ -207,8 +212,12 @@ enum ProductStatus {
 
 enum DepositStatus {
   NOT_REQUIRED
+  REQUIRED
+  HELD
   PENDING
   PAID
+  PENDING_REVIEW
+  FORFEITED
   REFUND_PENDING
   REFUNDED
 }
@@ -889,6 +898,8 @@ model Campaign {
   coverImageUrl            String?
   campaignType             CampaignType                @default(COMMUNITY)
   setupSource              CampaignSetupSource         @default(BRAND_REQUESTED)
+  fulfillmentMode          CampaignFulfillmentMode      @default(BRAND_SHIP)
+  creatorDepositRequired   Boolean                      @default(true)
   benefits                 String?
   participationRoadmap     String[]                    @default([])
   requiredHashtags         String[]                    @default([])
