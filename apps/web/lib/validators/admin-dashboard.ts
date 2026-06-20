@@ -56,6 +56,7 @@ export const adminCreatorMissionDecisionSchema = z
   .object({
     action: z.enum([
       "CONFIRM_DEPOSIT_AND_PRODUCT_RECEIVED",
+      "MARK_SAMPLE_SHIPPED",
       "APPROVE_PURCHASE_PROOF",
       "REJECT_PURCHASE_PROOF",
       "APPROVE_VIDEO_REVIEW",

@@ -213,6 +213,7 @@ enum ProductStatus {
 enum DepositStatus {
   NOT_REQUIRED
   REQUIRED
+  WAITING_TRANSFER
   HELD
   PENDING
   PAID
@@ -278,7 +279,18 @@ enum WalletTransactionType {
   REWARD_REDEEM
   COMMISSION_CREDIT
   COMMISSION_PAYOUT
+  CREATOR_DEPOSIT_HOLD
+  CREATOR_DEPOSIT_ADMIN_CONFIRMED
+  CREATOR_DEPOSIT_REFUND
   ADJUSTMENT
+}
+
+enum SampleShippingStatus {
+  NOT_REQUIRED
+  WAITING_DEPOSIT
+  READY_TO_SHIP
+  SHIPPED
+  RECEIVED
 }
 
 enum NPointTopupRequestStatus {
@@ -900,6 +912,7 @@ model Campaign {
   setupSource              CampaignSetupSource         @default(BRAND_REQUESTED)
   fulfillmentMode          CampaignFulfillmentMode      @default(BRAND_SHIP)
   creatorDepositRequired   Boolean                      @default(true)
+  creatorDepositAmountVnd  Int                          @default(0)
   benefits                 String?
   participationRoadmap     String[]                    @default([])
   requiredHashtags         String[]                    @default([])
@@ -1155,6 +1168,21 @@ model CreatorMission {
   productReceiveOption                 ProductReceiveOption
   productStatus                        ProductStatus
   depositStatus                        DepositStatus
+  creatorDepositAmountVnd              Int                             @default(0)
+  depositHeldAt                        DateTime?
+  depositRefundedAt                    DateTime?
+  depositTransactionId                 String?
+  shippingRecipientName                String?
+  shippingPhone                        String?
+  shippingProvince                     String?
+  shippingDistrict                     String?
+  shippingWard                         String?
+  shippingAddressLine                  String?
+  shippingNote                         String?
+  shippingInfoSubmittedAt              DateTime?
+  sampleShippingStatus                 SampleShippingStatus            @default(NOT_REQUIRED)
+  sampleShippedAt                      DateTime?
+  sampleReceivedAt                     DateTime?
   reimbursementStatus                  ReimbursementStatus
   purchaseProofTextNote                String?
   purchaseProofScreenshotUrl           String?
@@ -1608,6 +1636,11 @@ model AdminSetting {
   requireRequestChangesReason Boolean  @default(true)
   maintenanceMessage          String   @default("")
   campaignContentTemplateUrl  String   @default("")
+  creatorDepositQrImageUrl    String   @default("/qr-dcreator.jpg")
+  creatorDepositAccountName   String   @default("")
+  creatorDepositAccountNumber String   @default("")
+  creatorDepositBankName      String   @default("")
+  creatorDepositTransferPrefix String  @default("DCR")
   createdAt                   DateTime @default(now())
   updatedAt                   DateTime @updatedAt
 }

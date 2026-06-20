@@ -52,8 +52,9 @@ export function getCampaignParticipationSteps(
           description: "Sau khi được duyệt, Creator đặt mua sản phẩm theo hướng dẫn để đơn hàng đi qua sàn."
         }
       : {
-          title: "NHẬN SẢN PHẨM",
-          description: "Được Brand phê duyệt và nhận sản phẩm hoặc reward trải nghiệm."
+          title: "CỌC TIỀN – NHẬN HÀNG REVIEW",
+          description:
+            "Creator cọc tiền để nhận sản phẩm về review. Sau khi hoàn thành đúng yêu cầu campaign, khoản cọc sẽ được hoàn lại."
         },
     {
       title: "TẠO & ĐĂNG NỘI DUNG",
@@ -65,9 +66,9 @@ export function getCampaignParticipationSteps(
           description: "Đánh giá sản phẩm theo yêu cầu campaign, nộp proof và nhận hoa hồng/thu nhập sau khi được duyệt."
         }
       : {
-          title: "ĐÁNH GIÁ SẢN PHẨM & NHẬN THU NHẬP",
+          title: "HOÀN CỌC & NHẬN HOA HỒNG",
           description:
-            "Hoàn tất yêu cầu đánh giá sản phẩm, nộp proof và nhận hoa hồng/thu nhập theo chính sách campaign."
+            "Creator được hoàn cọc và nhận hoa hồng lên tới 12% trên mỗi đơn hàng thành công từ video được đăng tải."
         }
   ];
 }

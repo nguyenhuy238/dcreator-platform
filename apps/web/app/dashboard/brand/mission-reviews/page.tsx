@@ -9,7 +9,7 @@ type ApiResult<T> = { success: boolean; data?: T; error?: string };
 type DetailTab = "ACTIONS" | "HISTORY";
 type FinalReviewResubmitField = "PUBLIC_URL" | "AD_CODE" | "SCREENSHOT" | "PURCHASE_BILL" | "PRODUCT_REVIEW_SCREENSHOT";
 
-export type MissionReviewsTabKey = "transcript-reviews" | "applications" | "video-reviews" | "final-reviews" | "refund-reviews";
+export type MissionReviewsTabKey = "transcript-reviews" | "applications" | "deposit-confirmations" | "video-reviews" | "final-reviews" | "refund-reviews";
 
 type MissionReviewsPageProps = {
   pageTitle: string;
@@ -22,6 +22,7 @@ type MissionReviewsPageProps = {
 
 const tabs: Array<{ key: MissionReviewsTabKey; label: string }> = [
   { key: "applications", label: "Đơn tham gia campaign" },
+  { key: "deposit-confirmations", label: "Xác nhận cọc" },
   { key: "transcript-reviews", label: "Duyệt kịch bản" },
   { key: "video-reviews", label: "Duyệt video" },
   { key: "final-reviews", label: "Duyệt link public" },
@@ -52,6 +53,58 @@ function deadlineLabel(value: string | null) {
   if (days === 0) return "Hôm nay";
   if (days <= 7) return `${days} ngày nữa`;
   return fmtDateOnly(value);
+}
+
+type AdminDepositMission = {
+  id: string;
+  status: string;
+  productStatus: string;
+  depositStatus: string;
+  creatorDepositAmountVnd?: number | null;
+  shippingRecipientName?: string | null;
+  shippingPhone?: string | null;
+  shippingProvince?: string | null;
+  shippingDistrict?: string | null;
+  shippingWard?: string | null;
+  shippingAddressLine?: string | null;
+  shippingNote?: string | null;
+  shippingInfoSubmittedAt?: string | null;
+  sampleShippingStatus?: string | null;
+  sampleShippedAt?: string | null;
+  assignedAt?: string | null;
+  account: { displayName: string; email: string };
+  campaign: { id: string; title: string; slug?: string; fulfillmentMode?: "BRAND_SHIP" | "CREATOR_ORDER"; creatorDepositAmountVnd?: number | null };
+  mission: { title: string; productName?: string | null; productLink?: string | null; deadlineAt?: string | null };
+};
+
+function isDepositConfirmationCandidate(item: AdminDepositMission) {
+  return (
+    item.campaign.fulfillmentMode !== "CREATOR_ORDER" &&
+    (item.depositStatus === "WAITING_TRANSFER" ||
+      item.depositStatus === "PENDING" ||
+      (item.depositStatus === "HELD" && item.sampleShippingStatus !== "SHIPPED" && item.sampleShippingStatus !== "RECEIVED"))
+  );
+}
+
+function shippingAddressText(item: AdminDepositMission) {
+  return [item.shippingAddressLine, item.shippingWard, item.shippingDistrict, item.shippingProvince].filter(Boolean).join(", ");
+}
+
+function shippingCopyText(item: AdminDepositMission) {
+  return [
+    `Họ tên: ${item.shippingRecipientName ?? ""}`,
+    `SĐT: ${item.shippingPhone ?? ""}`,
+    `Địa chỉ: ${shippingAddressText(item)}`,
+    `Ghi chú: ${item.shippingNote ?? ""}`
+  ].join("\n");
+}
+
+function fmtVnd(value: number | null | undefined) {
+  return `${Math.max(0, value ?? 0).toLocaleString("vi-VN")}đ`;
+}
+
+function paginationTotal(data: { pagination?: { total?: number } } | AdminDepositMission[] | undefined) {
+  return !Array.isArray(data) ? data?.pagination?.total ?? 0 : 0;
 }
 
 function asLink(value: string | null | undefined) {
@@ -101,6 +154,11 @@ function mapStatusVi(value: string | null | undefined) {
     APPROVED: "Đã duyệt",
     REJECTED: "Đã từ chối",
     PENDING: "Chờ duyệt",
+    REQUIRED: "Cần đặt cọc",
+    WAITING_TRANSFER: "Chờ Admin xác nhận",
+    HELD: "Đã cọc",
+    REFUNDED: "Đã hoàn cọc",
+    FORFEITED: "Đã giữ cọc",
     SUBMITTED: "Đã nộp",
     OPEN: "Đang mở",
     COMPLETED: "Hoàn thành",
@@ -111,7 +169,10 @@ function mapStatusVi(value: string | null | undefined) {
     NOT_REQUIRED: "Không yêu cầu",
     WAITING_PURCHASE: "Chờ mua hàng",
     WAITING_DEPOSIT: "Chờ đặt cọc",
-    PAYOUT_PENDING: "Chờ hoàn tiền"
+    PAYOUT_PENDING: "Chờ hoàn tiền",
+    READY_TO_SHIP: "Sẵn sàng gửi",
+    SHIPPED: "Đã gửi hàng",
+    RECEIVED: "Đã nhận hàng"
   };
   return map[value] ?? value;
 }
@@ -137,10 +198,11 @@ function CreatorSocialLinks({ name, profile }: { name?: string | null; profile: 
   );
 }
 
-function buildStaticReviewTimeline(activeKey: TimelineStep["key"], includePurchase: boolean) {
+function buildStaticReviewTimeline(activeKey: TimelineStep["key"], includePurchase: boolean, fulfillmentMode?: "BRAND_SHIP" | "CREATOR_ORDER" | null) {
+  const isBrandShip = fulfillmentMode !== "CREATOR_ORDER";
   const steps: Array<{ key: TimelineStep["key"]; label: string; icon: TimelineStep["icon"] }> = [
     { key: "application", label: "Duyệt tham gia", icon: "application" },
-    ...(includePurchase ? [{ key: "purchase" as const, label: "Mua sản phẩm", icon: "purchase" as const }] : []),
+    ...(includePurchase ? [{ key: "purchase" as const, label: isBrandShip ? "Đặt cọc / nhận hàng" : "Mua sản phẩm", icon: "purchase" as const }] : []),
     { key: "draftChoice", label: "Nộp kịch bản hoặc video", icon: "draftSubmit" },
     { key: "draftSubmit", label: "Nộp kịch bản", icon: "draftSubmit" },
     { key: "draftReview", label: "Duyệt kịch bản", icon: "videoReview" },
@@ -148,7 +210,7 @@ function buildStaticReviewTimeline(activeKey: TimelineStep["key"], includePurcha
     { key: "videoReview", label: "Duyệt video", icon: "videoReview" },
     { key: "publish", label: "Nộp link public", icon: "publish" },
     { key: "publishReview", label: "Duyệt link public", icon: "publishReview" },
-    ...(includePurchase ? [{ key: "refund" as const, label: "Chờ hoàn tiền", icon: "refund" as const }] : []),
+    ...(includePurchase ? [{ key: "refund" as const, label: isBrandShip ? "Chờ hoàn tiền cọc / Hoàn tiền cọc" : "Chờ hoàn tiền", icon: "refund" as const }] : []),
     { key: "completed", label: "Hoàn thành", icon: "completed" }
   ];
   const activeIndex = steps.findIndex((step) => step.key === activeKey);
@@ -166,55 +228,56 @@ function buildReviewTimelineForStage(
   stage: "application" | "transcript" | "video" | "publish",
   includePurchase: boolean,
   status: string | null | undefined,
-  reimbursementStatus?: string | null
+  reimbursementStatus?: string | null,
+  fulfillmentMode?: "BRAND_SHIP" | "CREATOR_ORDER" | null
 ) {
   if (stage === "application") {
-    if (status === "REJECTED") return buildStaticReviewTimeline("application", includePurchase).map((step) => ({ ...step, current: step.key === "application", failed: step.key === "application", done: false }));
-    if (status === "APPROVED") return buildStaticReviewTimeline(includePurchase ? "purchase" : "draftChoice", includePurchase);
-    return buildStaticReviewTimeline("application", includePurchase);
+    if (status === "REJECTED") return buildStaticReviewTimeline("application", includePurchase, fulfillmentMode).map((step) => ({ ...step, current: step.key === "application", failed: step.key === "application", done: false }));
+    if (status === "APPROVED") return buildStaticReviewTimeline(includePurchase ? "purchase" : "draftChoice", includePurchase, fulfillmentMode);
+    return buildStaticReviewTimeline("application", includePurchase, fulfillmentMode);
   }
 
   if (stage === "transcript") {
     if (status === "REJECTED") {
-      return buildStaticReviewTimeline("draftReview", includePurchase).map((step) => ({
+      return buildStaticReviewTimeline("draftReview", includePurchase, fulfillmentMode).map((step) => ({
         ...step,
         current: step.key === "draftReview",
         failed: step.key === "draftReview"
       }));
     }
-    if (status === "APPROVED") return buildStaticReviewTimeline("videoSubmit", includePurchase);
-    return buildStaticReviewTimeline("draftReview", includePurchase);
+    if (status === "APPROVED") return buildStaticReviewTimeline("videoSubmit", includePurchase, fulfillmentMode);
+    return buildStaticReviewTimeline("draftReview", includePurchase, fulfillmentMode);
   }
 
   if (stage === "video") {
     if (status === "REJECTED") {
-      return buildStaticReviewTimeline("videoReview", includePurchase).map((step) => ({
+      return buildStaticReviewTimeline("videoReview", includePurchase, fulfillmentMode).map((step) => ({
         ...step,
         current: step.key === "videoReview",
         failed: step.key === "videoReview"
       }));
     }
-    if (status === "APPROVED") return buildStaticReviewTimeline("publish", includePurchase);
-    return buildStaticReviewTimeline("videoReview", includePurchase);
+    if (status === "APPROVED") return buildStaticReviewTimeline("publish", includePurchase, fulfillmentMode);
+    return buildStaticReviewTimeline("videoReview", includePurchase, fulfillmentMode);
   }
 
   if (status === "REJECTED") {
-    return buildStaticReviewTimeline("publishReview", includePurchase).map((step) => ({
+    return buildStaticReviewTimeline("publishReview", includePurchase, fulfillmentMode).map((step) => ({
       ...step,
       current: step.key === "publishReview",
       failed: step.key === "publishReview"
     }));
   }
-  if (includePurchase && reimbursementStatus === "PAYOUT_PENDING") return buildStaticReviewTimeline("refund", includePurchase);
+  if (includePurchase && reimbursementStatus === "PAYOUT_PENDING") return buildStaticReviewTimeline("refund", includePurchase, fulfillmentMode);
   if (status === "APPROVED" || status === "COMPLETED") {
-    return buildStaticReviewTimeline("publishReview", includePurchase).map((step) => ({
+    return buildStaticReviewTimeline("publishReview", includePurchase, fulfillmentMode).map((step) => ({
       ...step,
       done: step.key !== "completed",
       current: step.key === "completed",
       failed: false
     }));
   }
-  return buildStaticReviewTimeline("publishReview", includePurchase);
+  return buildStaticReviewTimeline("publishReview", includePurchase, fulfillmentMode);
 }
 
 const finalReviewFieldLabelMap: Record<FinalReviewResubmitField, string> = {
@@ -409,11 +472,15 @@ export function MissionReviewsPage({
   embedded = false,
   fixedCampaignId
 }: MissionReviewsPageProps) {
-  const canReviewRefunds = apiBasePath === "/api/admin";
-  const visibleTabs = useMemo(() => tabs.filter((tab) => canReviewRefunds || tab.key !== "refund-reviews"), [canReviewRefunds]);
+  const canReviewAdminOps = apiBasePath === "/api/admin";
+  const visibleTabs = useMemo(
+    () => tabs.filter((tab) => canReviewAdminOps || (tab.key !== "refund-reviews" && tab.key !== "deposit-confirmations")),
+    [canReviewAdminOps]
+  );
   const [activeTab, setActiveTab] = useState<MissionReviewsTabKey>(initialTab);
   const [tabCounts, setTabCounts] = useState<Record<MissionReviewsTabKey, number>>({
     applications: 0,
+    "deposit-confirmations": 0,
     "transcript-reviews": 0,
     "video-reviews": 0,
     "final-reviews": 0,
@@ -421,8 +488,9 @@ export function MissionReviewsPage({
   });
 
   useEffect(() => {
-    setActiveTab(canReviewRefunds || initialTab !== "refund-reviews" ? initialTab : "applications");
-  }, [canReviewRefunds, initialTab]);
+    const adminOnlyTab = initialTab === "refund-reviews" || initialTab === "deposit-confirmations";
+    setActiveTab(canReviewAdminOps || !adminOnlyTab ? initialTab : "applications");
+  }, [canReviewAdminOps, initialTab]);
 
   async function loadTabCounts() {
     const buildParams = (extra?: Record<string, string>) => {
@@ -438,21 +506,26 @@ export function MissionReviewsPage({
       fetch(`${apiBasePath}/mission-video-reviews?${buildParams()}`, { cache: "no-store" }),
       fetch(`${apiBasePath}/mission-final-reviews?${buildParams({ publishStatus: "PENDING" })}`, { cache: "no-store" })
     ];
-    if (canReviewRefunds) {
+    if (canReviewAdminOps) {
       requests.push(fetch(`${apiBasePath}/mission-final-reviews?${buildParams({ publishStatus: "APPROVED", reimbursementStatus: "PAYOUT_PENDING", productReceiveOption: "PRODUCT_REQUIRED" })}`, { cache: "no-store" }));
+      requests.push(fetch("/api/admin/dashboard/creator-missions", { cache: "no-store" }));
     }
     const responses = await Promise.all(requests);
 
-    const [applicationsBody, transcriptBody, videoBody, finalBody, refundBody] = await Promise.all(responses.map((response) => response.json())) as Array<ApiResult<{ pagination?: { total?: number } }>>;
+    const [applicationsBody, transcriptBody, videoBody, finalBody, refundBody, depositBody] = await Promise.all(responses.map((response) => response.json())) as Array<ApiResult<{ pagination?: { total?: number } } | AdminDepositMission[]>>;
 
-    const applicationsTotal = applicationsBody?.data?.pagination?.total ?? 0;
-    const transcriptTotal = transcriptBody?.data?.pagination?.total ?? 0;
-    const videoTotal = videoBody?.data?.pagination?.total ?? 0;
-    const finalTotal = finalBody?.data?.pagination?.total ?? 0;
-    const refundTotal = refundBody?.data?.pagination?.total ?? 0;
+    const applicationsTotal = paginationTotal(applicationsBody?.data);
+    const transcriptTotal = paginationTotal(transcriptBody?.data);
+    const videoTotal = paginationTotal(videoBody?.data);
+    const finalTotal = paginationTotal(finalBody?.data);
+    const refundTotal = paginationTotal(refundBody?.data);
+    const depositTotal = Array.isArray(depositBody?.data)
+      ? depositBody.data.filter((item) => isDepositConfirmationCandidate(item) && (!fixedCampaignId || item.campaign.id === fixedCampaignId)).length
+      : 0;
 
     setTabCounts({
       applications: applicationsTotal,
+      "deposit-confirmations": depositTotal,
       "transcript-reviews": transcriptTotal,
       "video-reviews": videoTotal,
       "final-reviews": finalTotal,
@@ -472,7 +545,7 @@ export function MissionReviewsPage({
     return () => {
       cancelled = true;
     };
-  }, [apiBasePath, canReviewRefunds, fixedCampaignId]);
+  }, [apiBasePath, canReviewAdminOps, fixedCampaignId]);
 
   return (
     <>
@@ -495,10 +568,178 @@ export function MissionReviewsPage({
 
       {activeTab === "transcript-reviews" ? <BrandMissionTranscriptReviewsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} onReviewUpdated={() => void loadTabCounts()} /> : null}
       {activeTab === "applications" ? <BrandMissionApplicationsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} onReviewUpdated={() => void loadTabCounts()} /> : null}
+      {activeTab === "deposit-confirmations" && canReviewAdminOps ? <AdminDepositConfirmationsTab fixedCampaignId={fixedCampaignId} hideFilters={embedded} onReviewUpdated={() => void loadTabCounts()} /> : null}
       {activeTab === "video-reviews" ? <BrandMissionVideoReviewsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} onReviewUpdated={() => void loadTabCounts()} /> : null}
       {activeTab === "final-reviews" ? <BrandMissionFinalReviewsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} onReviewUpdated={() => void loadTabCounts()} /> : null}
-      {activeTab === "refund-reviews" && canReviewRefunds ? <BrandMissionFinalReviewsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} mode="refund" onReviewUpdated={() => void loadTabCounts()} /> : null}
+      {activeTab === "refund-reviews" && canReviewAdminOps ? <BrandMissionFinalReviewsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} mode="refund" onReviewUpdated={() => void loadTabCounts()} /> : null}
     </>
+  );
+}
+
+function AdminDepositConfirmationsTab({ fixedCampaignId, hideFilters = false, onReviewUpdated }: { fixedCampaignId?: string; hideFilters?: boolean; onReviewUpdated?: () => void }) {
+  const [items, setItems] = useState<AdminDepositMission[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [query, setQuery] = useState("");
+  const [busyId, setBusyId] = useState("");
+
+  async function load() {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/dashboard/creator-missions", { cache: "no-store" });
+      const body = (await res.json()) as ApiResult<AdminDepositMission[]>;
+      if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? "Không thể tải danh sách chờ cọc");
+      setItems(body.data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không thể tải danh sách chờ cọc");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const filteredItems = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return items.filter((item) => {
+      if (!isDepositConfirmationCandidate(item)) return false;
+      if (fixedCampaignId && item.campaign.id !== fixedCampaignId) return false;
+      if (!q) return true;
+      const haystack = [item.account.displayName, item.account.email, item.campaign.title, item.mission.title, item.mission.productName]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [fixedCampaignId, items, query]);
+
+  async function confirmDeposit(item: AdminDepositMission) {
+    setNotice("");
+    setError("");
+    if (!window.confirm(`Xác nhận cọc và nhận sản phẩm cho ${item.account.displayName}?`)) return;
+    setBusyId(item.id);
+    try {
+      const res = await fetch(`/api/admin/dashboard/creator-missions/${item.id}/decision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "CONFIRM_DEPOSIT_AND_PRODUCT_RECEIVED" })
+      });
+      const body = (await res.json()) as ApiResult<unknown>;
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Xác nhận cọc thất bại");
+      setNotice("Đã xác nhận cọc và mở khóa bước thực hiện cho Creator.");
+      await load();
+      onReviewUpdated?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Xác nhận cọc thất bại");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function markShipped(item: AdminDepositMission) {
+    setNotice("");
+    setError("");
+    if (!window.confirm(`Đánh dấu đã gửi hàng cho ${item.account.displayName}?`)) return;
+    setBusyId(item.id);
+    try {
+      const res = await fetch(`/api/admin/dashboard/creator-missions/${item.id}/decision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "MARK_SAMPLE_SHIPPED" })
+      });
+      const body = (await res.json()) as ApiResult<unknown>;
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Cập nhật gửi hàng thất bại");
+      setNotice("Đã đánh dấu hàng review là đã gửi.");
+      await load();
+      onReviewUpdated?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Cập nhật gửi hàng thất bại");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function copyShipping(item: AdminDepositMission) {
+    try {
+      await navigator.clipboard.writeText(shippingCopyText(item));
+      setNotice("Đã copy thông tin nhận hàng.");
+    } catch {
+      setError("Không thể copy tự động. Vui lòng copy thủ công.");
+    }
+  }
+
+  return (
+    <section className="mt-4 grid gap-4">
+      {!hideFilters ? (
+        <section className="dc-card p-4">
+          <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+            <input className="dc-input" placeholder="Tìm creator, email, campaign, sản phẩm" value={query} onChange={(event) => setQuery(event.target.value)} />
+            <button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>
+          </div>
+          <p className="mt-2 text-sm text-zinc-500">Tổng {filteredItems.length} nhiệm vụ đang chờ xác nhận cọc hoặc gửi hàng.</p>
+        </section>
+      ) : null}
+
+      {notice ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</p> : null}
+      {error ? <ErrorState title="Có lỗi" description={error} onRetry={() => void load()} /> : null}
+      {loading ? <LoadingSkeleton rows={5} /> : null}
+
+      {!loading && !error ? (
+        <section className="grid gap-3">
+          {filteredItems.length === 0 ? (
+            <EmptyState title="Không có nhiệm vụ chờ xử lý cọc/gửi hàng" description="Khi Creator bấm đặt cọc hoặc đã cọc xong, nhiệm vụ sẽ xuất hiện tại đây để Admin/Brand xử lý." />
+          ) : (
+            filteredItems.map((item) => (
+              <article key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
+                <div className="grid gap-3 xl:grid-cols-[1.6fr_1fr_1fr_1.4fr_auto] xl:items-start">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-zinc-900">{item.mission.title}</p>
+                    <p className="line-clamp-1 text-sm text-zinc-500">Chiến dịch: {item.campaign.title}</p>
+                    <p className="line-clamp-1 text-sm text-zinc-500">Creator: {item.account.displayName} • {item.account.email}</p>
+                  </div>
+                  <div className="text-sm text-zinc-600">
+                    <p>Sản phẩm: <span className="font-semibold text-zinc-900">{item.mission.productName ?? "-"}</span></p>
+                    <p>Link: <UrlValue value={item.mission.productLink ?? null} /></p>
+                  </div>
+                  <div className="text-sm text-zinc-600">
+                    <p>Cọc: <span className="font-semibold text-zinc-900">{fmtVnd(item.creatorDepositAmountVnd ?? item.campaign.creatorDepositAmountVnd)}</span></p>
+                    <p>Trạng thái: {mapStatusVi(item.depositStatus)}</p>
+                    <p>Gửi hàng: {mapStatusVi(item.sampleShippingStatus)}</p>
+                    <p>Deadline: {deadlineLabel(item.mission.deadlineAt ?? null)}</p>
+                  </div>
+                  <div className="text-sm text-zinc-600">
+                    <p className="font-semibold text-zinc-900">Thông tin nhận hàng</p>
+                    <p>Họ tên: {item.shippingRecipientName ?? "-"}</p>
+                    <p>SĐT: {item.shippingPhone ?? "-"}</p>
+                    <p>Địa chỉ: {shippingAddressText(item) || "-"}</p>
+                    {item.shippingNote ? <p>Ghi chú: {item.shippingNote}</p> : null}
+                  </div>
+                  <div className="flex flex-wrap gap-2 xl:justify-end">
+                    <button className="dc-btn-secondary w-full whitespace-normal sm:w-auto" disabled={busyId === item.id} onClick={() => void copyShipping(item)}>
+                      Copy thông tin nhận hàng
+                    </button>
+                    {item.depositStatus !== "HELD" ? (
+                      <button className="dc-btn-primary w-full whitespace-normal sm:w-auto" disabled={busyId === item.id} onClick={() => void confirmDeposit(item)}>
+                        Xác nhận đã nhận tiền
+                      </button>
+                    ) : null}
+                    {item.depositStatus === "HELD" && item.sampleShippingStatus !== "SHIPPED" && item.sampleShippingStatus !== "RECEIVED" ? (
+                      <button className="dc-btn-primary w-full whitespace-normal sm:w-auto" disabled={busyId === item.id} onClick={() => void markShipped(item)}>
+                        Đã gửi hàng
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </article>
+            ))
+          )}
+        </section>
+      ) : null}
+    </section>
   );
 }
 
@@ -512,7 +753,7 @@ type TranscriptItem = {
     email: string;
     creatorProfile: { mainPlatform: string | null; socialUrl: string | null; followerCount: number | null; bio?: string | null; socialLinks?: Array<{ id: string; platform: string; socialUrl: string; followers: number | null; handle: string | null }> } | null;
   };
-  campaign: { id: string; title: string; slug: string; brandId: string };
+  campaign: { id: string; title: string; slug: string; brandId: string; fulfillmentMode?: "BRAND_SHIP" | "CREATOR_ORDER" };
   mission: { id: string; title: string; description: string; rewardPoints: number; productReceiveOption: string; productLink: string | null; deadlineAt: string | null; productName?: string | null; productDescription?: string | null; productImageUrl?: string | null };
   submission: {
     transcriptType: "TEXT" | "FILE" | "URL" | null;
@@ -739,7 +980,7 @@ function BrandMissionTranscriptReviewsTab({ apiBasePath, fixedCampaignId, hideFi
             onClose={() => { setSelectedId(""); setDetail(null); setDetailLoading(false); }}
             detailTab={detailTab}
             setDetailTab={setDetailTab}
-            timelineSteps={buildReviewTimelineForStage("transcript", detail?.mission.productReceiveOption === "PRODUCT_REQUIRED", detail ? transcriptStatusLabel(detail) : undefined)}
+            timelineSteps={buildReviewTimelineForStage("transcript", detail?.mission.productReceiveOption === "PRODUCT_REQUIRED", detail ? transcriptStatusLabel(detail) : undefined, undefined, detail?.campaign.fulfillmentMode)}
             campaignNode={<CampaignOverviewCard campaign={detail?.campaign} mission={detail?.mission} loading={detailLoading} />}
             missionNode={
               <>
@@ -1104,7 +1345,7 @@ function BrandMissionApplicationsTab({ apiBasePath, fixedCampaignId, hideFilters
             onClose={() => { setSelectedId(""); setDetail(null); setDetailLoading(false); }}
             detailTab={detailTab}
             setDetailTab={setDetailTab}
-            timelineSteps={buildReviewTimelineForStage("application", detail?.mission.productReceiveOption === "PRODUCT_REQUIRED", detail?.status)}
+            timelineSteps={buildReviewTimelineForStage("application", detail?.mission.productReceiveOption === "PRODUCT_REQUIRED", detail?.status, undefined, detail?.campaign.fulfillmentMode)}
             campaignNode={<CampaignOverviewCard campaign={detail?.campaign} mission={detail?.mission} loading={detailLoading} />}
             missionNode={
               <>
@@ -1148,7 +1389,7 @@ type VideoItem = {
   videoReviewStatus: string;
   videoSubmittedAt: string | null;
   account: { displayName: string; email: string; creatorProfile?: { socialLinks?: Array<{ id: string; platform: string; socialUrl: string; followers: number | null; handle: string | null }> } | null };
-  campaign: { id: string; title: string; slug?: string };
+  campaign: { id: string; title: string; slug?: string; fulfillmentMode?: "BRAND_SHIP" | "CREATOR_ORDER" };
   mission: { title: string; rewardPoints?: number | null; description?: string | null; deadlineAt?: string | null; productReceiveOption?: string | null; productName?: string | null; productDescription?: string | null; productImageUrl?: string | null; productLink?: string | null };
   submission: { videoUrl: string | null; note: string | null; rejectReason: string | null; publicVideoUrl?: string | null; socialPostUrl?: string | null } | null;
 };
@@ -1321,7 +1562,7 @@ function BrandMissionVideoReviewsTab({ apiBasePath, fixedCampaignId, hideFilters
             onClose={() => { setSelectedId(""); setDetail(null); setDetailLoading(false); }}
             detailTab={detailTab}
             setDetailTab={setDetailTab}
-            timelineSteps={buildReviewTimelineForStage("video", detail?.mission.productReceiveOption === "PRODUCT_REQUIRED", detail?.videoReviewStatus)}
+            timelineSteps={buildReviewTimelineForStage("video", detail?.mission.productReceiveOption === "PRODUCT_REQUIRED", detail?.videoReviewStatus, undefined, detail?.campaign.fulfillmentMode)}
             campaignNode={<CampaignOverviewCard campaign={detail?.campaign} mission={detail?.mission} loading={detailLoading} />}
             missionNode={<>{detail?.mission.productReceiveOption === "PRODUCT_REQUIRED" ? <ProductInfoCard title={detail?.mission.productName} description={detail?.mission.productDescription} imageUrl={detail?.mission.productImageUrl} link={detail?.mission.productLink} /> : null}<CreatorSocialLinks name={detail?.account.displayName} profile={detail?.account.creatorProfile} /></>}
             historyNode={<div className="space-y-3"><p className="text-sm font-semibold text-zinc-900">Lịch sử các lần đã nộp</p>{(detail?.videoSubmittedAt || detail?.submission?.videoUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp video</summary><div className="mt-2 space-y-1"><p>Thời gian nộp: {fmtDate(detail?.videoSubmittedAt ?? null)}</p><p>Video URL: <UrlValue value={detail?.submission?.videoUrl} /></p>{detail?.submission?.note?.trim() ? <p>Ghi chú: {detail.submission.note}</p> : null}</div></details> : null}{(detail?.submission?.publicVideoUrl || detail?.submission?.socialPostUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp link social</summary><div className="mt-2 space-y-1"><p>Link public: <UrlValue value={detail?.submission?.publicVideoUrl ?? detail?.submission?.socialPostUrl} label="Mở liên kết public" /></p></div></details> : null}</div>}
@@ -1360,7 +1601,7 @@ type FinalItem = {
   publishSubmittedAt: string | null;
   reimbursementStatus: string;
   account: { displayName: string; email: string; creatorProfile?: { socialLinks?: Array<{ id: string; platform: string; socialUrl: string; followers: number | null; handle: string | null }> } | null };
-  campaign: { id: string; title: string; slug?: string };
+  campaign: { id: string; title: string; slug?: string; fulfillmentMode?: "BRAND_SHIP" | "CREATOR_ORDER" };
   mission: { title: string; rewardPoints: number; productLink: string | null; description?: string | null; deadlineAt?: string | null; productName?: string | null; productDescription?: string | null; productImageUrl?: string | null };
   submission: {
     videoUrl: string | null;
@@ -1660,7 +1901,7 @@ function BrandMissionFinalReviewsTab({
             onClose={() => { setSelectedId(""); setDetail(null); setDetailLoading(false); }}
             detailTab={detailTab}
             setDetailTab={setDetailTab}
-            timelineSteps={buildReviewTimelineForStage("publish", detail?.productReceiveOption === "PRODUCT_REQUIRED", detail?.publishStatus, detail?.reimbursementStatus)}
+            timelineSteps={buildReviewTimelineForStage("publish", detail?.productReceiveOption === "PRODUCT_REQUIRED", detail?.publishStatus, detail?.reimbursementStatus, detail?.campaign.fulfillmentMode)}
             campaignNode={<CampaignOverviewCard campaign={detail?.campaign} mission={detail?.mission} loading={detailLoading} />}
             missionNode={<>{detail?.productReceiveOption === "PRODUCT_REQUIRED" ? <ProductInfoCard title={detail?.mission.productName} description={detail?.mission.productDescription} imageUrl={detail?.mission.productImageUrl} link={detail?.mission.productLink} /> : null}<CreatorSocialLinks name={detail?.account.displayName} profile={detail?.account.creatorProfile} /></>}
             historyNode={<div className="space-y-3"><p className="text-sm font-semibold text-zinc-900">Lịch sử các lần đã nộp</p>{(detail?.submission?.purchaseBillImageUrl || detail?.submission?.productReviewScreenshotUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước mua sản phẩm</summary><div className="mt-2 space-y-1"><p>Ảnh bill: <UrlValue value={detail?.submission?.purchaseBillImageUrl} label="Tải file ảnh" /></p><p>Ảnh đánh giá: <UrlValue value={detail?.submission?.productReviewScreenshotUrl} label="Tải file ảnh" /></p></div></details> : null}{detail?.submission?.videoUrl ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp video</summary><div className="mt-2 space-y-1"><p>Video review: <UrlValue value={detail?.submission?.videoUrl} /></p></div></details> : null}{(detail?.publishSubmittedAt || detail?.submission?.publicVideoUrl || detail?.submission?.socialPostUrl) ? <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700" open><summary className="cursor-pointer font-semibold text-zinc-900">Bước nộp link social</summary><div className="mt-2 space-y-1"><p>Thời gian nộp: {fmtDate(detail?.publishSubmittedAt ?? null)}</p><p>Link public: <UrlValue value={detail?.submission?.publicVideoUrl ?? detail?.submission?.socialPostUrl} label="Mở liên kết public" /></p><p>Ảnh chụp màn hình minh chứng: <UrlValue value={detail?.submission?.screenshotUrl} label="Tải file ảnh" /></p><p>Mã quảng cáo: {detail?.submission?.adCode ?? "-"}</p>{hasText(detail?.submission?.finalProofNote) ? <p>Ghi chú: {detail?.submission?.finalProofNote}</p> : null}</div></details> : null}</div>}

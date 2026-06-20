@@ -35,6 +35,7 @@ type CreatorMissionItem = {
   status: string;
   productReceiveOption: string;
   productStatus: string;
+  depositStatus: string;
   reimbursementStatus: string;
   publishStatus: string;
   publishFeedback: string | null;
@@ -122,6 +123,7 @@ export default function AdminCampaignApplicationsPage() {
   async function decideCreatorMission(
     id: string,
     action:
+      | "CONFIRM_DEPOSIT_AND_PRODUCT_RECEIVED"
       | "APPROVE_PURCHASE_PROOF"
       | "REJECT_PURCHASE_PROOF"
       | "APPROVE_PUBLISH_REPORT"
@@ -130,7 +132,9 @@ export default function AdminCampaignApplicationsPage() {
     setError("");
     setNotice("");
     const actionLabel =
-      action === "APPROVE_PURCHASE_PROOF"
+      action === "CONFIRM_DEPOSIT_AND_PRODUCT_RECEIVED"
+        ? "xác nhận cọc và nhận sản phẩm"
+        : action === "APPROVE_PURCHASE_PROOF"
         ? "duyệt bằng chứng mua hàng"
         : action === "REJECT_PURCHASE_PROOF"
           ? "từ chối bằng chứng mua hàng"
@@ -305,6 +309,10 @@ export default function AdminCampaignApplicationsPage() {
               <div className="mt-3 grid gap-3">
                 {productQueue.map((item) => {
                   const canReviewPurchaseProof = item.reimbursementStatus === "PURCHASE_SUBMITTED";
+                  const canConfirmDeposit =
+                    item.productReceiveOption === "PRODUCT_REQUIRED" &&
+                    item.productStatus === "WAITING_DEPOSIT" &&
+                    item.depositStatus !== "HELD";
                   return (
                     <article key={item.id} className="dc-card p-4">
                       <p className="font-semibold">{item.account.displayName} ({item.account.email})</p>
@@ -312,10 +320,19 @@ export default function AdminCampaignApplicationsPage() {
                       <p className="text-sm">Mission: {item.mission.title}</p>
                       <p className="text-sm">Trạng thái nhiệm vụ: {item.status}</p>
                       <p className="text-sm">Trạng thái sản phẩm: {item.productStatus}</p>
+                      <p className="text-sm">Trạng thái cọc: {item.depositStatus}</p>
                       <p className="text-sm">Trạng thái hoàn tiền: {item.reimbursementStatus}</p>
                       <p className="text-sm">Link sản phẩm: {item.mission.productLink ?? "(chưa có)"}</p>
                       <p className="text-sm">Hóa đơn URL: {item.submission?.screenshotUrl ?? "-"}</p>
                       <p className="text-sm">Ghi chú mua hàng: {item.submission?.proofTextNote ?? "-"}</p>
+
+                      {canConfirmDeposit ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button className="dc-btn-primary" onClick={() => void decideCreatorMission(item.id, "CONFIRM_DEPOSIT_AND_PRODUCT_RECEIVED")}>
+                            Xác nhận cọc + nhận sản phẩm
+                          </button>
+                        </div>
+                      ) : null}
 
                       {canReviewPurchaseProof ? (
                         <div className="mt-3 flex flex-wrap gap-2">

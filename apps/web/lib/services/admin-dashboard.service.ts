@@ -10,6 +10,7 @@ import {
   confirmDepositAndProductReceivedByAdmin,
   ensureCreatorMissionFromApprovedApplication,
   listCreatorMissionsForAdmin,
+  markSampleShippedByAdmin,
   rejectPublishReportByAdmin,
   rejectVideoReviewByAdmin,
   rejectPurchaseProofByAdmin
@@ -788,6 +789,7 @@ export async function decideCreatorMissionWorkflowByAdmin(
   creatorMissionId: string,
   action:
     | "CONFIRM_DEPOSIT_AND_PRODUCT_RECEIVED"
+    | "MARK_SAMPLE_SHIPPED"
     | "APPROVE_PURCHASE_PROOF"
     | "REJECT_PURCHASE_PROOF"
     | "APPROVE_VIDEO_REVIEW"
@@ -799,6 +801,9 @@ export async function decideCreatorMissionWorkflowByAdmin(
 ) {
   if (action === "CONFIRM_DEPOSIT_AND_PRODUCT_RECEIVED") {
     return confirmDepositAndProductReceivedByAdmin(actorId, creatorMissionId);
+  }
+  if (action === "MARK_SAMPLE_SHIPPED") {
+    return markSampleShippedByAdmin(actorId, creatorMissionId);
   }
   if (action === "APPROVE_PURCHASE_PROOF") {
     return approvePurchaseProofByAdmin(actorId, creatorMissionId);

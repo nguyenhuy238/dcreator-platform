@@ -126,13 +126,23 @@ async function ensureCreatorProfileForSocialLink(accountId: string) {
 
 export async function getCreatorDashboardOverview(accountId: string) {
   const wallet = await ensureWalletByAccountId(accountId);
-  const [totalJobs, pendingProofs, approvedVideos, completedSubmissions] = await prisma.$transaction([
+  const [totalJobs, pendingProofs, approvedVideos, completedSubmissions, adminSettings] = await prisma.$transaction([
     prisma.missionSubmission.count({ where: { accountId } }),
     prisma.missionSubmission.count({ where: { accountId, lifecycleStatus: "PENDING_REVIEW" } }),
     prisma.missionSubmission.count({ where: { accountId, lifecycleStatus: { in: ["APPROVED", "DONE"] } } }),
     prisma.missionSubmission.findMany({
       where: { accountId, lifecycleStatus: "DONE" },
       select: { mission: { select: { rewardPoints: true } } }
+    }),
+    prisma.adminSetting.findUnique({
+      where: { scope: "global" },
+      select: {
+        creatorDepositQrImageUrl: true,
+        creatorDepositAccountName: true,
+        creatorDepositAccountNumber: true,
+        creatorDepositBankName: true,
+        creatorDepositTransferPrefix: true
+      }
     })
   ]);
 
@@ -146,7 +156,14 @@ export async function getCreatorDashboardOverview(accountId: string) {
     pendingProofs,
     approvedVideos,
     totalCommission,
-    nPointsBalance: wallet.pointsBalance
+    nPointsBalance: wallet.pointsBalance,
+    creatorDepositBankConfig: {
+      qrImageUrl: adminSettings?.creatorDepositQrImageUrl || "/qr-dcreator.jpg",
+      accountName: adminSettings?.creatorDepositAccountName || "",
+      accountNumber: adminSettings?.creatorDepositAccountNumber || "",
+      bankName: adminSettings?.creatorDepositBankName || "",
+      transferPrefix: adminSettings?.creatorDepositTransferPrefix || "DCR"
+    }
   };
 }
 

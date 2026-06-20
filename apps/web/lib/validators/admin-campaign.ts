@@ -38,6 +38,7 @@ export const adminCampaignCreateSchema = z.object({
   campaignType: z.enum(["DONATION", "PREORDER", "SPONSORSHIP", "COMMUNITY"]),
   setupSource: z.enum(["JOIN_EXISTING_DCREATOR_CAMP", "BRAND_REQUESTED"]).default("BRAND_REQUESTED"),
   fulfillmentMode: z.enum(CAMPAIGN_FULFILLMENT_MODES).default("BRAND_SHIP"),
+  creatorDepositAmountVnd: z.number().int().min(0).max(2_000_000_000).default(0),
   requirementsSummary: z.string().trim().max(160).nullable().optional(),
   requirements: z.string().trim().min(3).max(2000),
   participationRoadmap: z.array(z.string().trim().min(1).max(300)).optional(),
@@ -62,6 +63,9 @@ export const adminCampaignCreateSchema = z.object({
   if (value.startsAt && value.endsAt && new Date(value.endsAt) <= new Date(value.startsAt)) {
     ctx.addIssue({ code: "custom", path: ["endsAt"], message: "Ngày kết thúc phải sau ngày bắt đầu." });
   }
+  if (value.fulfillmentMode === "BRAND_SHIP" && value.creatorDepositAmountVnd <= 0) {
+    ctx.addIssue({ code: "custom", path: ["creatorDepositAmountVnd"], message: "Tiền cọc Creator phải lớn hơn 0 khi Brand tự gửi hàng." });
+  }
 });
 
 export const adminCampaignUpdateSchema = z.object({
@@ -78,6 +82,7 @@ export const adminCampaignUpdateSchema = z.object({
   campaignType: z.enum(["DONATION", "PREORDER", "SPONSORSHIP", "COMMUNITY"]).optional(),
   setupSource: z.enum(["JOIN_EXISTING_DCREATOR_CAMP", "BRAND_REQUESTED"]).optional(),
   fulfillmentMode: z.enum(CAMPAIGN_FULFILLMENT_MODES).optional(),
+  creatorDepositAmountVnd: z.number().int().min(0).max(2_000_000_000).optional(),
   requirementsSummary: z.string().trim().max(160).nullable().optional(),
   requirements: z.string().trim().min(3).max(2000).nullable().optional(),
   benefits: z.string().trim().min(3).max(2000).nullable().optional(),
@@ -103,5 +108,8 @@ export const adminCampaignUpdateSchema = z.object({
 }).superRefine((value, ctx) => {
   if (value.startsAt && value.endsAt && new Date(value.endsAt) <= new Date(value.startsAt)) {
     ctx.addIssue({ code: "custom", path: ["endsAt"], message: "Ngày kết thúc phải sau ngày bắt đầu." });
+  }
+  if (value.fulfillmentMode === "BRAND_SHIP" && (value.creatorDepositAmountVnd ?? 0) <= 0) {
+    ctx.addIssue({ code: "custom", path: ["creatorDepositAmountVnd"], message: "Tiền cọc Creator phải lớn hơn 0 khi Brand tự gửi hàng." });
   }
 });

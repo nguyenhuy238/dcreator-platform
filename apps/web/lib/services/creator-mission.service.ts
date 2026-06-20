@@ -19,6 +19,16 @@ type Sort = "newest" | "oldest";
 type FinalReviewResubmitField = "PUBLIC_URL" | "AD_CODE" | "SCREENSHOT" | "PURCHASE_BILL" | "PRODUCT_REVIEW_SCREENSHOT";
 const FINAL_REVIEW_REJECT_META_PREFIX = "[[FINAL_REVIEW_REJECT_META]]:";
 
+type CreatorShippingInput = {
+  recipientName?: string;
+  phone?: string;
+  province?: string;
+  district?: string;
+  ward?: string;
+  addressLine?: string;
+  note?: string;
+};
+
 const creatorMissionInclude = {
   mission: {
     select: {
@@ -54,6 +64,7 @@ const creatorMissionInclude = {
       endsAt: true,
       fulfillmentMode: true,
       creatorDepositRequired: true,
+      creatorDepositAmountVnd: true,
       brand: {
         select: {
           id: true,
@@ -262,9 +273,24 @@ function mapMission(item: CreatorMissionEntity) {
     missionApplicationId: item.missionApplicationId,
     status: item.status,
     productReceiveOption: item.productReceiveOption,
-    productStatus: item.productStatus,
-    depositStatus: item.depositStatus,
-    reimbursementStatus: item.reimbursementStatus,
+  productStatus: item.productStatus,
+  depositStatus: item.depositStatus,
+  creatorDepositAmountVnd: item.creatorDepositAmountVnd,
+  depositHeldAt: dt(item.depositHeldAt),
+  depositRefundedAt: dt(item.depositRefundedAt),
+  depositTransactionId: item.depositTransactionId,
+  shippingRecipientName: item.shippingRecipientName,
+  shippingPhone: item.shippingPhone,
+  shippingProvince: item.shippingProvince,
+  shippingDistrict: item.shippingDistrict,
+  shippingWard: item.shippingWard,
+  shippingAddressLine: item.shippingAddressLine,
+  shippingNote: item.shippingNote,
+  shippingInfoSubmittedAt: dt(item.shippingInfoSubmittedAt),
+  sampleShippingStatus: item.sampleShippingStatus,
+  sampleShippedAt: dt(item.sampleShippedAt),
+  sampleReceivedAt: dt(item.sampleReceivedAt),
+  reimbursementStatus: item.reimbursementStatus,
     reimbursementAmountVnd: item.reimbursementAmountVnd,
     purchaseProofTextNote: item.purchaseProofTextNote,
     purchaseProofScreenshotUrl: item.purchaseProofScreenshotUrl,
@@ -315,6 +341,50 @@ function mapMission(item: CreatorMissionEntity) {
       reviewedAt: dt(missionApplication.reviewedAt),
       createdAt: missionApplication.createdAt.toISOString()
     }
+  };
+}
+
+function missionRequiresHeldCreatorDeposit(item: CreatorMissionEntity) {
+  return item.campaign.fulfillmentMode === "BRAND_SHIP" && item.campaign.creatorDepositRequired;
+}
+
+function assertHeldCreatorDeposit(item: CreatorMissionEntity) {
+  if (missionRequiresHeldCreatorDeposit(item) && item.depositStatus !== "HELD") {
+    throw new AppError("Campaign này yêu cầu đặt cọc trước khi nộp proof/video.", 409, "CREATOR_DEPOSIT_REQUIRED");
+  }
+}
+
+function campaignDepositAmount(item: CreatorMissionEntity) {
+  return item.creatorDepositAmountVnd > 0 ? item.creatorDepositAmountVnd : item.campaign.creatorDepositAmountVnd;
+}
+
+function normalizeCreatorShipping(input: CreatorShippingInput | undefined) {
+  const shipping = {
+    recipientName: input?.recipientName?.trim() ?? "",
+    phone: input?.phone?.trim() ?? "",
+    province: input?.province?.trim() ?? "",
+    district: input?.district?.trim() ?? "",
+    ward: input?.ward?.trim() ?? "",
+    addressLine: input?.addressLine?.trim() ?? "",
+    note: input?.note?.trim() ?? ""
+  };
+  if (!shipping.recipientName) throw new AppError("Họ tên người nhận là bắt buộc.", 422, "SHIPPING_RECIPIENT_REQUIRED");
+  if (!shipping.phone) throw new AppError("Số điện thoại nhận hàng là bắt buộc.", 422, "SHIPPING_PHONE_REQUIRED");
+  if (!shipping.province) throw new AppError("Tỉnh/Thành phố nhận hàng là bắt buộc.", 422, "SHIPPING_PROVINCE_REQUIRED");
+  if (!shipping.addressLine) throw new AppError("Địa chỉ chi tiết nhận hàng là bắt buộc.", 422, "SHIPPING_ADDRESS_REQUIRED");
+  return shipping;
+}
+
+function shippingUpdateData(shipping: ReturnType<typeof normalizeCreatorShipping>) {
+  return {
+    shippingRecipientName: shipping.recipientName,
+    shippingPhone: shipping.phone,
+    shippingProvince: shipping.province,
+    shippingDistrict: shipping.district || null,
+    shippingWard: shipping.ward || null,
+    shippingAddressLine: shipping.addressLine,
+    shippingNote: shipping.note || null,
+    shippingInfoSubmittedAt: now()
   };
 }
 
@@ -430,6 +500,127 @@ async function creditPointsOnce(
       balanceAfterCashVnd: updated.cashBalanceVnd,
       referenceType,
       referenceId,
+      idempotencyKey
+    }
+  });
+}
+
+async function debitCreatorDepositIfBalanceAllows(
+  tx: Prisma.TransactionClient,
+  accountId: string,
+  creatorMissionId: string,
+  amount: number
+) {
+  const wallet = await tx.wallet.upsert({
+    where: { userId: accountId },
+    create: { userId: accountId },
+    update: {}
+  });
+  const idempotencyKey = `creator_deposit_hold_${creatorMissionId}`;
+  const existing = await tx.walletTransaction.findUnique({
+    where: { walletId_idempotencyKey: { walletId: wallet.id, idempotencyKey } }
+  });
+  if (existing) return existing;
+
+  const rows = await tx.$queryRaw<Array<{ id: string; pointsBalance: number; cashBalanceVnd: number }>>`
+    UPDATE "Wallet"
+    SET "pointsBalance" = "pointsBalance" - ${amount}
+    WHERE "id" = ${wallet.id}
+      AND "pointsBalance" >= ${amount}
+    RETURNING "id", "pointsBalance", "cashBalanceVnd"
+  `;
+  const updatedWallet = rows[0];
+  if (!updatedWallet) return null;
+
+  return tx.walletTransaction.create({
+    data: {
+      walletId: wallet.id,
+      accountId,
+      type: "CREATOR_DEPOSIT_HOLD",
+      pointsDelta: -amount,
+      cashDeltaVnd: 0,
+      balanceAfterPoints: updatedWallet.pointsBalance,
+      balanceAfterCashVnd: updatedWallet.cashBalanceVnd,
+      referenceType: "CREATOR_MISSION",
+      referenceId: creatorMissionId,
+      idempotencyKey
+    }
+  });
+}
+
+async function recordAdminConfirmedCreatorDeposit(
+  tx: Prisma.TransactionClient,
+  accountId: string,
+  creatorMissionId: string
+) {
+  const wallet = await tx.wallet.upsert({
+    where: { userId: accountId },
+    create: { userId: accountId },
+    update: {}
+  });
+  const idempotencyKey = `creator_deposit_admin_confirmed_${creatorMissionId}`;
+  const existing = await tx.walletTransaction.findUnique({
+    where: { walletId_idempotencyKey: { walletId: wallet.id, idempotencyKey } }
+  });
+  if (existing) return existing;
+  const current = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+  return tx.walletTransaction.create({
+    data: {
+      walletId: wallet.id,
+      accountId,
+      type: "CREATOR_DEPOSIT_ADMIN_CONFIRMED",
+      pointsDelta: 0,
+      cashDeltaVnd: 0,
+      balanceAfterPoints: current.pointsBalance,
+      balanceAfterCashVnd: current.cashBalanceVnd,
+      referenceType: "CREATOR_MISSION",
+      referenceId: creatorMissionId,
+      idempotencyKey
+    }
+  });
+}
+
+async function refundCreatorDepositIfNeeded(
+  tx: Prisma.TransactionClient,
+  current: CreatorMissionEntity
+) {
+  if (
+    current.campaign.fulfillmentMode !== "BRAND_SHIP" ||
+    !current.campaign.creatorDepositRequired ||
+    current.depositStatus !== "HELD"
+  ) {
+    return null;
+  }
+  const amount = campaignDepositAmount(current);
+  if (amount <= 0) return null;
+
+  const wallet = await tx.wallet.upsert({
+    where: { userId: current.accountId },
+    create: { userId: current.accountId },
+    update: {}
+  });
+  const idempotencyKey = `creator_deposit_refund_${current.id}`;
+  const existing = await tx.walletTransaction.findUnique({
+    where: { walletId_idempotencyKey: { walletId: wallet.id, idempotencyKey } }
+  });
+  if (existing) return existing;
+
+  const currentWallet = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+  const updatedWallet = await tx.wallet.update({
+    where: { id: wallet.id },
+    data: { pointsBalance: currentWallet.pointsBalance + amount }
+  });
+  return tx.walletTransaction.create({
+    data: {
+      walletId: wallet.id,
+      accountId: current.accountId,
+      type: "CREATOR_DEPOSIT_REFUND",
+      pointsDelta: amount,
+      cashDeltaVnd: 0,
+      balanceAfterPoints: updatedWallet.pointsBalance,
+      balanceAfterCashVnd: updatedWallet.cashBalanceVnd,
+      referenceType: "CREATOR_MISSION",
+      referenceId: current.id,
       idempotencyKey
     }
   });
@@ -608,15 +799,50 @@ export async function getMissionHistoryDetailForAdmin(id: string) {
   return mapMission(item);
 }
 
-export async function confirmDepositPaid(creatorMissionId: string, accountId: string) {
+export async function confirmDepositPaid(creatorMissionId: string, accountId: string, shippingInput?: CreatorShippingInput) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
   if (current.productReceiveOption !== "PRODUCT_REQUIRED") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
-  if (current.campaign.fulfillmentMode === "BRAND_SHIP") {
-    throw new AppError(
-      "Tiền cọc cần được Admin xác nhận sau khi đối soát.",
-      409,
-      "CREATOR_DEPOSIT_ADMIN_CONFIRMATION_REQUIRED"
-    );
+  if (missionRequiresHeldCreatorDeposit(current)) {
+    if (current.depositStatus === "HELD") return mapMission(current);
+    const amount = campaignDepositAmount(current);
+    if (amount <= 0) {
+      throw new AppError("Campaign chưa cấu hình tiền cọc Creator.", 409, "CREATOR_DEPOSIT_AMOUNT_MISSING");
+    }
+    const shipping = normalizeCreatorShipping(shippingInput);
+    const updated = await prisma.$transaction(async (tx) => {
+      const depositTransaction = await debitCreatorDepositIfBalanceAllows(tx, accountId, creatorMissionId, amount);
+      return tx.creatorMission.update({
+        where: { id: creatorMissionId },
+        data: {
+          ...shippingUpdateData(shipping),
+          creatorDepositAmountVnd: amount,
+          depositStatus: depositTransaction ? "HELD" : "WAITING_TRANSFER",
+          productStatus: "WAITING_DEPOSIT",
+          depositHeldAt: depositTransaction ? now() : null,
+          depositTransactionId: depositTransaction?.id ?? null,
+          sampleShippingStatus: depositTransaction ? "READY_TO_SHIP" : "WAITING_DEPOSIT"
+        },
+        include: creatorMissionInclude
+      });
+    });
+    if (updated.depositStatus === "HELD") {
+      await notifyCreator(
+        accountId,
+        "PROOF_SUBMITTED",
+        "Đã đặt cọc bằng N-Points",
+        "Hệ thống đã giữ N-Points đặt cọc. Brand/Admin có thể gửi hàng theo thông tin nhận hàng của bạn.",
+        { creatorMissionId }
+      );
+    } else {
+      await notifyCreator(
+        accountId,
+        "PROOF_SUBMITTED",
+        "Đang chờ xác nhận cọc",
+        "Số dư N-Points chưa đủ. Vui lòng chuyển khoản theo hướng dẫn và chờ Admin xác nhận.",
+        { creatorMissionId }
+      );
+    }
+    return mapMission(updated);
   }
   const updated = await prisma.creatorMission.update({
     where: { id: creatorMissionId },
@@ -668,10 +894,15 @@ export async function submitPurchaseProof(creatorMissionId: string, accountId: s
 
 export async function submitDraft(creatorMissionId: string, accountId: string, payload: { videoUrl: string; note?: string }) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
+  assertHeldCreatorDeposit(current);
   if (current.status === "DRAFT_PENDING") {
     throw new AppError("Transcript must be approved first", 409, "CREATOR_MISSION_TRANSCRIPT_NOT_APPROVED");
   }
-  if (current.productReceiveOption === "PRODUCT_REQUIRED" && current.productStatus !== "RECEIVED") {
+  if (
+    current.productReceiveOption === "PRODUCT_REQUIRED" &&
+    current.campaign.fulfillmentMode === "CREATOR_ORDER" &&
+    current.productStatus !== "RECEIVED"
+  ) {
     throw new AppError("Purchase proof is required before video submission", 409, "PURCHASE_PROOF_REQUIRED");
   }
   await prisma.$transaction(async (tx) => {
@@ -715,19 +946,47 @@ export async function confirmDepositAndProductReceivedByAdmin(actorId: string, c
   const current = await getMissionById(creatorMissionId);
   if (!current) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
   if (current.productReceiveOption !== "PRODUCT_REQUIRED") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
+  const amount = campaignDepositAmount(current);
+  const updated = await prisma.$transaction(async (tx) => {
+    const transaction =
+      current.campaign.fulfillmentMode === "BRAND_SHIP"
+        ? await recordAdminConfirmedCreatorDeposit(tx, current.accountId, creatorMissionId)
+        : null;
+    return tx.creatorMission.update({
+      where: { id: creatorMissionId },
+      data: {
+        status: "IN_PROGRESS",
+        productStatus: current.campaign.fulfillmentMode === "BRAND_SHIP" ? "WAITING_DEPOSIT" : "RECEIVED",
+        depositStatus: current.campaign.fulfillmentMode === "BRAND_SHIP" ? "HELD" : "PAID",
+        creatorDepositAmountVnd: amount > 0 ? amount : current.creatorDepositAmountVnd,
+        depositHeldAt: current.depositHeldAt ?? now(),
+        depositTransactionId: current.depositTransactionId ?? transaction?.id ?? null,
+        sampleShippingStatus: current.campaign.fulfillmentMode === "BRAND_SHIP" ? "READY_TO_SHIP" : "NOT_REQUIRED",
+        purchaseProofReviewedAt: now(),
+        purchaseProofRejectReason: null,
+        startedAt: current.startedAt ?? now()
+      },
+      include: creatorMissionInclude
+    });
+  });
+  await notifyCreator(updated.accountId, "MISSION_APPLICATION_APPROVED", "Đã xác nhận cọc", "Admin đã xác nhận tiền cọc. Brand/Admin có thể gửi hàng theo thông tin nhận hàng của bạn.", { creatorMissionId, actorId });
+  return mapMission(updated);
+}
+
+export async function markSampleShippedByAdmin(actorId: string, creatorMissionId: string) {
+  const current = await getMissionById(creatorMissionId);
+  if (!current) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
+  if (current.campaign.fulfillmentMode !== "BRAND_SHIP") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
+  if (current.depositStatus !== "HELD") throw new AppError("Creator deposit must be held before shipping sample.", 409, "CREATOR_DEPOSIT_REQUIRED");
   const updated = await prisma.creatorMission.update({
     where: { id: creatorMissionId },
     data: {
-      status: "IN_PROGRESS",
-      productStatus: "RECEIVED",
-      depositStatus: current.campaign.fulfillmentMode === "BRAND_SHIP" ? "HELD" : "PAID",
-      purchaseProofReviewedAt: now(),
-      purchaseProofRejectReason: null,
-      startedAt: current.startedAt ?? now()
+      sampleShippingStatus: "SHIPPED",
+      sampleShippedAt: current.sampleShippedAt ?? now()
     },
     include: creatorMissionInclude
   });
-  await notifyCreator(updated.accountId, "MISSION_APPLICATION_APPROVED", "Đã xác nhận nhận sản phẩm", "Admin đã xác nhận bước nhận sản phẩm cho nhiệm vụ của bạn.", { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "MISSION_APPLICATION_APPROVED", "Brand/Admin đã gửi hàng", "Hàng review đã được đánh dấu là đã gửi theo thông tin nhận hàng của bạn.", { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -803,10 +1062,14 @@ export async function submitPublishReport(
   }
 ) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
+  assertHeldCreatorDeposit(current);
   if (current.videoReviewStatus !== "APPROVED") throw new AppError("Video must be approved first", 409, "CREATOR_MISSION_VIDEO_NOT_APPROVED");
+  const adCode = payload.adCode?.trim();
+  if (!adCode) throw new AppError("Mã quảng cáo là bắt buộc.", 422, "AD_CODE_REQUIRED");
   const purchaseBillImageUrl = payload.purchaseBillImageUrl ?? payload.purchaseInvoiceUrl;
   const productReviewScreenshotUrl = payload.productReviewScreenshotUrl ?? payload.ratingImageUrl;
-  if (current.productReceiveOption === "PRODUCT_REQUIRED") {
+  const requiresCreatorOrderProof = current.productReceiveOption === "PRODUCT_REQUIRED" && current.campaign.fulfillmentMode === "CREATOR_ORDER";
+  if (requiresCreatorOrderProof) {
     if (!purchaseBillImageUrl?.trim()) throw new AppError("Ảnh bill mua hàng là bắt buộc.", 422, "PURCHASE_BILL_REQUIRED");
     if (!productReviewScreenshotUrl?.trim()) throw new AppError("Ảnh đánh giá 5 sao là bắt buộc.", 422, "PRODUCT_REVIEW_SCREENSHOT_REQUIRED");
   }
@@ -814,10 +1077,10 @@ export async function submitPublishReport(
     await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
       socialPostUrl: payload.socialPostUrl,
       publicVideoUrl: payload.socialPostUrl,
-      adCode: payload.adCode ?? null,
-      screenshotUrl: payload.screenshotUrl ?? null,
-      purchaseBillImageUrl: purchaseBillImageUrl ?? current.submissionPurchaseBillImageUrl,
-      productReviewScreenshotUrl: productReviewScreenshotUrl ?? current.submissionProductReviewScreenshotUrl,
+      adCode,
+      screenshotUrl: current.campaign.fulfillmentMode === "CREATOR_ORDER" ? payload.screenshotUrl ?? null : null,
+      purchaseBillImageUrl: requiresCreatorOrderProof ? purchaseBillImageUrl ?? current.submissionPurchaseBillImageUrl : null,
+      productReviewScreenshotUrl: requiresCreatorOrderProof ? productReviewScreenshotUrl ?? current.submissionProductReviewScreenshotUrl : null,
       finalProofNote: payload.note ?? null,
       finalSubmittedAt: now(),
       status: "SUBMITTED",
@@ -831,10 +1094,10 @@ export async function submitPublishReport(
       data: {
         submissionSocialPostUrl: payload.socialPostUrl,
         submissionPublicVideoUrl: payload.socialPostUrl,
-        submissionAdCode: payload.adCode ?? null,
-        submissionScreenshotUrl: payload.screenshotUrl ?? null,
-        submissionPurchaseBillImageUrl: purchaseBillImageUrl ?? current.submissionPurchaseBillImageUrl,
-        submissionProductReviewScreenshotUrl: productReviewScreenshotUrl ?? current.submissionProductReviewScreenshotUrl,
+        submissionAdCode: adCode,
+        submissionScreenshotUrl: current.campaign.fulfillmentMode === "CREATOR_ORDER" ? payload.screenshotUrl ?? null : null,
+        submissionPurchaseBillImageUrl: requiresCreatorOrderProof ? purchaseBillImageUrl ?? current.submissionPurchaseBillImageUrl : null,
+        submissionProductReviewScreenshotUrl: requiresCreatorOrderProof ? productReviewScreenshotUrl ?? current.submissionProductReviewScreenshotUrl : null,
         submissionFinalProofNote: payload.note ?? null,
         submissionFinalSubmittedAt: now(),
         submissionStatus: "SUBMITTED",
@@ -962,6 +1225,7 @@ export async function approvePublishReportByAdmin(actorId: string, creatorMissio
     if (reimbursementPoints > 0) {
       await creditPointsOnce(tx, current.accountId, reimbursementPoints, "PRODUCT_REIMBURSEMENT", creatorMissionId, `creator_mission_reimbursement_${creatorMissionId}`);
     }
+    const depositRefundTransaction = await refundCreatorDepositIfNeeded(tx, current);
 
     return tx.creatorMission.update({
       where: { id: creatorMissionId },
@@ -987,7 +1251,8 @@ export async function approvePublishReportByAdmin(actorId: string, creatorMissio
           current.campaign.creatorDepositRequired &&
           current.depositStatus !== "FORFEITED"
             ? "REFUNDED"
-            : current.depositStatus
+            : current.depositStatus,
+        depositRefundedAt: depositRefundTransaction ? now() : current.depositRefundedAt
       },
       include: creatorMissionInclude
     });
@@ -1156,6 +1421,7 @@ type TranscriptSubmissionInput =
 
 export async function submitCreatorMissionTranscript(accountId: string, creatorMissionId: string, payload: TranscriptSubmissionInput) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
+  assertHeldCreatorDeposit(current);
   if (current.status === "COMPLETED") throw new AppError("Mission already completed", 409, "CREATOR_MISSION_ALREADY_COMPLETED");
   if (current.videoReviewStatus === "PENDING" || current.videoReviewStatus === "APPROVED") {
     throw new AppError("Video review already started", 409, "CREATOR_MISSION_VIDEO_ALREADY_STARTED");
@@ -1486,6 +1752,7 @@ export async function listMissionApplicationsForAdmin(input: {
             endsAt: true,
             fulfillmentMode: true,
             creatorDepositRequired: true,
+            creatorDepositAmountVnd: true,
             brand: {
               select: {
                 id: true,
@@ -1587,6 +1854,7 @@ export async function getMissionApplicationDetailForAdmin(id: string) {
           endsAt: true,
           fulfillmentMode: true,
           creatorDepositRequired: true,
+          creatorDepositAmountVnd: true,
           brand: {
             select: {
               id: true,
@@ -1685,6 +1953,8 @@ export async function approveMissionApplicationByAdmin(actorId: string, id: stri
         status: approvedStatus,
         productStatus: approvedProductStatus,
         depositStatus: approvedDepositStatus,
+        creatorDepositAmountVnd: requiresCreatorDeposit ? current.campaign.creatorDepositAmountVnd ?? 0 : 0,
+        sampleShippingStatus: requiresCreatorDeposit ? "WAITING_DEPOSIT" : "NOT_REQUIRED",
         reimbursementStatus: approvedReimbursementStatus,
         startedAt: current.mission.productReceiveOption === "NO_PRODUCT_REQUIRED" ? now() : null,
         submissionLifecycleStatus: "ACCEPTED",

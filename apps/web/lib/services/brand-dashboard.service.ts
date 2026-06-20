@@ -1393,6 +1393,126 @@ export async function listCampaignMissionsForBrand(accountId: string, campaignId
   };
 }
 
+function formatShippingAddress(item: {
+  shippingAddressLine: string | null;
+  shippingWard: string | null;
+  shippingDistrict: string | null;
+  shippingProvince: string | null;
+}) {
+  return [item.shippingAddressLine, item.shippingWard, item.shippingDistrict, item.shippingProvince].filter(Boolean).join(", ");
+}
+
+export async function listBrandCampaignShippingCreators(accountId: string, campaignId: string, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
+  const campaign = await getBrandScopedCampaign(campaignId, ctx.brand.id);
+  if (campaign.fulfillmentMode !== "BRAND_SHIP") {
+    return { campaign: { id: campaign.id, title: campaign.title, fulfillmentMode: campaign.fulfillmentMode }, items: [] };
+  }
+
+  const items = await prisma.creatorMission.findMany({
+    where: {
+      campaignId: campaign.id,
+      applicationStatus: "APPROVED",
+      depositStatus: "HELD",
+      shippingInfoSubmittedAt: { not: null },
+      shippingRecipientName: { not: null },
+      shippingPhone: { not: null },
+      shippingAddressLine: { not: null }
+    },
+    orderBy: [{ sampleShippingStatus: "asc" }, { depositHeldAt: "desc" }, { updatedAt: "desc" }],
+    select: {
+      id: true,
+      accountId: true,
+      depositStatus: true,
+      creatorDepositAmountVnd: true,
+      depositHeldAt: true,
+      shippingRecipientName: true,
+      shippingPhone: true,
+      shippingProvince: true,
+      shippingDistrict: true,
+      shippingWard: true,
+      shippingAddressLine: true,
+      shippingNote: true,
+      shippingInfoSubmittedAt: true,
+      sampleShippingStatus: true,
+      sampleShippedAt: true,
+      sampleReceivedAt: true,
+      account: { select: { displayName: true, email: true } },
+      campaign: { select: { id: true, title: true, productName: true, productLink: true, creatorDepositAmountVnd: true } },
+      mission: { select: { title: true, productName: true, productLink: true } }
+    }
+  });
+
+  return {
+    campaign: { id: campaign.id, title: campaign.title, fulfillmentMode: campaign.fulfillmentMode },
+    items: items.map((item) => ({
+      id: item.id,
+      accountId: item.accountId,
+      creatorName: item.account.displayName,
+      creatorEmail: item.account.email,
+      depositStatus: item.depositStatus,
+      creatorDepositAmountVnd: item.creatorDepositAmountVnd || item.campaign.creatorDepositAmountVnd,
+      depositHeldAt: item.depositHeldAt?.toISOString() ?? null,
+      shippingRecipientName: item.shippingRecipientName,
+      shippingPhone: item.shippingPhone,
+      shippingProvince: item.shippingProvince,
+      shippingDistrict: item.shippingDistrict,
+      shippingWard: item.shippingWard,
+      shippingAddressLine: item.shippingAddressLine,
+      shippingAddressFull: formatShippingAddress(item),
+      shippingNote: item.shippingNote,
+      shippingInfoSubmittedAt: item.shippingInfoSubmittedAt?.toISOString() ?? null,
+      sampleShippingStatus: item.sampleShippingStatus,
+      sampleShippedAt: item.sampleShippedAt?.toISOString() ?? null,
+      sampleReceivedAt: item.sampleReceivedAt?.toISOString() ?? null,
+      campaignTitle: item.campaign.title,
+      productName: item.campaign.productName ?? item.mission?.productName ?? item.mission?.title ?? null,
+      productLink: item.campaign.productLink ?? item.mission?.productLink ?? null
+    }))
+  };
+}
+
+export async function markBrandCampaignSampleShipped(accountId: string, campaignId: string, creatorMissionId: string, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
+  const campaign = await getBrandScopedCampaign(campaignId, ctx.brand.id);
+  if (campaign.fulfillmentMode !== "BRAND_SHIP") throw new AppError("Invalid fulfillment mode", 409, "INVALID_FULFILLMENT_MODE");
+
+  const current = await prisma.creatorMission.findUnique({
+    where: { id: creatorMissionId },
+    select: {
+      id: true,
+      campaignId: true,
+      accountId: true,
+      depositStatus: true,
+      sampleShippingStatus: true
+    }
+  });
+  if (!current || current.campaignId !== campaign.id) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
+  if (current.depositStatus !== "HELD") throw new AppError("Creator deposit must be held before shipping sample.", 409, "CREATOR_DEPOSIT_REQUIRED");
+  if (current.sampleShippingStatus === "SHIPPED" || current.sampleShippingStatus === "RECEIVED") {
+    return listBrandCampaignShippingCreators(accountId, campaignId, currentBrandId);
+  }
+  if (current.sampleShippingStatus !== "READY_TO_SHIP") throw new AppError("Creator is not ready to ship.", 409, "SAMPLE_SHIPPING_NOT_READY");
+
+  const updated = await prisma.creatorMission.update({
+    where: { id: creatorMissionId },
+    data: { sampleShippingStatus: "SHIPPED", sampleShippedAt: new Date() },
+    select: { id: true, sampleShippingStatus: true }
+  });
+
+  await writeAuditLog({
+    actorId: accountId,
+    action: "BRAND_SAMPLE_SHIPPED",
+    targetType: "CreatorMission",
+    targetId: updated.id,
+    oldStatus: current.sampleShippingStatus,
+    newStatus: updated.sampleShippingStatus,
+    metadata: { campaignId: campaign.id, brandId: ctx.brand.id, creatorAccountId: current.accountId }
+  });
+
+  return listBrandCampaignShippingCreators(accountId, campaignId, currentBrandId);
+}
+
 export async function decideCreatorApplication(accountId: string, input: CreatorApplicationDecisionInput, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const submission = await prisma.missionSubmission.findUnique({
