@@ -11,6 +11,11 @@ type Settings = {
   requireRequestChangesReason: boolean;
   maintenanceMessage: string;
   campaignContentTemplateUrl: string;
+  creatorDepositQrImageUrl: string;
+  creatorDepositAccountName: string;
+  creatorDepositAccountNumber: string;
+  creatorDepositBankName: string;
+  creatorDepositTransferPrefix: string;
 };
 
 function onlyDigits(raw: string) {
@@ -44,7 +49,12 @@ export default function AdminSettingsPage() {
     requireRejectReason: true,
     requireRequestChangesReason: true,
     maintenanceMessage: "",
-    campaignContentTemplateUrl: ""
+    campaignContentTemplateUrl: "",
+    creatorDepositQrImageUrl: "/qr-dcreator.jpg",
+    creatorDepositAccountName: "",
+    creatorDepositAccountNumber: "",
+    creatorDepositBankName: "",
+    creatorDepositTransferPrefix: "DCR"
   });
 
   async function load() {
@@ -103,6 +113,25 @@ export default function AdminSettingsPage() {
     }
   }
 
+  async function uploadDepositQr(file: File) {
+    setSubmitting(true);
+    setError("");
+    try {
+      const formData = new FormData();
+      formData.append("qr", file);
+      const response = await fetch("/api/uploads/admin-deposit-qr", { method: "POST", body: formData });
+      const payload = await response.json();
+      if (!response.ok || !payload.success || !payload.data?.qrImageUrl) {
+        throw new Error(payload.error ?? "Tải QR thất bại.");
+      }
+      setForm((prev) => ({ ...prev, creatorDepositQrImageUrl: payload.data.qrImageUrl }));
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "Tải QR thất bại.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   if (loading) return <LoadingSkeleton rows={4} />;
   if (error && !submitting) return <ErrorState title="Không thể tải trang cài đặt" description={error} onRetry={() => void load()} />;
 
@@ -140,6 +169,46 @@ export default function AdminSettingsPage() {
           Thông báo bảo trì (tuỳ chọn)
           <textarea className="dc-input min-h-24" value={form.maintenanceMessage} onChange={(e) => setForm((prev) => ({ ...prev, maintenanceMessage: e.target.value }))} />
         </label>
+        <section className="grid gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:col-span-2 md:grid-cols-[160px_1fr_1fr]">
+          <div className="md:row-span-3">
+            <p className="mb-2 text-sm font-semibold text-zinc-900">QR đặt cọc Creator</p>
+            <div
+              role="img"
+              aria-label="QR đặt cọc Creator"
+              className="h-36 w-36 rounded-xl border border-zinc-200 bg-white bg-contain bg-center bg-no-repeat"
+              style={{ backgroundImage: `url(${form.creatorDepositQrImageUrl || "/qr-dcreator.jpg"})` }}
+            />
+          </div>
+          <label className="grid gap-1 text-sm font-medium text-zinc-700 md:col-span-2">
+            Upload ảnh QR
+            <input className="dc-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void uploadDepositQr(file);
+              e.currentTarget.value = "";
+            }} />
+            <span className="text-xs text-zinc-500">Ảnh QR dùng cho Creator khi số dư N-Points không đủ để đặt cọc. Hỗ trợ JPG, PNG, WEBP tối đa 3MB.</span>
+          </label>
+          <label className="grid gap-1 text-sm font-medium text-zinc-700 md:col-span-2">
+            URL ảnh QR đã lưu
+            <input className="dc-input" value={form.creatorDepositQrImageUrl} onChange={(e) => setForm((prev) => ({ ...prev, creatorDepositQrImageUrl: e.target.value.trim() }))} placeholder="/uploads/... hoặc https://..." />
+          </label>
+          <label className="grid gap-1 text-sm font-medium text-zinc-700">
+            Tên chủ tài khoản
+            <input className="dc-input" value={form.creatorDepositAccountName} onChange={(e) => setForm((prev) => ({ ...prev, creatorDepositAccountName: e.target.value }))} placeholder="VD: CONG TY ..." />
+          </label>
+          <label className="grid gap-1 text-sm font-medium text-zinc-700">
+            Số tài khoản
+            <input className="dc-input" value={form.creatorDepositAccountNumber} onChange={(e) => setForm((prev) => ({ ...prev, creatorDepositAccountNumber: e.target.value.replace(/\s+/g, "") }))} placeholder="VD: 123456789" />
+          </label>
+          <label className="grid gap-1 text-sm font-medium text-zinc-700">
+            Ngân hàng
+            <input className="dc-input" value={form.creatorDepositBankName} onChange={(e) => setForm((prev) => ({ ...prev, creatorDepositBankName: e.target.value }))} placeholder="VD: Vietcombank" />
+          </label>
+          <label className="grid gap-1 text-sm font-medium text-zinc-700">
+            Tiền tố nội dung chuyển khoản
+            <input className="dc-input" value={form.creatorDepositTransferPrefix} onChange={(e) => setForm((prev) => ({ ...prev, creatorDepositTransferPrefix: e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, "") }))} placeholder="DCR" />
+          </label>
+        </section>
         <label className="grid gap-2 text-sm font-medium text-zinc-700 md:col-span-2">
           Template nội dung campaign cho Brand
           <input className="dc-input" type="file" accept=".pdf,.doc,.docx,.txt,image/png,image/jpeg" onChange={(e) => {

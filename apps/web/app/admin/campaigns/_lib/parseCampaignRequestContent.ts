@@ -1,4 +1,5 @@
 import { extractUrlsFromText, normalizeUrl } from "@/lib/url";
+import { extractCampaignRequestMeta } from "@/lib/campaign-request-meta";
 
 export type CampaignRequestLink = {
   key: string;
@@ -50,10 +51,11 @@ function addLink(links: CampaignRequestLink[], key: string, rawUrl: string) {
 
 export function parseCampaignRequestContent(rawContent?: string | null): ParsedCampaignRequestContent {
   const content = rawContent ?? "";
+  const meta = extractCampaignRequestMeta(content);
   const links: CampaignRequestLink[] = [];
   const cleanLines: string[] = [];
-  let coverImageUrl: string | undefined;
-  let contentFileUrl: string | undefined;
+  let coverImageUrl = meta.coverImageUrl ?? undefined;
+  let contentFileUrl = meta.contentFileUrl ?? undefined;
   let contractFileUrl: string | undefined;
 
   for (const line of content.split(/\r?\n/)) {
@@ -72,8 +74,11 @@ export function parseCampaignRequestContent(rawContent?: string | null): ParsedC
     extractUrlsFromText(line).forEach((url) => addLink(links, "URL", url));
   }
 
+  if (coverImageUrl) addLink(links, "COVER_IMAGE_URL", coverImageUrl);
+  if (contentFileUrl) addLink(links, "CONTENT_FILE_URL", contentFileUrl);
+
   return {
-    cleanContent: cleanLines.join("\n").trim(),
+    cleanContent: meta.cleanBrief || cleanLines.join("\n").trim(),
     links,
     coverImageUrl,
     contentFileUrl,

@@ -3,6 +3,7 @@ export const CAMPAIGN_IMAGE_FALLBACK = "/images/campaign-fallback.svg";
 const PUBLIC_STORAGE_PREFIX = "/storage/v1/object/public/";
 const UPLOADS_PREFIX = "/uploads/";
 const DEFAULT_STORAGE_BUCKET = "dcreator-uploads";
+const LOCAL_IMAGE_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
 function warnInvalidImageUrl(input: string | null | undefined, reason: string) {
   if (process.env.NODE_ENV !== "production") {
@@ -15,7 +16,7 @@ function getSupabaseUrl() {
 }
 
 export function normalizeImageUrlInput(input?: string | null): string {
-  return input?.replace(/\s+/g, "") ?? "";
+  return input?.replace(/[\r\n\s]/g, "").trim() ?? "";
 }
 
 export function resolveImageUrl(
@@ -31,6 +32,14 @@ export function resolveImageUrl(
       const url = new URL(value);
       if (!url.pathname || url.pathname === "/") {
         warnInvalidImageUrl(input, "URL chỉ có domain, không có object path");
+        return fallback;
+      }
+      if (LOCAL_IMAGE_HOSTS.has(url.hostname)) {
+        if (url.pathname.startsWith(UPLOADS_PREFIX) || url.pathname.startsWith("/images/")) {
+          warnInvalidImageUrl(input, "URL localhost được chuyển thành public path tương đối");
+          return `${url.pathname}${url.search}${url.hash}`;
+        }
+        warnInvalidImageUrl(input, "Không dùng URL localhost cho ảnh public");
         return fallback;
       }
       if (supabaseUrl && url.hostname.endsWith(".supabase.co")) {

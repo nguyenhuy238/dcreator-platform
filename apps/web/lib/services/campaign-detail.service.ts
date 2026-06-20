@@ -1,4 +1,5 @@
 import type { CampaignDetailDTO } from "@/lib/dto/campaign-detail";
+import { getCampaignBrandDisplay, getCreatorDisplay } from "@/lib/display-identity";
 import { AppError } from "@/lib/errors";
 import { resolveImageUrl } from "@/lib/images/resolve-image-url";
 import { findPublicCampaignDetailBySlug } from "@/lib/repositories/campaign-detail.repository";
@@ -57,6 +58,17 @@ export async function getCampaignDetailBySlug(slug: string, viewerId?: string): 
   const completionPercent = targetVideos > 0 ? Math.min(100, Math.round((approvedVideos / targetVideos) * 100)) : 0;
   const remainingSlots = targetVideos > 0 ? Math.max(0, targetVideos - approvedVideos) : 0;
   const isQuotaReached = targetVideos > 0 && remainingSlots <= 0;
+  const sourceBrand = campaign.sourceBrandRequests[0]?.brand;
+  const brandDisplay = getCampaignBrandDisplay({
+    brand: sourceBrand ?? campaign.ownerBrand ?? null
+  });
+  const creatorDisplay = campaign.creator
+    ? getCreatorDisplay({
+        displayName: campaign.creator.creatorProfile?.displayName,
+        avatarUrl: campaign.creator.creatorProfile?.avatarUrl,
+        account: campaign.creator
+      })
+    : null;
 
   return {
     hero: {
@@ -66,13 +78,18 @@ export async function getCampaignDetailBySlug(slug: string, viewerId?: string): 
       description: campaign.brief,
       coverMediaUrl: resolveImageUrl(campaign.coverImageUrl),
       coverMediaType: isVideoUrl(campaign.coverImageUrl) ? "video" : "image",
-      brand: campaign.brand.displayName,
-      creator: campaign.creator?.displayName ?? null,
+      brand: brandDisplay.name,
+      creator: creatorDisplay?.name ?? null,
       campaignType: campaign.campaignType,
+      fulfillmentMode: campaign.fulfillmentMode ?? "BRAND_SHIP",
+      creatorDepositRequired: campaign.creatorDepositRequired ?? true,
       category: campaign.category,
       objective: campaign.objective,
       benefits: campaign.benefits ?? campaign.objective,
+      requirementsSummary: campaign.requirementsSummary ?? null,
+      requirements: campaign.creatorBriefDescription ?? null,
       participationRoadmap: normalizeRoadmap(campaign.participationRoadmap, campaign.priorityChannels),
+      requiredHashtags: campaign.requiredHashtags ?? [],
       status: campaign.status,
       deadline: campaign.endsAt?.toISOString() ?? null,
       product: {

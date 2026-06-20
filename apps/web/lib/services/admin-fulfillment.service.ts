@@ -1,5 +1,6 @@
 import { FulfillmentStatus, InventoryStockStatus, NotificationEvent } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { getBrandDisplayName } from "@/lib/display-identity";
 import { AppError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
 import { createNotification, createNotificationForAdminOps } from "@/lib/services/notification.service";
@@ -49,6 +50,39 @@ function matchesStatus(status: OpsStatus, dbStatus: FulfillmentStatus, meta: Ops
   return dbStatus === "FAILED" && meta.opsStatus !== "cancelled";
 }
 
+async function getBrandsByOwnerAccountId(ownerAccountIds: string[]) {
+  const brands = ownerAccountIds.length
+    ? await prisma.brand.findMany({
+        where: { ownerAccountId: { in: [...new Set(ownerAccountIds)] } },
+        orderBy: { updatedAt: "desc" },
+        select: { ownerAccountId: true, name: true, legalName: true }
+      })
+    : [];
+  const brandByOwnerAccountId = new Map<string, (typeof brands)[number]>();
+  for (const brand of brands) {
+    if (!brandByOwnerAccountId.has(brand.ownerAccountId)) brandByOwnerAccountId.set(brand.ownerAccountId, brand);
+  }
+  return brandByOwnerAccountId;
+}
+
+function mapFulfillmentCampaignBrand<T extends { campaign?: { brand?: { id: string; displayName: string } | null } | null }>(
+  row: T,
+  brandByOwnerAccountId: Map<string, { name: string; legalName: string | null }>
+) {
+  if (!row.campaign?.brand) return row;
+  return {
+    ...row,
+    campaign: {
+      ...row.campaign,
+      brand: {
+        ...row.campaign.brand,
+        ownerDisplayName: row.campaign.brand.displayName,
+        displayName: getBrandDisplayName({ brand: brandByOwnerAccountId.get(row.campaign.brand.id) ?? null })
+      }
+    }
+  };
+}
+
 export async function listFulfillmentForAdmin(input: {
   status?: OpsStatus;
   campaignId?: string;
@@ -94,7 +128,10 @@ export async function listFulfillmentForAdmin(input: {
     }
   });
 
-  const mapped = rows.map((row: { status: FulfillmentStatus; failureReason: string | null }) => ({ ...row, opsMeta: parseMeta(row) }));
+  const brandByOwnerAccountId = await getBrandsByOwnerAccountId(rows.map((row: { campaign: { brand: { id: string } } | null }) => row.campaign?.brand.id).filter(Boolean));
+  const mapped = rows.map((row: { status: FulfillmentStatus; failureReason: string | null; campaign?: { brand?: { id: string; displayName: string } | null } | null }) =>
+    mapFulfillmentCampaignBrand({ ...row, opsMeta: parseMeta(row) }, brandByOwnerAccountId)
+  );
   if (!input.status) return mapped;
   return mapped.filter((item: { status: FulfillmentStatus; opsMeta: OpsMeta }) => matchesStatus(input.status as OpsStatus, item.status, item.opsMeta));
 }
@@ -115,7 +152,8 @@ export async function getFulfillmentDetailForAdmin(id: string) {
     }
   });
   if (!item) throw new AppError("Fulfillment order not found", 404, "FULFILLMENT_NOT_FOUND");
-  return { ...item, opsMeta: parseMeta(item) };
+  const brandByOwnerAccountId = await getBrandsByOwnerAccountId(item.campaign?.brand?.id ? [item.campaign.brand.id] : []);
+  return mapFulfillmentCampaignBrand({ ...item, opsMeta: parseMeta(item) }, brandByOwnerAccountId);
 }
 
 export async function updateFulfillmentByAdmin(input: {

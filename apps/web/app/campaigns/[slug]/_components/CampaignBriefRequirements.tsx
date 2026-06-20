@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CheckCircle, WarningCircle } from "@phosphor-icons/react";
 
-const fallbackHashtags = ["#dCreator", "#Kocogi.vn", "#Chiendich"];
-
 const submissionSteps = [
   "Quay video review theo brief phía trên",
   "Đăng lên tài khoản xã hội đã liên kết, không set private",
@@ -29,9 +27,11 @@ type CreatorChannel = {
 };
 
 export function CampaignBriefRequirements({
-  hashtags = fallbackHashtags,
+  hashtags = [],
+  requirements,
 }: {
   hashtags?: string[];
+  requirements?: string | null;
 }) {
   const [eligibility, setEligibility] = useState<EligibilityState>({
     isChecking: true,
@@ -92,13 +92,14 @@ export function CampaignBriefRequirements({
   }, []);
 
   const visibleHashtags = hashtags.map((hashtag) => hashtag.trim()).filter(Boolean);
+  const requirementLines = formatRequirementLines(requirements);
   const isEligible = eligibility.isLoggedIn && eligibility.hasConnectedSocialAccount;
 
   return (
     <div className="grid gap-5">
-      {visibleHashtags.length > 0 ? (
-        <article className="rounded-3xl border border-zinc-100 bg-white p-5 shadow-sm sm:p-6">
-          <h3 className="text-xl font-black text-zinc-900"># Hashtags Bắt Buộc</h3>
+      <article className="rounded-3xl border border-zinc-100 bg-white p-5 shadow-sm sm:p-6">
+        <h3 className="text-xl font-black text-zinc-900"># Hashtags Bắt Buộc</h3>
+        {visibleHashtags.length > 0 ? (
           <div className="mt-4 flex flex-wrap gap-2">
             {visibleHashtags.map((hashtag) => (
               <span
@@ -109,8 +110,10 @@ export function CampaignBriefRequirements({
               </span>
             ))}
           </div>
-        </article>
-      ) : null}
+        ) : (
+          <p className="mt-3 text-sm leading-6 text-zinc-500">Chiến dịch này chưa cấu hình hashtag bắt buộc.</p>
+        )}
+      </article>
 
       <article className="rounded-3xl border border-zinc-100 bg-white p-5 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -154,7 +157,7 @@ export function CampaignBriefRequirements({
       </article>
 
       <article className="rounded-3xl bg-zinc-950 p-5 text-white shadow-lg shadow-zinc-950/10 sm:p-6">
-        <h3 className="text-xl font-black">📤 Hướng Dẫn Nộp Bài</h3>
+        <h3 className="text-xl font-black">Hướng Dẫn Nộp Bài</h3>
         <ol className="mt-5 grid gap-4">
           {submissionSteps.map((step, index) => (
             <li key={step} className="flex gap-3">
@@ -166,8 +169,45 @@ export function CampaignBriefRequirements({
           ))}
         </ol>
       </article>
+
+      <article className="rounded-3xl border border-zinc-100 bg-white p-5 shadow-sm sm:p-6">
+        <h3 className="text-xl font-black text-zinc-900">Yêu Cầu Chi Tiết Từ Brand</h3>
+        {requirementLines.length > 0 ? (
+          <ol className="mt-5 grid gap-4">
+            {requirementLines.map((line, index) => (
+              <li key={`${line}-${index}`} className="flex gap-3">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-zinc-50 text-xs font-black text-zinc-900">
+                  {index + 1}
+                </span>
+                <p className="min-w-0 pt-0.5 text-sm leading-6 text-zinc-700">
+                  <span className="whitespace-pre-line break-words">{line}</span>
+                </p>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="mt-3 text-sm leading-6 text-zinc-500">Brand chưa cấu hình yêu cầu chi tiết cho chiến dịch này.</p>
+        )}
+      </article>
     </div>
   );
+}
+
+function formatRequirementLines(value?: string | null) {
+  const normalized = value?.trim();
+  if (!normalized) return [];
+
+  const lineParts = normalized
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*[-•]\s*/, "").trim())
+    .filter(Boolean);
+
+  if (lineParts.length > 1) return lineParts;
+
+  return normalized
+    .split(/(?<=[.!?。])\s+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
 }
 
 function EligibilityItem({

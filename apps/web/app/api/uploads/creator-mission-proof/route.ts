@@ -2,23 +2,12 @@ import { NextRequest } from "next/server";
 import { ok } from "@/lib/api-response";
 import { assertSameOrigin } from "@/lib/auth/csrf";
 import { requireAuth } from "@/lib/auth/guard";
-import { AppError, toErrorResponse } from "@/lib/errors";
-import { saveUpload } from "@/lib/storage/upload";
+import { toErrorResponse } from "@/lib/errors";
+import { IMAGE_MIME_TYPES, pickUploadFile, uploadResponse, uploadValidatedFile } from "@/lib/storage/upload-api";
 
 export const runtime = "nodejs";
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-
-function ensureImage(file: File | null): asserts file is File {
-  if (!file) throw new AppError("Thiếu file screenshot", 422, "FILE_REQUIRED");
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    throw new AppError("Screenshot phải là JPG, PNG hoặc WEBP", 422, "INVALID_FILE_TYPE");
-  }
-  if (file.size > MAX_FILE_SIZE_BYTES) {
-    throw new AppError("Screenshot vượt quá 5MB", 422, "FILE_TOO_LARGE");
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,18 +15,24 @@ export async function POST(request: NextRequest) {
     const account = await requireAuth(request);
 
     const formData = await request.formData();
-    const screenshot = formData.get("screenshot");
-    const screenshotFile = screenshot instanceof File ? screenshot : null;
-    ensureImage(screenshotFile);
+    const screenshotFile = pickUploadFile({
+      formData,
+      fieldNames: ["screenshot", "file", "image", "proof"],
+      label: "screenshot proof"
+    });
 
-    const screenshotUrl = await saveUpload({
+    const upload = await uploadValidatedFile({
       file: screenshotFile,
       folder: "creator-mission-proof",
       suffix: `mission-proof-${account.id}`,
-      ext: screenshotFile.type.split("/")[1] || "jpg"
+      ownerId: account.id,
+      label: "Screenshot proof",
+      allowedTypes: IMAGE_MIME_TYPES,
+      maxSizeBytes: MAX_FILE_SIZE_BYTES,
+      invalidTypeMessage: "Screenshot proof chỉ hỗ trợ JPG, PNG hoặc WEBP"
     });
 
-    return ok({ screenshotUrl }, 201);
+    return ok(uploadResponse(upload, { screenshotUrl: upload.url }), 201);
   } catch (error) {
     return toErrorResponse(error);
   }

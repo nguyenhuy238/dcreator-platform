@@ -1,6 +1,8 @@
 import { CampaignStatus, NotificationEvent } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { getBrandDisplayName } from "@/lib/display-identity";
 import { AppError } from "@/lib/errors";
+import { normalizeRequiredHashtags } from "@/lib/hashtags";
 import { normalizeImageUrlInput } from "@/lib/images/resolve-image-url";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
 import { createNotification } from "@/lib/services/notification.service";
@@ -15,11 +17,45 @@ type AdminCampaignCreateInput = z.infer<typeof adminCampaignCreateSchema>;
 type AdminCampaignUpdateInput = z.infer<typeof adminCampaignUpdateSchema>;
 type CampaignMissionInput = z.infer<typeof campaignMissionCreateSchema>;
 
-async function trySyncCampaignNewFields(campaignId: string, benefits: string | null, participationRoadmap: string[]) {
+async function trySyncCampaignNewFields(campaignId: string, benefits: string | null, participationRoadmap: string[], requiredHashtags?: string[]) {
   try {
-    await prisma.$executeRaw`UPDATE "Campaign" SET "benefits" = ${benefits}, "participationRoadmap" = ${participationRoadmap} WHERE "id" = ${campaignId}`;
+    await prisma.$executeRaw`
+      UPDATE "Campaign"
+      SET
+        "benefits" = ${benefits},
+        "participationRoadmap" = ${participationRoadmap},
+        "requiredHashtags" = ${requiredHashtags ?? []}
+      WHERE "id" = ${campaignId}
+    `;
   } catch {
     // Backward compatibility when DB has not applied migration yet.
+  }
+}
+
+async function getCampaignRequiredHashtags(campaignId: string) {
+  try {
+    const rows = await prisma.$queryRaw<Array<{ requiredHashtags: string[] }>>`
+      SELECT "requiredHashtags" FROM "Campaign" WHERE "id" = ${campaignId} LIMIT 1
+    `;
+    return rows[0]?.requiredHashtags ?? [];
+  } catch {
+    return [];
+  }
+}
+
+async function trySyncCampaignRequiredHashtags(campaignId: string, requiredHashtags: string[]) {
+  try {
+    await prisma.$executeRaw`
+      UPDATE "Campaign"
+      SET "requiredHashtags" = ${requiredHashtags}
+      WHERE "id" = ${campaignId}
+    `;
+  } catch {
+    throw new AppError(
+      "Hệ thống chưa cập nhật migration hashtag bắt buộc. Vui lòng chạy migration trước khi lưu thay đổi.",
+      500,
+      "CAMPAIGN_REQUIRED_HASHTAGS_MIGRATION_REQUIRED"
+    );
   }
 }
 
@@ -118,9 +154,29 @@ export async function listCampaignsForAdmin(input: { status?: CampaignStatus; qu
     }
   });
 
+  const brandOwnerAccountIds = [...new Set(campaigns.map((campaign) => campaign.brand.id))];
+  const brandProfiles = brandOwnerAccountIds.length
+    ? await prisma.brand.findMany({
+        where: { ownerAccountId: { in: brandOwnerAccountIds } },
+        orderBy: { updatedAt: "desc" },
+        select: { ownerAccountId: true, name: true, legalName: true, logoUrl: true }
+      })
+    : [];
+  const brandProfileByOwnerAccountId = new Map<string, (typeof brandProfiles)[number]>();
+  for (const brand of brandProfiles) {
+    if (!brandProfileByOwnerAccountId.has(brand.ownerAccountId)) {
+      brandProfileByOwnerAccountId.set(brand.ownerAccountId, brand);
+    }
+  }
+
   const tagMap = await getCampaignReviewTag(campaigns.map((c) => c.id));
   const normalized = campaigns.map((campaign) => ({
     ...campaign,
+    brand: {
+      ...campaign.brand,
+      ownerDisplayName: campaign.brand.displayName,
+      displayName: getBrandDisplayName({ brand: brandProfileByOwnerAccountId.get(campaign.brand.id) ?? null })
+    },
     statusView: normalizeStatusView({ status: campaign.status, reviewTag: tagMap.get(campaign.id) ?? null })
   }));
 
@@ -150,7 +206,12 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
       coverImageUrl: true,
       campaignType: true,
       setupSource: true,
+      fulfillmentMode: true,
+      creatorDepositRequired: true,
+      creatorDepositAmountVnd: true,
       benefits: true,
+      requirementsSummary: true,
+      creatorBriefDescription: true,
       productName: true,
       productDescription: true,
       productImageUrl: true,
@@ -169,17 +230,37 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
       backerCount: true,
       brand: { select: { id: true, displayName: true, email: true } },
       creator: { select: { id: true, displayName: true, email: true } },
+      sourceBrandRequests: {
+        select: {
+          id: true,
+          title: true,
+          brief: true,
+          requestedSlug: true,
+          status: true,
+          budgetVnd: true,
+          targetAmountVnd: true,
+          adminNote: true,
+          brandFeedback: true,
+          createdAt: true,
+          updatedAt: true
+        },
+        orderBy: { createdAt: "desc" }
+      },
       rewards: true,
       contributions: { select: { id: true, amountVnd: true, status: true } }
     }
   });
   if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
+  const requiredHashtags = await getCampaignRequiredHashtags(campaign.id);
 
   const brandProfile = await prisma.brand.findFirst({
     where: { ownerAccountId: campaign.brandId },
     select: {
       id: true,
       name: true,
+      legalName: true,
+      logoUrl: true,
+      contactName: true,
       status: true,
       commissionRatePercent: true,
       revenueSharePercent: true
@@ -207,6 +288,14 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
 
   return {
     ...campaign,
+    brand: {
+      ...campaign.brand,
+      ownerDisplayName: campaign.brand.displayName,
+      displayName: getBrandDisplayName({ brand: brandProfile })
+    },
+    requirementsSummary: campaign.requirementsSummary ?? null,
+    requirements: campaign.creatorBriefDescription ?? null,
+    requiredHashtags,
     statusView,
     brandProfile,
     productSubmissions,
@@ -368,7 +457,24 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
 
   const startsAt = input.startsAt ? new Date(input.startsAt) : null;
   const endsAt = input.endsAt ? new Date(input.endsAt) : null;
+  const requiredHashtags = normalizeRequiredHashtags(input.requiredHashtags);
   const campaign = await prisma.$transaction(async (tx) => {
+    const linkedRequest = input.requestId
+      ? await tx.brandCampaignRequest.findFirst({
+          where: {
+            id: input.requestId,
+            brandId: brandProfile.id,
+            createdCampaignId: null,
+            status: { in: ["PENDING_REVIEW", "NEEDS_REVISION"] }
+          },
+          select: { id: true }
+        })
+      : null;
+
+    if (input.requestId && !linkedRequest) {
+      throw new AppError("Campaign request not found or cannot be linked", 404, "CAMPAIGN_REQUEST_NOT_FOUND");
+    }
+
     const createdCampaign = await tx.campaign.create({
       data: {
         brandId: brandAccount.id,
@@ -380,16 +486,20 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
         category: input.category,
         campaignType: input.campaignType,
         setupSource: input.setupSource,
+        fulfillmentMode: input.fulfillmentMode,
+        creatorDepositRequired: input.fulfillmentMode === "BRAND_SHIP",
+        creatorDepositAmountVnd: input.fulfillmentMode === "BRAND_SHIP" ? input.creatorDepositAmountVnd : 0,
         objective: input.benefits || null,
         benefits: input.benefits || null,
-        creatorBriefTitle: null,
-        creatorBriefDescription: null,
+        requirementsSummary: input.requirementsSummary?.trim() || null,
+        creatorBriefTitle: "YÊU CẦU",
+        creatorBriefDescription: input.requirements || null,
         productName: input.productName,
         productDescription: input.productDescription,
         productImageUrl: input.productImageUrl,
         productLink: input.productLink,
-        participationRoadmap: input.participationRoadmap,
-        priorityChannels: input.participationRoadmap.join("\n"),
+        participationRoadmap: input.participationRoadmap ?? [],
+        priorityChannels: input.participationRoadmap?.join("\n") || null,
         missionTypes: null,
         creatorCommissionPercent: 0,
         userCommissionPercent: 0,
@@ -403,24 +513,36 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
       }
     });
 
-    await tx.brandCampaignRequest.updateMany({
-      where: {
-        brandId: brandProfile.id,
-        requestedSlug: input.slug,
-        createdCampaignId: null,
-        status: { in: ["PENDING_REVIEW", "NEEDS_REVISION"] }
-      },
-      data: {
-        status: "APPROVED",
-        reviewedById: actorId,
-        reviewedAt: new Date(),
-        createdCampaignId: createdCampaign.id
-      }
-    });
+    if (linkedRequest) {
+      await tx.brandCampaignRequest.update({
+        where: { id: linkedRequest.id },
+        data: {
+          status: "APPROVED",
+          reviewedById: actorId,
+          reviewedAt: new Date(),
+          createdCampaignId: createdCampaign.id
+        }
+      });
+    } else {
+      await tx.brandCampaignRequest.updateMany({
+        where: {
+          brandId: brandProfile.id,
+          requestedSlug: input.slug,
+          createdCampaignId: null,
+          status: { in: ["PENDING_REVIEW", "NEEDS_REVISION"] }
+        },
+        data: {
+          status: "APPROVED",
+          reviewedById: actorId,
+          reviewedAt: new Date(),
+          createdCampaignId: createdCampaign.id
+        }
+      });
+    }
 
     return createdCampaign;
   });
-  await trySyncCampaignNewFields(campaign.id, input.benefits || null, input.participationRoadmap);
+  await trySyncCampaignNewFields(campaign.id, input.benefits || null, input.participationRoadmap ?? [], requiredHashtags);
   await syncCampaignUgcVideoQuota(campaign.id, ugcVideoQuota);
 
   await writeAuditLog({
@@ -429,7 +551,15 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
     targetType: "Campaign",
     targetId: campaign.id,
     newStatus: campaign.status,
-    metadata: { publishNow: true, brandAccountId: brandAccount.id, ugcVideoQuota }
+    metadata: {
+      publishNow: true,
+      brandAccountId: brandAccount.id,
+      ugcVideoQuota,
+      requiredHashtags,
+      fulfillmentMode: input.fulfillmentMode,
+      creatorDepositRequired: input.fulfillmentMode === "BRAND_SHIP",
+      creatorDepositAmountVnd: input.fulfillmentMode === "BRAND_SHIP" ? input.creatorDepositAmountVnd : 0
+    }
   });
 
   await createNotification({
@@ -491,6 +621,7 @@ export async function addCampaignMissionByAdmin(actorId: string, campaignId: str
 export async function updateCampaignByAdmin(actorId: string, campaignId: string, input: AdminCampaignUpdateInput) {
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
   if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
+  const beforeRequiredHashtags = await getCampaignRequiredHashtags(campaignId);
 
   const nextStartsAt = input.startsAt === undefined ? undefined : input.startsAt ? new Date(input.startsAt) : null;
   const nextEndsAt = input.endsAt === undefined ? undefined : input.endsAt ? new Date(input.endsAt) : null;
@@ -510,11 +641,6 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
     }
   }
 
-  const nextParticipationRoadmap = input.participationRoadmap?.map((item) => item.trim()).filter(Boolean);
-  if (input.participationRoadmap && (!nextParticipationRoadmap || nextParticipationRoadmap.length === 0)) {
-    throw new AppError("Lộ trình tham gia cần ít nhất 1 bước.", 422, "CAMPAIGN_PARTICIPATION_ROADMAP_INVALID");
-  }
-
   const nextImageUrl =
     input.imageUrl === undefined
       ? undefined
@@ -522,6 +648,9 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
   
   const nextRoadmap = input.participationRoadmap ? input.participationRoadmap.map((step) => step.trim()).filter(Boolean) : undefined;
   const nextBenefits = input.benefits === undefined ? undefined : input.benefits?.trim() || null;
+  const nextRequirementsSummary = input.requirementsSummary === undefined ? undefined : input.requirementsSummary?.trim() || null;
+  const nextRequirements = input.requirements === undefined ? undefined : input.requirements?.trim() || null;
+  const nextRequiredHashtags = input.requiredHashtags === undefined ? undefined : normalizeRequiredHashtags(input.requiredHashtags);
 
   const updated = await prisma.$transaction(async (tx) => {
     const nextCampaign = await tx.campaign.update({
@@ -533,7 +662,17 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         category: input.category,
         campaignType: input.campaignType,
         setupSource: input.setupSource,
+        fulfillmentMode: input.fulfillmentMode,
+        creatorDepositRequired:
+          input.fulfillmentMode === undefined ? undefined : input.fulfillmentMode === "BRAND_SHIP",
+        creatorDepositAmountVnd:
+          input.fulfillmentMode === "CREATOR_ORDER"
+            ? 0
+            : input.creatorDepositAmountVnd,
         benefits: nextBenefits,
+        requirementsSummary: nextRequirementsSummary,
+        creatorBriefTitle: nextRequirements === undefined ? undefined : nextRequirements ? "YÊU CẦU" : null,
+        creatorBriefDescription: nextRequirements,
         productName: input.productName?.trim(),
         productDescription: input.productDescription?.trim(),
         productImageUrl: input.productImageUrl?.trim(),
@@ -552,6 +691,10 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
 
     return nextCampaign;
   });
+  if (nextRequiredHashtags !== undefined) {
+    await trySyncCampaignRequiredHashtags(campaignId, nextRequiredHashtags);
+  }
+  const afterRequiredHashtags = nextRequiredHashtags ?? beforeRequiredHashtags;
 
   await writeAuditLog({
     actorId,
@@ -569,8 +712,14 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         category: campaign.category,
         campaignType: campaign.campaignType,
         setupSource: campaign.setupSource,
+        fulfillmentMode: campaign.fulfillmentMode,
+        creatorDepositRequired: campaign.creatorDepositRequired,
+        creatorDepositAmountVnd: campaign.creatorDepositAmountVnd,
         participationRoadmap: campaign.participationRoadmap,
+        requiredHashtags: beforeRequiredHashtags,
         benefits: campaign.benefits ?? null,
+        requirementsSummary: campaign.requirementsSummary ?? null,
+        requirements: campaign.creatorBriefDescription ?? null,
         productName: campaign.productName ?? null,
         productDescription: campaign.productDescription ?? null,
         productImageUrl: campaign.productImageUrl ?? null,
@@ -591,8 +740,14 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         category: updated.category,
         campaignType: updated.campaignType,
         setupSource: updated.setupSource,
+        fulfillmentMode: updated.fulfillmentMode,
+        creatorDepositRequired: updated.creatorDepositRequired,
+        creatorDepositAmountVnd: updated.creatorDepositAmountVnd,
         participationRoadmap: updated.participationRoadmap,
+        requiredHashtags: afterRequiredHashtags,
         benefits: updated.benefits ?? null,
+        requirementsSummary: updated.requirementsSummary ?? null,
+        requirements: updated.creatorBriefDescription ?? null,
         productName: updated.productName ?? null,
         productDescription: updated.productDescription ?? null,
         productImageUrl: updated.productImageUrl ?? null,
@@ -609,32 +764,191 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
     }
   });
 
-  return updated;
+  return { ...updated, requirementsSummary: updated.requirementsSummary ?? null, requirements: updated.creatorBriefDescription ?? null, requiredHashtags: afterRequiredHashtags };
 }
 
-export async function archiveCampaignByAdmin(actorId: string, campaignId: string, reason: string) {
-  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
-  if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
-  if (campaign.status === "ACTIVE") {
-    throw new AppError("Campaign đang ACTIVE, hãy tạm dừng trước khi xóa.", 409, "CAMPAIGN_ACTIVE_CANNOT_ARCHIVE");
-  }
+export async function deleteCampaignCascadeByAdmin(actorId: string, campaignId: string, reason: string) {
+  const normalizedCampaignId = campaignId.trim();
+  if (!normalizedCampaignId) throw new AppError("Campaign id is required", 422, "CAMPAIGN_ID_REQUIRED");
 
-  const updated = await prisma.campaign.update({
-    where: { id: campaignId },
-    data: { status: "ARCHIVED" }
+  const result = await prisma.$transaction(async (tx) => {
+    const campaign = await tx.campaign.findUnique({
+      where: { id: normalizedCampaignId },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        status: true,
+        brandId: true,
+        creatorId: true
+      }
+    });
+    if (!campaign) throw new AppError("Campaign not found", 404, "CAMPAIGN_NOT_FOUND");
+
+    const missions = await tx.mission.findMany({
+      where: { campaignId: campaign.id },
+      select: { id: true }
+    });
+    const missionIds = missions.map((mission) => mission.id);
+
+    const rewards = await tx.reward.findMany({
+      where: { campaignId: campaign.id },
+      select: { id: true }
+    });
+    const rewardIds = rewards.map((reward) => reward.id);
+
+    const contributions = await tx.contribution.findMany({
+      where: { campaignId: campaign.id },
+      select: { id: true, paymentTransactionId: true }
+    });
+    const contributionIds = contributions.map((contribution) => contribution.id);
+    const paymentTransactionIds = contributions
+      .map((contribution) => contribution.paymentTransactionId)
+      .filter((id): id is string => Boolean(id));
+
+    const submissions = missionIds.length
+      ? await tx.missionSubmission.findMany({
+          where: { missionId: { in: missionIds } },
+          select: { id: true }
+        })
+      : [];
+    const submissionIds = submissions.map((submission) => submission.id);
+
+    const deletionCounts: Record<string, number> = {};
+
+    const track = (key: string, count: number) => {
+      deletionCounts[key] = count;
+    };
+
+    if (submissionIds.length || missionIds.length) {
+      const deleted = await tx.proofReview.deleteMany({
+        where: {
+          OR: [
+            ...(submissionIds.length ? [{ submissionId: { in: submissionIds } }] : []),
+            ...(missionIds.length ? [{ missionId: { in: missionIds } }] : [])
+          ]
+        }
+      });
+      track("proofReviews", deleted.count);
+    } else {
+      track("proofReviews", 0);
+    }
+
+    const creatorMissions = await tx.creatorMission.deleteMany({
+      where: { campaignId: campaign.id }
+    });
+    track("creatorMissions", creatorMissions.count);
+
+    const missionSubmissions = missionIds.length
+      ? await tx.missionSubmission.deleteMany({
+          where: { missionId: { in: missionIds } }
+        })
+      : { count: 0 };
+    track("missionSubmissions", missionSubmissions.count);
+
+    const missionApplications = await tx.missionApplication.deleteMany({
+      where: { campaignId: campaign.id }
+    });
+    track("missionApplications", missionApplications.count);
+
+    const rewardClaims = rewardIds.length || contributionIds.length
+      ? await tx.rewardClaim.deleteMany({
+          where: {
+            OR: [
+              ...(rewardIds.length ? [{ rewardId: { in: rewardIds } }] : []),
+              ...(contributionIds.length ? [{ contributionId: { in: contributionIds } }] : [])
+            ]
+          }
+        })
+      : { count: 0 };
+    track("rewardClaims", rewardClaims.count);
+
+    const contributionsDeleted = await tx.contribution.deleteMany({
+      where: { campaignId: campaign.id }
+    });
+    track("contributions", contributionsDeleted.count);
+
+    const rewardsDeleted = await tx.reward.deleteMany({
+      where: { campaignId: campaign.id }
+    });
+    track("rewards", rewardsDeleted.count);
+
+    const missionsDeleted = await tx.mission.deleteMany({
+      where: { campaignId: campaign.id }
+    });
+    track("missions", missionsDeleted.count);
+
+    const paymentOrders = await tx.paymentOrder.deleteMany({
+      where: { campaignId: campaign.id }
+    });
+    track("paymentOrders", paymentOrders.count);
+
+    const analyticsDaily = await tx.analyticsDaily.deleteMany({
+      where: { campaignId: campaign.id }
+    });
+    track("analyticsDaily", analyticsDaily.count);
+
+    const analyticsEvents = await tx.analyticsEvent.deleteMany({
+      where: { campaignId: campaign.id }
+    });
+    track("analyticsEvents", analyticsEvents.count);
+
+    const brandCampaignRequests = await tx.brandCampaignRequest.updateMany({
+      where: { createdCampaignId: campaign.id },
+      data: { createdCampaignId: null }
+    });
+    track("brandCampaignRequestsDetached", brandCampaignRequests.count);
+
+    const productSubmissions = await tx.productSubmission.updateMany({
+      where: { campaignId: campaign.id },
+      data: { campaignId: null }
+    });
+    track("productSubmissionsDetached", productSubmissions.count);
+
+    const fulfillmentOrders = await tx.fulfillmentOrder.updateMany({
+      where: { campaignId: campaign.id },
+      data: { campaignId: null }
+    });
+    track("fulfillmentOrdersDetached", fulfillmentOrders.count);
+
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: "ADMIN_CAMPAIGN_HARD_DELETED",
+        targetType: "Campaign",
+        targetId: campaign.id,
+        oldStatus: campaign.status,
+        reason,
+        metadata: {
+          campaign: {
+            id: campaign.id,
+            slug: campaign.slug,
+            title: campaign.title,
+            brandId: campaign.brandId,
+            creatorId: campaign.creatorId ?? null
+          },
+          deletionCounts,
+          preservedFinancialReferences: {
+            paymentTransactionIds,
+            walletTransactions: "preserved"
+          }
+        }
+      }
+    });
+
+    await tx.campaign.delete({
+      where: { id: campaign.id }
+    });
+
+    return {
+      id: campaign.id,
+      title: campaign.title,
+      message: "Đã xóa campaign và dữ liệu liên quan.",
+      deletionCounts
+    };
   });
 
-  await writeAuditLog({
-    actorId,
-    action: "ADMIN_CAMPAIGN_ARCHIVED",
-    targetType: "Campaign",
-    targetId: campaignId,
-    oldStatus: campaign.status,
-    newStatus: updated.status,
-    reason
-  });
-
-  return updated;
+  return result;
 }
 
 export async function listCampaignMissionsByAdmin(campaignId: string) {

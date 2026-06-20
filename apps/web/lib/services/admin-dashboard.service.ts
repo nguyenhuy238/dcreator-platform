@@ -1,4 +1,5 @@
 import { BrandMemberRole, BrandMemberStatus, BrandStatus, CampaignStatus, CreatorChannelVerificationStatus, CreatorSocialLinkStatus, MissionAudience, MissionLifecycleStatus, Prisma, Role, RoleRequestStatus, RoleRequestType } from "@prisma/client";
+import { extractCampaignRequestMeta } from "@/lib/campaign-request-meta";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { approveProof, rejectProof } from "@/lib/services/mission.service";
@@ -9,6 +10,7 @@ import {
   confirmDepositAndProductReceivedByAdmin,
   ensureCreatorMissionFromApprovedApplication,
   listCreatorMissionsForAdmin,
+  markSampleShippedByAdmin,
   rejectPublishReportByAdmin,
   rejectVideoReviewByAdmin,
   rejectPurchaseProofByAdmin
@@ -18,18 +20,8 @@ import { listAdminVouchers } from "@/lib/services/voucher.service";
 import { scanFraudRiskSignals } from "@/lib/services/fraud-flag.service";
 import { getAdminKpis } from "@/lib/services/analytics.service";
 
-const COVER_MARKER = "[[COVER_IMAGE_URL]]:";
-
 function extractCoverImageMeta(brief: string) {
-  const lines = brief.split("\n");
-  const markerLine = lines.find((line) => line.trim().startsWith(COVER_MARKER));
-  const coverImageUrl = markerLine ? markerLine.trim().slice(COVER_MARKER.length).trim() : null;
-  const cleanBrief = lines
-    .filter((line) => !line.trim().startsWith(COVER_MARKER))
-    .join("\n")
-    .trim();
-
-  return { coverImageUrl, cleanBrief };
+  return extractCampaignRequestMeta(brief);
 }
 
 async function createDefaultMissionsFromRequest(
@@ -87,7 +79,7 @@ export async function getAdminOverview() {
     totalBrands,
     activeCampaigns,
     pendingReviews,
-    totalContributions,
+    totalRevenue,
     fraudAlerts,
     pendingBrandRequests,
     pendingCreatorRequests,
@@ -108,7 +100,7 @@ export async function getAdminOverview() {
     prisma.brand.count(),
     prisma.campaign.count({ where: { status: CampaignStatus.ACTIVE } }),
     prisma.roleRequest.count({ where: { status: RoleRequestStatus.PENDING } }),
-    prisma.contribution.aggregate({ _sum: { amountVnd: true }, where: { status: "SUCCESS" } }),
+    prisma.paymentOrder.aggregate({ _sum: { amountVnd: true }, where: { status: "SUCCESS" } }),
     prisma.riskFlag.count(),
     prisma.brand.count({
       where: {
@@ -190,7 +182,7 @@ export async function getAdminOverview() {
     totalBrands,
     activeCampaigns,
     pendingReviews,
-    totalContributions: totalContributions._sum.amountVnd ?? 0,
+    totalContributions: totalRevenue._sum.amountVnd ?? 0,
     fraudAlerts,
     queues: {
       brandPendingReview: pendingBrandRequests,
@@ -210,7 +202,7 @@ export async function getAdminOverview() {
       activeCampaigns,
       activeBrands,
       activeCreators,
-      grossRevenueVnd: totalContributions._sum.amountVnd ?? 0,
+      grossRevenueVnd: totalRevenue._sum.amountVnd ?? 0,
       commissionPayoutVnd: Math.abs(totalCommissionPaid._sum.cashDeltaVnd ?? 0)
     },
     systemAlerts
@@ -489,7 +481,7 @@ export async function rejectRoleRequestByAdmin(actorId: string, requestId: strin
 }
 
 export async function listPendingCampaignReviews() {
-  return prisma.brandCampaignRequest.findMany({
+  const requests = await prisma.brandCampaignRequest.findMany({
     where: { status: { in: ["PENDING_REVIEW", "NEEDS_REVISION"] } },
     select: {
       id: true,
@@ -519,6 +511,16 @@ export async function listPendingCampaignReviews() {
     },
     orderBy: { updatedAt: "asc" }
   });
+
+  return requests.map((request) => {
+    const { coverImageUrl, contentFileUrl, cleanBrief } = extractCoverImageMeta(request.brief);
+    return {
+      ...request,
+      brief: cleanBrief,
+      coverImageUrl,
+      contentFileUrl
+    };
+  });
 }
 
 export async function decideCampaignReview(actorId: string, campaignId: string, decision: "APPROVED" | "REJECTED" | "CHANGES_REQUESTED", reason?: string) {
@@ -531,13 +533,15 @@ export async function decideCampaignReview(actorId: string, campaignId: string, 
 
   const updated = await prisma.$transaction(async (tx) => {
     if (decision === "APPROVED") {
-      const { coverImageUrl, cleanBrief } = extractCoverImageMeta(request.brief);
+      const { coverImageUrl, cleanBrief, requirements } = extractCoverImageMeta(request.brief);
       const campaign = await tx.campaign.create({
         data: {
           brandId: request.brand.ownerAccountId,
           slug: request.requestedSlug,
           title: request.title,
           brief: cleanBrief,
+          creatorBriefTitle: requirements ? "YÊU CẦU" : null,
+          creatorBriefDescription: requirements,
           coverImageUrl: coverImageUrl || null,
           budgetVnd: request.budgetVnd,
           targetAmountVnd: request.targetAmountVnd,
@@ -785,6 +789,7 @@ export async function decideCreatorMissionWorkflowByAdmin(
   creatorMissionId: string,
   action:
     | "CONFIRM_DEPOSIT_AND_PRODUCT_RECEIVED"
+    | "MARK_SAMPLE_SHIPPED"
     | "APPROVE_PURCHASE_PROOF"
     | "REJECT_PURCHASE_PROOF"
     | "APPROVE_VIDEO_REVIEW"
@@ -796,6 +801,9 @@ export async function decideCreatorMissionWorkflowByAdmin(
 ) {
   if (action === "CONFIRM_DEPOSIT_AND_PRODUCT_RECEIVED") {
     return confirmDepositAndProductReceivedByAdmin(actorId, creatorMissionId);
+  }
+  if (action === "MARK_SAMPLE_SHIPPED") {
+    return markSampleShippedByAdmin(actorId, creatorMissionId);
   }
   if (action === "APPROVE_PURCHASE_PROOF") {
     return approvePurchaseProofByAdmin(actorId, creatorMissionId);

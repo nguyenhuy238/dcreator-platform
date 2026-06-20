@@ -3,7 +3,9 @@ import Image from "next/image";
 import { CampaignStatus } from "@prisma/client";
 import { AnalyticsLink } from "@/app/components/analytics/AnalyticsLink";
 import { TrackPageEvent } from "@/app/components/analytics/TrackPageEvent";
+import { BrandProcessScrollLink } from "@/app/brand/_components/BrandProcessScrollLink";
 import { PublicFooter, PublicHeader } from "@/app/components/dcreator/layout/shell";
+import { AvatarImage } from "@/app/components/dcreator/ui/AvatarImage";
 import { AnalyticsEvents } from "@/lib/analytics-events";
 import { getCurrentUserFromServer } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/db";
@@ -15,14 +17,6 @@ const formatCompactNumber = (value: number) =>
     maximumFractionDigits: 1
   }).format(value);
 
-const getInitials = (name: string) =>
-  name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("") || "DC";
-
 const trustedBrands = [
   { name: "L'ORÉAL", initials: "L'O" },
   { name: "LA ROCHE-POSAY", initials: "LRP" },
@@ -31,6 +25,14 @@ const trustedBrands = [
   { name: "Tiki", initials: "T" },
   { name: "belif", initials: "b" }
 ];
+
+const creatorProcessSteps = [
+  ["1", "ĐĂNG KÝ THAM GIA", "Tạo hồ sơ Creator và kết nối kênh mạng xã hội.", "doc"],
+  ["2", "CHỌN CAMPAIGN", "Khám phá chiến dịch phù hợp và gửi đăng ký tham gia.", "users"],
+  ["3", "NHẬN SẢN PHẨM", "Được Brand phê duyệt và nhận sản phẩm hoặc reward trải nghiệm.", "package"],
+  ["4", "TẠO & ĐĂNG NỘI DUNG", "Sản xuất video review và đăng tải lên nền tảng Social Commerce.", "play"],
+  ["5", "NHẬN THU NHẬP", "Nhận tiền hoa hồng affiliate lên tới 12% cho mỗi đơn hàng", "chart"]
+] as const;
 
 function MonoIcon({ kind }: { kind: "box" | "users" | "video" | "eye" | "chart" | "rocket" | "target" | "gauge" | "coins" | "doc" | "package" | "play" }) {
   if (kind === "box") {
@@ -138,7 +140,7 @@ export default async function CreatorLandingPage() {
         hideRoleSwitch
         audienceToggle={{ href: "/brand", label: "Dành cho Brand" }}
       />
-      <main className="mx-auto w-full max-w-7xl overflow-x-hidden px-4 pb-24 pt-5 md:px-6">
+      <main className="mx-auto w-full max-w-7xl overflow-x-hidden px-4 pb-24 pt-5 sm:px-6 lg:px-8">
         <section className="relative overflow-hidden rounded-[2.2rem] border border-zinc-200 bg-white px-5 py-9 shadow-sm md:px-8 md:py-12">
           <div className="grid items-center gap-8 md:grid-cols-2">
             <div>
@@ -146,26 +148,29 @@ export default async function CreatorLandingPage() {
                 <span className="rounded-full bg-zinc-950 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-white">Phát triển cùng thương hiệu thật</span>
               </div>
 
-              <h1 className="mt-5 max-w-none text-3xl font-black leading-[1.08] text-zinc-950 md:text-[36px] lg:text-[40px] xl:text-[44px]">
-                <span className="block whitespace-nowrap">Nơi Creator Biến Nội Dung</span>
-                <span className="block whitespace-nowrap">Thành Doanh Thu Thật</span>
+              <h1 className="mt-5 max-w-none break-words text-3xl font-black leading-[1.08] text-zinc-950 md:text-[36px] lg:text-[40px] xl:text-[44px]">
+                <span className="block">Nơi Creator Biến Nội Dung</span>
+                <span className="block">Thành Doanh Thu Thật</span>
               </h1>
               <p className="mt-5 max-w-2xl text-base leading-7 text-zinc-600 md:text-lg">
                 dCreator là hệ sinh thái social commerce kết nối bạn với các brand/SME. Nhận sản phẩm thật, làm video UGC theo brief rõ ràng, gắn giỏ hàng và nhận hoa hồng minh bạch trên từng đơn hàng. Từ 1.000 follower, bạn đã có thể bắt đầu xây profile và kiếm thêm thu nhập từ content của mình.
               </p>
 
-              <div className="mt-7 flex flex-wrap items-center gap-3">
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <AnalyticsLink
                   href={primaryCtaHref}
                   eventName={AnalyticsEvents.CREATOR_UPGRADE_CLICK}
                   eventParams={{ role: "creator", page_source: "creator_landing_hero" }}
-                  className="dc-btn-primary min-w-[220px] rounded-xl px-6 text-base font-bold"
+                  className="dc-btn-primary w-full rounded-xl px-6 text-base font-bold sm:w-auto sm:min-w-[220px]"
                 >
                   Bắt Đầu Nhận Job UGC
                 </AnalyticsLink>
-                <Link href="#creator-how-it-works" className="dc-btn-secondary min-w-[220px] rounded-xl px-6 text-base font-semibold">
+                <BrandProcessScrollLink
+                  targetId="creator-process"
+                  className="dc-btn-secondary w-full rounded-xl px-6 text-base font-semibold sm:w-auto sm:min-w-[220px]"
+                >
                   Xem Cách dCreator Hoạt Động
-                </Link>
+                </BrandProcessScrollLink>
               </div>
             </div>
 
@@ -184,11 +189,11 @@ export default async function CreatorLandingPage() {
             </div>
           </div>
 
-          <div className="mt-7 grid overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-50/80 md:grid-cols-4">
+          <div className="mt-7 grid overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-50/80 sm:grid-cols-2 lg:grid-cols-4">
             {heroStats.map(([value, label], index) => (
-              <article key={label} className={`px-4 py-4 text-center ${index < heroStats.length - 1 ? "md:border-r md:border-zinc-200" : ""}`}>
-                <p className="text-3xl font-black text-zinc-900 md:text-4xl">{formatCompactNumber(value)}</p>
-                <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">{label}</p>
+              <article key={label} className={`border-b border-zinc-200 px-4 py-4 text-center sm:[&:nth-child(odd)]:border-r lg:border-b-0 ${index < heroStats.length - 1 ? "lg:border-r" : ""}`}>
+                <p className="text-3xl font-black text-zinc-900 sm:text-4xl">{formatCompactNumber(value)}</p>
+                <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500 sm:text-xs">{label}</p>
               </article>
             ))}
           </div>
@@ -236,7 +241,7 @@ export default async function CreatorLandingPage() {
               </div>
               <h3 className="mt-7 text-xl font-black text-zinc-950">Nhận tiền affiliate lên tới 12%</h3>
               <p className="mt-3 text-sm leading-6 text-zinc-600">
-                Xem được hiệu quả từng video: click, đơn hàng, hoa hồng… ngay trong hệ thống dCreator, biết rõ nội dung nào chốt đơn tốt nhất.
+                Kết nối với thương hiệu, nhận sản phẩm trải nghiệm và kiếm thu nhập từ cả phí nội dung lẫn hoa hồng affiliate lên tới 12%.
               </p>
             </article>
 
@@ -263,23 +268,17 @@ export default async function CreatorLandingPage() {
           </div>
         </section>
 
-        <section className="mt-8 rounded-[2rem] border border-zinc-200 bg-gradient-to-br from-zinc-50 via-white to-zinc-100 p-5 shadow-sm md:p-8">
+        <section id="creator-process" className="mt-8 scroll-mt-24 rounded-[2rem] border border-zinc-200 bg-gradient-to-br from-zinc-50 via-white to-zinc-100 p-5 shadow-sm md:p-8">
           <div className="mx-auto max-w-3xl text-center">
             <span className="inline-flex rounded-full bg-zinc-900 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-white">Quy trình</span>
             <h2 className="mt-4 text-3xl font-black leading-tight text-zinc-900 md:text-4xl">Quy trình triển khai</h2>
           </div>
 
           <div className="mt-9 overflow-x-auto pb-2">
-            <div className="relative min-w-[980px]">
+            <div className="relative min-w-[860px] lg:min-w-[980px]">
               <div className="absolute left-20 right-20 top-12 h-px bg-zinc-300" />
               <div className="grid grid-cols-5 gap-4">
-                {[
-                  ["1", "Tạo Campaign", "Đăng sản phẩm và mục tiêu chiến dịch.", "doc"],
-                  ["2", "Creator Ứng Tuyển", "Nhận hồ sơ từ Creator phù hợp.", "users"],
-                  ["3", "Duyệt & Gửi Sản Phẩm", "Phân phối reward hoặc sản phẩm tài trợ.", "package"],
-                  ["4", "Nhận Nội Dung", "Creator sản xuất và đăng tải nội dung.", "play"],
-                  ["5", "Đo Lường Hiệu Quả", "Theo dõi hiệu suất và tối ưu doanh thu.", "chart"]
-                ].map(([step, title, description, kind], index, steps) => (
+                {creatorProcessSteps.map(([step, title, description, kind], index, steps) => (
                   <article key={title} className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 text-center shadow-[0_16px_42px_-28px_rgba(24,24,27,0.55)] ring-1 ring-white transition-all duration-300 hover:-translate-y-1 hover:border-zinc-300 hover:shadow-[0_24px_58px_-32px_rgba(24,24,27,0.45)]">
                     <div className="absolute inset-x-0 top-0 h-1 bg-zinc-900" />
                     {index < steps.length - 1 ? (
@@ -323,11 +322,7 @@ export default async function CreatorLandingPage() {
               {featuredCreators.map((creator) => (
                 <article key={creator.id} className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
                   <div className="relative aspect-[4/3] bg-zinc-100">
-                    {creator.avatar ? (
-                      <Image src={creator.avatar} alt={creator.name} fill sizes="(min-width: 1024px) 25vw, 50vw" className="object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-4xl font-black text-zinc-300">{getInitials(creator.name)}</div>
-                    )}
+                    <AvatarImage src={creator.avatar} name={creator.name} />
                     <span className="absolute left-3 top-3 rounded-full bg-zinc-950 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white">Live</span>
                   </div>
                   <div className="p-4">
@@ -370,16 +365,21 @@ export default async function CreatorLandingPage() {
             <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-zinc-300">
               Tham gia cộng đồng Creator dCreator để nhận job UGC, kết nối brand thật và xây profile nội dung của riêng mình.
             </p>
-            <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+            <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <AnalyticsLink
                 href="/auth/register"
                 eventName={AnalyticsEvents.CREATOR_UPGRADE_CLICK}
                 eventParams={{ role: "creator", page_source: "creator_landing_bottom" }}
-                className="inline-flex min-w-[190px] items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-black !text-zinc-950 transition-colors hover:bg-zinc-200"
+                className="inline-flex w-full items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-black !text-zinc-950 transition-colors hover:bg-zinc-200 sm:w-auto sm:min-w-[190px]"
               >
                 Trở Thành Creator
               </AnalyticsLink>
-              <Link href="#creator-how-it-works" className="rounded-xl border border-white/20 px-6 py-3 text-sm font-black text-white transition-colors hover:bg-white hover:text-zinc-950">
+              <Link
+                href="https://www.facebook.com/profile.php?id=61590739340712"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex w-full items-center justify-center rounded-xl border border-white/20 px-6 py-3 text-sm font-black text-white transition-colors hover:bg-white hover:text-zinc-950 sm:w-auto"
+              >
                 Khám Phá Cộng Đồng
               </Link>
             </div>

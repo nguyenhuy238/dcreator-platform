@@ -10,7 +10,7 @@ type PartnerLogoProps = {
 
 function resolveLogoSrc(input?: string | null) {
   if (!input) return "";
-  const raw = input.trim();
+  const raw = input.replace(/[\r\n\s]/g, "").trim();
   if (!raw) return "";
 
   try {

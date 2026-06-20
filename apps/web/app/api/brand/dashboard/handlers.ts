@@ -17,6 +17,7 @@ import {
   getBrandProfile,
   listBrandCampaigns,
   listCampaignMissionsForBrand,
+  listBrandCampaignShippingCreators,
   listBrandCampaignRequests,
   listBrandMembers,
   listBrandProofs,
@@ -28,6 +29,7 @@ import {
   reviewBrandProof,
   requestCampaignAdjustment,
   respondBrandCampaignRequest,
+  markBrandCampaignSampleShipped,
   topupBrandFund,
   updateBrandMemberRole,
   updateBrandOnboarding,
@@ -224,6 +226,19 @@ export async function POST_campaign_mission(request: NextRequest, campaignId: st
 export async function GET_campaign_missions(request: NextRequest, campaignId: string) {
   const account = await requireBrandActor(request);
   return ok(await listCampaignMissionsForBrand(account.id, campaignId, account.currentBrandId));
+}
+
+export async function GET_campaign_shipping(request: NextRequest, campaignId: string) {
+  const account = await requireBrandActor(request);
+  return ok(await listBrandCampaignShippingCreators(account.id, campaignId, account.currentBrandId));
+}
+
+export async function POST_campaign_shipping_shipped(request: NextRequest, campaignId: string) {
+  const account = await requireBrandActor(request);
+  const payload = (await request.json()) as { creatorMissionId?: string };
+  const creatorMissionId = payload.creatorMissionId?.trim();
+  if (!creatorMissionId) throw new AppError("creatorMissionId is required", 422, "CREATOR_MISSION_ID_REQUIRED");
+  return ok(await markBrandCampaignSampleShipped(account.id, campaignId, creatorMissionId, account.currentBrandId));
 }
 
 export async function GET_members(request: NextRequest) {

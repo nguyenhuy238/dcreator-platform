@@ -1,25 +1,42 @@
-"use client";
+﻿"use client";
 
 import type { ReactNode } from "react";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 import type { CampaignDetailDTO } from "@/lib/dto/campaign-detail";
+import { getCampaignParticipationSteps } from "@/lib/constants/campaign-fulfillment";
 import { getCampaignTypeLabel } from "@/lib/constants/campaign-type";
 import { CAMPAIGN_IMAGE_FALLBACK, resolveImageUrl } from "@/lib/images/resolve-image-url";
 import { CampaignBriefRequirements } from "./CampaignBriefRequirements";
 import { CampaignReviewProducts } from "./CampaignReviewProducts";
 import { formatDateTime } from "./campaign-detail.utils";
 
-const fallbackRoadmap = [
-  "Đọc brief và đăng ký tham gia campaign.",
-  "Brand/Admin xét duyệt creator phù hợp.",
-  "Creator nhận yêu cầu nội dung và quay video review/seeding.",
-  "Creator gửi video để Brand/Admin kiểm duyệt.",
-  "Sau khi được duyệt, creator đăng video công khai theo đúng yêu cầu.",
-  "Brand/Admin kiểm tra bài đăng và hoàn tất nghiệm thu."
-];
+function getDisplayLines(value: string) {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*[-•]\s*/, "").trim())
+    .filter(Boolean);
+}
 
-function stripStepPrefix(step: string) {
-  return step.replace(/^\s*(bước|step)\s*\d+\s*[:.)-]?\s*/i, "").trim();
+function truncateText(value: string, maxLength = 120) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength).trim()}...`;
+}
+
+function buildRequirementSummary(data: CampaignDetailDTO) {
+  const explicitSummary = data.hero.requirementsSummary?.trim();
+  if (explicitSummary) return explicitSummary;
+
+  const targetVideos = data.videoStats.targetVideos;
+  if (targetVideos > 0) {
+    const countLabel = targetVideos < 10 ? String(targetVideos).padStart(2, "0") : String(targetVideos);
+    return `${countLabel} Video Review Sản Phẩm`;
+  }
+
+  const detailedRequirement = data.hero.requirements?.trim();
+  if (detailedRequirement) return truncateText(detailedRequirement);
+
+  return "Xem chi tiết trong tab Yêu cầu & brief";
 }
 
 export function HeroSection({ data, applyCard }: { data: CampaignDetailDTO; applyCard: ReactNode }) {
@@ -39,8 +56,8 @@ export function HeroSection({ data, applyCard }: { data: CampaignDetailDTO; appl
           <span className="inline-flex rounded-full border border-emerald-200/40 bg-emerald-500/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-emerald-100">
             {getCampaignTypeLabel()}
           </span>
-          <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-tight md:text-6xl">{data.hero.title}</h1>
-          <p className="mt-3 text-base font-semibold text-zinc-100">Brand: {data.hero.brand}</p>
+          <h1 className="mt-4 max-w-4xl break-words text-3xl font-black tracking-tight sm:text-4xl md:text-6xl">{data.hero.title}</h1>
+          <p className="mt-3 break-words text-base font-semibold text-zinc-100">Brand: {data.hero.brand}</p>
         </div>
         <div className="hidden lg:block">{applyCard}</div>
       </div>
@@ -57,7 +74,7 @@ function CampaignDealOverview({ data }: { data: CampaignDetailDTO }) {
   };
   const requirementCard = {
     eyebrow: "YÊU CẦU",
-    title: mission?.description || "01 Video + 01 Đánh giá sản phẩm",
+    title: buildRequirementSummary(data),
     color: "from-sky-50 to-cyan-100"
   };
   const deadlineCard = {
@@ -65,28 +82,36 @@ function CampaignDealOverview({ data }: { data: CampaignDetailDTO }) {
     title: formatDateTime(mission?.deadline ?? data.hero.deadline),
     color: "from-amber-50 to-orange-100"
   };
+  const benefitLines = getDisplayLines(benefitCard.title);
 
   return (
     <section className="dc-card p-5 md:p-6">
-      <h3 className="text-2xl font-black text-zinc-900">Tổng Quan Deal</h3>
+      <h3 className="text-[26px] font-extrabold text-zinc-950 md:text-3xl">Tổng Quan Deal</h3>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <article
           className={`rounded-[24px] border border-white/70 bg-gradient-to-br ${benefitCard.color} p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md md:col-span-2`}
         >
-          <p className="text-xs font-black tracking-[0.18em] text-zinc-500">{benefitCard.eyebrow}</p>
-          <p className="mt-3 whitespace-pre-line text-lg font-black text-zinc-900">{benefitCard.title}</p>
+          <p className="text-[11px] font-bold uppercase text-zinc-500">{benefitCard.eyebrow}</p>
+          <ul className="mt-4 grid gap-2.5">
+            {benefitLines.map((line) => (
+              <li key={line} className="flex gap-3 text-base font-medium leading-7 text-zinc-900 md:text-lg">
+                <span className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                <span className="min-w-0 break-words">{line}</span>
+              </li>
+            ))}
+          </ul>
         </article>
         <article
           className={`rounded-[24px] border border-white/70 bg-gradient-to-br ${requirementCard.color} p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md`}
         >
-          <p className="text-xs font-black tracking-[0.18em] text-zinc-500">{requirementCard.eyebrow}</p>
-          <p className="mt-3 text-lg font-black text-zinc-900">{requirementCard.title}</p>
+          <p className="text-[11px] font-bold uppercase text-zinc-500">{requirementCard.eyebrow}</p>
+          <p className="mt-4 break-words text-lg font-semibold leading-7 text-zinc-950 md:text-xl">{requirementCard.title}</p>
         </article>
         <article
           className={`rounded-[24px] border border-white/70 bg-gradient-to-br ${deadlineCard.color} p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md`}
         >
-          <p className="text-xs font-black tracking-[0.18em] text-zinc-500">{deadlineCard.eyebrow}</p>
-          <p className="mt-3 text-lg font-black text-zinc-900">{deadlineCard.title}</p>
+          <p className="text-[11px] font-bold uppercase text-zinc-500">{deadlineCard.eyebrow}</p>
+          <p className="mt-4 break-words text-lg font-semibold leading-7 text-zinc-950 md:text-xl">{deadlineCard.title}</p>
         </article>
       </div>
     </section>
@@ -94,23 +119,22 @@ function CampaignDealOverview({ data }: { data: CampaignDetailDTO }) {
 }
 
 function CampaignJoinTimeline({ data }: { data: CampaignDetailDTO }) {
-  const roadmap = (data.hero.participationRoadmap.length > 0 ? data.hero.participationRoadmap : fallbackRoadmap)
-    .map(stripStepPrefix)
-    .filter(Boolean);
+  const participationSteps = getCampaignParticipationSteps(data.hero.fulfillmentMode);
 
   return (
     <section>
       <h3 className="text-2xl font-black text-zinc-900">Lộ trình tham gia</h3>
-      <ol className="mt-4 grid gap-3 lg:grid-cols-3">
-        {roadmap.map((step, index) => (
+      <ol className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {participationSteps.map((step, index) => (
           <li
-            key={`${index}-${step}`}
-            className="relative rounded-[24px] border border-zinc-200 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+            key={step.title}
+            className="relative min-h-[180px] rounded-[24px] border border-zinc-200 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
           >
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900 text-sm font-black text-white">
               {index + 1}
             </span>
-            <p className="mt-3 text-sm leading-6 text-zinc-700">{step}</p>
+            <p className="mt-4 break-words text-sm font-black leading-5 text-zinc-900">{step.title}</p>
+            <p className="mt-2 break-words text-sm leading-6 text-zinc-600">{step.description}</p>
           </li>
         ))}
       </ol>
@@ -133,7 +157,7 @@ export function OverviewTab({ data }: { data: CampaignDetailDTO }) {
 export function BriefTab({ data }: { data: CampaignDetailDTO }) {
   return (
     <section className="grid gap-4">
-      <CampaignBriefRequirements />
+      <CampaignBriefRequirements hashtags={data.hero.requiredHashtags} requirements={data.hero.requirements} />
       <CampaignJoinTimeline data={data} />
     </section>
   );

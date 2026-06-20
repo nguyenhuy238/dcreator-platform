@@ -1,4 +1,4 @@
-export const CREATOR_PLATFORMS = ["tiktok", "facebook", "instagram", "shopee"] as const;
+export const CREATOR_PLATFORMS = ["tiktok", "facebook", "instagram", "youtube", "shopee", "other"] as const;
 export const BRAND_LINK_PLATFORMS = ["website", "tiktok", "tiktok_shop", "shopee", "facebook", "instagram", "youtube", "lazada", "other"] as const;
 
 export type CreatorPlatform = (typeof CREATOR_PLATFORMS)[number];
@@ -32,13 +32,13 @@ export function normalizeCreatorUrl(input: string) {
 export function normalizeCreatorLinks(links: CreatorLink[]) {
   const populatedLinks = links.filter((item) => item.url.trim());
   if (populatedLinks.length === 0) {
-    throw new Error("Vui lòng thêm ít nhất 1 liên kết TikTok, Facebook, Instagram hoặc Shopee.");
+    throw new Error("Vui lòng thêm ít nhất 1 liên kết mạng xã hội hoặc kênh bán hàng.");
   }
 
   return populatedLinks.map((item) => {
     const url = normalizeCreatorUrl(item.url);
     if (!url) {
-      throw new Error("Liên kết không hợp lệ. Vui lòng nhập URL TikTok, Facebook, Instagram hoặc Shopee hợp lệ.");
+      throw new Error("Liên kết không hợp lệ. Vui lòng nhập URL hợp lệ.");
     }
     const handle = item.handle.trim().replace(/^@+/, "");
     if (!handle) {

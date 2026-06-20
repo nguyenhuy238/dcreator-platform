@@ -15,6 +15,7 @@ type MissionHistoryItem = {
   videoReviewStatus: string;
   submission?: { status: string } | null;
   publishStatus: string;
+  reimbursementStatus: string;
   missionApplication?: { status: string; rejectReason?: string | null } | null;
   mission: { title: string; deadlineAt?: string | null };
   campaign: { id: string; title: string; slug: string; coverImageUrl?: string | null; brand?: { displayName?: string } | null };
@@ -62,6 +63,7 @@ function missionStatusLabel(item: MissionHistoryItem) {
   if (item.missionApplication?.status === "REJECTED") return "Đăng ký bị từ chối";
   if (item.status === "COMPLETED") return "Đã hoàn thành";
   if (item.status === "CANCELLED") return "Bị từ chối";
+  if (item.reimbursementStatus === "PAYOUT_PENDING") return "Chờ hoàn tiền";
   if (item.publishStatus === "PENDING") return "Chờ duyệt link public";
   if (item.publishStatus === "REJECTED") return "Link public bị từ chối";
   if (item.videoReviewStatus === "PENDING") return "Chờ duyệt video";

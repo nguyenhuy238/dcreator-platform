@@ -18,8 +18,12 @@ export async function findPublicCampaignDetailBySlug(slug: string, viewerId?: st
       productImageUrl: true,
       productLink: true,
       campaignType: true,
+      fulfillmentMode: true,
+      creatorDepositRequired: true,
       category: true,
       benefits: true,
+      requirementsSummary: true,
+      creatorBriefDescription: true,
       participationRoadmap: true,
       objective: true,
       priorityChannels: true,
@@ -35,8 +39,19 @@ export async function findPublicCampaignDetailBySlug(slug: string, viewerId?: st
       fundedAmountVnd: true,
       ugcVideoQuota: true,
       ugcVideoApprovedCount: true,
-      brand: { select: { displayName: true } },
-      creator: { select: { displayName: true } },
+      brand: { select: { id: true, displayName: true, avatarUrl: true } },
+      creator: {
+        select: {
+          displayName: true,
+          avatarUrl: true,
+          creatorProfile: { select: { displayName: true, avatarUrl: true } }
+        }
+      },
+      sourceBrandRequests: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { brand: { select: { name: true, logoUrl: true, legalName: true } } }
+      },
       rewards: {
         where: { isActive: true },
         orderBy: { pointsCost: "asc" },
@@ -89,10 +104,24 @@ export async function findPublicCampaignDetailBySlug(slug: string, viewerId?: st
   });
 
   if (!campaign) return null;
+  const ownerBrand = await prisma.brand.findFirst({
+    where: { ownerAccountId: campaign.brand.id },
+    orderBy: { updatedAt: "desc" },
+    select: { name: true, legalName: true, logoUrl: true }
+  });
+  let requiredHashtags: string[] = [];
+  try {
+    const rows = await prisma.$queryRaw<Array<{ requiredHashtags: string[] }>>`
+      SELECT "requiredHashtags" FROM "Campaign" WHERE "id" = ${campaign.id} LIMIT 1
+    `;
+    requiredHashtags = rows[0]?.requiredHashtags ?? [];
+  } catch {
+    requiredHashtags = [];
+  }
 
   const viewerHasSupported = viewerId
     ? campaign.contributions.some((contribution) => contribution.supporterId === viewerId)
     : false;
 
-  return { campaign, viewerHasSupported };
+  return { campaign: { ...campaign, ownerBrand, requiredHashtags }, viewerHasSupported };
 }

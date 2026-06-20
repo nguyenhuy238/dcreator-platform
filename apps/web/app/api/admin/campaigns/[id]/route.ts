@@ -3,7 +3,7 @@ import { ok } from "@/lib/api-response";
 import { requireAdminOps } from "@/lib/auth/admin-guard";
 import { AppError, toErrorResponse } from "@/lib/errors";
 import { adminCampaignDecisionSchema, adminCampaignUpdateSchema } from "@/lib/validators/admin-campaign";
-import { archiveCampaignByAdmin, getCampaignDetailForAdmin, updateCampaignByAdmin } from "@/lib/services/admin-campaign-review.service";
+import { deleteCampaignCascadeByAdmin, getCampaignDetailForAdmin, updateCampaignByAdmin } from "@/lib/services/admin-campaign-review.service";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -36,7 +36,7 @@ export async function DELETE(request: NextRequest, { params }: Props) {
     if (!payload.reason?.trim()) {
       throw new AppError("reason is required", 422, "REASON_REQUIRED");
     }
-    return ok(await archiveCampaignByAdmin(actor.id, id, payload.reason.trim()));
+    return ok(await deleteCampaignCascadeByAdmin(actor.id, id, payload.reason.trim()));
   } catch (error) {
     return toErrorResponse(error);
   }

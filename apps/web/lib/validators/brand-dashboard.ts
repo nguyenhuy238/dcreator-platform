@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CAMPAIGN_FULFILLMENT_MODES } from "../constants/campaign-fulfillment.ts";
 
 const campaignSlugSchema = z
   .string()
@@ -7,7 +8,7 @@ const campaignSlugSchema = z
   .max(120)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug chỉ gồm chữ thường, số và dấu gạch ngang (-), không có khoảng trắng.");
 
-const uploadPathOrHttpUrlSchema = z
+export const uploadPathOrHttpUrlSchema = z
   .string()
   .trim()
   .min(1)
@@ -116,6 +117,7 @@ export const campaignCreateSchema = z.object({
   category: z.enum(["TECH", "FASHION", "FOOD", "BEAUTY", "LIFESTYLE", "EDUCATION"]),
   campaignType: z.enum(["DONATION", "PREORDER", "SPONSORSHIP", "COMMUNITY"]),
   setupSource: z.enum(["JOIN_EXISTING_DCREATOR_CAMP", "BRAND_REQUESTED"]).default("BRAND_REQUESTED"),
+  fulfillmentMode: z.enum(CAMPAIGN_FULFILLMENT_MODES).default("BRAND_SHIP"),
   benefits: z.string().trim().min(3).max(2000),
   participationRoadmap: z.array(z.string().trim().min(1).max(300)).min(1),
   imageUrl: uploadPathOrHttpUrlSchema.optional().or(z.literal("")),
@@ -130,12 +132,14 @@ export const campaignCreateSchema = z.object({
 export const campaignBrandFeedbackSchema = z.object({
   feedback: z.string().trim().min(10).max(1200),
   title: z.string().trim().min(3).max(200).optional(),
+  requirements: z.string().trim().min(3).max(2000).optional().or(z.literal("")),
   imageUrl: uploadPathOrHttpUrlSchema.optional().or(z.literal("")),
   contentFileUrl: uploadPathOrHttpUrlSchema.optional()
 });
 
 export const campaignRequestSchema = z.object({
   title: z.string().trim().min(3).max(200),
+  requirements: z.string().trim().min(3).max(2000).optional().or(z.literal("")),
   imageUrl: uploadPathOrHttpUrlSchema.optional().or(z.literal("")),
   contentFileUrl: uploadPathOrHttpUrlSchema,
 });
@@ -234,5 +238,5 @@ export const brandMemberRemoveSchema = z.object({
 });
 
 export const brandSubscriptionPurchaseSchema = z.object({
-  packageCode: z.enum(["FREE", "UGC_15_VIDEO", "UGC_50_VIDEO"])
+  packageCode: z.enum(["FREE", "UGC_20_VIDEO", "UGC_60_VIDEO"])
 });

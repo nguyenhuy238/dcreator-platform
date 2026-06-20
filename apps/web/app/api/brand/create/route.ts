@@ -10,13 +10,14 @@ import { getCurrentSessionFromRequest } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { toErrorResponse } from "@/lib/errors";
 import { BRAND_LINK_PLATFORMS, normalizeBrandLinks } from "@/lib/profile-upgrade-form";
+import { uploadPathOrHttpUrlSchema } from "@/lib/validators/brand-dashboard";
 
 const createBrandSchema = z.object({
   brandName: z.string().trim().min(2).max(160),
   industry: z.string().trim().min(2).max(120).optional(),
   selectedIndustries: z.array(z.string().trim().min(1).max(80)).max(10).optional(),
-  description: z.string().trim().max(300).optional(),
-  logoUrl: z.string().trim().url().max(400).optional().or(z.literal("")),
+  description: z.string().trim().max(2000).optional(),
+  logoUrl: uploadPathOrHttpUrlSchema.optional().or(z.literal("")),
   website: z.string().trim().url().max(400).optional().or(z.literal("")),
   brandLinks: z.array(z.object({
     platform: z.enum(BRAND_LINK_PLATFORMS),

@@ -1,0 +1,23 @@
+
+> web@0.1.0 dev
+> next dev --port 3000
+
+▲ Next.js 16.2.0 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.53:3000
+- Environments: .env
+✓ Ready in 481ms
+Creating turbopack project { dir: 'D:\\dCreator\\dcreator-platform\\apps\\web', testMode: true }
+
+ GET /api/auth/me 200 in 250ms (next.js: 143ms, application-code: 106ms)
+ GET /api/auth/me 200 in 8ms (next.js: 3ms, application-code: 5ms)
+ GET /dashboard/brand/campaigns 200 in 474ms (next.js: 120ms, proxy.ts: 23ms, application-code: 331ms)
+ GET /api/brand/current 200 in 55ms (next.js: 36ms, application-code: 19ms)
+ GET /api/brand/current 200 in 256ms (next.js: 45ms, application-code: 210ms)
+ GET /api/brand/dashboard/campaign-template 200 in 336ms (next.js: 243ms, application-code: 93ms)
+ GET /api/brand/dashboard/campaign-requests 200 in 341ms (next.js: 197ms, application-code: 143ms)
+ GET /api/brand/dashboard/campaign-template?brandId=cmq0wwjmy001bth6cw3c1xbql 200 in 33ms (next.js: 4ms, application-code: 30ms)
+ GET /api/brand/dashboard/campaign-requests?brandId=cmq0wwjmy001bth6cw3c1xbql 200 in 92ms (next.js: 13ms, application-code: 79ms)
+ GET /api/brand/dashboard/campaigns?brandId=cmq0wwjmy001bth6cw3c1xbql 200 in 110ms (next.js: 6ms, application-code: 104ms)
+ GET /api/brand/dashboard/campaigns 200 in 436ms (next.js: 149ms, application-code: 287ms)
+[?25h

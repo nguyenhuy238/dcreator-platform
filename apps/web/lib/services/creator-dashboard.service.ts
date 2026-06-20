@@ -126,13 +126,23 @@ async function ensureCreatorProfileForSocialLink(accountId: string) {
 
 export async function getCreatorDashboardOverview(accountId: string) {
   const wallet = await ensureWalletByAccountId(accountId);
-  const [totalJobs, pendingProofs, approvedVideos, completedSubmissions] = await prisma.$transaction([
+  const [totalJobs, pendingProofs, approvedVideos, completedSubmissions, adminSettings] = await prisma.$transaction([
     prisma.missionSubmission.count({ where: { accountId } }),
     prisma.missionSubmission.count({ where: { accountId, lifecycleStatus: "PENDING_REVIEW" } }),
     prisma.missionSubmission.count({ where: { accountId, lifecycleStatus: { in: ["APPROVED", "DONE"] } } }),
     prisma.missionSubmission.findMany({
       where: { accountId, lifecycleStatus: "DONE" },
       select: { mission: { select: { rewardPoints: true } } }
+    }),
+    prisma.adminSetting.findUnique({
+      where: { scope: "global" },
+      select: {
+        creatorDepositQrImageUrl: true,
+        creatorDepositAccountName: true,
+        creatorDepositAccountNumber: true,
+        creatorDepositBankName: true,
+        creatorDepositTransferPrefix: true
+      }
     })
   ]);
 
@@ -146,7 +156,14 @@ export async function getCreatorDashboardOverview(accountId: string) {
     pendingProofs,
     approvedVideos,
     totalCommission,
-    nPointsBalance: wallet.pointsBalance
+    nPointsBalance: wallet.pointsBalance,
+    creatorDepositBankConfig: {
+      qrImageUrl: adminSettings?.creatorDepositQrImageUrl || "/qr-dcreator.jpg",
+      accountName: adminSettings?.creatorDepositAccountName || "",
+      accountNumber: adminSettings?.creatorDepositAccountNumber || "",
+      bankName: adminSettings?.creatorDepositBankName || "",
+      transferPrefix: adminSettings?.creatorDepositTransferPrefix || "DCR"
+    }
   };
 }
 
@@ -273,16 +290,29 @@ export async function getCreatorCommission(accountId: string) {
 export async function getCreatorProfile(accountId: string) {
   const account = await prisma.account.findUniqueOrThrow({
     where: { id: accountId },
-    include: { profile: true }
+    include: {
+      profile: true,
+      creatorProfile: {
+        select: {
+          displayName: true,
+          avatarUrl: true,
+          bio: true,
+          contentCategory: true
+        }
+      }
+    }
   });
 
   const profileMeta = parseProfileMeta(account.profile?.socialLinks);
+  const categories = account.creatorProfile?.contentCategory
+    ? [account.creatorProfile.contentCategory]
+    : profileMeta.categories;
 
   return {
-    displayName: account.displayName,
-    avatarUrl: account.avatarUrl,
-    bio: account.profile?.bio ?? "",
-    categories: profileMeta.categories,
+    displayName: account.creatorProfile?.displayName ?? account.displayName,
+    avatarUrl: account.creatorProfile?.avatarUrl ?? "",
+    bio: account.creatorProfile?.bio ?? account.profile?.bio ?? "",
+    categories,
     socialLinks: profileMeta.socialLinks
   };
 }
@@ -291,35 +321,44 @@ export async function updateCreatorProfile(accountId: string, input: CreatorProf
   const current = await prisma.profile.findUnique({ where: { accountId } });
   const currentMeta = parseProfileMeta(current?.socialLinks);
 
-  await prisma.account.update({
-    where: { id: accountId },
-    data: {
-      displayName: input.displayName,
-      avatarUrl: input.avatarUrl || null
-    }
-  });
+  await prisma.$transaction(async (tx) => {
+    await tx.creatorProfile.upsert({
+      where: { accountId },
+      create: {
+        accountId,
+        displayName: input.displayName,
+        avatarUrl: input.avatarUrl || null,
+        bio: input.bio || null,
+        contentCategory: input.categories[0] ?? null
+      },
+      update: {
+        displayName: input.displayName,
+        avatarUrl: input.avatarUrl || null,
+        bio: input.bio || null,
+        contentCategory: input.categories[0] ?? null
+      }
+    });
 
-  await prisma.profile.upsert({
-    where: { accountId },
-    create: {
-      accountId,
-      bio: input.bio,
-      socialLinks: {
-        categories: input.categories,
-        socialLinks: input.socialLinks,
-        channels: currentMeta.channels,
-        kycVerified: currentMeta.kycVerified
+    await tx.profile.upsert({
+      where: { accountId },
+      create: {
+        accountId,
+        socialLinks: {
+          categories: input.categories,
+          socialLinks: input.socialLinks,
+          channels: currentMeta.channels,
+          kycVerified: currentMeta.kycVerified
+        }
+      },
+      update: {
+        socialLinks: {
+          categories: input.categories,
+          socialLinks: input.socialLinks,
+          channels: currentMeta.channels,
+          kycVerified: currentMeta.kycVerified
+        }
       }
-    },
-    update: {
-      bio: input.bio,
-      socialLinks: {
-        categories: input.categories,
-        socialLinks: input.socialLinks,
-        channels: currentMeta.channels,
-        kycVerified: currentMeta.kycVerified
-      }
-    }
+    });
   });
 
   await createNotification({

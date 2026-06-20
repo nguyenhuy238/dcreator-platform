@@ -5,149 +5,125 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { FormField } from "@/app/components/dcreator/ui/base";
+import { BRAND_LINK_PLATFORMS, normalizeBrandLinks, resolveSelectedIndustries, type BrandLink, type BrandLinkPlatform } from "@/lib/profile-upgrade-form";
 import { upsertCurrentBrandInContext } from "@/app/dashboard/brand/_hooks/use-brand-context";
 
-type UploadState = {
-  idCardFrontImageUrl: string;
-  idCardBackImageUrl: string;
-  businessLicenseUrl: string | null;
+const INDUSTRY_OPTIONS = ["Thời trang", "Mỹ phẩm", "F&B", "Đồ gia dụng", "Công nghệ", "Mẹ và bé", "Sức khỏe", "Giáo dục", "Giải trí", "Khác"] as const;
+const BRAND_LINK_LABELS: Record<BrandLinkPlatform, string> = {
+  website: "Website chính thức",
+  tiktok: "TikTok",
+  tiktok_shop: "TikTok Shop",
+  shopee: "Shopee",
+  facebook: "Facebook",
+  instagram: "Instagram",
+  youtube: "YouTube",
+  lazada: "Lazada",
+  other: "Khác"
 };
+
+type FieldErrors = Record<string, string>;
+
+function ErrorText({ message }: { message?: string }) {
+  return message ? <p className="text-xs font-medium text-red-600">{message}</p> : null;
+}
 
 export default function BrandRegisterPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [idCardFrontImageUrl, setIdCardFrontImageUrl] = useState("");
-  const [idCardBackImageUrl, setIdCardBackImageUrl] = useState("");
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
+  const [otherIndustry, setOtherIndustry] = useState("");
+  const [brandLinks, setBrandLinks] = useState<BrandLink[]>([{ platform: "website", url: "" }]);
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+    confirmPassword: "",
+    displayName: "",
+    brandName: "",
+    description: "",
+    contactName: "",
+    contactPhone: "",
+    contactEmail: ""
+  });
 
-  async function uploadBrandKycFiles(formData: FormData): Promise<UploadState> {
-    const uploadData = new FormData();
-    const representativeIdFrontImage = formData.get("representativeIdFrontImage");
-    const representativeIdBackImage = formData.get("representativeIdBackImage");
-    const businessLicenseFile = formData.get("businessLicenseFile");
+  function addBrandLink() {
+    const used = new Set(brandLinks.map((item) => item.platform));
+    const nextPlatform = BRAND_LINK_PLATFORMS.find((platform) => platform === "other" || !used.has(platform)) ?? "other";
+    setBrandLinks((items) => [...items, { platform: nextPlatform, url: "" }]);
+  }
 
-    if (representativeIdFrontImage instanceof File && representativeIdFrontImage.size > 0) {
-      uploadData.append("representativeIdFrontImage", representativeIdFrontImage);
+  function validate() {
+    const nextErrors: FieldErrors = {};
+    if (!form.email.trim()) nextErrors.email = "Email là bắt buộc.";
+    if (form.password.length < 8) nextErrors.password = "Mật khẩu tối thiểu 8 ký tự.";
+    if (form.password !== form.confirmPassword) nextErrors.confirmPassword = "Mật khẩu nhập lại không khớp.";
+    if (!form.displayName.trim()) nextErrors.displayName = "Tên hiển thị là bắt buộc.";
+    if (!form.brandName.trim()) nextErrors.brandName = "Tên nhãn hàng là bắt buộc.";
+    if (form.contactPhone && !/^(0|\+84)[0-9\s.-]{8,14}$/.test(form.contactPhone)) nextErrors.contactPhone = "Số điện thoại Việt Nam không hợp lệ.";
+    try {
+      resolveSelectedIndustries(selectedIndustries, otherIndustry);
+    } catch (validationError) {
+      nextErrors.industry = validationError instanceof Error ? validationError.message : "Vui lòng chọn ngành hàng.";
     }
-    if (representativeIdBackImage instanceof File && representativeIdBackImage.size > 0) {
-      uploadData.append("representativeIdBackImage", representativeIdBackImage);
+    try {
+      normalizeBrandLinks(brandLinks);
+    } catch (validationError) {
+      nextErrors.brandLinks = validationError instanceof Error ? validationError.message : "Liên kết không hợp lệ.";
     }
-    if (businessLicenseFile instanceof File && businessLicenseFile.size > 0) {
-      uploadData.append("businessLicense", businessLicenseFile);
-    }
-
-    if (Array.from(uploadData.keys()).length === 0) {
-      return { idCardFrontImageUrl: "", idCardBackImageUrl: "", businessLicenseUrl: null };
-    }
-
-    const uploadResponse = await fetch("/api/uploads/brand-kyc", {
-      method: "POST",
-      body: uploadData
-    });
-    const uploadPayload = await uploadResponse.json();
-
-    if (!uploadResponse.ok || !uploadPayload.success) {
-      throw new Error(uploadPayload.error ?? "Không thể tải ảnh xác minh Brand.");
-    }
-
-    return uploadPayload.data as UploadState;
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setLoading(true);
     setError("");
-    setSuccess("");
-
-    const formData = new FormData(event.currentTarget);
-    const displayName = String(formData.get("displayName") ?? "").trim();
-    const email = String(formData.get("email") ?? "").trim();
-    const password = String(formData.get("password") ?? "").trim();
-    const brandName = String(formData.get("brandName") ?? "").trim();
-    const legalName = String(formData.get("legalName") ?? "").trim();
-    const industry = String(formData.get("industry") ?? "").trim();
-    const productCategories = String(formData.get("productCategories") ?? "").trim();
-    const inventoryDescription = String(formData.get("inventoryDescription") ?? "").trim();
-    const website = String(formData.get("website") ?? "").trim();
-    const fanpage = String(formData.get("fanpage") ?? "").trim();
-    const address = String(formData.get("address") ?? "").trim();
-    const logoUrl = String(formData.get("logoUrl") ?? "").trim();
-    const representativeName = String(formData.get("representativeName") ?? "").trim();
-    const representativeEmail = String(formData.get("representativeEmail") ?? "").trim();
-    const representativeIdentityNumber = String(formData.get("representativeIdentityNumber") ?? "").trim();
-    const phone = String(formData.get("phone") ?? "").trim();
-    const taxCode = String(formData.get("taxCode") ?? "").trim();
-    const campaignGoal = String(formData.get("campaignGoal") ?? "").trim();
-    const estimatedBudget = String(formData.get("estimatedBudget") ?? "").trim();
-    const expectedCreatorCount = String(formData.get("expectedCreatorCount") ?? "").trim();
-    const brandNote = String(formData.get("brandNote") ?? "").trim();
+    if (!validate()) return;
+    setSubmitting(true);
 
     try {
-      const registerResponse = await fetch("/api/auth/register", {
+      const industries = resolveSelectedIndustries(selectedIndustries, otherIndustry);
+      const normalizedLinks = normalizeBrandLinks(brandLinks);
+      const formData = new FormData(event.currentTarget);
+      formData.set("payload", JSON.stringify({
+        email: form.email,
+        password: form.password,
+        displayName: form.displayName,
+        brandName: form.brandName,
+        industry: industries.join(", "),
+        description: form.description,
+        contactName: form.contactName,
+        contactPhone: form.contactPhone,
+        contactEmail: form.contactEmail || form.email,
+        website: normalizedLinks.find((item) => item.platform === "website")?.url ?? "",
+        brandLinks: normalizedLinks,
+        legalName: "",
+        taxCode: "",
+        address: ""
+      }));
+
+      const response = await fetch("/api/auth/register/brand", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ displayName, email, password })
+        body: formData
       });
-      const registerPayload = await registerResponse.json();
-      if (!registerResponse.ok || !registerPayload.success) {
-        throw new Error(registerPayload.error ?? "Không thể tạo tài khoản.");
+      const payload = await response.json();
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error ?? "Không thể tạo tài khoản Brand.");
       }
 
-      setUploading(true);
-      const uploadState = await uploadBrandKycFiles(formData);
-      setIdCardFrontImageUrl(uploadState.idCardFrontImageUrl);
-      setIdCardBackImageUrl(uploadState.idCardBackImageUrl);
-
-      const applicationResponse = await fetch("/api/brand/create", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          brandName,
-          industry,
-          logoUrl,
-          description: [
-            brandNote,
-            legalName ? `Pháp nhân: ${legalName}` : "",
-            taxCode ? `MST: ${taxCode}` : "",
-            website ? `Website: ${website}` : "",
-            fanpage ? `Fanpage: ${fanpage}` : "",
-            address ? `Địa chỉ: ${address}` : "",
-            representativeName ? `Đại diện: ${representativeName}` : "",
-            phone ? `SĐT: ${phone}` : "",
-            representativeEmail || email ? `Email đại diện: ${representativeEmail || email}` : "",
-            representativeIdentityNumber ? `Định danh đại diện: ${representativeIdentityNumber}` : "",
-            productCategories ? `Danh mục: ${productCategories}` : "",
-            campaignGoal ? `Mục tiêu campaign: ${campaignGoal}` : "",
-            estimatedBudget ? `Ngân sách dự kiến: ${estimatedBudget}` : "",
-            expectedCreatorCount ? `Số creator dự kiến: ${expectedCreatorCount}` : "",
-            uploadState.businessLicenseUrl ? `GPKD: ${uploadState.businessLicenseUrl}` : "",
-            inventoryDescription,
-            `CCCD mặt trước: ${uploadState.idCardFrontImageUrl}`,
-            `CCCD mặt sau: ${uploadState.idCardBackImageUrl}`
-          ].filter(Boolean).join("\n").slice(0, 300)
-        })
-      });
-      const applicationPayload = await applicationResponse.json();
-      if (!applicationResponse.ok || !applicationPayload.success) {
-        throw new Error(applicationPayload.error ?? "Không thể gửi đăng ký Brand.");
+      if (payload.data?.brand?.id) {
+        upsertCurrentBrandInContext({
+          id: payload.data.brand.id,
+          name: payload.data.brand.name,
+          role: "OWNER"
+        });
       }
-
-      upsertCurrentBrandInContext({
-        id: applicationPayload.data.id,
-        name: applicationPayload.data.name,
-        role: "OWNER"
-      });
-      setSuccess("Brand đã được tạo. Bạn có thể bắt đầu thiết lập sản phẩm/campaign.");
-      event.currentTarget.reset();
       router.push("/dashboard/brand?created=1");
       router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Có lỗi xảy ra. Vui lòng thử lại.");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Lỗi server. Vui lòng thử lại.");
     } finally {
-      setUploading(false);
-      setLoading(false);
+      setSubmitting(false);
     }
   }
 
@@ -156,135 +132,123 @@ export default function BrandRegisterPage() {
       <PublicHeader />
       <main className="mx-auto grid min-h-[calc(100vh-80px)] w-full max-w-[88rem] items-start gap-6 px-4 py-8 md:grid-cols-[0.75fr_1.25fr] md:px-6">
         <section className="hidden rounded-3xl border border-zinc-200 bg-white p-8 md:block">
-          <p className="text-xs font-bold uppercase tracking-[0.15em] text-zinc-500">Brand Onboarding</p>
-          <h1 className="mt-3 text-4xl font-black tracking-tight">Đăng ký Brand</h1>
+          <p className="text-xs font-bold uppercase tracking-[0.15em] text-zinc-500">Brand Portal</p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-zinc-900">Đăng ký Brand</h1>
           <p className="mt-3 text-zinc-600">
-            Hoàn tất thông tin thương hiệu để vào Brand Dashboard ngay. Hồ sơ xác minh nâng cao có thể bổ sung sau.
+            Tạo tài khoản Brand Portal để quản lý sản phẩm, campaign và làm việc với Creator.
           </p>
-          <div className="mt-6 grid gap-3 text-sm text-zinc-600">
-            <p>1. Tạo tài khoản Brand Portal.</p>
-            <p>2. Bắt đầu quản lý sản phẩm/campaign ngay sau khi tạo.</p>
-            <p>3. Bổ sung xác minh để mở khóa payout/campaign nâng cao.</p>
-          </div>
         </section>
 
         <form className="dc-card mx-auto w-full max-w-none space-y-6 p-7 lg:p-9" onSubmit={onSubmit}>
           <div className="border-b border-zinc-200 pb-4">
-            <h2 className="text-2xl font-black">Thông tin Brand Portal</h2>
-            <p className="mt-1 text-sm text-zinc-600">Trường có <span className="text-red-500">*</span> là bắt buộc.</p>
+            <h2 className="text-2xl font-black text-zinc-900">Đăng ký Brand</h2>
+            <p className="mt-1 text-sm text-zinc-600">Tài khoản được tạo kèm quyền Brand Owner và đăng nhập tự động.</p>
           </div>
 
           <section className="grid gap-4 md:grid-cols-2">
+            <h3 className="text-sm font-bold uppercase tracking-[0.12em] text-zinc-500 md:col-span-2">Thông tin tài khoản</h3>
             <FormField label={<span>Email <span className="text-red-500">*</span></span>}>
-              <input name="email" type="email" className="dc-input" placeholder="brand@example.com" required />
-            </FormField>
-            <FormField label={<span>Mật khẩu <span className="text-red-500">*</span></span>}>
-              <input name="password" type="password" className="dc-input" placeholder="Tối thiểu 8 ký tự" required minLength={8} />
+              <>
+                <input type="email" className="dc-input" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} placeholder="brand@example.com" disabled={submitting} required />
+                <ErrorText message={errors.email} />
+              </>
             </FormField>
             <FormField label={<span>Tên hiển thị <span className="text-red-500">*</span></span>}>
-              <input name="displayName" className="dc-input" placeholder="FreshSkin Team" required minLength={2} />
-            </FormField>
-            <FormField label={<span>Tên thương hiệu <span className="text-red-500">*</span></span>}>
-              <input name="brandName" className="dc-input" placeholder="FreshSkin" required minLength={2} />
-            </FormField>
-            <FormField label={<span>Pháp nhân / tên công ty <span className="text-xs text-zinc-500">(bổ sung sau)</span></span>}>
-              <input name="legalName" className="dc-input" placeholder="Công ty TNHH FreshSkin" />
-            </FormField>
-            <FormField label={<span>Mã số thuế <span className="text-xs text-zinc-500">(bổ sung sau)</span></span>}>
-              <input name="taxCode" className="dc-input" placeholder="0101234567" />
-              <p className="text-xs font-medium text-zinc-500">Nhập mã số thuế doanh nghiệp, chỉ gồm ký tự số.</p>
-            </FormField>
-            <FormField label={<span>Ngành hàng <span className="text-red-500">*</span></span>}>
-              <input name="industry" className="dc-input" placeholder="Beauty, Food, Fashion..." required />
-            </FormField>
-            <FormField label={<span>Danh mục sản phẩm</span>}>
-              <input name="productCategories" className="dc-input" placeholder="Skincare, voucher spa, combo quà..." />
-            </FormField>
-            <FormField label={<span>Website</span>}>
               <>
-                <input name="website" type="url" className="dc-input" placeholder="https://example.com" />
-                <p className="text-xs font-medium text-zinc-500">Nhập URL đầy đủ, bao gồm `https://`.</p>
+                <input className="dc-input" value={form.displayName} onChange={(event) => setForm((current) => ({ ...current, displayName: event.target.value }))} placeholder="FreshSkin Team" disabled={submitting} required />
+                <ErrorText message={errors.displayName} />
               </>
             </FormField>
-            <FormField label={<span>Fanpage</span>}>
-              <input name="fanpage" type="url" className="dc-input" placeholder="https://facebook.com/..." />
+            <FormField label={<span>Mật khẩu <span className="text-red-500">*</span></span>}>
+              <>
+                <input type="password" className="dc-input" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} placeholder="Tối thiểu 8 ký tự" disabled={submitting} required minLength={8} />
+                <ErrorText message={errors.password} />
+              </>
             </FormField>
-            <FormField label={<span>Logo thương hiệu</span>}>
-              <input name="logoUrl" type="url" className="dc-input" placeholder="https://example.com/logo.png" />
+            <FormField label={<span>Nhập lại mật khẩu <span className="text-red-500">*</span></span>}>
+              <>
+                <input type="password" className="dc-input" value={form.confirmPassword} onChange={(event) => setForm((current) => ({ ...current, confirmPassword: event.target.value }))} placeholder="Nhập lại mật khẩu" disabled={submitting} required minLength={8} />
+                <ErrorText message={errors.confirmPassword} />
+              </>
             </FormField>
-            <FormField label={<span>Giấy phép kinh doanh <span className="text-xs text-zinc-500">(PDF, DOC, DOCX, JPG, PNG – tối đa 10MB)</span></span>}>
-              <input name="businessLicenseFile" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" className="dc-input bg-white" />
-            </FormField>
-            <div className="md:col-span-2">
-              <FormField label={<span>Địa chỉ kinh doanh</span>}>
-                <input name="address" className="dc-input" placeholder="Số nhà, phường/xã, quận/huyện, tỉnh/thành" />
-              </FormField>
-            </div>
-            <div className="md:col-span-2">
-              <FormField label={<span>Mô tả tồn kho / sản phẩm có thể dùng làm campaign capital</span>}>
-                <textarea name="inventoryDescription" className="dc-input min-h-24" placeholder="Sản phẩm, voucher, số lượng, điều kiện đổi quà..." />
-              </FormField>
-            </div>
           </section>
 
           <section className="grid gap-4 border-t border-zinc-200 pt-5 md:grid-cols-2">
-            <FormField label={<span>Người đại diện</span>}>
-              <input name="representativeName" className="dc-input" placeholder="Nguyễn An" />
-            </FormField>
-            <FormField label={<span>Số điện thoại</span>}>
-              <input name="phone" className="dc-input" placeholder="09xx xxx xxx" />
-            </FormField>
-            <FormField label={<span>Email người đại diện</span>}>
-              <input name="representativeEmail" type="email" className="dc-input" placeholder="owner@example.com" />
-            </FormField>
-            <FormField label={<span>Số CCCD / định danh người đại diện</span>}>
-              <input name="representativeIdentityNumber" className="dc-input" placeholder="012345678901" />
-            </FormField>
-            <div className="grid gap-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:col-span-2 md:grid-cols-2">
-              <FormField label={<span>CCCD mặt trước <span className="text-xs text-zinc-500">(bổ sung sau nếu cần)</span></span>}>
-                <input name="representativeIdFrontImage" type="file" accept="image/*" className="dc-input bg-white" />
-              </FormField>
-              <FormField label={<span>CCCD mặt sau <span className="text-xs text-zinc-500">(bổ sung sau nếu cần)</span></span>}>
-                <input name="representativeIdBackImage" type="file" accept="image/*" className="dc-input bg-white" />
-              </FormField>
-              {idCardFrontImageUrl ? <p className="text-xs text-zinc-500 md:col-span-2">CCCD mặt trước: {idCardFrontImageUrl}</p> : null}
-              {idCardBackImageUrl ? <p className="text-xs text-zinc-500 md:col-span-2">CCCD mặt sau: {idCardBackImageUrl}</p> : null}
-            </div>
-          </section>
-
-          <section className="grid gap-4 border-t border-zinc-200 pt-5 md:grid-cols-2">
-            <FormField label={<span>Mục tiêu campaign</span>}>
-              <input name="campaignGoal" className="dc-input" placeholder="Tăng nhận diện, tăng đơn hàng, xử lý tồn kho..." />
-            </FormField>
-            <FormField label={<span>Ngân sách dự kiến (VND)</span>}>
+            <h3 className="text-sm font-bold uppercase tracking-[0.12em] text-zinc-500 md:col-span-2">Thông tin Brand</h3>
+            <FormField label={<span>Tên nhãn hàng <span className="text-red-500">*</span></span>}>
               <>
-                <input name="estimatedBudget" type="text" inputMode="numeric" pattern="[0-9]*" className="dc-input" placeholder="50000000" />
-                <p className="text-xs font-medium text-zinc-500">Đơn vị: VND, chỉ nhập số.</p>
+                <input className="dc-input" value={form.brandName} onChange={(event) => setForm((current) => ({ ...current, brandName: event.target.value }))} placeholder="FreshSkin" disabled={submitting} required />
+                <ErrorText message={errors.brandName} />
               </>
             </FormField>
-            <FormField label={<span>Số creator dự kiến</span>}>
-              <>
-                <input name="expectedCreatorCount" type="text" inputMode="numeric" pattern="[0-9]*" className="dc-input" placeholder="20" />
-                <p className="text-xs font-medium text-zinc-500">Đơn vị: người (creator).</p>
-              </>
+            <FormField label="Logo Brand">
+              <input name="logo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="dc-input bg-white" disabled={submitting} />
             </FormField>
             <div className="md:col-span-2">
-              <FormField label={<span>Ghi chú</span>}>
-                <textarea name="brandNote" className="dc-input min-h-24" placeholder="Thông tin thêm về nhu cầu hợp tác..." />
+              <FormField label={<span>Ngành hàng <span className="text-red-500">*</span></span>}>
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {INDUSTRY_OPTIONS.map((industry) => {
+                      const selected = selectedIndustries.includes(industry);
+                      return (
+                        <button key={industry} type="button" className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${selected ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"}`} onClick={() => setSelectedIndustries((items) => selected ? items.filter((item) => item !== industry) : [...items, industry])} disabled={submitting}>
+                          {industry}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedIndustries.includes("Khác") ? <input className="dc-input mt-2" placeholder="Nhập ngành hàng khác" value={otherIndustry} onChange={(event) => setOtherIndustry(event.target.value)} disabled={submitting} /> : null}
+                  <ErrorText message={errors.industry} />
+                </>
               </FormField>
             </div>
+            <div className="md:col-span-2">
+              <FormField label="Mô tả ngắn">
+                <textarea className="dc-input min-h-24" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="Sản phẩm, thế mạnh, nhu cầu hợp tác với Creator..." disabled={submitting} />
+              </FormField>
+            </div>
+            <FormField label="Tên người liên hệ">
+              <input className="dc-input" value={form.contactName} onChange={(event) => setForm((current) => ({ ...current, contactName: event.target.value }))} placeholder="Nguyễn An" disabled={submitting} />
+            </FormField>
+            <FormField label="Số điện thoại liên hệ">
+              <>
+                <input className="dc-input" value={form.contactPhone} onChange={(event) => setForm((current) => ({ ...current, contactPhone: event.target.value }))} placeholder="09xx xxx xxx" disabled={submitting} />
+                <ErrorText message={errors.contactPhone} />
+              </>
+            </FormField>
+            <FormField label="Email liên hệ">
+              <input className="dc-input" type="email" value={form.contactEmail} onChange={(event) => setForm((current) => ({ ...current, contactEmail: event.target.value }))} placeholder="owner@example.com" disabled={submitting} />
+            </FormField>
           </section>
 
-          {success ? <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p> : null}
-          {error ? <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+          <section className="grid gap-3 border-t border-zinc-200 pt-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-bold uppercase tracking-[0.12em] text-zinc-500">Website / kênh bán hàng / mạng xã hội</h3>
+              <button type="button" className="dc-btn-secondary" onClick={addBrandLink} disabled={submitting}>Thêm link</button>
+            </div>
+            {brandLinks.map((item, index) => {
+              const selectedPlatforms = new Set(brandLinks.map((link, linkIndex) => linkIndex === index ? "" : link.platform));
+              return (
+                <div key={`${index}-${item.platform}`} className="grid gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 sm:grid-cols-[12rem_minmax(0,1fr)_auto]">
+                  <select className="dc-input bg-white" value={item.platform} onChange={(event) => setBrandLinks((items) => items.map((link, itemIndex) => itemIndex === index ? { ...link, platform: event.target.value as BrandLinkPlatform } : link))} disabled={submitting}>
+                    {BRAND_LINK_PLATFORMS.map((platform) => <option key={platform} value={platform} disabled={platform !== "other" && selectedPlatforms.has(platform)}>{BRAND_LINK_LABELS[platform]}</option>)}
+                  </select>
+                  <input className="dc-input bg-white" inputMode="url" placeholder="https://..." value={item.url} onChange={(event) => setBrandLinks((items) => items.map((link, itemIndex) => itemIndex === index ? { ...link, url: event.target.value } : link))} disabled={submitting} />
+                  <button type="button" className="dc-btn-secondary h-fit text-red-700" onClick={() => setBrandLinks((items) => items.length > 1 ? items.filter((_, itemIndex) => itemIndex !== index) : [{ platform: "website", url: "" }])} disabled={submitting}>
+                    Xóa
+                  </button>
+                </div>
+              );
+            })}
+            <ErrorText message={errors.brandLinks} />
+          </section>
 
-          <button className="dc-btn-primary w-full" disabled={loading || uploading}>
-            {loading || uploading ? "Đang tạo..." : "Tạo Brand"}
+          {error ? <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+          <button className="dc-btn-primary w-full" disabled={submitting} type="submit">
+            {submitting ? "Đang tạo..." : "Tạo tài khoản Brand"}
           </button>
-
           <p className="text-sm text-zinc-600">
-            Đã có tài khoản?{" "}
-            <Link href="/auth/login" className="font-semibold text-zinc-900">Đăng nhập</Link>
+            Đã có tài khoản? <Link href="/auth/login" className="font-semibold text-zinc-900">Đăng nhập</Link>
           </p>
         </form>
       </main>

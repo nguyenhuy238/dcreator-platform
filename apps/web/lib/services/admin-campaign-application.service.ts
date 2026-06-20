@@ -1,6 +1,7 @@
 import { MissionLifecycleStatus, MissionStatus, NotificationEvent, Prisma } from "@prisma/client";
 import { CREATOR_CAMPAIGN_APPLICATION_TAG, hasCreatorCampaignApplicationTag } from "@/lib/constants/campaign-application";
 import { prisma } from "@/lib/db";
+import { getBrandDisplayName } from "@/lib/display-identity";
 import { AppError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
 import { ensureCreatorMissionFromApprovedApplication } from "@/lib/services/creator-mission.service";
@@ -61,7 +62,7 @@ export async function listCampaignApplicationsForAdmin(input: {
       }
     : null;
 
-  return prisma.missionSubmission.findMany({
+  const rows = await prisma.missionSubmission.findMany({
     where: {
       mission: {
         ...(input.campaignId ? { campaignId: input.campaignId } : {}),
@@ -118,6 +119,32 @@ export async function listCampaignApplicationsForAdmin(input: {
       }
     }
   });
+  const brandOwnerAccountIds = [...new Set(rows.map((row) => row.mission.campaign.brand.id))];
+  const brands = brandOwnerAccountIds.length
+    ? await prisma.brand.findMany({
+        where: { ownerAccountId: { in: brandOwnerAccountIds } },
+        orderBy: { updatedAt: "desc" },
+        select: { ownerAccountId: true, name: true, legalName: true }
+      })
+    : [];
+  const brandByOwnerAccountId = new Map<string, (typeof brands)[number]>();
+  for (const brand of brands) {
+    if (!brandByOwnerAccountId.has(brand.ownerAccountId)) brandByOwnerAccountId.set(brand.ownerAccountId, brand);
+  }
+  return rows.map((row) => ({
+    ...row,
+    mission: {
+      ...row.mission,
+      campaign: {
+        ...row.mission.campaign,
+        brand: {
+          ...row.mission.campaign.brand,
+          ownerDisplayName: row.mission.campaign.brand.displayName,
+          displayName: getBrandDisplayName({ brand: brandByOwnerAccountId.get(row.mission.campaign.brand.id) ?? null })
+        }
+      }
+    }
+  }));
 }
 
 export async function getCampaignApplicationDetailForAdmin(applicationId: string) {
@@ -160,7 +187,25 @@ export async function getCampaignApplicationDetailForAdmin(applicationId: string
   });
   if (!item) throw new AppError("Application not found", 404, "APPLICATION_NOT_FOUND");
   if (!isCreatorApplicationRecord(item)) throw new AppError("Not a creator application", 400, "NOT_CREATOR_APPLICATION");
-  return item;
+  const brand = await prisma.brand.findFirst({
+    where: { ownerAccountId: item.mission.campaign.brand.id },
+    orderBy: { updatedAt: "desc" },
+    select: { name: true, legalName: true }
+  });
+  return {
+    ...item,
+    mission: {
+      ...item.mission,
+      campaign: {
+        ...item.mission.campaign,
+        brand: {
+          ...item.mission.campaign.brand,
+          ownerDisplayName: item.mission.campaign.brand.displayName,
+          displayName: getBrandDisplayName({ brand })
+        }
+      }
+    }
+  };
 }
 
 export async function adminApproveCampaignApplication(actorId: string, applicationId: string) {

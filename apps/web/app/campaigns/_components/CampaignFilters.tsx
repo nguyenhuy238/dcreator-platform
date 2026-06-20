@@ -16,15 +16,16 @@ export function CampaignFilters({
   return (
     <section className="dc-card p-4">
       <div className="grid gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">Bộ lọc chiến dịch</p>
-          <label className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+          <label className="inline-flex min-w-0 items-start gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 sm:items-center">
             <input
+              className="mt-0.5 shrink-0 sm:mt-0"
               type="checkbox"
               checked={value.rewardAvailable}
               onChange={(e) => onChange({ ...value, rewardAvailable: e.target.checked })}
             />{" "}
-            Chỉ hiển thị campaign đang thực hiện
+            <span className="min-w-0 break-words">Chỉ hiển thị campaign đang thực hiện</span>
           </label>
         </div>
         <input

@@ -3,13 +3,20 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { RequiredHashtagInput } from "@/app/admin/campaigns/_components/RequiredHashtagInput";
 import { ErrorState, PageHeader } from "@/app/components/dcreator/ui/base";
+import { campaignRequestMarkers, extractCampaignRequestMarkerValue } from "@/lib/campaign-request-meta";
 import { getCampaignTypeLabel } from "@/lib/constants/campaign-type";
+import {
+  CAMPAIGN_FULFILLMENT_OPTIONS,
+  type CampaignFulfillmentMode
+} from "@/lib/constants/campaign-fulfillment";
+import { DEFAULT_REQUIRED_HASHTAGS, normalizeRequiredHashtags, validateRequiredHashtags } from "@/lib/hashtags";
 
 type CampaignCategory = "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
 type CampaignType = "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
 type SetupSource = "JOIN_EXISTING_DCREATOR_CAMP" | "BRAND_REQUESTED";
-type BrandOption = { id: string; displayName: string; email: string };
+type BrandOption = { id: string; brandId?: string; displayName: string; ownerDisplayName?: string; email: string };
 
 type CreatorBriefForm = {
   productName: string;
@@ -24,10 +31,14 @@ type FormState = {
   slug: string;
   title: string;
   brief: string;
+  requirementsSummary: string;
+  requirements: string;
   category: CampaignCategory;
   campaignType: CampaignType;
   setupSource: SetupSource;
-  participationRoadmap: string[];
+  fulfillmentMode: CampaignFulfillmentMode;
+  creatorDepositAmountVnd: number;
+  requiredHashtags: string[];
   benefits: string;
   imageUrl: string;
   ugcVideoQuota: number;
@@ -59,10 +70,14 @@ const defaultForm: FormState = {
   slug: "",
   title: "",
   brief: "",
+  requirementsSummary: "",
+  requirements: "",
   category: "LIFESTYLE",
   campaignType: "COMMUNITY",
   setupSource: "BRAND_REQUESTED",
-  participationRoadmap: [""],
+  fulfillmentMode: "BRAND_SHIP",
+  creatorDepositAmountVnd: 100000,
+  requiredHashtags: DEFAULT_REQUIRED_HASHTAGS,
   benefits: "",
   imageUrl: "",
   ugcVideoQuota: 1,
@@ -89,15 +104,22 @@ function toDateTimeLocalInput(value?: string | null) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-const COVER_IMAGE_MARKER = "[[COVER_IMAGE_URL]]:";
-const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
+const COVER_IMAGE_MARKER = campaignRequestMarkers.cover;
+const CONTENT_FILE_MARKER = campaignRequestMarkers.content;
+const REQUIREMENTS_MARKER = campaignRequestMarkers.requirements;
 
 function extractMarker(brief: string, marker: string) {
-  const line = brief
-    .split("\n")
-    .map((item) => item.trim())
-    .find((item) => item.startsWith(marker));
-  return line ? line.slice(marker.length).trim() : "";
+  return extractCampaignRequestMarkerValue(brief, marker);
+}
+
+function extractRequirements(brief: string) {
+  const value = extractMarker(brief, REQUIREMENTS_MARKER);
+  if (!value) return "";
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 const apiErrorFieldMap: Record<string, string> = {
@@ -105,7 +127,9 @@ const apiErrorFieldMap: Record<string, string> = {
   BRAND_ACCOUNT_INACTIVE: "brandAccountId",
   BRAND_PROFILE_NOT_FOUND: "brandAccountId",
   CAMPAIGN_TIMELINE_INVALID: "endsAt",
-  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "ugcVideoQuota"
+  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "ugcVideoQuota",
+  CAMPAIGN_REQUIRED_HASHTAGS_MIGRATION_REQUIRED: "requiredHashtags",
+  CREATOR_DEPOSIT_AMOUNT_MISSING: "creatorDepositAmountVnd"
 };
 
 const apiErrorMessageMap: Record<string, string> = {
@@ -113,19 +137,22 @@ const apiErrorMessageMap: Record<string, string> = {
   BRAND_ACCOUNT_INACTIVE: "Tài khoản Brand đang bị vô hiệu hóa.",
   BRAND_PROFILE_NOT_FOUND: "Brand chưa hoàn tất onboarding.",
   CAMPAIGN_TIMELINE_INVALID: "Ngày kết thúc phải sau ngày bắt đầu.",
-  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "Hệ thống chưa cập nhật quota video UGC. Vui lòng chạy migration trước khi tạo chiến dịch."
+  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "Hệ thống chưa cập nhật quota video UGC. Vui lòng chạy migration trước khi tạo chiến dịch.",
+  CAMPAIGN_REQUIRED_HASHTAGS_MIGRATION_REQUIRED: "Hệ thống chưa cập nhật hashtag bắt buộc. Vui lòng chạy migration trước khi tạo chiến dịch."
 };
 
 const vietnameseErrorMessages: Record<string, string> = {
   brandAccountId: "Vui lòng chọn tài khoản Brand.",
   slug: "Đường dẫn công khai chưa hợp lệ. Chỉ dùng chữ thường, số và dấu gạch ngang.",
   title: "Vui lòng nhập tên chiến dịch tối thiểu 3 ký tự.",
+  requirementsSummary: "Yêu cầu ngắn tối đa 160 ký tự.",
+  requirements: "Vui lòng nhập yêu cầu tối thiểu 3 ký tự.",
   benefits: "Vui lòng nhập quyền lợi tối thiểu 3 ký tự.",
   imageUrl: "Ảnh chưa hợp lệ. Vui lòng chọn file ảnh hoặc dùng URL /uploads, http, https.",
   ugcVideoQuota: "Số lượng video review phải lớn hơn 0.",
   startsAt: "Ngày bắt đầu chưa hợp lệ.",
   endsAt: "Ngày kết thúc phải sau ngày bắt đầu.",
-  participationRoadmap: "Vui lòng nhập ít nhất 1 bước lộ trình tham gia.",
+  requiredHashtags: "Hashtag bắt buộc chưa hợp lệ.",
   productName: "Vui lòng nhập tên sản phẩm.",
   productDescription: "Vui lòng nhập mô tả sản phẩm.",
   productLink: "Vui lòng nhập link sản phẩm.",
@@ -141,8 +168,7 @@ function getApiFieldErrors(payload: ApiFailure) {
   const details = payload.details as { fieldErrors?: Record<string, string[]>; formErrors?: string[] } | undefined;
   if (details?.fieldErrors) {
     for (const [field, messages] of Object.entries(details.fieldErrors)) {
-      const targetField = field === "mission" ? "participationRoadmap" : field;
-      nextErrors[targetField] = vietnameseErrorMessages[targetField] ?? fieldErrorsText(messages[0]);
+      nextErrors[field] = vietnameseErrorMessages[field] ?? fieldErrorsText(messages[0]);
     }
   }
   const mappedField = payload.code ? apiErrorFieldMap[payload.code] : undefined;
@@ -179,25 +205,6 @@ export default function AdminCreateCampaignPage() {
     setFieldErrors((current) => ({ ...current, [fieldName]: undefined }));
   }
 
-  function setRoadmapStep(index: number, value: string) {
-    setForm((current) => ({
-      ...current,
-      participationRoadmap: current.participationRoadmap.map((item, idx) => (idx === index ? value : item))
-    }));
-    setFieldErrors((current) => ({ ...current, participationRoadmap: undefined }));
-  }
-
-  function addRoadmapStep() {
-    setForm((current) => ({ ...current, participationRoadmap: [...current.participationRoadmap, ""] }));
-  }
-
-  function removeRoadmapStep(index: number) {
-    setForm((current) => ({
-      ...current,
-      participationRoadmap: current.participationRoadmap.filter((_, idx) => idx !== index)
-    }));
-  }
-
   useEffect(() => {
     if (!requestId) return;
     let mounted = true;
@@ -215,12 +222,6 @@ export default function AdminCreateCampaignPage() {
 
         const coverImageUrl = extractMarker(request.brief, COVER_IMAGE_MARKER);
         const contentFileUrl = extractMarker(request.brief, CONTENT_FILE_MARKER);
-        const participationRoadmap = (request.priorityChannels ?? "")
-          .split("\n")
-          .map((item) => item.trim())
-          .filter(Boolean);
-        const normalizedRoadmap = participationRoadmap.length > 0 ? participationRoadmap : [""];
-
         if (!mounted) return;
         setForm((current) => ({
           ...current,
@@ -229,8 +230,9 @@ export default function AdminCreateCampaignPage() {
           slug: request.requestedSlug || current.slug,
           title: request.title || current.title,
           brief: contentFileUrl ? `${request.brief}\n\nFile nội dung Brand gửi: ${contentFileUrl}` : request.brief || current.brief,
+          requirementsSummary: current.requirementsSummary,
+          requirements: extractRequirements(request.brief) || current.requirements,
           setupSource: "BRAND_REQUESTED",
-          participationRoadmap: normalizedRoadmap,
           benefits: request.objective ?? current.benefits,
           imageUrl: coverImageUrl || current.imageUrl,
           startsAt: toDateTimeLocalInput(request.startsAt),
@@ -298,6 +300,8 @@ export default function AdminCreateCampaignPage() {
     if (form.slug.trim().length < 3) nextErrors.slug = "Slug cần tối thiểu 3 ký tự.";
     else if (!slugPattern.test(form.slug.trim())) nextErrors.slug = "Slug chỉ gồm chữ thường, số và dấu gạch ngang (-).";
     if (form.title.trim().length < 3) nextErrors.title = "Tên chiến dịch cần tối thiểu 3 ký tự.";
+    if (form.requirementsSummary.trim().length > 160) nextErrors.requirementsSummary = "Yêu cầu ngắn tối đa 160 ký tự.";
+    if (form.requirements.trim().length < 3) nextErrors.requirements = "Yêu cầu cần tối thiểu 3 ký tự.";
     if (form.benefits.trim().length < 3) nextErrors.benefits = "Quyền lợi cần tối thiểu 3 ký tự.";
     if (imageUrl && !imageUrl.startsWith("/uploads/") && !/^https?:\/\//.test(imageUrl)) {
       nextErrors.imageUrl = "Ảnh phải là URL bắt đầu bằng /uploads/ hoặc http(s)://";
@@ -305,9 +309,11 @@ export default function AdminCreateCampaignPage() {
     if (!Number.isInteger(form.ugcVideoQuota) || form.ugcVideoQuota <= 0) {
       nextErrors.ugcVideoQuota = "Số lượng video review phải lớn hơn 0.";
     }
-    if (!form.participationRoadmap.some((item) => item.trim().length > 0)) {
-      nextErrors.participationRoadmap = "Cần ít nhất 1 bước lộ trình tham gia.";
+    if (form.fulfillmentMode === "BRAND_SHIP" && (!Number.isInteger(form.creatorDepositAmountVnd) || form.creatorDepositAmountVnd <= 0)) {
+      nextErrors.creatorDepositAmountVnd = "Tiền cọc Creator phải lớn hơn 0.";
     }
+    const hashtagError = validateRequiredHashtags(form.requiredHashtags);
+    if (hashtagError) nextErrors.requiredHashtags = hashtagError;
     if (form.startsAt && form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) {
       nextErrors.endsAt = "Ngày kết thúc phải sau ngày bắt đầu.";
     }
@@ -336,12 +342,16 @@ export default function AdminCreateCampaignPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          requestId: requestId || undefined,
           ...form,
           brief: null,
+          requirementsSummary: form.requirementsSummary,
+          requirements: form.requirements,
+          creatorDepositAmountVnd: form.fulfillmentMode === "BRAND_SHIP" ? form.creatorDepositAmountVnd : 0,
           publishNow: true,
           startsAt: toDateTime(form.startsAt),
           endsAt: toDateTime(form.endsAt),
-          participationRoadmap: form.participationRoadmap.filter((item) => item.trim().length > 0),
+          requiredHashtags: normalizeRequiredHashtags(form.requiredHashtags),
           productName: form.creatorBrief.productName,
           productDescription: form.creatorBrief.productDescription,
           productLink: form.creatorBrief.productLink,
@@ -400,6 +410,7 @@ export default function AdminCreateCampaignPage() {
                     }}
                   >
                     {option.displayName} - {option.email}
+                    {option.ownerDisplayName ? <span className="block text-xs opacity-75">Chủ tài khoản: {option.ownerDisplayName}</span> : null}
                   </button>
                 ))}
               </div>
@@ -449,6 +460,59 @@ export default function AdminCreateCampaignPage() {
             </label>
           </div>
 
+          <fieldset className="grid gap-3 md:col-span-2">
+            <legend className="text-sm font-semibold text-zinc-700">Hình thức xử lý hàng mẫu / đơn hàng</legend>
+            <div className="grid gap-3 md:grid-cols-2">
+              {CAMPAIGN_FULFILLMENT_OPTIONS.map((option) => {
+                const selected = form.fulfillmentMode === option.value;
+                return (
+                  <label
+                    key={option.value}
+                    className={`cursor-pointer rounded-2xl border p-4 transition ${
+                      selected ? "border-zinc-900 bg-zinc-50 ring-1 ring-zinc-900" : "border-zinc-200 bg-white hover:border-zinc-300"
+                    }`}
+                  >
+                    <span className="flex items-start gap-3">
+                      <input
+                        className="mt-1"
+                        type="radio"
+                        name="fulfillmentMode"
+                        value={option.value}
+                        checked={selected}
+                        onChange={() => setField("fulfillmentMode", option.value)}
+                      />
+                      <span>
+                        <span className="block text-sm font-bold text-zinc-900">{option.label}</span>
+                        <span className="mt-2 block text-sm font-normal leading-6 text-zinc-600">{option.description}</span>
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            {form.fulfillmentMode === "BRAND_SHIP" ? (
+              <div className="grid gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <label className="grid gap-2 text-sm font-semibold text-amber-800">
+                  <span>Tiền cọc Creator</span>
+                  <input
+                    className={`dc-input bg-white ${fieldErrors.creatorDepositAmountVnd ? "border-red-500 ring-1 ring-red-300" : ""}`}
+                    type="number"
+                    min={1}
+                    placeholder="Ví dụ: 100000"
+                    value={form.creatorDepositAmountVnd}
+                    onChange={(event) => setField("creatorDepositAmountVnd", Number(event.target.value || 0))}
+                    required
+                  />
+                  <span className="text-xs font-medium text-amber-700">Khoản cọc được giữ để đảm bảo Creator hoàn thành video sau khi nhận hàng mẫu.</span>
+                  {fieldErrors.creatorDepositAmountVnd ? <span className="text-xs text-red-600">{fieldErrors.creatorDepositAmountVnd}</span> : null}
+                </label>
+                <p className="text-sm font-medium text-amber-700">
+                  Creator được duyệt sẽ có trạng thái yêu cầu tiền cọc. Hệ thống chưa tự động trừ ví, Admin cần xác nhận sau khi đối soát.
+                </p>
+              </div>
+            ) : null}
+          </fieldset>
+
           <div className="grid gap-3 text-sm font-semibold text-zinc-700 md:col-span-2 md:grid-cols-3">
             <label className="grid gap-2">
               <span>Tên sản phẩm</span>
@@ -473,17 +537,32 @@ export default function AdminCreateCampaignPage() {
             </label>
           </div>
 
-          <div className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
-            <span>Lộ trình tham gia</span>
-            {form.participationRoadmap.map((step, index) => (
-              <div key={`step-${index}`} className="flex gap-2">
-                <input className="dc-input" value={step} onChange={(event) => setRoadmapStep(index, event.target.value)} placeholder={`Bước ${index + 1}: ...`} />
-                {form.participationRoadmap.length > 1 ? <button type="button" className="dc-btn-secondary" onClick={() => removeRoadmapStep(index)}>Xóa</button> : null}
-              </div>
-            ))}
-            <button type="button" className="dc-btn-secondary w-fit" onClick={addRoadmapStep}>+ Thêm bước</button>
-            {fieldErrors.participationRoadmap ? <span className="text-xs text-red-600">{fieldErrors.participationRoadmap}</span> : null}
+          <div className="md:col-span-2">
+            <RequiredHashtagInput
+              value={form.requiredHashtags}
+              onChange={(value) => setField("requiredHashtags", value)}
+              error={fieldErrors.requiredHashtags}
+            />
           </div>
+
+          <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
+            <span>Yêu cầu ngắn hiển thị ở Tổng quan</span>
+            <input
+              className={`dc-input ${fieldErrors.requirementsSummary ? "border-red-500 ring-1 ring-red-300" : ""}`}
+              value={form.requirementsSummary}
+              onChange={(event) => setField("requirementsSummary", event.target.value)}
+              placeholder="Ví dụ: 01 Video Review Sản Phẩm"
+              maxLength={160}
+            />
+            <span className="text-xs font-medium text-zinc-500">Có thể để trống, hệ thống sẽ tự rút gọn từ yêu cầu chi tiết hoặc số lượng video review.</span>
+            {fieldErrors.requirementsSummary ? <span className="text-xs text-red-600">{fieldErrors.requirementsSummary}</span> : null}
+          </label>
+
+          <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
+            <span>Yêu cầu chi tiết từ Brand</span>
+            <textarea className={`dc-input min-h-24 ${fieldErrors.requirements ? "border-red-500 ring-1 ring-red-300" : ""}`} value={form.requirements} onChange={(event) => setField("requirements", event.target.value)} required />
+            {fieldErrors.requirements ? <span className="text-xs text-red-600">{fieldErrors.requirements}</span> : null}
+          </label>
 
           <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
             <span>Quyền lợi</span>

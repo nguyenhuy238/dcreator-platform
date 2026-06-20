@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
+import { campaignRequestMarkers, extractCampaignRequestMarkerValue } from "@/lib/campaign-request-meta";
 
 type CampaignRequest = {
   id: string;
@@ -31,11 +32,10 @@ const defaultForm: RequestForm = {
   contentFileUrl: ""
 };
 
-const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
+const CONTENT_FILE_MARKER = campaignRequestMarkers.content;
 
 function getContentFileUrlFromBrief(brief: string) {
-  const line = brief.split("\n").find((item) => item.trim().startsWith(CONTENT_FILE_MARKER));
-  return line ? line.trim().slice(CONTENT_FILE_MARKER.length).trim() : "";
+  return extractCampaignRequestMarkerValue(brief, CONTENT_FILE_MARKER);
 }
 
 function requestStatusLabel(status: CampaignRequest["status"]) {

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Brand, BrandInventoryBatch, BrandMemberRole, BrandProduct, CampaignStatus, MissionAudience, Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { APPLICATION_STATUS } from "@/lib/constants/enums";
+import { campaignRequestMarkers, extractCampaignRequestMarkerValue, extractCampaignRequestMeta } from "@/lib/campaign-request-meta";
 import { AppError } from "@/lib/errors";
 import { normalizeImageUrlInput } from "@/lib/images/resolve-image-url";
 import { approveProof, rejectProof } from "@/lib/services/mission.service";
@@ -47,8 +48,9 @@ type ProductSubmissionInput = z.infer<typeof productSubmissionSchema>;
 type BrandMemberInviteInput = z.infer<typeof brandMemberInviteSchema>;
 type BrandMemberRoleUpdateInput = z.infer<typeof brandMemberRoleUpdateSchema>;
 type BrandMemberRemoveInput = z.infer<typeof brandMemberRemoveSchema>;
-const COVER_MARKER = "[[COVER_IMAGE_URL]]:";
-const CONTENT_FILE_MARKER = "[[CONTENT_FILE_URL]]:";
+const COVER_MARKER = campaignRequestMarkers.cover;
+const CONTENT_FILE_MARKER = campaignRequestMarkers.content;
+const REQUIREMENTS_MARKER = campaignRequestMarkers.requirements;
 
 function sanitizeCampaignImageUrl(input?: string | null) {
   const value = normalizeImageUrlInput(input);
@@ -57,8 +59,26 @@ function sanitizeCampaignImageUrl(input?: string | null) {
 
 function extractMarkerValue(text: string | null | undefined, marker: string) {
   if (!text) return "";
-  const line = text.split("\n").find((item) => item.startsWith(marker));
-  return line?.slice(marker.length).trim() ?? "";
+  return extractCampaignRequestMarkerValue(text, marker);
+}
+
+function extractRequirementsValue(text: string | null | undefined) {
+  const encoded = extractMarkerValue(text, REQUIREMENTS_MARKER);
+  if (!encoded) return "";
+  try {
+    return decodeURIComponent(encoded);
+  } catch {
+    return encoded;
+  }
+}
+
+function buildCampaignRequestBrief(input: { title: string; imageUrl?: string | null; contentFileUrl?: string | null; requirements?: string | null }) {
+  return [
+    `Yêu cầu tạo campaign từ Brand: ${input.title}`,
+    input.imageUrl ? `${COVER_MARKER}${input.imageUrl}` : "",
+    input.contentFileUrl ? `${CONTENT_FILE_MARKER}${input.contentFileUrl}` : "",
+    input.requirements?.trim() ? `${REQUIREMENTS_MARKER}${encodeURIComponent(input.requirements.trim())}` : ""
+  ].filter(Boolean).join("\n");
 }
 
 async function trySyncCampaignNewFields(campaignId: string, benefits: string | null, participationRoadmap: string[]) {
@@ -773,6 +793,8 @@ export async function createBrandCampaign(accountId: string, input: CampaignInpu
       category: input.category,
       campaignType: input.campaignType,
       setupSource: input.setupSource,
+      fulfillmentMode: input.fulfillmentMode,
+      creatorDepositRequired: input.fulfillmentMode === "BRAND_SHIP",
       objective: input.benefits || null,
       priorityChannels: input.participationRoadmap.join("\n"),
       missionTypes: null,
@@ -832,6 +854,8 @@ export async function editDraftCampaign(accountId: string, campaignId: string, i
       category: input.category,
       campaignType: input.campaignType,
       setupSource: input.setupSource,
+      fulfillmentMode: input.fulfillmentMode,
+      creatorDepositRequired: input.fulfillmentMode === "BRAND_SHIP",
       objective: input.benefits || null,
       priorityChannels: input.participationRoadmap.join("\n"),
       missionTypes: null,
@@ -1094,11 +1118,15 @@ export async function listBrandCampaignRequests(accountId: string, currentBrandI
     })
   ]);
   const campaignBySlug = new Map(matchingCampaigns.map((campaign) => [campaign.slug, campaign]));
-  return requests.map((request) => ({
-    ...request,
-    createdCampaign: request.createdCampaign ?? campaignBySlug.get(request.requestedSlug) ?? null,
-    coverImageUrl: sanitizeCampaignImageUrl(extractMarkerValue(request.brief, COVER_MARKER))
-  }));
+  return requests.map((request) => {
+    const meta = extractCampaignRequestMeta(request.brief);
+    return {
+      ...request,
+      createdCampaign: request.createdCampaign ?? campaignBySlug.get(request.requestedSlug) ?? null,
+      coverImageUrl: sanitizeCampaignImageUrl(meta.coverImageUrl),
+      requirements: meta.requirements
+    };
+  });
 }
 
 export async function createBrandCampaignRequest(accountId: string, input: CampaignRequestInput, currentBrandId?: string | null) {
@@ -1114,11 +1142,12 @@ export async function createBrandCampaignRequest(accountId: string, input: Campa
     .replace(/-{2,}/g, "-")
     .slice(0, 80) || "campaign-request";
   const requestedSlug = `${slugBase}-${Date.now().toString().slice(-6)}`;
-  const briefWithMeta = [
-    `Yêu cầu tạo campaign từ Brand: ${input.title}`,
-    input.imageUrl ? `${COVER_MARKER}${input.imageUrl}` : "",
-    `${CONTENT_FILE_MARKER}${input.contentFileUrl}`
-  ].filter(Boolean).join("\n");
+  const briefWithMeta = buildCampaignRequestBrief({
+    title: input.title,
+    imageUrl: input.imageUrl,
+    contentFileUrl: input.contentFileUrl,
+    requirements: input.requirements
+  });
 
   const created = await prisma.brandCampaignRequest.create({
     data: {
@@ -1171,11 +1200,13 @@ export async function respondBrandCampaignRequest(accountId: string, requestId: 
   const nextTitle = input.title?.trim() || request.title;
   const nextImageUrl = input.imageUrl === undefined ? extractMarkerValue(request.brief, COVER_MARKER) : input.imageUrl;
   const nextContentFileUrl = input.contentFileUrl ?? extractMarkerValue(request.brief, CONTENT_FILE_MARKER);
-  const nextBrief = [
-    `Yêu cầu tạo campaign từ Brand: ${nextTitle}`,
-    nextImageUrl ? `${COVER_MARKER}${nextImageUrl}` : "",
-    nextContentFileUrl ? `${CONTENT_FILE_MARKER}${nextContentFileUrl}` : ""
-  ].filter(Boolean).join("\n");
+  const nextRequirements = input.requirements === undefined ? extractRequirementsValue(request.brief) : input.requirements;
+  const nextBrief = buildCampaignRequestBrief({
+    title: nextTitle,
+    imageUrl: nextImageUrl,
+    contentFileUrl: nextContentFileUrl,
+    requirements: nextRequirements
+  });
 
   return prisma.brandCampaignRequest.update({
     where: { id: requestId },
@@ -1362,6 +1393,126 @@ export async function listCampaignMissionsForBrand(accountId: string, campaignId
   };
 }
 
+function formatShippingAddress(item: {
+  shippingAddressLine: string | null;
+  shippingWard: string | null;
+  shippingDistrict: string | null;
+  shippingProvince: string | null;
+}) {
+  return [item.shippingAddressLine, item.shippingWard, item.shippingDistrict, item.shippingProvince].filter(Boolean).join(", ");
+}
+
+export async function listBrandCampaignShippingCreators(accountId: string, campaignId: string, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
+  const campaign = await getBrandScopedCampaign(campaignId, ctx.brand.id);
+  if (campaign.fulfillmentMode !== "BRAND_SHIP") {
+    return { campaign: { id: campaign.id, title: campaign.title, fulfillmentMode: campaign.fulfillmentMode }, items: [] };
+  }
+
+  const items = await prisma.creatorMission.findMany({
+    where: {
+      campaignId: campaign.id,
+      applicationStatus: "APPROVED",
+      depositStatus: "HELD",
+      shippingInfoSubmittedAt: { not: null },
+      shippingRecipientName: { not: null },
+      shippingPhone: { not: null },
+      shippingAddressLine: { not: null }
+    },
+    orderBy: [{ sampleShippingStatus: "asc" }, { depositHeldAt: "desc" }, { updatedAt: "desc" }],
+    select: {
+      id: true,
+      accountId: true,
+      depositStatus: true,
+      creatorDepositAmountVnd: true,
+      depositHeldAt: true,
+      shippingRecipientName: true,
+      shippingPhone: true,
+      shippingProvince: true,
+      shippingDistrict: true,
+      shippingWard: true,
+      shippingAddressLine: true,
+      shippingNote: true,
+      shippingInfoSubmittedAt: true,
+      sampleShippingStatus: true,
+      sampleShippedAt: true,
+      sampleReceivedAt: true,
+      account: { select: { displayName: true, email: true } },
+      campaign: { select: { id: true, title: true, productName: true, productLink: true, creatorDepositAmountVnd: true } },
+      mission: { select: { title: true, productName: true, productLink: true } }
+    }
+  });
+
+  return {
+    campaign: { id: campaign.id, title: campaign.title, fulfillmentMode: campaign.fulfillmentMode },
+    items: items.map((item) => ({
+      id: item.id,
+      accountId: item.accountId,
+      creatorName: item.account.displayName,
+      creatorEmail: item.account.email,
+      depositStatus: item.depositStatus,
+      creatorDepositAmountVnd: item.creatorDepositAmountVnd || item.campaign.creatorDepositAmountVnd,
+      depositHeldAt: item.depositHeldAt?.toISOString() ?? null,
+      shippingRecipientName: item.shippingRecipientName,
+      shippingPhone: item.shippingPhone,
+      shippingProvince: item.shippingProvince,
+      shippingDistrict: item.shippingDistrict,
+      shippingWard: item.shippingWard,
+      shippingAddressLine: item.shippingAddressLine,
+      shippingAddressFull: formatShippingAddress(item),
+      shippingNote: item.shippingNote,
+      shippingInfoSubmittedAt: item.shippingInfoSubmittedAt?.toISOString() ?? null,
+      sampleShippingStatus: item.sampleShippingStatus,
+      sampleShippedAt: item.sampleShippedAt?.toISOString() ?? null,
+      sampleReceivedAt: item.sampleReceivedAt?.toISOString() ?? null,
+      campaignTitle: item.campaign.title,
+      productName: item.campaign.productName ?? item.mission?.productName ?? item.mission?.title ?? null,
+      productLink: item.campaign.productLink ?? item.mission?.productLink ?? null
+    }))
+  };
+}
+
+export async function markBrandCampaignSampleShipped(accountId: string, campaignId: string, creatorMissionId: string, currentBrandId?: string | null) {
+  const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
+  const campaign = await getBrandScopedCampaign(campaignId, ctx.brand.id);
+  if (campaign.fulfillmentMode !== "BRAND_SHIP") throw new AppError("Invalid fulfillment mode", 409, "INVALID_FULFILLMENT_MODE");
+
+  const current = await prisma.creatorMission.findUnique({
+    where: { id: creatorMissionId },
+    select: {
+      id: true,
+      campaignId: true,
+      accountId: true,
+      depositStatus: true,
+      sampleShippingStatus: true
+    }
+  });
+  if (!current || current.campaignId !== campaign.id) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
+  if (current.depositStatus !== "HELD") throw new AppError("Creator deposit must be held before shipping sample.", 409, "CREATOR_DEPOSIT_REQUIRED");
+  if (current.sampleShippingStatus === "SHIPPED" || current.sampleShippingStatus === "RECEIVED") {
+    return listBrandCampaignShippingCreators(accountId, campaignId, currentBrandId);
+  }
+  if (current.sampleShippingStatus !== "READY_TO_SHIP") throw new AppError("Creator is not ready to ship.", 409, "SAMPLE_SHIPPING_NOT_READY");
+
+  const updated = await prisma.creatorMission.update({
+    where: { id: creatorMissionId },
+    data: { sampleShippingStatus: "SHIPPED", sampleShippedAt: new Date() },
+    select: { id: true, sampleShippingStatus: true }
+  });
+
+  await writeAuditLog({
+    actorId: accountId,
+    action: "BRAND_SAMPLE_SHIPPED",
+    targetType: "CreatorMission",
+    targetId: updated.id,
+    oldStatus: current.sampleShippingStatus,
+    newStatus: updated.sampleShippingStatus,
+    metadata: { campaignId: campaign.id, brandId: ctx.brand.id, creatorAccountId: current.accountId }
+  });
+
+  return listBrandCampaignShippingCreators(accountId, campaignId, currentBrandId);
+}
+
 export async function decideCreatorApplication(accountId: string, input: CreatorApplicationDecisionInput, currentBrandId?: string | null) {
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const submission = await prisma.missionSubmission.findUnique({
@@ -1537,33 +1688,53 @@ export async function getBrandAnalytics(accountId: string, currentBrandId?: stri
   const ctx = await resolveBrandActorContext(accountId, { provisionIfOwner: true, currentBrandId });
   const campaigns = await prisma.campaign.findMany({
     where: { id: { in: await getScopedCampaignIds(ctx.brand.id, ctx.brandOwnerAccountId) } },
-    select: { id: true, title: true }
+    select: { id: true, title: true, status: true, createdAt: true, endsAt: true }
   });
   const campaignIds = campaigns.map((x) => x.id);
 
-  const [topCreatorRaw, topProductRaw, voucherRedemption, conversionRaw, campaignPerformance] = await Promise.all([
-    prisma.missionSubmission.groupBy({
+  const [topCreatorRaw, topProductRaw, voucherRedemption, paymentSummary, campaignPayments, creatorMissions, applications] = await Promise.all([
+    prisma.creatorMission.groupBy({
       by: ["accountId"],
-      where: { mission: { campaignId: { in: campaignIds } }, lifecycleStatus: { in: ["APPROVED", "DONE"] } },
+      where: { campaignId: { in: campaignIds }, applicationStatus: "APPROVED" },
       _count: { _all: true },
       orderBy: { _count: { accountId: "desc" } },
       take: 1
     }),
-    prisma.reward.findMany({
-      where: { campaignId: { in: campaignIds } },
-      orderBy: { stockRemaining: "asc" },
+    prisma.brandProduct.findMany({
+      where: { brandId: ctx.brand.id },
+      orderBy: [{ stockQty: "asc" }, { updatedAt: "desc" }],
       take: 1,
-      select: { id: true, title: true, stockTotal: true, stockRemaining: true }
+      select: { id: true, name: true, stockQty: true, voucherStock: true, priceVnd: true }
     }),
     prisma.rewardClaim.count({ where: { reward: { campaignId: { in: campaignIds } }, status: "USED" } }),
-    prisma.contribution.aggregate({
+    prisma.paymentOrder.aggregate({
       _count: { _all: true },
       _sum: { amountVnd: true },
       where: { campaignId: { in: campaignIds }, status: "SUCCESS" }
     }),
-    prisma.campaign.findMany({
-      where: { id: { in: campaignIds } },
-      select: { id: true, title: true, fundedAmountVnd: true, backerCount: true }
+    prisma.paymentOrder.groupBy({
+      by: ["campaignId"],
+      where: { campaignId: { in: campaignIds }, status: "SUCCESS" },
+      _count: { _all: true },
+      _sum: { amountVnd: true }
+    }),
+    prisma.creatorMission.findMany({
+      where: { campaignId: { in: campaignIds } },
+      select: {
+        campaignId: true,
+        accountId: true,
+        applicationStatus: true,
+        videoReviewStatus: true,
+        publishStatus: true,
+        submissionLifecycleStatus: true,
+        submissionFinalSubmittedAt: true,
+        mission: { select: { rewardCommissionVnd: true } }
+      }
+    }),
+    prisma.missionApplication.groupBy({
+      by: ["campaignId"],
+      where: { campaignId: { in: campaignIds } },
+      _count: { _all: true }
     })
   ]);
 
@@ -1573,16 +1744,47 @@ export async function getBrandAnalytics(accountId: string, currentBrandId?: stri
 
   const kpis = await getBrandKpis(ctx.brandOwnerAccountId);
 
+  const paymentByCampaign = new Map(campaignPayments.map((item) => [item.campaignId, item]));
+  const applicationByCampaign = new Map(applications.map((item) => [item.campaignId, item._count._all]));
+  const campaignPerformance = campaigns.map((campaign) => {
+    const relatedMissions = creatorMissions.filter((item) => item.campaignId === campaign.id);
+    const proofSubmitted = relatedMissions.filter((item) =>
+      item.videoReviewStatus !== "NOT_SUBMITTED" || item.publishStatus !== "NOT_SUBMITTED" || item.submissionFinalSubmittedAt
+    ).length;
+    const proofApproved = relatedMissions.filter((item) =>
+      item.videoReviewStatus === "APPROVED" || item.publishStatus === "APPROVED" || ["APPROVED", "DONE"].includes(item.submissionLifecycleStatus)
+    ).length;
+    const commissionPaidVnd = relatedMissions
+      .filter((item) => item.videoReviewStatus === "APPROVED" || item.publishStatus === "APPROVED" || ["APPROVED", "DONE"].includes(item.submissionLifecycleStatus))
+      .reduce((sum, item) => sum + (item.mission?.rewardCommissionVnd ?? 0), 0);
+    const payment = paymentByCampaign.get(campaign.id);
+
+    return {
+      id: campaign.id,
+      title: campaign.title,
+      status: campaign.status,
+      creatorApplied: applicationByCampaign.get(campaign.id) ?? 0,
+      creatorApproved: new Set(relatedMissions.filter((item) => item.applicationStatus === "APPROVED").map((item) => item.accountId)).size,
+      proofSubmitted,
+      proofApproved,
+      orderCount: payment?._count._all ?? 0,
+      revenueVnd: payment?._sum.amountVnd ?? 0,
+      commissionPaidVnd,
+      createdAt: campaign.createdAt,
+      deadline: campaign.endsAt
+    };
+  });
+
   const topCampaign = campaignPerformance
     .slice()
-    .sort((a, b) => b.fundedAmountVnd - a.fundedAmountVnd)[0] ?? null;
+    .sort((a, b) => b.revenueVnd - a.revenueVnd || b.proofApproved - a.proofApproved)[0] ?? null;
 
   return {
     campaignPerformance,
     topCreator,
     topProduct: topProductRaw[0] ?? null,
     voucherRedemption,
-    conversionRate: conversionRaw._count._all > 0 ? Number(((conversionRaw._sum.amountVnd ?? 0) / conversionRaw._count._all).toFixed(2)) : 0,
+    conversionRate: paymentSummary._count._all > 0 ? Number(((paymentSummary._sum.amountVnd ?? 0) / paymentSummary._count._all).toFixed(2)) : 0,
     topCampaign,
     kpis
   };

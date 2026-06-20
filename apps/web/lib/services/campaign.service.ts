@@ -1,5 +1,6 @@
 import { CampaignStatus, Prisma } from "@prisma/client";
 import { prisma } from "../db";
+import { getCampaignBrandDisplay, getCreatorDisplay } from "../display-identity";
 import { resolveImageUrl } from "../images/resolve-image-url";
 
 export type ListCampaignsInput = {
@@ -35,7 +36,9 @@ export async function listCampaigns(input: ListCampaignsInput) {
     where.OR = [
       { title: { contains: input.search, mode: "insensitive" } },
       { brand: { displayName: { contains: input.search, mode: "insensitive" } } },
-      { creator: { displayName: { contains: input.search, mode: "insensitive" } } }
+      { creator: { displayName: { contains: input.search, mode: "insensitive" } } },
+      { sourceBrandRequests: { some: { brand: { name: { contains: input.search, mode: "insensitive" } } } } },
+      { creator: { creatorProfile: { displayName: { contains: input.search, mode: "insensitive" } } } }
     ];
   }
 
@@ -72,11 +75,37 @@ export async function listCampaigns(input: ListCampaignsInput) {
         ugcVideoApprovedCount: true,
         endsAt: true,
         createdAt: true,
-        brand: { select: { displayName: true, avatarUrl: true } },
-        creator: { select: { displayName: true } }
+        brand: { select: { id: true, displayName: true, avatarUrl: true } },
+        creator: {
+          select: {
+            displayName: true,
+            avatarUrl: true,
+            creatorProfile: { select: { displayName: true, avatarUrl: true } }
+          }
+        },
+        sourceBrandRequests: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { brand: { select: { name: true, logoUrl: true, legalName: true } } }
+        }
       }
     })
   ]);
+
+  const brandOwnerAccountIds = [...new Set(campaigns.map((campaign) => campaign.brand.id))];
+  const brandProfiles = brandOwnerAccountIds.length
+    ? await prisma.brand.findMany({
+        where: { ownerAccountId: { in: brandOwnerAccountIds } },
+        orderBy: { updatedAt: "desc" },
+        select: { ownerAccountId: true, name: true, legalName: true, logoUrl: true }
+      })
+    : [];
+  const brandProfileByOwnerAccountId = new Map<string, (typeof brandProfiles)[number]>();
+  for (const brand of brandProfiles) {
+    if (!brandProfileByOwnerAccountId.has(brand.ownerAccountId)) {
+      brandProfileByOwnerAccountId.set(brand.ownerAccountId, brand);
+    }
+  }
 
   const campaignIds = campaigns.map((campaign) => campaign.id);
   const rewardSums =
@@ -136,14 +165,26 @@ export async function listCampaigns(input: ListCampaignsInput) {
       const videoProgressPercent = videoTarget > 0 ? Math.min(100, Math.round((approvedVideos / videoTarget) * 100)) : 0;
       const missionSlotsRemaining = videoTarget > 0 ? Math.max(0, videoTarget - approvedVideos) : 0;
 
+      const sourceBrand = campaign.sourceBrandRequests[0]?.brand;
+      const brandDisplay = getCampaignBrandDisplay({
+        brand: sourceBrand ?? brandProfileByOwnerAccountId.get(campaign.brand.id) ?? null
+      });
+      const creatorDisplay = campaign.creator
+        ? getCreatorDisplay({
+            displayName: campaign.creator.creatorProfile?.displayName,
+            avatarUrl: campaign.creator.creatorProfile?.avatarUrl,
+            account: campaign.creator
+          })
+        : null;
+
       return {
         id: campaign.id,
         slug: campaign.slug,
         title: campaign.title,
         coverImageUrl: resolveImageUrl(campaign.coverImageUrl),
-        brand: campaign.brand.displayName,
-        brandLogoUrl: campaign.brand.avatarUrl,
-        creator: campaign.creator?.displayName ?? null,
+        brand: brandDisplay.name,
+        brandLogoUrl: brandDisplay.logo,
+        creator: creatorDisplay?.name ?? null,
         campaignType: campaign.campaignType,
         featuredType: "VIDEO_SEEDING" as const,
         category: campaign.category,

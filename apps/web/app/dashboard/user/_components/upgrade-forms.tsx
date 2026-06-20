@@ -34,7 +34,9 @@ const CREATOR_PLATFORM_LABELS: Record<CreatorLink["platform"], string> = {
   tiktok: "TikTok",
   facebook: "Facebook",
   instagram: "Instagram",
-  shopee: "Shopee"
+  youtube: "YouTube",
+  shopee: "Shopee",
+  other: "Khác"
 };
 const BRAND_LINK_LABELS: Record<BrandLinkPlatform, string> = {
   website: "Website chính thức",
@@ -125,8 +127,9 @@ function parseBrandLinks(value: unknown, fallbackWebsite?: string | null): Brand
 
 export function CreatorUpgradeForm({ data, onError, onSuccess, embedded = false }: UpgradeFormProps) {
   const router = useRouter();
-  const [form, setForm] = useState({ displayName: "", bio: "" });
+  const [form, setForm] = useState({ displayName: "", bio: "", avatarUrl: "" });
   const [creatorLinks, setCreatorLinks] = useState<CreatorLink[]>([{ platform: "tiktok", url: "", handle: "", followerCount: 0 }]);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const creatorStatus = data.creatorApplication?.status as string | undefined;
   const isCreator = Boolean(data.account.hasCreatorProfile) || data.account.roles.includes("CREATOR");
@@ -152,6 +155,7 @@ export function CreatorUpgradeForm({ data, onError, onSuccess, embedded = false 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           displayName: form.displayName || data.account.displayName,
+          avatarUrl: form.avatarUrl,
           bio: form.bio,
           creatorLinks: normalizedLinks
         })
@@ -168,6 +172,34 @@ export function CreatorUpgradeForm({ data, onError, onSuccess, embedded = false 
       onError(requestError instanceof Error ? requestError.message : "Gửi đơn Creator thất bại");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function uploadCreatorAvatar(file: File) {
+    onError("");
+    if (!file.type.startsWith("image/")) {
+      onError("Ảnh Creator phải là file ảnh.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      onError("Ảnh Creator vượt quá 5MB.");
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+      const response = await fetch("/api/uploads/creator-avatar", { method: "POST", body: formData });
+      const payload = await response.json();
+      if (!response.ok || !payload.success || !payload.data?.avatarUrl) {
+        throw new Error(payload.error ?? "Tải ảnh Creator thất bại.");
+      }
+      setForm((current) => ({ ...current, avatarUrl: payload.data.avatarUrl }));
+    } catch (requestError) {
+      onError(requestError instanceof Error ? requestError.message : "Tải ảnh Creator thất bại.");
+    } finally {
+      setUploadingAvatar(false);
     }
   }
 
@@ -189,6 +221,32 @@ export function CreatorUpgradeForm({ data, onError, onSuccess, embedded = false 
       ) : (
         <form className="mt-4 grid gap-3" onSubmit={submit}>
           <input className="dc-input" placeholder="Tên hiển thị" value={form.displayName} onChange={(event) => setForm((current) => ({ ...current, displayName: event.target.value }))} required />
+          <div className="grid gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+            <p className="text-sm font-semibold text-zinc-700">Avatar Creator</p>
+            <div className="flex flex-wrap items-center gap-3">
+              {form.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={form.avatarUrl} alt="Avatar Creator" className="h-14 w-14 rounded-xl border border-zinc-200 object-cover" />
+              ) : (
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white text-sm font-black text-zinc-400 ring-1 ring-zinc-200">CR</div>
+              )}
+              <label className={`dc-btn-secondary cursor-pointer ${uploadingAvatar ? "pointer-events-none opacity-60" : ""}`}>
+                {uploadingAvatar ? "Đang tải..." : "Tải avatar Creator"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  disabled={uploadingAvatar || submitting}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    if (file) void uploadCreatorAvatar(file);
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+            <p className="text-xs text-zinc-500">Avatar này chỉ dùng cho hồ sơ Creator, không thay đổi ảnh tài khoản cá nhân.</p>
+          </div>
           <textarea className="dc-input min-h-24" placeholder="Giới thiệu bản thân" value={form.bio} onChange={(event) => setForm((current) => ({ ...current, bio: event.target.value }))} />
           <div className="grid gap-2">
             <p className="text-sm font-semibold text-zinc-700">Liên kết mạng xã hội / kênh bán hàng</p>
@@ -238,11 +296,12 @@ export function CreatorUpgradeForm({ data, onError, onSuccess, embedded = false 
 
 export function BrandUpgradeForm({ data, onError, onSuccess, embedded = false }: UpgradeFormProps) {
   const router = useRouter();
-  const [form, setForm] = useState({ brandName: "", description: "", contactName: "", contactPhone: "", contactEmail: "" });
+  const [form, setForm] = useState({ brandName: "", description: "", contactName: "", contactPhone: "", contactEmail: "", logoUrl: "" });
   const [brandLinks, setBrandLinks] = useState<BrandLink[]>([{ platform: "website", url: "" }]);
   const [linkErrors, setLinkErrors] = useState<Record<number, string>>({});
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [otherIndustry, setOtherIndustry] = useState("");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const brandStatus = data.brandApplication?.status as string | undefined;
   const hasBrand = (data.account.brandMemberships?.length ?? 0) > 0;
@@ -317,6 +376,34 @@ export function BrandUpgradeForm({ data, onError, onSuccess, embedded = false }:
     }
   }
 
+  async function uploadBrandLogo(file: File) {
+    onError("");
+    if (!["image/jpeg", "image/png", "image/webp", "image/svg+xml"].includes(file.type)) {
+      onError("Logo Brand phải là JPG, PNG, WebP hoặc SVG.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      onError("Logo Brand vượt quá 5MB.");
+      return;
+    }
+
+    setUploadingLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append("logo", file);
+      const response = await fetch("/api/uploads/brand-logo", { method: "POST", body: formData });
+      const payload = await response.json();
+      if (!response.ok || !payload.success || !payload.data?.logoUrl) {
+        throw new Error(payload.error ?? "Tải logo Brand thất bại.");
+      }
+      setForm((current) => ({ ...current, logoUrl: payload.data.logoUrl }));
+    } catch (requestError) {
+      onError(requestError instanceof Error ? requestError.message : "Tải logo Brand thất bại.");
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
+
   return (
     <article className={wrapperClassName(embedded)}>
       {!embedded ? <h2 className="text-xl font-bold">Nâng cấp Brand</h2> : null}
@@ -345,6 +432,32 @@ export function BrandUpgradeForm({ data, onError, onSuccess, embedded = false }:
       ) : (
         <form className="mt-4 grid gap-3" onSubmit={submit}>
           <input className="dc-input" placeholder="Tên nhãn hàng" value={form.brandName} onChange={(event) => setForm((current) => ({ ...current, brandName: event.target.value }))} required />
+          <div className="grid gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+            <p className="text-sm font-semibold text-zinc-700">Logo Brand</p>
+            <div className="flex flex-wrap items-center gap-3">
+              {form.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={form.logoUrl} alt="Logo Brand" className="h-14 w-14 rounded-xl border border-zinc-200 bg-white object-contain p-1" />
+              ) : (
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white text-sm font-black text-zinc-400 ring-1 ring-zinc-200">BR</div>
+              )}
+              <label className={`dc-btn-secondary cursor-pointer ${uploadingLogo ? "pointer-events-none opacity-60" : ""}`}>
+                {uploadingLogo ? "Đang tải..." : "Tải logo Brand"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  className="hidden"
+                  disabled={uploadingLogo || submitting}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    if (file) void uploadBrandLogo(file);
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+            <p className="text-xs text-zinc-500">Logo này chỉ dùng cho Brand, không thay đổi ảnh tài khoản hay avatar Creator.</p>
+          </div>
           <div className="grid gap-2">
             <p className="text-sm font-semibold text-zinc-700">Ngành hàng</p>
             <div className="flex flex-wrap gap-2">

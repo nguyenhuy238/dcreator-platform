@@ -94,7 +94,7 @@ export function CampaignCard({
           sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/55 via-zinc-950/10 to-transparent" />
-        <div className="absolute left-3 top-3 rounded-full border border-white/25 bg-zinc-900/65 px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-white">
+        <div className="absolute left-3 top-3 max-w-[calc(100%-1.5rem)] rounded-full border border-white/25 bg-zinc-900/65 px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-white">
           Video seeding
         </div>
         {clickableCard ? (
@@ -111,9 +111,9 @@ export function CampaignCard({
             <p className="truncate text-sm font-semibold leading-5 text-zinc-600">Brand: {campaign.brand}</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 md:flex-nowrap">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div
-              className={`min-w-0 ${showDetailButton ? "flex-1" : "ml-auto w-auto"}`}
+              className={`min-w-0 ${showDetailButton ? "w-full sm:flex-1" : "sm:ml-auto sm:w-auto"}`}
               onClick={clickableCard ? (event) => event.stopPropagation() : undefined}
               onKeyDown={clickableCard ? (event) => event.stopPropagation() : undefined}
             >
@@ -129,7 +129,7 @@ export function CampaignCard({
             {showDetailButton ? (
               <Link
                 href={detailHref}
-                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
+                    className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-full border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100 sm:w-auto"
                 aria-label={`Xem chi tiết ${campaign.title}`}
                 onClick={trackCampaignClick}
               >
@@ -161,9 +161,9 @@ export function CampaignCard({
           </div>
           <p className="mt-1 text-xs text-zinc-500">Tiến độ video: {videoProgressPercent}%</p>
 
-          <div className="mt-4 flex items-center gap-2">
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
             <div
-              className={`min-w-0 ${showDetailButton ? "flex-1" : "ml-auto w-auto"}`}
+              className={`min-w-0 ${showDetailButton ? "w-full sm:flex-1" : "sm:ml-auto sm:w-auto"}`}
               onClick={clickableCard ? (event) => event.stopPropagation() : undefined}
               onKeyDown={clickableCard ? (event) => event.stopPropagation() : undefined}
             >
@@ -179,7 +179,7 @@ export function CampaignCard({
             {showDetailButton ? (
               <Link
                 href={detailHref}
-                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
+                className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-full border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100 sm:w-auto"
                 aria-label={`Xem chi tiết ${campaign.title}`}
                 onClick={trackCampaignClick}
               >

@@ -2,8 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { RequiredHashtagInput } from "@/app/admin/campaigns/_components/RequiredHashtagInput";
 import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
+import { campaignRequestMarkers, extractCampaignRequestMarkerValue } from "@/lib/campaign-request-meta";
+import { DEFAULT_REQUIRED_HASHTAGS, normalizeRequiredHashtags, validateRequiredHashtags } from "@/lib/hashtags";
+import {
+  CAMPAIGN_FULFILLMENT_OPTIONS,
+  type CampaignFulfillmentMode
+} from "@/lib/constants/campaign-fulfillment";
 
 type CampaignCategory = "TECH" | "FASHION" | "FOOD" | "BEAUTY" | "LIFESTYLE" | "EDUCATION";
 type CampaignType = "DONATION" | "PREORDER" | "SPONSORSHIP" | "COMMUNITY";
@@ -29,8 +36,12 @@ type FormState = {
   category: CampaignCategory;
   campaignType: CampaignType;
   setupSource: SetupSource;
+  fulfillmentMode: CampaignFulfillmentMode;
+  creatorDepositAmountVnd: number;
+  requirementsSummary: string;
+  requirements: string;
   benefits: string;
-  participationRoadmap: string[];
+  requiredHashtags: string[];
   imageUrl: string;
   startsAt: string;
   endsAt: string;
@@ -45,20 +56,39 @@ type CampaignDetail = {
   category: CampaignCategory;
   campaignType: CampaignType;
   setupSource: SetupSource;
+  fulfillmentMode: CampaignFulfillmentMode;
+  creatorDepositRequired: boolean;
+  creatorDepositAmountVnd: number;
   benefits: string | null;
+  requirementsSummary: string | null;
+  requirements: string | null;
   productName: string | null;
   productDescription: string | null;
   productLink: string | null;
   productImageUrl: string | null;
-  participationRoadmap: string[];
+  requiredHashtags: string[];
   coverImageUrl: string | null;
   startsAt: string | null;
   endsAt: string | null;
   status: string;
   statusView: string;
   ugcVideoQuota: number | null;
-  brand: { id: string; displayName: string; email: string };
+  brand: { id: string; displayName: string; ownerDisplayName?: string; email: string };
+  sourceBrandRequests: Array<{
+    id: string;
+    title: string;
+    brief: string;
+    requestedSlug: string;
+    status: string;
+    adminNote: string | null;
+    brandFeedback: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
 };
+
+const CONTENT_FILE_MARKER = campaignRequestMarkers.content;
+const REQUIREMENTS_MARKER = campaignRequestMarkers.requirements;
 
 const DEFAULT_FORM: FormState = {
   slug: "",
@@ -66,8 +96,12 @@ const DEFAULT_FORM: FormState = {
   category: "LIFESTYLE",
   campaignType: "COMMUNITY",
   setupSource: "BRAND_REQUESTED",
+  fulfillmentMode: "BRAND_SHIP",
+  creatorDepositAmountVnd: 100000,
   benefits: "",
-  participationRoadmap: [""],
+  requirementsSummary: "",
+  requirements: "",
+  requiredHashtags: DEFAULT_REQUIRED_HASHTAGS,
   imageUrl: "",
   startsAt: "",
   endsAt: "",
@@ -82,23 +116,29 @@ const DEFAULT_FORM: FormState = {
 
 const apiErrorFieldMap: Record<string, string> = {
   CAMPAIGN_TIMELINE_INVALID: "endsAt",
-  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "ugcVideoQuota"
+  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "ugcVideoQuota",
+  CAMPAIGN_REQUIRED_HASHTAGS_MIGRATION_REQUIRED: "requiredHashtags",
+  CREATOR_DEPOSIT_AMOUNT_MISSING: "creatorDepositAmountVnd"
 };
 
 const apiErrorMessageMap: Record<string, string> = {
   CAMPAIGN_TIMELINE_INVALID: "Ngày kết thúc phải sau ngày bắt đầu.",
-  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "Hệ thống chưa cập nhật quota video UGC. Vui lòng chạy migration trước khi lưu thay đổi."
+  CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "Hệ thống chưa cập nhật quota video UGC. Vui lòng chạy migration trước khi lưu thay đổi.",
+  CAMPAIGN_REQUIRED_HASHTAGS_MIGRATION_REQUIRED: "Hệ thống chưa cập nhật hashtag bắt buộc. Vui lòng chạy migration trước khi lưu thay đổi."
 };
 
 const fieldMessageMap: Record<string, string> = {
   slug: "Đường dẫn công khai chưa hợp lệ. Chỉ dùng chữ thường, số và dấu gạch ngang.",
   title: "Vui lòng nhập tên chiến dịch tối thiểu 3 ký tự.",
+  requirementsSummary: "Yêu cầu ngắn tối đa 160 ký tự.",
+  requirements: "Vui lòng nhập yêu cầu tối thiểu 3 ký tự.",
   benefits: "Vui lòng nhập quyền lợi tối thiểu 3 ký tự.",
   imageUrl: "Ảnh chưa hợp lệ. Vui lòng chọn file ảnh hoặc dùng URL /uploads, http, https.",
   ugcVideoQuota: "Số lượng video review phải lớn hơn 0.",
+  creatorDepositAmountVnd: "Tiền cọc Creator phải lớn hơn 0.",
   startsAt: "Ngày bắt đầu chưa hợp lệ.",
   endsAt: "Ngày kết thúc phải sau ngày bắt đầu.",
-  participationRoadmap: "Vui lòng nhập ít nhất 1 bước lộ trình tham gia.",
+  requiredHashtags: "Hashtag bắt buộc chưa hợp lệ.",
   productName: "Vui lòng nhập tên sản phẩm.",
   productDescription: "Vui lòng nhập mô tả sản phẩm.",
   productLink: "Vui lòng nhập link sản phẩm.",
@@ -121,6 +161,24 @@ function fieldErrorsText(message?: string) {
   return message?.trim();
 }
 
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString("vi-VN");
+}
+
+function getContentFileUrlFromBrief(brief: string) {
+  return extractCampaignRequestMarkerValue(brief, CONTENT_FILE_MARKER);
+}
+
+function getRequirementsFromBrief(brief: string) {
+  const value = extractCampaignRequestMarkerValue(brief, REQUIREMENTS_MARKER);
+  if (!value) return "";
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 function buildCreatorBriefForm(item: CampaignDetail): CreatorBriefForm {
   return {
     productName: item.productName ?? "",
@@ -137,8 +195,12 @@ function buildForm(item: CampaignDetail): FormState {
     category: item.category,
     campaignType: item.campaignType,
     setupSource: item.setupSource,
+    fulfillmentMode: item.fulfillmentMode ?? "BRAND_SHIP",
+    creatorDepositAmountVnd: item.creatorDepositAmountVnd ?? 0,
+    requirementsSummary: item.requirementsSummary ?? "",
+    requirements: item.requirements ?? "",
     benefits: item.benefits ?? "",
-    participationRoadmap: item.participationRoadmap.length > 0 ? item.participationRoadmap : [""],
+    requiredHashtags: item.requiredHashtags ?? [],
     imageUrl: item.coverImageUrl ?? "",
     startsAt: toDateTimeLocalInput(item.startsAt),
     endsAt: toDateTimeLocalInput(item.endsAt),
@@ -152,8 +214,7 @@ function getApiFieldErrors(payload: ApiFailure) {
   const details = payload.details as { fieldErrors?: Record<string, string[]>; formErrors?: string[] } | undefined;
   if (details?.fieldErrors) {
     for (const [field, messages] of Object.entries(details.fieldErrors)) {
-      const targetField = field === "mission" ? "participationRoadmap" : field;
-      nextErrors[targetField] = fieldMessageMap[targetField] ?? fieldErrorsText(messages[0]);
+      nextErrors[field] = fieldMessageMap[field] ?? fieldErrorsText(messages[0]);
     }
   }
   const mappedField = payload.code ? apiErrorFieldMap[payload.code] : undefined;
@@ -179,6 +240,7 @@ export default function AdminCampaignDetailPage() {
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [coverImageState, setCoverImageState] = useState<ImageSelectionState>({ source: "none", fileName: "" });
   const [productImageState, setProductImageState] = useState<ImageSelectionState>({ source: "none", fileName: "" });
+  const [downloadingFileRequestId, setDownloadingFileRequestId] = useState("");
 
   const loadCampaign = useCallback(async () => {
     if (!id) return null;
@@ -226,25 +288,6 @@ export default function AdminCampaignDetailPage() {
     setFieldErrors((current) => ({ ...current, [fieldName]: undefined }));
   }
 
-  function setRoadmapStep(index: number, value: string) {
-    setForm((current) => ({
-      ...current,
-      participationRoadmap: current.participationRoadmap.map((item, idx) => (idx === index ? value : item))
-    }));
-    setFieldErrors((current) => ({ ...current, participationRoadmap: undefined }));
-  }
-
-  function addRoadmapStep() {
-    setForm((current) => ({ ...current, participationRoadmap: [...current.participationRoadmap, ""] }));
-  }
-
-  function removeRoadmapStep(index: number) {
-    setForm((current) => ({
-      ...current,
-      participationRoadmap: current.participationRoadmap.filter((_, idx) => idx !== index)
-    }));
-  }
-
   async function uploadImage(file: File, target: "cover" | "product" = "cover") {
     if (target === "cover") setUploadingCover(true);
     else setUploadingProductImage(true);
@@ -280,6 +323,8 @@ export default function AdminCampaignDetailPage() {
     if (form.slug.trim().length < 3) nextErrors.slug = "Slug cần tối thiểu 3 ký tự.";
     else if (!slugPattern.test(form.slug.trim())) nextErrors.slug = "Slug chỉ gồm chữ thường, số và dấu gạch ngang (-).";
     if (form.title.trim().length < 3) nextErrors.title = "Tên chiến dịch cần tối thiểu 3 ký tự.";
+    if (form.requirementsSummary.trim().length > 160) nextErrors.requirementsSummary = "Yêu cầu ngắn tối đa 160 ký tự.";
+    if (form.requirements.trim().length < 3) nextErrors.requirements = "Yêu cầu cần tối thiểu 3 ký tự.";
     if (form.benefits.trim().length < 3) nextErrors.benefits = "Quyền lợi cần tối thiểu 3 ký tự.";
     if (imageUrl && !imageUrl.startsWith("/uploads/") && !/^https?:\/\//.test(imageUrl)) {
       nextErrors.imageUrl = "Ảnh phải là URL bắt đầu bằng /uploads/ hoặc http(s)://";
@@ -287,9 +332,11 @@ export default function AdminCampaignDetailPage() {
     if (!Number.isInteger(form.ugcVideoQuota) || form.ugcVideoQuota <= 0) {
       nextErrors.ugcVideoQuota = "Số lượng video review phải lớn hơn 0.";
     }
-    if (!form.participationRoadmap.some((item) => item.trim().length > 0)) {
-      nextErrors.participationRoadmap = "Cần ít nhất 1 bước lộ trình tham gia.";
+    if (form.fulfillmentMode === "BRAND_SHIP" && (!Number.isInteger(form.creatorDepositAmountVnd) || form.creatorDepositAmountVnd <= 0)) {
+      nextErrors.creatorDepositAmountVnd = "Tiền cọc Creator phải lớn hơn 0.";
     }
+    const hashtagError = validateRequiredHashtags(form.requiredHashtags);
+    if (hashtagError) nextErrors.requiredHashtags = hashtagError;
     if (form.startsAt && form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) {
       nextErrors.endsAt = "Ngày kết thúc phải sau ngày bắt đầu.";
     }
@@ -321,8 +368,12 @@ export default function AdminCampaignDetailPage() {
           category: form.category,
           campaignType: form.campaignType,
           setupSource: form.setupSource,
+          fulfillmentMode: form.fulfillmentMode,
+          creatorDepositAmountVnd: form.fulfillmentMode === "BRAND_SHIP" ? form.creatorDepositAmountVnd : 0,
+          requirementsSummary: form.requirementsSummary,
+          requirements: form.requirements,
           benefits: form.benefits,
-          participationRoadmap: form.participationRoadmap.filter((step) => step.trim().length > 0),
+          requiredHashtags: normalizeRequiredHashtags(form.requiredHashtags),
           imageUrl: form.imageUrl,
           startsAt: toDateTime(form.startsAt),
           endsAt: toDateTime(form.endsAt),
@@ -386,6 +437,38 @@ export default function AdminCampaignDetailPage() {
     }
   }
 
+  async function downloadCampaignFile(requestId: string) {
+    if (!item) return;
+    setDownloadingFileRequestId(requestId);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/campaigns/${item.id}/content-file/download?requestId=${encodeURIComponent(requestId)}`, {
+        cache: "no-store"
+      });
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as ApiFailure | null;
+        throw new Error(payload?.error || "Không thể tải file campaign. Vui lòng kiểm tra quyền hoặc file đã bị xoá.");
+      }
+
+      const blob = await res.blob();
+      const disposition = res.headers.get("content-disposition") ?? "";
+      const fileNameMatch = disposition.match(/filename="([^"]+)"/);
+      const fileName = fileNameMatch?.[1] || "campaign-content";
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (downloadError) {
+      setError(downloadError instanceof Error ? downloadError.message : "Không thể tải file campaign. Vui lòng kiểm tra quyền hoặc file đã bị xoá.");
+    } finally {
+      setDownloadingFileRequestId("");
+    }
+  }
+
   if (loading) {
     return (
       <>
@@ -410,9 +493,6 @@ export default function AdminCampaignDetailPage() {
         subtitle={`Brand: ${item.brand.displayName} • ${item.slug}`}
         action={
           <div className="flex flex-wrap gap-2">
-            <button className="dc-btn-secondary" onClick={() => router.push(`/admin/campaigns/${item.id}/applications`)}>
-              Đơn đăng ký
-            </button>
             <button className="dc-btn-secondary" onClick={() => router.push("/admin/campaigns")}>
               Quay lại
             </button>
@@ -428,12 +508,62 @@ export default function AdminCampaignDetailPage() {
       {toast ? <ActionToast message={toast} /> : null}
 
       <section className="mt-4 grid gap-4">
+        {item.sourceBrandRequests.length > 0 ? (
+          <div className="dc-card p-4">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-zinc-500">Đơn yêu cầu tạo campaign</p>
+                <h2 className="text-lg font-semibold text-zinc-900">Campaign này được tạo từ đơn đăng ký của Brand</h2>
+              </div>
+              <StatusBadge status={item.sourceBrandRequests[0]?.status.toLowerCase() ?? "approved"} />
+            </div>
+            <div className="grid gap-3">
+              {item.sourceBrandRequests.map((request) => (
+                <article key={request.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-zinc-900">{request.title}</p>
+                      <p className="text-sm text-zinc-500">/{request.requestedSlug} • Gửi lúc {formatDateTime(request.createdAt)}</p>
+                    </div>
+                    <StatusBadge status={request.status.toLowerCase()} />
+                  </div>
+                  <div className="mt-3 grid gap-2 text-sm text-zinc-700 md:grid-cols-2">
+                    <p className="md:col-span-2">
+                      File campaign:{" "}
+                      {getContentFileUrlFromBrief(request.brief) ? (
+                        <button
+                          type="button"
+                          className="font-semibold text-zinc-900 underline underline-offset-2 disabled:cursor-not-allowed disabled:text-zinc-400"
+                          disabled={downloadingFileRequestId === request.id}
+                          onClick={() => void downloadCampaignFile(request.id)}
+                        >
+                          {downloadingFileRequestId === request.id ? "đang tải..." : "Tải file campaign"}
+                        </button>
+                      ) : (
+                        <span className="text-zinc-500">Chưa có file đính kèm</span>
+                      )}
+                    </p>
+                    {getRequirementsFromBrief(request.brief) ? (
+                      <p className="md:col-span-2">
+                        Yêu cầu: <span className="whitespace-pre-line">{getRequirementsFromBrief(request.brief)}</span>
+                      </p>
+                    ) : null}
+                    {request.adminNote ? <p className="md:col-span-2">Ghi chú admin: <span className="whitespace-pre-line">{request.adminNote}</span></p> : null}
+                    {request.brandFeedback ? <p className="md:col-span-2">Phản hồi Brand: <span className="whitespace-pre-line">{request.brandFeedback}</span></p> : null}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <div className="dc-card p-4">
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-semibold text-zinc-500">Chỉnh sửa chiến dịch</p>
               <h2 className="text-lg font-semibold text-zinc-900">Thông tin chiến dịch</h2>
               <p className="mt-1 text-sm text-zinc-600">Brand: {item.brand.displayName}</p>
+              {item.brand.ownerDisplayName ? <p className="mt-1 text-sm text-zinc-500">Chủ tài khoản: {item.brand.ownerDisplayName}</p> : null}
             </div>
             <div className="shrink-0">
               <StatusBadge status={item.statusView.toLowerCase()} />
@@ -442,14 +572,14 @@ export default function AdminCampaignDetailPage() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">
-              <span>Tài khoản Brand</span>
+              <span>Brand</span>
               <input
                 className="dc-input !bg-zinc-200 !border-zinc-300 !text-zinc-500 opacity-100 cursor-not-allowed"
                 value={item.brand.displayName}
                 readOnly
                 disabled
               />
-              <span className="invisible text-xs">Giữ dòng cân với Slug</span>
+              <span className="text-xs text-zinc-500">Chủ tài khoản: {item.brand.ownerDisplayName ?? item.brand.email}</span>
             </label>
 
             <label className="grid gap-2 text-sm font-semibold text-zinc-700">
@@ -498,6 +628,64 @@ export default function AdminCampaignDetailPage() {
               </select>
             </label>
             <div />
+
+            <fieldset className="grid gap-3 md:col-span-2">
+              <legend className="text-sm font-semibold text-zinc-700">Hình thức xử lý hàng mẫu / đơn hàng</legend>
+              <div className="grid gap-3 md:grid-cols-2">
+                {CAMPAIGN_FULFILLMENT_OPTIONS.map((option) => {
+                  const selected = form.fulfillmentMode === option.value;
+                  return (
+                    <label
+                      key={option.value}
+                      className={`cursor-pointer rounded-2xl border p-4 transition ${
+                        selected ? "border-zinc-900 bg-zinc-50 ring-1 ring-zinc-900" : "border-zinc-200 bg-white hover:border-zinc-300"
+                      }`}
+                    >
+                      <span className="flex items-start gap-3">
+                        <input
+                          className="mt-1"
+                          type="radio"
+                          name="fulfillmentMode"
+                          value={option.value}
+                          checked={selected}
+                          onChange={() => setField("fulfillmentMode", option.value)}
+                        />
+                        <span>
+                          <span className="block text-sm font-bold text-zinc-900">{option.label}</span>
+                          <span className="mt-2 block text-sm font-normal leading-6 text-zinc-600">{option.description}</span>
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              {form.fulfillmentMode === "BRAND_SHIP" ? (
+                <div className="grid gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <label className="grid gap-2 text-sm font-semibold text-amber-800">
+                    <span>Tiền cọc Creator</span>
+                    <input
+                      className={`dc-input bg-white ${fieldErrors.creatorDepositAmountVnd ? "border-red-500 ring-1 ring-red-300" : ""}`}
+                      type="number"
+                      min={1}
+                      placeholder="Ví dụ: 100000"
+                      value={form.creatorDepositAmountVnd}
+                      onChange={(event) => setField("creatorDepositAmountVnd", Number(event.target.value || 0))}
+                      required
+                    />
+                    <span className="text-xs font-medium text-amber-700">Khoản cọc được giữ để đảm bảo Creator hoàn thành video sau khi nhận hàng mẫu.</span>
+                    {fieldErrors.creatorDepositAmountVnd ? <span className="text-xs text-red-600">{fieldErrors.creatorDepositAmountVnd}</span> : null}
+                  </label>
+                  {item.creatorDepositRequired && item.creatorDepositAmountVnd <= 0 ? (
+                    <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+                      Campaign cũ đang thiếu tiền cọc Creator. Vui lòng nhập số tiền cọc trước khi lưu.
+                    </p>
+                  ) : null}
+                  <p className="text-sm font-medium text-amber-700">
+                    Creator được duyệt sẽ có trạng thái yêu cầu tiền cọc. Hệ thống chưa tự động trừ ví, Admin cần xác nhận sau khi đối soát.
+                  </p>
+                </div>
+              ) : null}
+            </fieldset>
 
             <div className="md:col-span-2">
               <div className="mb-2">
@@ -568,26 +756,31 @@ export default function AdminCampaignDetailPage() {
             </div>
 
             <div className="md:col-span-2">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-semibold text-zinc-700">Lộ trình tham gia</span>
-              </div>
-              <div className="grid gap-2">
-                {form.participationRoadmap.map((step, index) => (
-                  <div key={`roadmap-${index}`} className="flex gap-2">
-                    <input className="dc-input" value={step} onChange={(event) => setRoadmapStep(index, event.target.value)} placeholder={`Bước ${index + 1}: ...`} />
-                    {form.participationRoadmap.length > 1 ? (
-                      <button type="button" className="dc-btn-secondary" onClick={() => removeRoadmapStep(index)}>
-                        Xóa
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-                <button type="button" className="dc-btn-secondary w-fit" onClick={addRoadmapStep}>
-                  + Thêm bước
-                </button>
-                {fieldErrors.participationRoadmap ? <span className="text-xs text-red-600">{fieldErrors.participationRoadmap}</span> : null}
-              </div>
+              <RequiredHashtagInput
+                value={form.requiredHashtags}
+                onChange={(value) => setField("requiredHashtags", value)}
+                error={fieldErrors.requiredHashtags}
+              />
             </div>
+
+            <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
+              <span>Yêu cầu ngắn hiển thị ở Tổng quan</span>
+              <input
+                className={`dc-input ${fieldErrors.requirementsSummary ? "border-red-500 ring-1 ring-red-300" : ""}`}
+                value={form.requirementsSummary}
+                onChange={(event) => setField("requirementsSummary", event.target.value)}
+                placeholder="Ví dụ: 01 Video Review Sản Phẩm"
+                maxLength={160}
+              />
+              <span className="text-xs font-medium text-zinc-500">Có thể để trống, hệ thống sẽ tự rút gọn từ yêu cầu chi tiết hoặc số lượng video review.</span>
+              {fieldErrors.requirementsSummary ? <span className="text-xs text-red-600">{fieldErrors.requirementsSummary}</span> : null}
+            </label>
+
+            <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
+              <span>Yêu cầu chi tiết từ Brand</span>
+              <textarea className={`dc-input min-h-24 ${fieldErrors.requirements ? "border-red-500 ring-1 ring-red-300" : ""}`} value={form.requirements} onChange={(event) => setField("requirements", event.target.value)} />
+              {fieldErrors.requirements ? <span className="text-xs text-red-600">{fieldErrors.requirements}</span> : null}
+            </label>
 
             <label className="grid gap-2 text-sm font-semibold text-zinc-700 md:col-span-2">
               <span>Quyền lợi</span>

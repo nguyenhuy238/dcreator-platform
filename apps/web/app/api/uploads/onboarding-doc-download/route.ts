@@ -11,6 +11,10 @@ const MIME_BY_EXT: Record<string, string> = {
   pdf: "application/pdf",
   doc: "application/msword",
   docx: DOCX_MIME,
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   txt: "text/plain; charset=utf-8",
   png: "image/png",
   jpg: "image/jpeg",
@@ -45,14 +49,16 @@ function buildAttachmentHeaders(fileName: string, contentType: string) {
 }
 
 function getLocalOnboardingDocFilePath(relativeUrl: string) {
-  if (!relativeUrl.startsWith("/uploads/onboarding-doc/")) {
+  const allowedPrefixes = ["/uploads/onboarding-doc/", "/uploads/campaign-file/"];
+  if (!allowedPrefixes.some((prefix) => relativeUrl.startsWith(prefix))) {
     throw new AppError("Invalid campaign content file path", 400, "INVALID_CAMPAIGN_CONTENT_FILE_PATH");
   }
 
   const publicRoot = path.resolve(process.cwd(), "public");
   const resolved = path.resolve(publicRoot, `.${relativeUrl}`);
 
-  if (!resolved.startsWith(path.resolve(publicRoot, "uploads", "onboarding-doc"))) {
+  const allowedRoots = ["onboarding-doc", "campaign-file"].map((folder) => path.resolve(publicRoot, "uploads", folder));
+  if (!allowedRoots.some((root) => resolved.startsWith(root))) {
     throw new AppError("Invalid campaign content file path", 400, "INVALID_CAMPAIGN_CONTENT_FILE_PATH");
   }
 
@@ -60,8 +66,8 @@ function getLocalOnboardingDocFilePath(relativeUrl: string) {
 }
 
 function isAllowedSupabaseOnboardingDocUrl(url: URL) {
-  if (!url.pathname.includes("/onboarding-doc/")) return false;
-  const supabaseUrl = process.env.SUPABASE_URL;
+  if (!url.pathname.includes("/onboarding-doc/") && !url.pathname.includes("/campaign-file/")) return false;
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!supabaseUrl) return false;
 
   try {
@@ -116,4 +122,3 @@ export async function GET(request: NextRequest) {
     return toErrorResponse(error);
   }
 }
-

@@ -1,16 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
+import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
 
 type BrandConsultation = {
   id: string;
   name: string;
+  email: string | null;
   phone: string;
-  facebookUrl: string;
+  facebookUrl: string | null;
   source: string;
+  interestedPackage: string | null;
   note: string | null;
   status: "NEW" | "CONTACTED" | "ARCHIVED";
   submittedByUserId: string | null;
@@ -65,7 +67,7 @@ export default function AdminBrandConsultationsPage() {
 
       <section className="dc-card p-4">
         <div className="grid gap-2 md:grid-cols-[1fr_auto]">
-          <input className="dc-input" placeholder="Tìm theo tên, SĐT, link FB" value={query} onChange={(event) => setQuery(event.target.value)} />
+          <input className="dc-input" placeholder="Tìm theo tên, email, SĐT, link FB" value={query} onChange={(event) => setQuery(event.target.value)} />
           <button className="dc-btn-primary" onClick={() => void load()}>Lọc</button>
         </div>
       </section>
@@ -103,18 +105,23 @@ export default function AdminBrandConsultationsPage() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-lg font-bold text-zinc-900">Tên khách hàng: {item.name}</p>
+                    {item.email ? <p className="mt-1 text-sm text-zinc-600">Email: {item.email}</p> : null}
                     <p className="mt-1 text-sm text-zinc-600">Số điện thoại: {item.phone}</p>
                   </div>
                   <StatusBadge status={item.status} />
                 </div>
 
                 <div className="mt-3 grid gap-2 text-sm text-zinc-700 md:grid-cols-2">
-                  <p>
-                    <span className="font-semibold">Facebook:</span>{" "}
-                    <a href={item.facebookUrl} target="_blank" rel="noreferrer" className="text-zinc-950 underline decoration-zinc-300 decoration-2 underline-offset-4">
-                      {item.facebookUrl}
-                    </a>
-                  </p>
+                  {item.facebookUrl ? (
+                    <p>
+                      <span className="font-semibold">Facebook:</span>{" "}
+                      <a href={item.facebookUrl} target="_blank" rel="noreferrer" className="text-zinc-950 underline decoration-zinc-300 decoration-2 underline-offset-4">
+                        {item.facebookUrl}
+                      </a>
+                    </p>
+                  ) : null}
+                  {item.interestedPackage ? <p><span className="font-semibold">Gói quan tâm:</span> {item.interestedPackage}</p> : null}
+                  {item.note ? <p><span className="font-semibold">Thông tin:</span> {item.note}</p> : null}
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500">

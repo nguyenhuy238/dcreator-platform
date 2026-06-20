@@ -26,3 +26,45 @@ export function trackEvent(eventName: AnalyticsEventName | string, params?: Gtag
     app_name: "dcreator"
   });
 }
+
+export function trackSignUp(method: string) {
+  trackEvent("sign_up", { method });
+}
+
+export function trackCreatorRegisterSuccess() {
+  trackEvent("creator_register_success", { role: "creator" });
+}
+
+export function trackBrandRegisterSuccess() {
+  trackEvent("brand_register_success", { role: "brand" });
+}
+
+export function trackRoleRegisterSuccess(role: "creator" | "brand" | string) {
+  trackEvent("role_register_success", { role });
+}
+
+export function trackCreatorApplyJob(campaignId: string) {
+  trackEvent("creator_apply_job_success", { campaign_id: campaignId, job_id: campaignId });
+}
+
+export function trackBrandCreateCampaign(campaignId: string) {
+  trackEvent("brand_create_campaign_success", { campaign_id: campaignId, job_id: campaignId });
+}
+
+export function trackProofSubmit(campaignId: string) {
+  trackEvent("creator_submit_proof_success", { campaign_id: campaignId, job_id: campaignId });
+}
+
+export function trackProofApproved(campaignId: string) {
+  trackEvent("proof_approved", { campaign_id: campaignId, job_id: campaignId });
+}
+
+export function trackOrderSuccess(orderId: string, revenue: number, brandId?: string, creatorId?: string) {
+  trackEvent("order_success", {
+    order_id: orderId,
+    value: revenue,
+    currency: "VND",
+    brand_id: brandId,
+    creator_id: creatorId
+  });
+}

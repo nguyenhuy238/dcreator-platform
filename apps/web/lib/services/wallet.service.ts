@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import type { z } from "zod";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
@@ -33,11 +34,19 @@ export function assertNonNegativeBalance(pointsBalance: number, cashBalanceVnd: 
 }
 
 export async function ensureWalletByAccountId(accountId: string) {
-  return prisma.wallet.upsert({
-    where: { userId: accountId },
-    create: { userId: accountId },
-    update: {}
-  });
+  try {
+    return await prisma.wallet.upsert({
+      where: { userId: accountId },
+      create: { userId: accountId },
+      update: {}
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const wallet = await prisma.wallet.findUnique({ where: { userId: accountId } });
+      if (wallet) return wallet;
+    }
+    throw error;
+  }
 }
 
 export async function getWalletMe(accountId: string) {
