@@ -1,0 +1,2 @@
+-- No-op placeholder. The actual creator deposit amount column is added in
+-- 20260620110000_add_creator_deposit_amount.

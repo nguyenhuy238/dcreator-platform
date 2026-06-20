@@ -54,6 +54,7 @@ const creatorMissionInclude = {
       endsAt: true,
       fulfillmentMode: true,
       creatorDepositRequired: true,
+      creatorDepositAmountVnd: true,
       brand: {
         select: {
           id: true,
@@ -316,6 +317,16 @@ function mapMission(item: CreatorMissionEntity) {
       createdAt: missionApplication.createdAt.toISOString()
     }
   };
+}
+
+function missionRequiresHeldCreatorDeposit(item: CreatorMissionEntity) {
+  return item.campaign.fulfillmentMode === "BRAND_SHIP" && item.campaign.creatorDepositRequired;
+}
+
+function assertHeldCreatorDeposit(item: CreatorMissionEntity) {
+  if (missionRequiresHeldCreatorDeposit(item) && item.depositStatus !== "HELD") {
+    throw new AppError("Campaign này yêu cầu đặt cọc trước khi nộp proof/video.", 409, "CREATOR_DEPOSIT_REQUIRED");
+  }
 }
 
 async function getMissionById(id: string) {
@@ -611,12 +622,27 @@ export async function getMissionHistoryDetailForAdmin(id: string) {
 export async function confirmDepositPaid(creatorMissionId: string, accountId: string) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
   if (current.productReceiveOption !== "PRODUCT_REQUIRED") throw new AppError("Invalid flow", 409, "CREATOR_MISSION_INVALID_FLOW");
-  if (current.campaign.fulfillmentMode === "BRAND_SHIP") {
-    throw new AppError(
-      "Tiền cọc cần được Admin xác nhận sau khi đối soát.",
-      409,
-      "CREATOR_DEPOSIT_ADMIN_CONFIRMATION_REQUIRED"
+  if (missionRequiresHeldCreatorDeposit(current)) {
+    if (current.depositStatus === "HELD") return mapMission(current);
+    if (current.campaign.creatorDepositAmountVnd <= 0) {
+      throw new AppError("Campaign chưa cấu hình tiền cọc Creator.", 409, "CREATOR_DEPOSIT_AMOUNT_MISSING");
+    }
+    const updated = await prisma.creatorMission.update({
+      where: { id: creatorMissionId },
+      data: {
+        depositStatus: "PENDING",
+        productStatus: "WAITING_DEPOSIT"
+      },
+      include: creatorMissionInclude
+    });
+    await notifyCreator(
+      accountId,
+      "PROOF_SUBMITTED",
+      "Đã ghi nhận yêu cầu đặt cọc",
+      "Yêu cầu đặt cọc đã được ghi nhận. Vui lòng chờ Admin xác nhận sau khi đối soát.",
+      { creatorMissionId }
     );
+    return mapMission(updated);
   }
   const updated = await prisma.creatorMission.update({
     where: { id: creatorMissionId },
@@ -668,6 +694,7 @@ export async function submitPurchaseProof(creatorMissionId: string, accountId: s
 
 export async function submitDraft(creatorMissionId: string, accountId: string, payload: { videoUrl: string; note?: string }) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
+  assertHeldCreatorDeposit(current);
   if (current.status === "DRAFT_PENDING") {
     throw new AppError("Transcript must be approved first", 409, "CREATOR_MISSION_TRANSCRIPT_NOT_APPROVED");
   }
@@ -803,10 +830,14 @@ export async function submitPublishReport(
   }
 ) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
+  assertHeldCreatorDeposit(current);
   if (current.videoReviewStatus !== "APPROVED") throw new AppError("Video must be approved first", 409, "CREATOR_MISSION_VIDEO_NOT_APPROVED");
+  const adCode = payload.adCode?.trim();
+  if (!adCode) throw new AppError("Mã quảng cáo là bắt buộc.", 422, "AD_CODE_REQUIRED");
   const purchaseBillImageUrl = payload.purchaseBillImageUrl ?? payload.purchaseInvoiceUrl;
   const productReviewScreenshotUrl = payload.productReviewScreenshotUrl ?? payload.ratingImageUrl;
-  if (current.productReceiveOption === "PRODUCT_REQUIRED") {
+  const requiresCreatorOrderProof = current.productReceiveOption === "PRODUCT_REQUIRED" && current.campaign.fulfillmentMode === "CREATOR_ORDER";
+  if (requiresCreatorOrderProof) {
     if (!purchaseBillImageUrl?.trim()) throw new AppError("Ảnh bill mua hàng là bắt buộc.", 422, "PURCHASE_BILL_REQUIRED");
     if (!productReviewScreenshotUrl?.trim()) throw new AppError("Ảnh đánh giá 5 sao là bắt buộc.", 422, "PRODUCT_REVIEW_SCREENSHOT_REQUIRED");
   }
@@ -814,10 +845,10 @@ export async function submitPublishReport(
     await syncLegacySubmission(tx, current.missionId, current.accountId, current.submissionId, {
       socialPostUrl: payload.socialPostUrl,
       publicVideoUrl: payload.socialPostUrl,
-      adCode: payload.adCode ?? null,
-      screenshotUrl: payload.screenshotUrl ?? null,
-      purchaseBillImageUrl: purchaseBillImageUrl ?? current.submissionPurchaseBillImageUrl,
-      productReviewScreenshotUrl: productReviewScreenshotUrl ?? current.submissionProductReviewScreenshotUrl,
+      adCode,
+      screenshotUrl: current.campaign.fulfillmentMode === "CREATOR_ORDER" ? payload.screenshotUrl ?? null : null,
+      purchaseBillImageUrl: requiresCreatorOrderProof ? purchaseBillImageUrl ?? current.submissionPurchaseBillImageUrl : null,
+      productReviewScreenshotUrl: requiresCreatorOrderProof ? productReviewScreenshotUrl ?? current.submissionProductReviewScreenshotUrl : null,
       finalProofNote: payload.note ?? null,
       finalSubmittedAt: now(),
       status: "SUBMITTED",
@@ -831,10 +862,10 @@ export async function submitPublishReport(
       data: {
         submissionSocialPostUrl: payload.socialPostUrl,
         submissionPublicVideoUrl: payload.socialPostUrl,
-        submissionAdCode: payload.adCode ?? null,
-        submissionScreenshotUrl: payload.screenshotUrl ?? null,
-        submissionPurchaseBillImageUrl: purchaseBillImageUrl ?? current.submissionPurchaseBillImageUrl,
-        submissionProductReviewScreenshotUrl: productReviewScreenshotUrl ?? current.submissionProductReviewScreenshotUrl,
+        submissionAdCode: adCode,
+        submissionScreenshotUrl: current.campaign.fulfillmentMode === "CREATOR_ORDER" ? payload.screenshotUrl ?? null : null,
+        submissionPurchaseBillImageUrl: requiresCreatorOrderProof ? purchaseBillImageUrl ?? current.submissionPurchaseBillImageUrl : null,
+        submissionProductReviewScreenshotUrl: requiresCreatorOrderProof ? productReviewScreenshotUrl ?? current.submissionProductReviewScreenshotUrl : null,
         submissionFinalProofNote: payload.note ?? null,
         submissionFinalSubmittedAt: now(),
         submissionStatus: "SUBMITTED",
@@ -1156,6 +1187,7 @@ type TranscriptSubmissionInput =
 
 export async function submitCreatorMissionTranscript(accountId: string, creatorMissionId: string, payload: TranscriptSubmissionInput) {
   const current = await getMissionByIdForAccount(creatorMissionId, accountId);
+  assertHeldCreatorDeposit(current);
   if (current.status === "COMPLETED") throw new AppError("Mission already completed", 409, "CREATOR_MISSION_ALREADY_COMPLETED");
   if (current.videoReviewStatus === "PENDING" || current.videoReviewStatus === "APPROVED") {
     throw new AppError("Video review already started", 409, "CREATOR_MISSION_VIDEO_ALREADY_STARTED");

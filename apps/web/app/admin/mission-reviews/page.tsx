@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { MissionReviewsPage, type MissionReviewsTabKey } from "@/app/dashboard/brand/mission-reviews/page";
 
 function getInitialTab(value: string | null): MissionReviewsTabKey {
-  if (value === "transcript-reviews" || value === "video-reviews" || value === "final-reviews" || value === "refund-reviews" || value === "applications") {
+  if (value === "transcript-reviews" || value === "video-reviews" || value === "final-reviews" || value === "refund-reviews" || value === "deposit-confirmations" || value === "applications") {
     return value;
   }
   return "applications";

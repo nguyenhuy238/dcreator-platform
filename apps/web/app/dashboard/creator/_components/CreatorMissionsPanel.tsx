@@ -17,6 +17,7 @@ type MissionItem = {
   status: string;
   productReceiveOption: string;
   productStatus: string;
+  depositStatus: string;
   reimbursementStatus?: string | null;
   purchaseProofSubmittedAt?: string | null;
   purchaseProofReviewedAt?: string | null;
@@ -42,7 +43,13 @@ type MissionItem = {
     allowRepeat: boolean;
     deadlineAt: string | null;
   };
-  campaign: { title: string; slug: string };
+  campaign: {
+    title: string;
+    slug: string;
+    fulfillmentMode?: "BRAND_SHIP" | "CREATOR_ORDER" | null;
+    creatorDepositRequired?: boolean | null;
+    creatorDepositAmountVnd?: number | null;
+  };
   submission: {
     transcriptType: "TEXT" | "FILE" | "URL" | null;
     transcriptTextNote: string | null;
@@ -125,6 +132,22 @@ function toPlainTranscript(value: string | null | undefined) {
 function fmtDate(value: string | null) {
   if (!value) return "Không giới hạn";
   return new Date(value).toLocaleDateString("vi-VN");
+}
+
+function fmtVnd(value: number | null | undefined) {
+  return `${Math.max(0, value ?? 0).toLocaleString("vi-VN")}đ`;
+}
+
+function campaignFulfillmentMode(item: MissionItem) {
+  return item.campaign.fulfillmentMode === "CREATOR_ORDER" ? "CREATOR_ORDER" : "BRAND_SHIP";
+}
+
+function requiresCreatorDeposit(item: MissionItem) {
+  return campaignFulfillmentMode(item) === "BRAND_SHIP" && item.campaign.creatorDepositRequired !== false;
+}
+
+function hasHeldCreatorDeposit(item: MissionItem) {
+  return !requiresCreatorDeposit(item) || item.depositStatus === "HELD";
 }
 
 function asLink(value: string | null | undefined) {
@@ -211,6 +234,9 @@ function workflowStatus(item: MissionItem) {
   if (item.status === "CANCELLED") return "Bị từ chối";
   if (isMissionOverdue(item)) return "Quá hạn";
   if (item.reimbursementStatus === "PAYOUT_PENDING") return "Chờ hoàn tiền";
+  if (requiresCreatorDeposit(item) && item.depositStatus !== "HELD") {
+    return item.depositStatus === "PENDING" ? "Chờ Admin xác nhận cọc" : "Chờ đặt cọc";
+  }
   if (item.publishStatus === "PENDING") return "Link public đang chờ duyệt";
   if (item.publishStatus === "REJECTED") return "Link public bị từ chối";
   if (item.videoReviewStatus === "PENDING") return "Video đang chờ duyệt";
@@ -221,7 +247,9 @@ function workflowStatus(item: MissionItem) {
     if (item.submission?.status === "REJECTED") return "Kịch bản bị từ chối";
     return "Chờ nộp kịch bản";
   }
-  if (item.productReceiveOption === "PRODUCT_REQUIRED" && item.productStatus !== "RECEIVED") return "Chờ mua sản phẩm";
+  if (item.productReceiveOption === "PRODUCT_REQUIRED" && item.productStatus !== "RECEIVED") {
+    return campaignFulfillmentMode(item) === "BRAND_SHIP" ? "Chờ nhận sản phẩm" : "Chờ mua sản phẩm";
+  }
   if (purchaseDone && !hasVideoSubmitted && transcriptApproved) return "Nộp video";
   return "Chờ chọn kịch bản hoặc nộp video";
 }
@@ -463,6 +491,21 @@ export function CreatorMissionsPanel({
     }
   }
 
+  async function submitCreatorDeposit(item: MissionItem) {
+    clearMissionFormErrors(item.id);
+    setBusyId(item.id);
+    setNotice("");
+    try {
+      await fetchJson(`/api/me/mission/${item.id}/confirm-deposit`, { method: "POST" });
+      pushSuccess("Đã ghi nhận yêu cầu đặt cọc. Vui lòng chờ Admin xác nhận sau khi đối soát.");
+      await load();
+    } catch (e) {
+      setMissionFormErrors(item.id, { form: toErrorMessage(e) });
+    } finally {
+      setBusyId("");
+    }
+  }
+
   async function submitTranscript(item: MissionItem) {
     const mode = transcriptModeMap[item.id] ?? transcriptModeFromSubmission(item.submission);
     const transcript = transcriptMap[item.id]?.trim() ?? toPlainTranscript(item.submission?.transcriptTextNote);
@@ -537,10 +580,18 @@ export function CreatorMissionsPanel({
 
   async function submitPublish(item: MissionItem) {
     const requestedFields = getRequestedPublishResubmitFields(item);
-    const shouldResubmit = (field: string) => !requestedFields || requestedFields.has(field);
+    const isBrandShip = campaignFulfillmentMode(item) === "BRAND_SHIP";
+    const shouldResubmit = (field: string) => isBrandShip || !requestedFields || requestedFields.has(field);
+    const isCreatorOrder = campaignFulfillmentMode(item) === "CREATOR_ORDER";
     const publicUrl = publicUrlMap[item.id]?.trim() || item.submission?.publicVideoUrl || item.submission?.socialPostUrl || "";
     if (shouldResubmit("PUBLIC_URL") && !publicUrl.trim()) {
       setMissionFormErrors(item.id, { publicUrl: "Bạn chưa nhập link video social public." });
+      trackEvent(AnalyticsEvents.MISSION_SUBMIT_FAILED, missionAnalyticsParams(item, "publish"));
+      return;
+    }
+    const adCode = adCodeMap[item.id]?.trim() || item.submission?.adCode || "";
+    if (shouldResubmit("AD_CODE") && !adCode.trim()) {
+      setMissionFormErrors(item.id, { adCode: "Bạn chưa nhập mã quảng cáo." });
       trackEvent(AnalyticsEvents.MISSION_SUBMIT_FAILED, missionAnalyticsParams(item, "publish"));
       return;
     }
@@ -549,8 +600,8 @@ export function CreatorMissionsPanel({
     const bill = billUrlMap[item.id]?.trim() || item.submission?.purchaseBillImageUrl || "";
     const rating = ratingUrlMap[item.id]?.trim() || item.submission?.productReviewScreenshotUrl || "";
     const errors: MissionFormErrors = {};
-    if (item.productReceiveOption === "PRODUCT_REQUIRED" && shouldResubmit("PURCHASE_BILL") && !bill) errors.bill = "Bạn chưa tải ảnh bill mua hàng.";
-    if (item.productReceiveOption === "PRODUCT_REQUIRED" && shouldResubmit("PRODUCT_REVIEW_SCREENSHOT") && !rating) errors.rating = "Bạn chưa tải ảnh đánh giá 5 sao.";
+    if (isCreatorOrder && item.productReceiveOption === "PRODUCT_REQUIRED" && shouldResubmit("PURCHASE_BILL") && !bill) errors.bill = "Bạn chưa tải ảnh bill mua hàng.";
+    if (isCreatorOrder && item.productReceiveOption === "PRODUCT_REQUIRED" && shouldResubmit("PRODUCT_REVIEW_SCREENSHOT") && !rating) errors.rating = "Bạn chưa tải ảnh đánh giá 5 sao.";
     if (errors.bill || errors.rating || errors.publicUrl) {
       setMissionFormErrors(item.id, errors);
       trackEvent(AnalyticsEvents.MISSION_SUBMIT_FAILED, missionAnalyticsParams(item, "publish"));
@@ -566,11 +617,11 @@ export function CreatorMissionsPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           publicVideoUrl: normalizedPublicUrl,
-          adCode: adCodeMap[item.id]?.trim() || item.submission?.adCode || undefined,
-          screenshotUrl: screenshotUrl || undefined,
-          purchaseBillImageUrl: bill || undefined,
-          productReviewScreenshotUrl: rating || undefined,
-          finalProofNote: finalNoteMap[item.id]?.trim() || item.submission?.finalProofNote || undefined
+          adCode: adCode || undefined,
+          screenshotUrl: isCreatorOrder ? screenshotUrl || undefined : undefined,
+          purchaseBillImageUrl: isCreatorOrder ? bill || undefined : undefined,
+          productReviewScreenshotUrl: isCreatorOrder ? rating || undefined : undefined,
+          finalProofNote: isCreatorOrder ? finalNoteMap[item.id]?.trim() || item.submission?.finalProofNote || undefined : undefined
         })
       });
       trackEvent(AnalyticsEvents.MISSION_SUBMIT_SUCCESS, missionAnalyticsParams(item, "publish"));
@@ -759,6 +810,7 @@ export function CreatorMissionsPanel({
     const publishDone = item.publishStatus === "APPROVED";
     const completed = item.status === "COMPLETED";
     const refundPending = item.productReceiveOption === "PRODUCT_REQUIRED" && item.reimbursementStatus === "PAYOUT_PENDING";
+    const depositReady = hasHeldCreatorDeposit(item);
     const selectedFlow = preVideoChoiceMap[item.id];
     const hasChosenPreStep = Boolean(selectedFlow) || hasTranscriptSubmitted || hasVideoSubmitted;
 
@@ -767,10 +819,10 @@ export function CreatorMissionsPanel({
     const transcriptApproved = hasTranscriptSubmitted && !transcriptPending && !transcriptRejected;
     const transcriptStepPassed = hasTranscriptSubmitted || hasVideoSubmitted;
     const transcriptReviewPassed = transcriptApproved || hasVideoSubmitted;
-    const chooseCurrent = !hasChosenPreStep && item.missionApplication?.status === "APPROVED" && purchaseDone && !completed;
-    const transcriptSubmitCurrent = hasChosenPreStep && !transcriptStepPassed && item.missionApplication?.status === "APPROVED" && purchaseDone && !completed;
+    const chooseCurrent = !hasChosenPreStep && item.missionApplication?.status === "APPROVED" && purchaseDone && depositReady && !completed;
+    const transcriptSubmitCurrent = hasChosenPreStep && !transcriptStepPassed && item.missionApplication?.status === "APPROVED" && purchaseDone && depositReady && !completed;
     const transcriptReviewCurrent = transcriptPending;
-    const videoSubmitCurrent = !hasVideoSubmitted && transcriptReviewPassed && item.missionApplication?.status === "APPROVED" && purchaseDone && !completed;
+    const videoSubmitCurrent = !hasVideoSubmitted && transcriptReviewPassed && item.missionApplication?.status === "APPROVED" && purchaseDone && depositReady && !completed;
 
     const steps: TimelineStep[] = [
       {
@@ -786,7 +838,7 @@ export function CreatorMissionsPanel({
     if (item.productReceiveOption === "PRODUCT_REQUIRED") {
       steps.push({
         key: "purchase",
-        label: "Mua sản phẩm",
+        label: campaignFulfillmentMode(item) === "BRAND_SHIP" ? "Đặt cọc / nhận hàng" : "Mua sản phẩm",
         icon: "purchase",
         done: purchaseDone || completed,
         current: !purchaseDone && item.missionApplication?.status === "APPROVED",
@@ -876,13 +928,21 @@ export function CreatorMissionsPanel({
   function renderMissionDetail(item: MissionItem) {
     const isApplicationPending = item.missionApplication?.status === "PENDING_REVIEW";
     const isOverdue = isMissionOverdue(item);
-    const canSubmitPurchase = !isApplicationPending && item.productReceiveOption === "PRODUCT_REQUIRED" && item.productStatus !== "RECEIVED";
+    const isCreatorOrder = campaignFulfillmentMode(item) === "CREATOR_ORDER";
+    const needsCreatorDeposit = requiresCreatorDeposit(item);
+    const depositHeld = hasHeldCreatorDeposit(item);
+    const depositAmount = item.campaign.creatorDepositAmountVnd ?? 0;
+    const depositConfigMissing = needsCreatorDeposit && depositAmount <= 0;
+    const depositPending = needsCreatorDeposit && item.depositStatus === "PENDING";
+    const depositBlocked = needsCreatorDeposit && !depositHeld;
+    const canSubmitPurchase = !isApplicationPending && isCreatorOrder && item.productReceiveOption === "PRODUCT_REQUIRED" && item.productStatus !== "RECEIVED";
     const canSubmitVideoCandidate =
       !isApplicationPending &&
       item.status !== "COMPLETED" &&
       item.videoReviewStatus !== "PENDING" &&
       item.videoReviewStatus !== "APPROVED" &&
       item.publishStatus !== "PENDING" &&
+      !depositBlocked &&
       (item.productReceiveOption === "NO_PRODUCT_REQUIRED" || item.productStatus === "RECEIVED");
     const isTranscriptFlow = item.status === "DRAFT_PENDING";
     const hasTranscript = Boolean(item.submission?.transcriptTextNote?.trim() || item.submission?.transcriptResourceUrl?.trim());
@@ -894,10 +954,14 @@ export function CreatorMissionsPanel({
     const showTranscriptComposer = !isOverdue && (isTranscriptFlow || (needsPreVideoChoice && selectedChoice === "TRANSCRIPT"));
     const showVideoComposer = !isOverdue && canSubmitVideoCandidate && !isTranscriptFlow && (!needsPreVideoChoice || selectedChoice === "VIDEO");
     const isRefundPending = item.productReceiveOption === "PRODUCT_REQUIRED" && item.reimbursementStatus === "PAYOUT_PENDING";
-    const canSubmitPublish = !isOverdue && !isApplicationPending && item.videoReviewStatus === "APPROVED" && item.status !== "COMPLETED" && item.publishStatus !== "PENDING" && !isRefundPending;
+    const canSubmitPublish = !isOverdue && !isApplicationPending && item.videoReviewStatus === "APPROVED" && item.status !== "COMPLETED" && item.publishStatus !== "PENDING" && !isRefundPending && !depositBlocked;
     const isWaitingPublishReview = !isApplicationPending && item.videoReviewStatus === "APPROVED" && item.publishStatus === "PENDING" && item.status !== "COMPLETED";
     const requestedPublishFields = getRequestedPublishResubmitFields(item);
-    const shouldShowPublishField = (field: string) => !requestedPublishFields || requestedPublishFields.has(field);
+    const shouldShowPublishField = (field: string) => {
+      if (!requestedPublishFields) return true;
+      if (!isCreatorOrder && (field === "PUBLIC_URL" || field === "AD_CODE")) return true;
+      return requestedPublishFields.has(field);
+    };
     const showProductSection = item.productReceiveOption === "PRODUCT_REQUIRED";
     const timelineSteps = buildMissionTimeline(item);
     const formError = missionErrors[item.id];
@@ -977,6 +1041,27 @@ export function CreatorMissionsPanel({
           ) : null}
 
           {!isRefundPending ? rejectionNotices : null}
+
+          {depositBlocked && !isApplicationPending && !isOverdue && !isRefundPending ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              <p className="font-semibold">Campaign này yêu cầu đặt cọc trước khi thực hiện vì Brand sẽ gửi hàng mẫu trực tiếp cho Creator.</p>
+              <p className="mt-1">Số tiền cọc: <strong>{fmtVnd(depositAmount)}</strong></p>
+              {depositConfigMissing ? (
+                <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700">
+                  Campaign cũ hoặc cấu hình hiện thiếu tiền cọc. Vui lòng chờ Admin cập nhật trước khi thực hiện.
+                </p>
+              ) : depositPending ? (
+                <p className="mt-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-zinc-700">
+                  Hệ thống đã ghi nhận yêu cầu đặt cọc. Form proof sẽ mở sau khi Admin xác nhận cọc.
+                </p>
+              ) : (
+                <button className="dc-btn-primary mt-3 w-full sm:w-auto" disabled={busyId === item.id} onClick={() => void submitCreatorDeposit(item)}>
+                  Đặt cọc ngay
+                </button>
+              )}
+              {formError?.form ? <p className="mt-2 text-sm text-red-600">{formError.form}</p> : null}
+            </div>
+          ) : null}
 
           {canSubmitPurchase && !isOverdue && !isRefundPending ? (
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
@@ -1178,11 +1263,15 @@ export function CreatorMissionsPanel({
                       className="dc-input"
                       placeholder="Mã quảng cáo (adCode)"
                       value={adCodeMap[item.id] ?? item.submission?.adCode ?? ""}
-                      onChange={(e) => setAdCodeMap((s) => ({ ...s, [item.id]: e.target.value }))}
+                      onChange={(e) => {
+                        setAdCodeMap((s) => ({ ...s, [item.id]: e.target.value }));
+                        clearMissionErrorField(item.id, "adCode");
+                      }}
                     />
+                    {formError?.adCode ? <p className="text-sm text-red-600">{formError.adCode}</p> : null}
                   </>
                 ) : null}
-                {item.productReceiveOption === "PRODUCT_REQUIRED" ? (
+                {isCreatorOrder && item.productReceiveOption === "PRODUCT_REQUIRED" ? (
                   <>
                     {shouldShowPublishField("PURCHASE_BILL") ? (
                       <div className="grid gap-1.5">
@@ -1224,7 +1313,7 @@ export function CreatorMissionsPanel({
                     ) : null}
                   </>
                 ) : null}
-                {shouldShowPublishField("SCREENSHOT") ? (
+                {isCreatorOrder && shouldShowPublishField("SCREENSHOT") ? (
                   <>
                     <label htmlFor={`screenshot-upload-${item.id}`} className="text-sm font-medium text-zinc-700">
                       Ảnh chụp màn hình minh chứng
@@ -1244,7 +1333,7 @@ export function CreatorMissionsPanel({
                     {formError?.screenshot ? <p className="text-sm text-red-600">{formError.screenshot}</p> : null}
                   </>
                 ) : null}
-                {!requestedPublishFields ? (
+                {isCreatorOrder && !requestedPublishFields ? (
                   <>
                     <label htmlFor={`final-note-${item.id}`} className="text-sm font-medium text-zinc-700">
                       Ghi chú bổ sung

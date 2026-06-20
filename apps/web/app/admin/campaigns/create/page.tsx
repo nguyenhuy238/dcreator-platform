@@ -37,6 +37,7 @@ type FormState = {
   campaignType: CampaignType;
   setupSource: SetupSource;
   fulfillmentMode: CampaignFulfillmentMode;
+  creatorDepositAmountVnd: number;
   requiredHashtags: string[];
   benefits: string;
   imageUrl: string;
@@ -75,6 +76,7 @@ const defaultForm: FormState = {
   campaignType: "COMMUNITY",
   setupSource: "BRAND_REQUESTED",
   fulfillmentMode: "BRAND_SHIP",
+  creatorDepositAmountVnd: 100000,
   requiredHashtags: DEFAULT_REQUIRED_HASHTAGS,
   benefits: "",
   imageUrl: "",
@@ -126,7 +128,8 @@ const apiErrorFieldMap: Record<string, string> = {
   BRAND_PROFILE_NOT_FOUND: "brandAccountId",
   CAMPAIGN_TIMELINE_INVALID: "endsAt",
   CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "ugcVideoQuota",
-  CAMPAIGN_REQUIRED_HASHTAGS_MIGRATION_REQUIRED: "requiredHashtags"
+  CAMPAIGN_REQUIRED_HASHTAGS_MIGRATION_REQUIRED: "requiredHashtags",
+  CREATOR_DEPOSIT_AMOUNT_MISSING: "creatorDepositAmountVnd"
 };
 
 const apiErrorMessageMap: Record<string, string> = {
@@ -306,6 +309,9 @@ export default function AdminCreateCampaignPage() {
     if (!Number.isInteger(form.ugcVideoQuota) || form.ugcVideoQuota <= 0) {
       nextErrors.ugcVideoQuota = "Số lượng video review phải lớn hơn 0.";
     }
+    if (form.fulfillmentMode === "BRAND_SHIP" && (!Number.isInteger(form.creatorDepositAmountVnd) || form.creatorDepositAmountVnd <= 0)) {
+      nextErrors.creatorDepositAmountVnd = "Tiền cọc Creator phải lớn hơn 0.";
+    }
     const hashtagError = validateRequiredHashtags(form.requiredHashtags);
     if (hashtagError) nextErrors.requiredHashtags = hashtagError;
     if (form.startsAt && form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) {
@@ -341,6 +347,7 @@ export default function AdminCreateCampaignPage() {
           brief: null,
           requirementsSummary: form.requirementsSummary,
           requirements: form.requirements,
+          creatorDepositAmountVnd: form.fulfillmentMode === "BRAND_SHIP" ? form.creatorDepositAmountVnd : 0,
           publishNow: true,
           startsAt: toDateTime(form.startsAt),
           endsAt: toDateTime(form.endsAt),
@@ -484,9 +491,25 @@ export default function AdminCreateCampaignPage() {
               })}
             </div>
             {form.fulfillmentMode === "BRAND_SHIP" ? (
-              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
-                Creator được duyệt sẽ có trạng thái yêu cầu tiền cọc. Hệ thống chưa tự động trừ ví.
-              </p>
+              <div className="grid gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <label className="grid gap-2 text-sm font-semibold text-amber-800">
+                  <span>Tiền cọc Creator</span>
+                  <input
+                    className={`dc-input bg-white ${fieldErrors.creatorDepositAmountVnd ? "border-red-500 ring-1 ring-red-300" : ""}`}
+                    type="number"
+                    min={1}
+                    placeholder="Ví dụ: 100000"
+                    value={form.creatorDepositAmountVnd}
+                    onChange={(event) => setField("creatorDepositAmountVnd", Number(event.target.value || 0))}
+                    required
+                  />
+                  <span className="text-xs font-medium text-amber-700">Khoản cọc được giữ để đảm bảo Creator hoàn thành video sau khi nhận hàng mẫu.</span>
+                  {fieldErrors.creatorDepositAmountVnd ? <span className="text-xs text-red-600">{fieldErrors.creatorDepositAmountVnd}</span> : null}
+                </label>
+                <p className="text-sm font-medium text-amber-700">
+                  Creator được duyệt sẽ có trạng thái yêu cầu tiền cọc. Hệ thống chưa tự động trừ ví, Admin cần xác nhận sau khi đối soát.
+                </p>
+              </div>
             ) : null}
           </fieldset>
 

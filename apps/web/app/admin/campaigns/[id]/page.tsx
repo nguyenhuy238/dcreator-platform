@@ -37,6 +37,7 @@ type FormState = {
   campaignType: CampaignType;
   setupSource: SetupSource;
   fulfillmentMode: CampaignFulfillmentMode;
+  creatorDepositAmountVnd: number;
   requirementsSummary: string;
   requirements: string;
   benefits: string;
@@ -57,6 +58,7 @@ type CampaignDetail = {
   setupSource: SetupSource;
   fulfillmentMode: CampaignFulfillmentMode;
   creatorDepositRequired: boolean;
+  creatorDepositAmountVnd: number;
   benefits: string | null;
   requirementsSummary: string | null;
   requirements: string | null;
@@ -95,6 +97,7 @@ const DEFAULT_FORM: FormState = {
   campaignType: "COMMUNITY",
   setupSource: "BRAND_REQUESTED",
   fulfillmentMode: "BRAND_SHIP",
+  creatorDepositAmountVnd: 100000,
   benefits: "",
   requirementsSummary: "",
   requirements: "",
@@ -114,7 +117,8 @@ const DEFAULT_FORM: FormState = {
 const apiErrorFieldMap: Record<string, string> = {
   CAMPAIGN_TIMELINE_INVALID: "endsAt",
   CAMPAIGN_UGC_VIDEO_QUOTA_MIGRATION_REQUIRED: "ugcVideoQuota",
-  CAMPAIGN_REQUIRED_HASHTAGS_MIGRATION_REQUIRED: "requiredHashtags"
+  CAMPAIGN_REQUIRED_HASHTAGS_MIGRATION_REQUIRED: "requiredHashtags",
+  CREATOR_DEPOSIT_AMOUNT_MISSING: "creatorDepositAmountVnd"
 };
 
 const apiErrorMessageMap: Record<string, string> = {
@@ -131,6 +135,7 @@ const fieldMessageMap: Record<string, string> = {
   benefits: "Vui lòng nhập quyền lợi tối thiểu 3 ký tự.",
   imageUrl: "Ảnh chưa hợp lệ. Vui lòng chọn file ảnh hoặc dùng URL /uploads, http, https.",
   ugcVideoQuota: "Số lượng video review phải lớn hơn 0.",
+  creatorDepositAmountVnd: "Tiền cọc Creator phải lớn hơn 0.",
   startsAt: "Ngày bắt đầu chưa hợp lệ.",
   endsAt: "Ngày kết thúc phải sau ngày bắt đầu.",
   requiredHashtags: "Hashtag bắt buộc chưa hợp lệ.",
@@ -191,6 +196,7 @@ function buildForm(item: CampaignDetail): FormState {
     campaignType: item.campaignType,
     setupSource: item.setupSource,
     fulfillmentMode: item.fulfillmentMode ?? "BRAND_SHIP",
+    creatorDepositAmountVnd: item.creatorDepositAmountVnd ?? 0,
     requirementsSummary: item.requirementsSummary ?? "",
     requirements: item.requirements ?? "",
     benefits: item.benefits ?? "",
@@ -326,6 +332,9 @@ export default function AdminCampaignDetailPage() {
     if (!Number.isInteger(form.ugcVideoQuota) || form.ugcVideoQuota <= 0) {
       nextErrors.ugcVideoQuota = "Số lượng video review phải lớn hơn 0.";
     }
+    if (form.fulfillmentMode === "BRAND_SHIP" && (!Number.isInteger(form.creatorDepositAmountVnd) || form.creatorDepositAmountVnd <= 0)) {
+      nextErrors.creatorDepositAmountVnd = "Tiền cọc Creator phải lớn hơn 0.";
+    }
     const hashtagError = validateRequiredHashtags(form.requiredHashtags);
     if (hashtagError) nextErrors.requiredHashtags = hashtagError;
     if (form.startsAt && form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) {
@@ -360,6 +369,7 @@ export default function AdminCampaignDetailPage() {
           campaignType: form.campaignType,
           setupSource: form.setupSource,
           fulfillmentMode: form.fulfillmentMode,
+          creatorDepositAmountVnd: form.fulfillmentMode === "BRAND_SHIP" ? form.creatorDepositAmountVnd : 0,
           requirementsSummary: form.requirementsSummary,
           requirements: form.requirements,
           benefits: form.benefits,
@@ -650,9 +660,30 @@ export default function AdminCampaignDetailPage() {
                 })}
               </div>
               {form.fulfillmentMode === "BRAND_SHIP" ? (
-                <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
-                  Creator được duyệt sẽ có trạng thái yêu cầu tiền cọc. Hệ thống chưa tự động trừ ví.
-                </p>
+                <div className="grid gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <label className="grid gap-2 text-sm font-semibold text-amber-800">
+                    <span>Tiền cọc Creator</span>
+                    <input
+                      className={`dc-input bg-white ${fieldErrors.creatorDepositAmountVnd ? "border-red-500 ring-1 ring-red-300" : ""}`}
+                      type="number"
+                      min={1}
+                      placeholder="Ví dụ: 100000"
+                      value={form.creatorDepositAmountVnd}
+                      onChange={(event) => setField("creatorDepositAmountVnd", Number(event.target.value || 0))}
+                      required
+                    />
+                    <span className="text-xs font-medium text-amber-700">Khoản cọc được giữ để đảm bảo Creator hoàn thành video sau khi nhận hàng mẫu.</span>
+                    {fieldErrors.creatorDepositAmountVnd ? <span className="text-xs text-red-600">{fieldErrors.creatorDepositAmountVnd}</span> : null}
+                  </label>
+                  {item.creatorDepositRequired && item.creatorDepositAmountVnd <= 0 ? (
+                    <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+                      Campaign cũ đang thiếu tiền cọc Creator. Vui lòng nhập số tiền cọc trước khi lưu.
+                    </p>
+                  ) : null}
+                  <p className="text-sm font-medium text-amber-700">
+                    Creator được duyệt sẽ có trạng thái yêu cầu tiền cọc. Hệ thống chưa tự động trừ ví, Admin cần xác nhận sau khi đối soát.
+                  </p>
+                </div>
               ) : null}
             </fieldset>
 

@@ -9,7 +9,7 @@ type ApiResult<T> = { success: boolean; data?: T; error?: string };
 type DetailTab = "ACTIONS" | "HISTORY";
 type FinalReviewResubmitField = "PUBLIC_URL" | "AD_CODE" | "SCREENSHOT" | "PURCHASE_BILL" | "PRODUCT_REVIEW_SCREENSHOT";
 
-export type MissionReviewsTabKey = "transcript-reviews" | "applications" | "video-reviews" | "final-reviews" | "refund-reviews";
+export type MissionReviewsTabKey = "transcript-reviews" | "applications" | "deposit-confirmations" | "video-reviews" | "final-reviews" | "refund-reviews";
 
 type MissionReviewsPageProps = {
   pageTitle: string;
@@ -22,6 +22,7 @@ type MissionReviewsPageProps = {
 
 const tabs: Array<{ key: MissionReviewsTabKey; label: string }> = [
   { key: "applications", label: "Đơn tham gia campaign" },
+  { key: "deposit-confirmations", label: "Xác nhận cọc" },
   { key: "transcript-reviews", label: "Duyệt kịch bản" },
   { key: "video-reviews", label: "Duyệt video" },
   { key: "final-reviews", label: "Duyệt link public" },
@@ -52,6 +53,29 @@ function deadlineLabel(value: string | null) {
   if (days === 0) return "Hôm nay";
   if (days <= 7) return `${days} ngày nữa`;
   return fmtDateOnly(value);
+}
+
+type AdminDepositMission = {
+  id: string;
+  status: string;
+  productStatus: string;
+  depositStatus: string;
+  assignedAt?: string | null;
+  account: { displayName: string; email: string };
+  campaign: { id: string; title: string; slug?: string; fulfillmentMode?: "BRAND_SHIP" | "CREATOR_ORDER"; creatorDepositAmountVnd?: number | null };
+  mission: { title: string; productName?: string | null; productLink?: string | null; deadlineAt?: string | null };
+};
+
+function isDepositConfirmationCandidate(item: AdminDepositMission) {
+  return item.productStatus === "WAITING_DEPOSIT" && item.depositStatus !== "HELD";
+}
+
+function fmtVnd(value: number | null | undefined) {
+  return `${Math.max(0, value ?? 0).toLocaleString("vi-VN")}đ`;
+}
+
+function paginationTotal(data: { pagination?: { total?: number } } | AdminDepositMission[] | undefined) {
+  return !Array.isArray(data) ? data?.pagination?.total ?? 0 : 0;
 }
 
 function asLink(value: string | null | undefined) {
@@ -409,11 +433,15 @@ export function MissionReviewsPage({
   embedded = false,
   fixedCampaignId
 }: MissionReviewsPageProps) {
-  const canReviewRefunds = apiBasePath === "/api/admin";
-  const visibleTabs = useMemo(() => tabs.filter((tab) => canReviewRefunds || tab.key !== "refund-reviews"), [canReviewRefunds]);
+  const canReviewAdminOps = apiBasePath === "/api/admin";
+  const visibleTabs = useMemo(
+    () => tabs.filter((tab) => canReviewAdminOps || (tab.key !== "refund-reviews" && tab.key !== "deposit-confirmations")),
+    [canReviewAdminOps]
+  );
   const [activeTab, setActiveTab] = useState<MissionReviewsTabKey>(initialTab);
   const [tabCounts, setTabCounts] = useState<Record<MissionReviewsTabKey, number>>({
     applications: 0,
+    "deposit-confirmations": 0,
     "transcript-reviews": 0,
     "video-reviews": 0,
     "final-reviews": 0,
@@ -421,8 +449,9 @@ export function MissionReviewsPage({
   });
 
   useEffect(() => {
-    setActiveTab(canReviewRefunds || initialTab !== "refund-reviews" ? initialTab : "applications");
-  }, [canReviewRefunds, initialTab]);
+    const adminOnlyTab = initialTab === "refund-reviews" || initialTab === "deposit-confirmations";
+    setActiveTab(canReviewAdminOps || !adminOnlyTab ? initialTab : "applications");
+  }, [canReviewAdminOps, initialTab]);
 
   async function loadTabCounts() {
     const buildParams = (extra?: Record<string, string>) => {
@@ -438,21 +467,26 @@ export function MissionReviewsPage({
       fetch(`${apiBasePath}/mission-video-reviews?${buildParams()}`, { cache: "no-store" }),
       fetch(`${apiBasePath}/mission-final-reviews?${buildParams({ publishStatus: "PENDING" })}`, { cache: "no-store" })
     ];
-    if (canReviewRefunds) {
+    if (canReviewAdminOps) {
       requests.push(fetch(`${apiBasePath}/mission-final-reviews?${buildParams({ publishStatus: "APPROVED", reimbursementStatus: "PAYOUT_PENDING", productReceiveOption: "PRODUCT_REQUIRED" })}`, { cache: "no-store" }));
+      requests.push(fetch("/api/admin/dashboard/creator-missions", { cache: "no-store" }));
     }
     const responses = await Promise.all(requests);
 
-    const [applicationsBody, transcriptBody, videoBody, finalBody, refundBody] = await Promise.all(responses.map((response) => response.json())) as Array<ApiResult<{ pagination?: { total?: number } }>>;
+    const [applicationsBody, transcriptBody, videoBody, finalBody, refundBody, depositBody] = await Promise.all(responses.map((response) => response.json())) as Array<ApiResult<{ pagination?: { total?: number } } | AdminDepositMission[]>>;
 
-    const applicationsTotal = applicationsBody?.data?.pagination?.total ?? 0;
-    const transcriptTotal = transcriptBody?.data?.pagination?.total ?? 0;
-    const videoTotal = videoBody?.data?.pagination?.total ?? 0;
-    const finalTotal = finalBody?.data?.pagination?.total ?? 0;
-    const refundTotal = refundBody?.data?.pagination?.total ?? 0;
+    const applicationsTotal = paginationTotal(applicationsBody?.data);
+    const transcriptTotal = paginationTotal(transcriptBody?.data);
+    const videoTotal = paginationTotal(videoBody?.data);
+    const finalTotal = paginationTotal(finalBody?.data);
+    const refundTotal = paginationTotal(refundBody?.data);
+    const depositTotal = Array.isArray(depositBody?.data)
+      ? depositBody.data.filter((item) => isDepositConfirmationCandidate(item) && (!fixedCampaignId || item.campaign.id === fixedCampaignId)).length
+      : 0;
 
     setTabCounts({
       applications: applicationsTotal,
+      "deposit-confirmations": depositTotal,
       "transcript-reviews": transcriptTotal,
       "video-reviews": videoTotal,
       "final-reviews": finalTotal,
@@ -472,7 +506,7 @@ export function MissionReviewsPage({
     return () => {
       cancelled = true;
     };
-  }, [apiBasePath, canReviewRefunds, fixedCampaignId]);
+  }, [apiBasePath, canReviewAdminOps, fixedCampaignId]);
 
   return (
     <>
@@ -495,10 +529,128 @@ export function MissionReviewsPage({
 
       {activeTab === "transcript-reviews" ? <BrandMissionTranscriptReviewsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} onReviewUpdated={() => void loadTabCounts()} /> : null}
       {activeTab === "applications" ? <BrandMissionApplicationsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} onReviewUpdated={() => void loadTabCounts()} /> : null}
+      {activeTab === "deposit-confirmations" && canReviewAdminOps ? <AdminDepositConfirmationsTab fixedCampaignId={fixedCampaignId} hideFilters={embedded} onReviewUpdated={() => void loadTabCounts()} /> : null}
       {activeTab === "video-reviews" ? <BrandMissionVideoReviewsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} onReviewUpdated={() => void loadTabCounts()} /> : null}
       {activeTab === "final-reviews" ? <BrandMissionFinalReviewsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} onReviewUpdated={() => void loadTabCounts()} /> : null}
-      {activeTab === "refund-reviews" && canReviewRefunds ? <BrandMissionFinalReviewsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} mode="refund" onReviewUpdated={() => void loadTabCounts()} /> : null}
+      {activeTab === "refund-reviews" && canReviewAdminOps ? <BrandMissionFinalReviewsTab apiBasePath={apiBasePath} fixedCampaignId={fixedCampaignId} hideFilters={embedded} mode="refund" onReviewUpdated={() => void loadTabCounts()} /> : null}
     </>
+  );
+}
+
+function AdminDepositConfirmationsTab({ fixedCampaignId, hideFilters = false, onReviewUpdated }: { fixedCampaignId?: string; hideFilters?: boolean; onReviewUpdated?: () => void }) {
+  const [items, setItems] = useState<AdminDepositMission[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [query, setQuery] = useState("");
+  const [busyId, setBusyId] = useState("");
+
+  async function load() {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/dashboard/creator-missions", { cache: "no-store" });
+      const body = (await res.json()) as ApiResult<AdminDepositMission[]>;
+      if (!res.ok || !body.success || !body.data) throw new Error(body.error ?? "Không thể tải danh sách chờ cọc");
+      setItems(body.data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không thể tải danh sách chờ cọc");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const filteredItems = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return items.filter((item) => {
+      if (!isDepositConfirmationCandidate(item)) return false;
+      if (fixedCampaignId && item.campaign.id !== fixedCampaignId) return false;
+      if (!q) return true;
+      const haystack = [item.account.displayName, item.account.email, item.campaign.title, item.mission.title, item.mission.productName]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [fixedCampaignId, items, query]);
+
+  async function confirmDeposit(item: AdminDepositMission) {
+    setNotice("");
+    setError("");
+    if (!window.confirm(`Xác nhận cọc và nhận sản phẩm cho ${item.account.displayName}?`)) return;
+    setBusyId(item.id);
+    try {
+      const res = await fetch(`/api/admin/dashboard/creator-missions/${item.id}/decision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "CONFIRM_DEPOSIT_AND_PRODUCT_RECEIVED" })
+      });
+      const body = (await res.json()) as ApiResult<unknown>;
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Xác nhận cọc thất bại");
+      setNotice("Đã xác nhận cọc và mở khóa bước thực hiện cho Creator.");
+      await load();
+      onReviewUpdated?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Xác nhận cọc thất bại");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  return (
+    <section className="mt-4 grid gap-4">
+      {!hideFilters ? (
+        <section className="dc-card p-4">
+          <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+            <input className="dc-input" placeholder="Tìm creator, email, campaign, sản phẩm" value={query} onChange={(event) => setQuery(event.target.value)} />
+            <button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>
+          </div>
+          <p className="mt-2 text-sm text-zinc-500">Tổng {filteredItems.length} nhiệm vụ đang chờ Admin xác nhận cọc.</p>
+        </section>
+      ) : null}
+
+      {notice ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</p> : null}
+      {error ? <ErrorState title="Có lỗi" description={error} onRetry={() => void load()} /> : null}
+      {loading ? <LoadingSkeleton rows={5} /> : null}
+
+      {!loading && !error ? (
+        <section className="grid gap-3">
+          {filteredItems.length === 0 ? (
+            <EmptyState title="Không có nhiệm vụ chờ xác nhận cọc" description="Khi Creator bấm đặt cọc, nhiệm vụ sẽ xuất hiện tại đây để Admin đối soát và xác nhận." />
+          ) : (
+            filteredItems.map((item) => (
+              <article key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
+                <div className="grid gap-3 xl:grid-cols-[2fr_1.2fr_1fr_auto] xl:items-start">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-zinc-900">{item.mission.title}</p>
+                    <p className="line-clamp-1 text-sm text-zinc-500">Chiến dịch: {item.campaign.title}</p>
+                    <p className="line-clamp-1 text-sm text-zinc-500">Creator: {item.account.displayName} • {item.account.email}</p>
+                  </div>
+                  <div className="text-sm text-zinc-600">
+                    <p>Sản phẩm: <span className="font-semibold text-zinc-900">{item.mission.productName ?? "-"}</span></p>
+                    <p>Link: <UrlValue value={item.mission.productLink ?? null} /></p>
+                  </div>
+                  <div className="text-sm text-zinc-600">
+                    <p>Cọc: <span className="font-semibold text-zinc-900">{fmtVnd(item.campaign.creatorDepositAmountVnd)}</span></p>
+                    <p>Trạng thái: {mapStatusVi(item.depositStatus)}</p>
+                    <p>Deadline: {deadlineLabel(item.mission.deadlineAt ?? null)}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 xl:justify-end">
+                    <button className="dc-btn-primary w-full whitespace-normal sm:w-auto" disabled={busyId === item.id} onClick={() => void confirmDeposit(item)}>
+                      Xác nhận cọc + nhận sản phẩm
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))
+          )}
+        </section>
+      ) : null}
+    </section>
   );
 }
 

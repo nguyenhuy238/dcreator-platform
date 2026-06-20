@@ -208,6 +208,7 @@ export async function getCampaignDetailForAdmin(campaignId: string) {
       setupSource: true,
       fulfillmentMode: true,
       creatorDepositRequired: true,
+      creatorDepositAmountVnd: true,
       benefits: true,
       requirementsSummary: true,
       creatorBriefDescription: true,
@@ -487,6 +488,7 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
         setupSource: input.setupSource,
         fulfillmentMode: input.fulfillmentMode,
         creatorDepositRequired: input.fulfillmentMode === "BRAND_SHIP",
+        creatorDepositAmountVnd: input.fulfillmentMode === "BRAND_SHIP" ? input.creatorDepositAmountVnd : 0,
         objective: input.benefits || null,
         benefits: input.benefits || null,
         requirementsSummary: input.requirementsSummary?.trim() || null,
@@ -555,7 +557,8 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
       ugcVideoQuota,
       requiredHashtags,
       fulfillmentMode: input.fulfillmentMode,
-      creatorDepositRequired: input.fulfillmentMode === "BRAND_SHIP"
+      creatorDepositRequired: input.fulfillmentMode === "BRAND_SHIP",
+      creatorDepositAmountVnd: input.fulfillmentMode === "BRAND_SHIP" ? input.creatorDepositAmountVnd : 0
     }
   });
 
@@ -662,6 +665,10 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         fulfillmentMode: input.fulfillmentMode,
         creatorDepositRequired:
           input.fulfillmentMode === undefined ? undefined : input.fulfillmentMode === "BRAND_SHIP",
+        creatorDepositAmountVnd:
+          input.fulfillmentMode === "CREATOR_ORDER"
+            ? 0
+            : input.creatorDepositAmountVnd,
         benefits: nextBenefits,
         requirementsSummary: nextRequirementsSummary,
         creatorBriefTitle: nextRequirements === undefined ? undefined : nextRequirements ? "YÊU CẦU" : null,
@@ -707,6 +714,7 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         setupSource: campaign.setupSource,
         fulfillmentMode: campaign.fulfillmentMode,
         creatorDepositRequired: campaign.creatorDepositRequired,
+        creatorDepositAmountVnd: campaign.creatorDepositAmountVnd,
         participationRoadmap: campaign.participationRoadmap,
         requiredHashtags: beforeRequiredHashtags,
         benefits: campaign.benefits ?? null,
@@ -734,6 +742,7 @@ export async function updateCampaignByAdmin(actorId: string, campaignId: string,
         setupSource: updated.setupSource,
         fulfillmentMode: updated.fulfillmentMode,
         creatorDepositRequired: updated.creatorDepositRequired,
+        creatorDepositAmountVnd: updated.creatorDepositAmountVnd,
         participationRoadmap: updated.participationRoadmap,
         requiredHashtags: afterRequiredHashtags,
         benefits: updated.benefits ?? null,

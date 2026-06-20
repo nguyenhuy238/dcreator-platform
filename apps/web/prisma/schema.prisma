@@ -900,6 +900,7 @@ model Campaign {
   setupSource              CampaignSetupSource         @default(BRAND_REQUESTED)
   fulfillmentMode          CampaignFulfillmentMode      @default(BRAND_SHIP)
   creatorDepositRequired   Boolean                      @default(true)
+  creatorDepositAmountVnd  Int                          @default(0)
   benefits                 String?
   participationRoadmap     String[]                    @default([])
   requiredHashtags         String[]                    @default([])
