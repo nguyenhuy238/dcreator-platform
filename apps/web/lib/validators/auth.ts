@@ -11,6 +11,10 @@ export const loginSchema = z.object({
   password: z.string().min(8).max(64)
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.email().trim().toLowerCase()
+});
+
 export const creatorRoleRequestSchema = z.object({
   note: z.string().trim().max(500).optional()
 });

@@ -1,6 +1,6 @@
 import { AppError } from "@/lib/errors";
 
-type Bucket = "login" | "contribution" | "proof_submit" | "payment_create";
+type Bucket = "login" | "forgot_password" | "reset_password" | "contribution" | "proof_submit" | "payment_create";
 
 type Rule = {
   windowMs: number;
@@ -14,6 +14,8 @@ type Entry = {
 };
 
 const rules: Record<Bucket, Rule> = {
+  forgot_password: { windowMs: 10 * 60 * 1000, max: 5, message: "Qua nhieu yeu cau khoi phuc mat khau. Vui long thu lai sau." },
+  reset_password: { windowMs: 10 * 60 * 1000, max: 8, message: "Qua nhieu lan dat lai mat khau. Vui long thu lai sau." },
   login: { windowMs: 10 * 60 * 1000, max: 5, message: "Đăng nhập quá nhiều lần. Vui lòng thử lại sau." },
   contribution: { windowMs: 10 * 60 * 1000, max: 20, message: "Quá nhiều yêu cầu đóng góp. Vui lòng thử lại sau." },
   proof_submit: { windowMs: 10 * 60 * 1000, max: 15, message: "Quá nhiều lần gửi bằng chứng. Vui lòng thử lại sau." },
@@ -40,4 +42,3 @@ export function assertRateLimit(bucket: Bucket, key: string) {
   current.count += 1;
   store.set(storeKey, current);
 }
-

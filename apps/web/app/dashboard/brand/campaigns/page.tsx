@@ -107,6 +107,20 @@ function progress(current: number, target: number) {
   return Math.min(100, Math.round((current / target) * 100));
 }
 
+async function fetchApi<T>(path: string, label: string) {
+  try {
+    const response = await fetch(path, { cache: "no-store" });
+    const payload = (await response.json()) as ApiResponse<T>;
+    if (!response.ok || !payload.success || payload.data === undefined) {
+      throw new Error(payload.error ?? `Khong the tai ${label}`);
+    }
+    return payload.data;
+  } catch (fetchError) {
+    const message = fetchError instanceof Error ? fetchError.message : "Failed to fetch";
+    throw new Error(`${label}: ${message}`);
+  }
+}
+
 const REQUEST_STATUS_OPTIONS = [
   { value: "", label: "Tất cả trạng thái" },
   { value: "PENDING_REVIEW", label: "Chờ duyệt" },
@@ -193,29 +207,16 @@ export default function BrandCampaignsPage() {
     setLoading(true);
     setError("");
     try {
-      const [campaignResponse, requestResponse, templateResponse] = await Promise.all([
-        fetch(campaignApiPath, { cache: "no-store" }),
-        fetch(campaignRequestApiPath, { cache: "no-store" }),
-        fetch(campaignTemplateApiPath, { cache: "no-store" })
+      const [campaignData, requestData, templateData] = await Promise.all([
+        fetchApi<CampaignItem[]>(campaignApiPath, "Campaign / Job"),
+        fetchApi<CampaignRequestItem[]>(campaignRequestApiPath, "Yeu cau tao campaign"),
+        fetchApi<{ campaignContentTemplateUrl: string }>(campaignTemplateApiPath, "Template noi dung campaign")
       ]);
-      const campaignPayload = (await campaignResponse.json()) as ApiResponse<CampaignItem[]>;
-      const requestPayload = (await requestResponse.json()) as ApiResponse<CampaignRequestItem[]>;
-      const templatePayload = (await templateResponse.json()) as ApiResponse<{ campaignContentTemplateUrl: string }>;
-      if (templateResponse.ok && templatePayload.success && templatePayload.data) {
-        setTemplateUrl(templatePayload.data.campaignContentTemplateUrl ?? "");
-      } else {
-        setTemplateUrl("");
-      }
-      if (!campaignResponse.ok || !campaignPayload.success || !campaignPayload.data) {
-        throw new Error(campaignPayload.error ?? "Không thể tải campaign");
-      }
-      if (!requestResponse.ok || !requestPayload.success || !requestPayload.data) {
-        throw new Error(requestPayload.error ?? "Không thể tải yêu cầu campaign");
-      }
-      setItems(campaignPayload.data);
-      setRequests(requestPayload.data);
+      setTemplateUrl(templateData.campaignContentTemplateUrl ?? "");
+      setItems(campaignData);
+      setRequests(requestData);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Không thể tải campaign");
+      setError(loadError instanceof Error ? loadError.message : "Khong the tai campaign");
     } finally {
       setLoading(false);
     }

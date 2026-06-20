@@ -450,6 +450,7 @@ model Account {
   resolvedRiskFlags             RiskFlag[]             @relation("RiskFlagResolver")
   internalNotes                 InternalNote[]         @relation("InternalNoteActor")
   sessions                      AuthSession[]
+  passwordResetTokens           PasswordResetToken[]
   roleRequests                  RoleRequest[]          @relation("RoleRequestApplicant")
   reviewedRoleRequests          RoleRequest[]          @relation("RoleRequestReviewer")
   walletTransactions            WalletTransaction[]
@@ -824,6 +825,20 @@ model AuthSession {
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@index([accountId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  accountId String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, createdAt])
   @@index([expiresAt])
 }
 

@@ -63,8 +63,8 @@ function LoginPageContent() {
     setError("");
     setFieldErrors({});
     const formData = new FormData(event.currentTarget);
-    const email = String(formData.get("email") ?? "");
-    const password = String(formData.get("password") ?? "");
+    const email = String(formData.get("email") ?? "").trim();
+    const password = String(formData.get("password") ?? "").trim();
     const nextFieldErrors: { email?: string; password?: string } = {};
     if (!email.includes("@")) nextFieldErrors.email = "Email không hợp lệ.";
     if (password.length < 8) nextFieldErrors.password = "Mật khẩu cần tối thiểu 8 ký tự.";

@@ -3,6 +3,7 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
+import { AccountPasswordResetCard } from "@/app/dashboard/_components/AccountPasswordResetCard";
 import { useCurrentBrand } from "@/app/dashboard/brand/_hooks/use-brand-context";
 import { resolveImageUrl } from "@/lib/images/resolve-image-url";
 
@@ -215,7 +216,8 @@ export default function BrandProfilePage() {
               </button>
             </form>
 
-            <aside className="dc-card h-fit p-5">
+            <aside className="grid h-fit gap-4">
+              <div className="dc-card p-5">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">Xem trước</p>
               <div className="mt-4 flex items-center gap-3">
                 {previewLogoSrc && !logoLoadError ? (
@@ -239,6 +241,8 @@ export default function BrandProfilePage() {
                 </div>
               </div>
               <p className="mt-4 text-sm leading-6 text-zinc-600">{form.businessInfo || "Chưa có thông tin Brand."}</p>
+              </div>
+              <AccountPasswordResetCard />
             </aside>
           </section>
         ) : null}
@@ -246,6 +250,4 @@ export default function BrandProfilePage() {
     </>
   );
 }
-
-
 
