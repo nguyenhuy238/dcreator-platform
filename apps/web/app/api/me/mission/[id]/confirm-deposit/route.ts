@@ -10,7 +10,18 @@ export async function POST(request: NextRequest, { params }: Props) {
   try {
     const account = await requireApprovedCreator(request);
     const { id } = await params;
-    return ok(await confirmDepositPaid(id, account.id));
+    const payload = (await request.json().catch(() => ({}))) as {
+      shipping?: {
+        recipientName?: string;
+        phone?: string;
+        province?: string;
+        district?: string;
+        ward?: string;
+        addressLine?: string;
+        note?: string;
+      };
+    };
+    return ok(await confirmDepositPaid(id, account.id, payload.shipping));
   } catch (error) {
     return toErrorResponse(error);
   }

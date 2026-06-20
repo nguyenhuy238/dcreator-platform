@@ -14,7 +14,8 @@ export type UploadFolder =
   | "creator-avatar"
   | "creator-mission-proof"
   | "creator-transcript"
-  | "n-point-bill";
+  | "n-point-bill"
+  | "admin-settings";
 
 type UploadInput = {
   file: File;

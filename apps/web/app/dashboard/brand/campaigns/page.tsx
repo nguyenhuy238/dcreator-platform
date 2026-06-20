@@ -38,6 +38,32 @@ type CampaignItem = {
   videoApproved?: number;
   videoProgressPercent?: number;
   reviewPendingCount?: number;
+  fulfillmentMode?: "BRAND_SHIP" | "CREATOR_ORDER";
+};
+
+type ShippingCreatorItem = {
+  id: string;
+  creatorName: string;
+  creatorEmail: string | null;
+  depositStatus: string;
+  creatorDepositAmountVnd: number;
+  depositHeldAt: string | null;
+  shippingRecipientName: string | null;
+  shippingPhone: string | null;
+  shippingAddressFull: string;
+  shippingNote: string | null;
+  shippingInfoSubmittedAt: string | null;
+  sampleShippingStatus: string;
+  sampleShippedAt: string | null;
+  sampleReceivedAt: string | null;
+  campaignTitle: string;
+  productName: string | null;
+  productLink: string | null;
+};
+
+type ShippingCreatorsResponse = {
+  campaign: { id: string; title: string; fulfillmentMode: "BRAND_SHIP" | "CREATOR_ORDER" };
+  items: ShippingCreatorItem[];
 };
 
 type CampaignRequestItem = {
@@ -89,6 +115,145 @@ const defaultRequestForm: RequestForm = {
 
 const CONTENT_FILE_MARKER = campaignRequestMarkers.content;
 
+function BrandCampaignShippingModal({
+  campaign,
+  currentBrandId,
+  onClose
+}: {
+  campaign: Pick<CampaignItem, "id" | "title" | "slug">;
+  currentBrandId: string | null | undefined;
+  onClose: () => void;
+}) {
+  const [items, setItems] = useState<ShippingCreatorItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busyId, setBusyId] = useState("");
+
+  const apiUrl = useMemo(() => {
+    const base = `/api/brand/dashboard/campaigns/${campaign.id}/shipping`;
+    return currentBrandId ? `${base}?brandId=${encodeURIComponent(currentBrandId)}` : base;
+  }, [campaign.id, currentBrandId]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(apiUrl, { cache: "no-store" });
+      const payload = (await response.json()) as ApiResponse<ShippingCreatorsResponse>;
+      if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error ?? "Không thể tải danh sách gửi hàng");
+      setItems(payload.data.items);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Không thể tải danh sách gửi hàng");
+    } finally {
+      setLoading(false);
+    }
+  }, [apiUrl]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function copyShipping(item: ShippingCreatorItem) {
+    try {
+      await navigator.clipboard.writeText(shippingCopyText(item));
+      setNotice("Đã copy thông tin nhận hàng");
+      setTimeout(() => setNotice(""), 2000);
+    } catch {
+      setError("Không thể copy tự động. Vui lòng copy thủ công.");
+    }
+  }
+
+  async function markShipped(item: ShippingCreatorItem) {
+    setBusyId(item.id);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ creatorMissionId: item.id })
+      });
+      const payload = (await response.json()) as ApiResponse<ShippingCreatorsResponse>;
+      if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error ?? "Cập nhật trạng thái gửi hàng thất bại");
+      setItems(payload.data.items);
+      setNotice("Đã cập nhật trạng thái gửi hàng");
+      setTimeout(() => setNotice(""), 2000);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Cập nhật trạng thái gửi hàng thất bại");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[90] bg-zinc-900/50 p-3 md:p-6" onClick={onClose}>
+      <div className="mx-auto max-h-[95vh] w-full max-w-6xl overflow-y-auto rounded-2xl border border-zinc-200 bg-zinc-50 p-4 md:p-6" onClick={(event) => event.stopPropagation()}>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-xl font-semibold text-zinc-900">Creator cần gửi hàng</h3>
+            <p className="text-sm text-zinc-600">{campaign.title} • /{campaign.slug}</p>
+          </div>
+          <button type="button" className="dc-btn-secondary" onClick={onClose}>Đóng</button>
+        </div>
+
+        {notice ? <p className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</p> : null}
+        {error ? <ErrorState title="Không thể tải danh sách gửi hàng" description={error} onRetry={() => void load()} /> : null}
+        {loading ? <LoadingSkeleton rows={4} /> : null}
+
+        {!loading && !error ? (
+          <section className="grid gap-3">
+            {items.length === 0 ? (
+              <EmptyState title="Chưa có Creator nào đã đặt cọc và cần gửi hàng." description="Danh sách sẽ xuất hiện khi Creator được duyệt, đã đặt cọc và đã nhập thông tin nhận hàng." />
+            ) : (
+              items.map((item) => (
+                <article key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
+                  <div className="grid gap-4 xl:grid-cols-[1.2fr_1.4fr_1fr_auto] xl:items-start">
+                    <div className="min-w-0 text-sm">
+                      <p className="font-semibold text-zinc-900">{item.creatorName}</p>
+                      <p className="break-all text-zinc-500">{item.creatorEmail ?? "-"}</p>
+                      <p className="mt-2 text-zinc-600">Cọc: <strong className="text-zinc-900">{formatVnd(item.creatorDepositAmountVnd)}</strong></p>
+                      <p className="text-zinc-600">Trạng thái cọc: <strong className="text-zinc-900">{shippingStatusLabel(item.depositStatus)}</strong></p>
+                      <p className="text-zinc-600">Ngày cọc: {formatDateTime(item.depositHeldAt)}</p>
+                    </div>
+                    <div className="min-w-0 text-sm text-zinc-700">
+                      <p className="font-semibold text-zinc-900">Thông tin nhận hàng</p>
+                      <p>Họ tên: {item.shippingRecipientName ?? "-"}</p>
+                      <p>SĐT: {item.shippingPhone ?? "-"}</p>
+                      <p>Địa chỉ: {item.shippingAddressFull || "-"}</p>
+                      {item.shippingNote ? <p>Ghi chú: {item.shippingNote}</p> : null}
+                    </div>
+                    <div className="min-w-0 text-sm text-zinc-700">
+                      <p>Sản phẩm: <strong className="text-zinc-900">{item.productName ?? "-"}</strong></p>
+                      <p>Link: {item.productLink ? <a className="font-semibold text-zinc-900 underline break-all" href={item.productLink} target="_blank" rel="noreferrer">{item.productLink}</a> : "-"}</p>
+                      <p className="mt-2">Gửi hàng: <strong className="text-zinc-900">{shippingStatusLabel(item.sampleShippingStatus)}</strong></p>
+                      {item.sampleShippedAt ? <p>Đã gửi lúc: {formatDateTime(item.sampleShippedAt)}</p> : null}
+                    </div>
+                    <div className="flex flex-wrap gap-2 xl:justify-end">
+                      <button type="button" className="dc-btn-secondary w-full whitespace-normal sm:w-auto" onClick={() => void copyShipping(item)}>
+                        Copy thông tin nhận hàng
+                      </button>
+                      {item.sampleShippingStatus === "READY_TO_SHIP" ? (
+                        <button type="button" className="dc-btn-primary w-full whitespace-normal sm:w-auto" disabled={busyId === item.id} onClick={() => void markShipped(item)}>
+                          Đã gửi hàng
+                        </button>
+                      ) : (
+                        <span className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-semibold text-zinc-600">
+                          {shippingStatusLabel(item.sampleShippingStatus)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              ))
+            )}
+          </section>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function getContentFileUrlFromBrief(brief: string) {
   return extractCampaignRequestMarkerValue(brief, CONTENT_FILE_MARKER);
 }
@@ -122,6 +287,38 @@ function getRequestRejectionReason(request: CampaignRequestItem) {
 function formatDate(value: string | null) {
   if (!value) return "Chưa đặt";
   return new Date(value).toLocaleDateString("vi-VN");
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) return "-";
+  return new Date(value).toLocaleString("vi-VN");
+}
+
+function formatVnd(value: number | null | undefined) {
+  return `${Math.max(0, value ?? 0).toLocaleString("vi-VN")}đ`;
+}
+
+function shippingStatusLabel(value: string | null | undefined) {
+  const map: Record<string, string> = {
+    NOT_REQUIRED: "Không yêu cầu",
+    WAITING_DEPOSIT: "Chờ đặt cọc",
+    READY_TO_SHIP: "Sẵn sàng gửi",
+    SHIPPED: "Đã gửi hàng",
+    RECEIVED: "Đã nhận hàng",
+    HELD: "Đã cọc"
+  };
+  return value ? map[value] ?? value : "-";
+}
+
+function shippingCopyText(item: ShippingCreatorItem) {
+  return [
+    `Người nhận: ${item.shippingRecipientName ?? ""}`,
+    `SĐT: ${item.shippingPhone ?? ""}`,
+    `Địa chỉ: ${item.shippingAddressFull}`,
+    `Ghi chú: ${item.shippingNote ?? ""}`,
+    `Campaign: ${item.campaignTitle}`,
+    `Sản phẩm: ${item.productName ?? ""}`
+  ].join("\n");
 }
 
 function progress(current: number, target: number) {
@@ -164,6 +361,7 @@ export default function BrandCampaignsPage() {
   const [requestListTab, setRequestListTab] = useState<"pending" | "approved">("pending");
   const [reviewCampaign, setReviewCampaign] = useState<Pick<CampaignItem, "id" | "title" | "slug"> | null>(null);
   const [historyCampaign, setHistoryCampaign] = useState<Pick<CampaignItem, "id" | "title" | "slug"> | null>(null);
+  const [shippingCampaign, setShippingCampaign] = useState<Pick<CampaignItem, "id" | "title" | "slug"> | null>(null);
   const [rejectedReasonTarget, setRejectedReasonTarget] = useState<CampaignRequestItem | null>(null);
   const [reviewInitialTab, setReviewInitialTab] = useState<MissionReviewsTabKey>("applications");
   const [items, setItems] = useState<CampaignItem[]>([]);
@@ -712,6 +910,18 @@ export default function BrandCampaignsPage() {
                               Xem lịch sử
                             </button>
                             <button type="button" className="dc-btn-secondary w-full min-w-0 max-w-full whitespace-normal break-words px-3 py-2 text-xs leading-tight sm:w-auto" disabled onClick={(event) => event.stopPropagation()}>KPI / Analytics</button>
+                            {campaign.fulfillmentMode === "BRAND_SHIP" ? (
+                              <button
+                                type="button"
+                                className="dc-btn-secondary w-full min-w-0 max-w-full whitespace-normal break-words px-3 py-2 text-xs leading-tight sm:w-auto"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setShippingCampaign({ id: campaign.id, title: campaign.title, slug: campaign.slug });
+                                }}
+                              >
+                                Creator cần gửi hàng
+                              </button>
+                            ) : null}
                             <button
                               type="button"
                               className={`${campaign.reviewPendingCount ? "dc-btn-primary" : "dc-btn-secondary"} w-full min-w-0 max-w-full whitespace-normal break-words px-3 py-2 text-xs leading-tight sm:w-auto`}
@@ -1034,6 +1244,14 @@ export default function BrandCampaignsPage() {
             <BrandMissionHistoryPanel embedded fixedCampaignId={historyCampaign.id} />
           </div>
         </div>
+      ) : null}
+
+      {shippingCampaign ? (
+        <BrandCampaignShippingModal
+          campaign={shippingCampaign}
+          currentBrandId={currentBrandId}
+          onClose={() => setShippingCampaign(null)}
+        />
       ) : null}
     </>
   );

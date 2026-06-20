@@ -18,6 +18,20 @@ type MissionItem = {
   productReceiveOption: string;
   productStatus: string;
   depositStatus: string;
+  creatorDepositAmountVnd?: number | null;
+  depositHeldAt?: string | null;
+  depositRefundedAt?: string | null;
+  shippingRecipientName?: string | null;
+  shippingPhone?: string | null;
+  shippingProvince?: string | null;
+  shippingDistrict?: string | null;
+  shippingWard?: string | null;
+  shippingAddressLine?: string | null;
+  shippingNote?: string | null;
+  shippingInfoSubmittedAt?: string | null;
+  sampleShippingStatus?: string | null;
+  sampleShippedAt?: string | null;
+  sampleReceivedAt?: string | null;
   reimbursementStatus?: string | null;
   purchaseProofSubmittedAt?: string | null;
   purchaseProofReviewedAt?: string | null;
@@ -77,6 +91,16 @@ type MissionItem = {
 };
 
 type FormMap = Record<string, string>;
+type ShippingForm = {
+  recipientName: string;
+  phone: string;
+  province: string;
+  district: string;
+  ward: string;
+  addressLine: string;
+  note: string;
+};
+type ShippingFormMap = Record<string, ShippingForm>;
 type PreVideoChoice = "VIDEO" | "TRANSCRIPT";
 type PreVideoChoiceMap = Record<string, PreVideoChoice>;
 type TranscriptMode = "TEXT" | "FILE" | "URL";
@@ -86,6 +110,16 @@ type MissionSort = "APPROVED_NEWEST" | "APPROVED_OLDEST" | "EXPIRING_SOON";
 type MissionErrorField = "form" | "bill" | "rating" | "transcript" | "transcriptFile" | "transcriptUrl" | "videoUrl" | "videoNote" | "publicUrl" | "adCode" | "screenshot" | "finalNote";
 type MissionFormErrors = Partial<Record<MissionErrorField, string>>;
 type DetailTab = "ACTIONS" | "HISTORY";
+
+const emptyShippingForm: ShippingForm = {
+  recipientName: "",
+  phone: "",
+  province: "",
+  district: "",
+  ward: "",
+  addressLine: "",
+  note: ""
+};
 
 type CreatorMissionsPanelProps = {
   overview: CreatorOverview | null;
@@ -148,6 +182,16 @@ function requiresCreatorDeposit(item: MissionItem) {
 
 function hasHeldCreatorDeposit(item: MissionItem) {
   return !requiresCreatorDeposit(item) || item.depositStatus === "HELD";
+}
+
+function creatorDepositStatusLabel(status: string | null | undefined) {
+  if (status === "REQUIRED") return "Cần đặt cọc";
+  if (status === "WAITING_TRANSFER") return "Chờ Admin xác nhận";
+  if (status === "HELD") return "Đã đặt cọc";
+  if (status === "REFUNDED") return "Đã hoàn cọc";
+  if (status === "FORFEITED") return "Đã giữ cọc";
+  if (status === "NOT_REQUIRED") return "Không yêu cầu";
+  return status ?? "-";
 }
 
 function asLink(value: string | null | undefined) {
@@ -424,6 +468,7 @@ export function CreatorMissionsPanel({
   const [adCodeMap, setAdCodeMap] = useState<FormMap>({});
   const [screenshotMap, setScreenshotMap] = useState<FormMap>({});
   const [finalNoteMap, setFinalNoteMap] = useState<FormMap>({});
+  const [shippingFormMap, setShippingFormMap] = useState<ShippingFormMap>({});
 
   function setMissionFormErrors(missionId: string, nextErrors: MissionFormErrors) {
     setMissionErrors((prev) => ({ ...prev, [missionId]: nextErrors }));
@@ -454,6 +499,25 @@ export function CreatorMissionsPanel({
     setToast(message);
     setTimeout(() => setToast(""), 2600);
     window.dispatchEvent(new CustomEvent("dcreator:notifications-refresh", { detail: { suppressToast: true } }));
+  }
+
+  function shippingFormFor(item: MissionItem) {
+    return shippingFormMap[item.id] ?? {
+      recipientName: item.shippingRecipientName ?? "",
+      phone: item.shippingPhone ?? "",
+      province: item.shippingProvince ?? "",
+      district: item.shippingDistrict ?? "",
+      ward: item.shippingWard ?? "",
+      addressLine: item.shippingAddressLine ?? "",
+      note: item.shippingNote ?? ""
+    };
+  }
+
+  function updateShippingForm(missionId: string, field: keyof ShippingForm, value: string) {
+    setShippingFormMap((prev) => ({
+      ...prev,
+      [missionId]: { ...(prev[missionId] ?? emptyShippingForm), [field]: value }
+    }));
   }
 
   async function load() {
@@ -492,12 +556,30 @@ export function CreatorMissionsPanel({
   }
 
   async function submitCreatorDeposit(item: MissionItem) {
+    const shipping = shippingFormFor(item);
+    const shippingErrors: MissionFormErrors = {};
+    if (!shipping.recipientName.trim()) shippingErrors.form = "Bạn chưa nhập họ tên người nhận.";
+    else if (!shipping.phone.trim()) shippingErrors.form = "Bạn chưa nhập số điện thoại nhận hàng.";
+    else if (!shipping.province.trim()) shippingErrors.form = "Bạn chưa nhập Tỉnh/Thành phố.";
+    else if (!shipping.addressLine.trim()) shippingErrors.form = "Bạn chưa nhập địa chỉ chi tiết.";
+    if (shippingErrors.form) {
+      setMissionFormErrors(item.id, shippingErrors);
+      return;
+    }
     clearMissionFormErrors(item.id);
     setBusyId(item.id);
     setNotice("");
     try {
-      await fetchJson(`/api/me/mission/${item.id}/confirm-deposit`, { method: "POST" });
-      pushSuccess("Đã ghi nhận yêu cầu đặt cọc. Vui lòng chờ Admin xác nhận sau khi đối soát.");
+      const updated = await fetchJson<MissionItem>(`/api/me/mission/${item.id}/confirm-deposit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shipping })
+      });
+      pushSuccess(
+        updated.depositStatus === "HELD"
+          ? "Đã đặt cọc bằng N-Points. Brand/Admin có thể gửi hàng theo thông tin nhận hàng của bạn."
+          : "Số dư N-Points không đủ. Vui lòng nạp thêm qua mã QR và chờ Admin xác nhận."
+      );
       await load();
     } catch (e) {
       setMissionFormErrors(item.id, { form: toErrorMessage(e) });
@@ -795,7 +877,11 @@ export function CreatorMissionsPanel({
   );
 
   function buildMissionTimeline(item: MissionItem): TimelineStep[] {
-    const purchaseDone = item.productReceiveOption === "NO_PRODUCT_REQUIRED" || item.productStatus === "RECEIVED";
+    const isBrandShip = campaignFulfillmentMode(item) === "BRAND_SHIP";
+    const purchaseDone =
+      item.productReceiveOption === "NO_PRODUCT_REQUIRED" ||
+      item.productStatus === "RECEIVED" ||
+      (isBrandShip && hasHeldCreatorDeposit(item));
     const transcriptText = Boolean(toPlainTranscript(item.submission?.transcriptTextNote));
     const transcriptFile = Boolean(item.submission?.transcriptResourceUrl?.trim());
     const hasTranscriptSubmitted =
@@ -906,7 +992,7 @@ export function CreatorMissionsPanel({
     if (item.productReceiveOption === "PRODUCT_REQUIRED") {
       steps.push({
         key: "refund",
-        label: "Chờ hoàn tiền",
+        label: campaignFulfillmentMode(item) === "BRAND_SHIP" ? "Chờ hoàn tiền cọc / Hoàn tiền cọc" : "Chờ hoàn tiền",
         icon: "refund",
         done: completed,
         current: refundPending,
@@ -931,9 +1017,9 @@ export function CreatorMissionsPanel({
     const isCreatorOrder = campaignFulfillmentMode(item) === "CREATOR_ORDER";
     const needsCreatorDeposit = requiresCreatorDeposit(item);
     const depositHeld = hasHeldCreatorDeposit(item);
-    const depositAmount = item.campaign.creatorDepositAmountVnd ?? 0;
+    const depositAmount = item.creatorDepositAmountVnd && item.creatorDepositAmountVnd > 0 ? item.creatorDepositAmountVnd : item.campaign.creatorDepositAmountVnd ?? 0;
     const depositConfigMissing = needsCreatorDeposit && depositAmount <= 0;
-    const depositPending = needsCreatorDeposit && item.depositStatus === "PENDING";
+    const depositPending = needsCreatorDeposit && (item.depositStatus === "PENDING" || item.depositStatus === "WAITING_TRANSFER");
     const depositBlocked = needsCreatorDeposit && !depositHeld;
     const canSubmitPurchase = !isApplicationPending && isCreatorOrder && item.productReceiveOption === "PRODUCT_REQUIRED" && item.productStatus !== "RECEIVED";
     const canSubmitVideoCandidate =
@@ -943,7 +1029,7 @@ export function CreatorMissionsPanel({
       item.videoReviewStatus !== "APPROVED" &&
       item.publishStatus !== "PENDING" &&
       !depositBlocked &&
-      (item.productReceiveOption === "NO_PRODUCT_REQUIRED" || item.productStatus === "RECEIVED");
+      (item.productReceiveOption === "NO_PRODUCT_REQUIRED" || item.productStatus === "RECEIVED" || (needsCreatorDeposit && depositHeld));
     const isTranscriptFlow = item.status === "DRAFT_PENDING";
     const hasTranscript = Boolean(item.submission?.transcriptTextNote?.trim() || item.submission?.transcriptResourceUrl?.trim());
     const hasVideoSubmission = item.videoReviewStatus !== "NOT_SUBMITTED" || Boolean(item.submission?.videoUrl?.trim());
@@ -965,6 +1051,10 @@ export function CreatorMissionsPanel({
     const showProductSection = item.productReceiveOption === "PRODUCT_REQUIRED";
     const timelineSteps = buildMissionTimeline(item);
     const formError = missionErrors[item.id];
+    const shippingForm = shippingFormFor(item);
+    const bankConfig = overview?.creatorDepositBankConfig;
+    const transferPrefix = bankConfig?.transferPrefix?.trim() || "DCR";
+    const transferNote = `${transferPrefix} ${item.id.slice(-6).toUpperCase()}`;
     const transcriptMode = transcriptModeMap[item.id] ?? transcriptModeFromSubmission(item.submission);
     const transcriptFileUrl = transcriptUrlMap[item.id] ?? item.submission?.transcriptResourceUrl ?? "";
     const hasAnyHistory =
@@ -1021,7 +1111,9 @@ export function CreatorMissionsPanel({
         <div className="mt-3 space-y-3">
           {isRefundPending ? (
             <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-              Link public đã được duyệt. Bạn không cần thao tác thêm, vui lòng chờ Admin kiểm tra bill mua hàng và ảnh đánh giá 5 sao để hoàn N-Points.
+              {isCreatorOrder
+                ? "Link public đã được duyệt. Bạn không cần thao tác thêm, vui lòng chờ Admin kiểm tra bill mua hàng và ảnh đánh giá 5 sao để hoàn N-Points."
+                : "Link public đã được duyệt. Bạn không cần thao tác thêm, vui lòng chờ hệ thống hoàn tiền cọc."}
             </p>
           ) : null}
           {isApplicationPending && !isOverdue && !isRefundPending ? (
@@ -1044,23 +1136,88 @@ export function CreatorMissionsPanel({
 
           {depositBlocked && !isApplicationPending && !isOverdue && !isRefundPending ? (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              <p className="font-semibold">Campaign này yêu cầu đặt cọc trước khi thực hiện vì Brand sẽ gửi hàng mẫu trực tiếp cho Creator.</p>
-              <p className="mt-1">Số tiền cọc: <strong>{fmtVnd(depositAmount)}</strong></p>
+              <p className="font-semibold text-zinc-900">Đặt cọc để nhận hàng review</p>
+              <p className="mt-1">
+                Campaign này yêu cầu Creator đặt cọc trước khi Brand gửi hàng mẫu. Khoản cọc sẽ được hoàn lại sau khi bạn hoàn thành đúng yêu cầu campaign.
+              </p>
+              <div className="mt-3 grid gap-2 rounded-xl border border-amber-200 bg-white/80 p-3 text-zinc-700 md:grid-cols-3">
+                <p>Số tiền cọc: <strong className="text-zinc-900">{fmtVnd(depositAmount)}</strong></p>
+                <p>Số dư N-Points: <strong className="text-zinc-900">{(overview?.nPointsBalance ?? 0).toLocaleString("vi-VN")}</strong></p>
+                <p>Trạng thái cọc: <strong className="text-zinc-900">{creatorDepositStatusLabel(item.depositStatus)}</strong></p>
+              </div>
               {depositConfigMissing ? (
                 <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700">
                   Campaign cũ hoặc cấu hình hiện thiếu tiền cọc. Vui lòng chờ Admin cập nhật trước khi thực hiện.
                 </p>
-              ) : depositPending ? (
-                <p className="mt-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-zinc-700">
-                  Hệ thống đã ghi nhận yêu cầu đặt cọc. Form proof sẽ mở sau khi Admin xác nhận cọc.
-                </p>
               ) : (
-                <button className="dc-btn-primary mt-3 w-full sm:w-auto" disabled={busyId === item.id} onClick={() => void submitCreatorDeposit(item)}>
-                  Đặt cọc ngay
-                </button>
+                <>
+                  <div className="mt-3 grid gap-3 rounded-xl border border-zinc-200 bg-white p-3 md:grid-cols-2">
+                    <label className="grid gap-1 text-sm">
+                      <span className="font-medium text-zinc-700">Họ và tên người nhận</span>
+                      <input className="dc-input" value={shippingForm.recipientName} onChange={(event) => updateShippingForm(item.id, "recipientName", event.target.value)} />
+                    </label>
+                    <label className="grid gap-1 text-sm">
+                      <span className="font-medium text-zinc-700">Số điện thoại</span>
+                      <input className="dc-input" value={shippingForm.phone} onChange={(event) => updateShippingForm(item.id, "phone", event.target.value)} />
+                    </label>
+                    <label className="grid gap-1 text-sm">
+                      <span className="font-medium text-zinc-700">Tỉnh/Thành phố</span>
+                      <input className="dc-input" value={shippingForm.province} onChange={(event) => updateShippingForm(item.id, "province", event.target.value)} />
+                    </label>
+                    <label className="grid gap-1 text-sm">
+                      <span className="font-medium text-zinc-700">Quận/Huyện</span>
+                      <input className="dc-input" value={shippingForm.district} onChange={(event) => updateShippingForm(item.id, "district", event.target.value)} />
+                    </label>
+                    <label className="grid gap-1 text-sm">
+                      <span className="font-medium text-zinc-700">Phường/Xã</span>
+                      <input className="dc-input" value={shippingForm.ward} onChange={(event) => updateShippingForm(item.id, "ward", event.target.value)} />
+                    </label>
+                    <label className="grid gap-1 text-sm">
+                      <span className="font-medium text-zinc-700">Địa chỉ chi tiết</span>
+                      <input className="dc-input" value={shippingForm.addressLine} onChange={(event) => updateShippingForm(item.id, "addressLine", event.target.value)} />
+                    </label>
+                    <label className="grid gap-1 text-sm md:col-span-2">
+                      <span className="font-medium text-zinc-700">Ghi chú giao hàng</span>
+                      <textarea className="dc-input min-h-20" value={shippingForm.note} onChange={(event) => updateShippingForm(item.id, "note", event.target.value)} />
+                    </label>
+                  </div>
+                  {depositPending ? (
+                    <div className="mt-3 grid gap-3 rounded-xl border border-zinc-200 bg-white p-3 md:grid-cols-[140px_1fr]">
+                      <div
+                        role="img"
+                        aria-label="QR nạp N-Points"
+                        className="h-32 w-32 rounded-xl border border-zinc-200 bg-cover bg-center"
+                        style={{ backgroundImage: `url(${bankConfig?.qrImageUrl || "/qr-dcreator.jpg"})` }}
+                      />
+                      <div className="text-sm text-zinc-700">
+                        <p className="font-semibold text-zinc-900">Số dư N-Points không đủ để đặt cọc. Vui lòng nạp thêm qua mã QR bên dưới.</p>
+                        <p>Tên chủ tài khoản: <strong>{bankConfig?.accountName || "Chưa cấu hình"}</strong></p>
+                        <p>Số tài khoản: <strong>{bankConfig?.accountNumber || "Chưa cấu hình"}</strong></p>
+                        <p>Ngân hàng: <strong>{bankConfig?.bankName || "Chưa cấu hình"}</strong></p>
+                        <p>Nội dung chuyển khoản: <strong>{transferNote}</strong></p>
+                        <p>Số tiền cần nạp: <strong>{fmtVnd(Math.max(0, depositAmount - (overview?.nPointsBalance ?? 0)))}</strong></p>
+                        {!bankConfig?.accountName || !bankConfig.accountNumber || !bankConfig.bankName ? (
+                          <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700">
+                            Admin chưa cấu hình đủ thông tin chuyển khoản. Vui lòng liên hệ Admin trước khi chuyển tiền.
+                          </p>
+                        ) : null}
+                        <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700">Trạng thái: Chờ Admin xác nhận.</p>
+                      </div>
+                    </div>
+                  ) : null}
+                  <button className="dc-btn-primary mt-3 w-full sm:w-auto" disabled={busyId === item.id} onClick={() => void submitCreatorDeposit(item)}>
+                    Đặt cọc bằng N-Points
+                  </button>
+                </>
               )}
               {formError?.form ? <p className="mt-2 text-sm text-red-600">{formError.form}</p> : null}
             </div>
+          ) : null}
+
+          {needsCreatorDeposit && depositHeld && !isRefundPending ? (
+            <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+              Đã đặt cọc. Brand/Admin có thể gửi hàng theo thông tin nhận hàng của bạn.
+            </p>
           ) : null}
 
           {canSubmitPurchase && !isOverdue && !isRefundPending ? (
@@ -1351,7 +1508,9 @@ export function CreatorMissionsPanel({
 
           {item.status === "COMPLETED" ? (
             <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-              Campaign đã hoàn thành. Hệ thống đã hoàn N-Points mua sản phẩm theo kết quả duyệt.
+              {isCreatorOrder
+                ? "Campaign đã hoàn thành. Hệ thống đã hoàn N-Points mua sản phẩm theo kết quả duyệt."
+                : "Campaign đã hoàn thành. Hệ thống đã hoàn cọc theo kết quả duyệt."}
             </p>
           ) : null}
         </div>

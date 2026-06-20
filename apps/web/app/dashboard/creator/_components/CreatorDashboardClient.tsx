@@ -14,6 +14,13 @@ export type CreatorOverview = {
   approvedVideos: number;
   totalCommission: number;
   nPointsBalance: number;
+  creatorDepositBankConfig?: {
+    qrImageUrl: string;
+    accountName: string;
+    accountNumber: string;
+    bankName: string;
+    transferPrefix: string;
+  };
 };
 
 async function fetcher<T>(url: string) {
