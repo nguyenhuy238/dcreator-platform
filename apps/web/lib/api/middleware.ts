@@ -13,9 +13,8 @@ export function parseJsonWithSchema<T>(schema: z.ZodSchema<T>, raw: unknown): T 
 
 export function assertApiRateLimit(
   request: NextRequest,
-  bucket: "login" | "contribution" | "proof_submit" | "payment_create",
+  bucket: "login" | "forgot_password" | "reset_password" | "contribution" | "proof_submit" | "payment_create",
   userScoped?: string
 ) {
   assertRateLimit(bucket, getRequestClientKey(request, userScoped));
 }
-

@@ -12,6 +12,7 @@ import {
   StatusBadge
 } from "@/app/components/dcreator/ui/base";
 import { ClickableUrl } from "@/app/components/dcreator/ui/clickable-url";
+import { AccountPasswordResetCard } from "@/app/dashboard/_components/AccountPasswordResetCard";
 import { BrandUpgradeTabPanel } from "@/app/dashboard/user/_components/BrandUpgradeTabPanel";
 import { resolveImageUrl } from "@/lib/images/resolve-image-url";
 
@@ -402,6 +403,8 @@ export default function CreatorProfilePage() {
               </div>
             )}
           </article>
+
+          <AccountPasswordResetCard />
 
         </section>
       ) : null}

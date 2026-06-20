@@ -5,6 +5,14 @@ import { FormEvent, useState } from "react";
 import { PublicHeader } from "@/app/components/dcreator/layout/shell";
 import { FormField } from "@/app/components/dcreator/ui/base";
 
+type ForgotPasswordResponse = {
+  success: boolean;
+  error?: string;
+  data?: {
+    message?: string;
+  };
+};
+
 export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -15,16 +23,31 @@ export default function ForgotPasswordPage() {
     setError("");
     setSuccess("");
     setLoading(true);
+
     const formData = new FormData(event.currentTarget);
-    const email = String(formData.get("email") ?? "");
+    const email = String(formData.get("email") ?? "").trim();
+
     if (!email.includes("@")) {
       setError("Email không hợp lệ.");
       setLoading(false);
       return;
     }
-    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    const response = await fetch("/api/auth/forgot-password", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email })
+    });
+    const payload = (await response.json()) as ForgotPasswordResponse;
+
     setLoading(false);
-    setSuccess("Nếu email tồn tại, hệ thống sẽ gửi hướng dẫn khôi phục mật khẩu.");
+
+    if (!response.ok || !payload.success) {
+      setError(payload.error ?? "Không thể gửi yêu cầu khôi phục mật khẩu.");
+      return;
+    }
+
+    setSuccess(payload.data?.message ?? "Nếu email tồn tại, hệ thống sẽ gửi mật khẩu tạm để bạn đăng nhập và đổi mật khẩu mới.");
   }
 
   return (
@@ -33,7 +56,7 @@ export default function ForgotPasswordPage() {
       <main className="mx-auto w-full max-w-xl px-4 py-10 md:px-6">
         <form className="space-y-4 rounded-[28px] border border-zinc-200 bg-white p-6 shadow-[0_40px_120px_-60px_rgba(24,24,27,0.55)]" onSubmit={onSubmit}>
           <h1 className="text-3xl font-black">Khôi phục mật khẩu</h1>
-          <p className="text-sm text-zinc-600">Nhập email tài khoản dCreator để nhận hướng dẫn đặt lại mật khẩu.</p>
+          <p className="text-sm text-zinc-600">Nhập email tài khoản dCreator để nhận mật khẩu tạm qua email.</p>
           <FormField label="Email">
             <input name="email" type="email" className="dc-input" placeholder="example@email.com" required />
           </FormField>

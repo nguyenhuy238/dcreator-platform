@@ -3,10 +3,11 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ActionToast, PageHeader, SectionHeader } from "@/app/components/dcreator/ui/base";
-import { EmbeddedRoleUpgradePanels } from "../_components/EmbeddedRoleUpgradePanels";
-import { UserAccountInfoCard, type UserAccountInfo, type UserSettingsFeedback } from "../_components/user-account-info-card";
+import { PasswordInput } from "@/app/components/dcreator/ui/PasswordInput";
 import { trackEvent } from "@/lib/analytics";
 import { AnalyticsEvents } from "@/lib/analytics-events";
+import { EmbeddedRoleUpgradePanels } from "../_components/EmbeddedRoleUpgradePanels";
+import { UserAccountInfoCard, type UserAccountInfo, type UserSettingsFeedback } from "../_components/user-account-info-card";
 
 export default function UserSettingsPage() {
   const searchParams = useSearchParams();
@@ -59,19 +60,21 @@ export default function UserSettingsPage() {
       title: "Đang lưu cài đặt",
       description: "Hệ thống đang cập nhật cài đặt tài khoản."
     });
+
     try {
       const response = await fetch("/api/me/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          currentPassword: currentPassword || undefined,
-          newPassword: newPassword || undefined,
+          currentPassword: currentPassword.trim() || undefined,
+          newPassword: newPassword.trim() || undefined,
           notifyReviewStatusEmail,
           notifyVoucherMissionEmail
         })
       });
       const payload = await response.json();
       if (!response.ok || !payload.success) throw new Error(payload.error ?? "Lưu cài đặt thất bại.");
+
       trackEvent(AnalyticsEvents.PROFILE_UPDATE_SUCCESS, { page_source: "user_settings" });
       const successMessage = payload.data?.message ?? "Đã lưu cài đặt tài khoản.";
       setToast({
@@ -96,49 +99,49 @@ export default function UserSettingsPage() {
 
   return (
     <>
-        <PageHeader title="Cài đặt tài khoản" subtitle="Thông tin cá nhân, bảo mật, thông báo và phiên đăng nhập." />
-        {loading ? <div className="h-48 animate-pulse rounded-3xl bg-zinc-100" /> : null}
-        {!loading ? (
-          <>
-            {account ? <UserAccountInfoCard account={account} onAccountUpdate={setAccount} onFeedback={setToast} /> : null}
-            <section className="mt-4">
-              <EmbeddedRoleUpgradePanels targets={["creator", "brand"]} message={searchParams.get("message")} />
-            </section>
-            <form className="mt-4 grid gap-4 md:grid-cols-2" onSubmit={onSave}>
-              <article className="dc-card p-5">
-                <SectionHeader title="Bảo mật" />
-                <p className="text-sm text-zinc-600">Đổi mật khẩu bằng cách nhập mật khẩu hiện tại và mật khẩu mới.</p>
-                <div className="mt-3 grid gap-2">
-                  <input className="dc-input" placeholder="Mật khẩu hiện tại" type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
-                  <input className="dc-input" placeholder="Mật khẩu mới" type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
-                </div>
-              </article>
-              <article className="dc-card p-5">
-                <SectionHeader title="Thông báo" />
-                <div className="mt-2 grid gap-2 text-sm">
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={notifyReviewStatusEmail} onChange={(event) => setNotifyReviewStatusEmail(event.target.checked)} />
-                    Email về trạng thái duyệt
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={notifyVoucherMissionEmail} onChange={(event) => setNotifyVoucherMissionEmail(event.target.checked)} />
-                    Email về voucher/mission
-                  </label>
-                </div>
-              </article>
-              <div className="md:col-span-2">
-                <button type="submit" className="dc-btn-secondary" disabled={saving}>{saving ? "Đang lưu..." : "Lưu cài đặt"}</button>
+      <PageHeader title="Cài đặt tài khoản" subtitle="Thông tin cá nhân, bảo mật, thông báo và phiên đăng nhập." />
+      {loading ? <div className="h-48 animate-pulse rounded-3xl bg-zinc-100" /> : null}
+      {!loading ? (
+        <>
+          {account ? <UserAccountInfoCard account={account} onAccountUpdate={setAccount} onFeedback={setToast} /> : null}
+          <section className="mt-4">
+            <EmbeddedRoleUpgradePanels targets={["creator", "brand"]} message={searchParams.get("message")} />
+          </section>
+          <form className="mt-4 grid gap-4 md:grid-cols-2" onSubmit={onSave}>
+            <article className="dc-card p-5">
+              <SectionHeader title="Bảo mật" />
+              <p className="text-sm text-zinc-600">Đổi mật khẩu bằng cách nhập mật khẩu hiện tại hoặc mật khẩu tạm và mật khẩu mới.</p>
+              <div className="mt-3 grid gap-2">
+                <PasswordInput placeholder="Mật khẩu hiện tại hoặc mật khẩu tạm" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
+                <PasswordInput placeholder="Mật khẩu mới" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
               </div>
-            </form>
-            <section className="mt-4">
-              <article className="dc-card p-5">
-                <SectionHeader title="Phiên đăng nhập" />
-                <p className="text-sm text-zinc-600">Đăng xuất khỏi phiên hiện tại.</p>
-                <button type="button" className="dc-btn-primary mt-3" onClick={logout}>Đăng xuất</button>
-              </article>
-            </section>
-          </>
-        ) : null}
+            </article>
+            <article className="dc-card p-5">
+              <SectionHeader title="Thông báo" />
+              <div className="mt-2 grid gap-2 text-sm">
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={notifyReviewStatusEmail} onChange={(event) => setNotifyReviewStatusEmail(event.target.checked)} />
+                  Email về trạng thái duyệt
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={notifyVoucherMissionEmail} onChange={(event) => setNotifyVoucherMissionEmail(event.target.checked)} />
+                  Email về voucher/mission
+                </label>
+              </div>
+            </article>
+            <div className="md:col-span-2">
+              <button type="submit" className="dc-btn-secondary" disabled={saving}>{saving ? "Đang lưu..." : "Lưu cài đặt"}</button>
+            </div>
+          </form>
+          <section className="mt-4">
+            <article className="dc-card p-5">
+              <SectionHeader title="Phiên đăng nhập" />
+              <p className="text-sm text-zinc-600">Đăng xuất khỏi phiên hiện tại.</p>
+              <button type="button" className="dc-btn-primary mt-3" onClick={logout}>Đăng xuất</button>
+            </article>
+          </section>
+        </>
+      ) : null}
       {toast ? <ActionToast tone={toast.tone} title={toast.title} description={toast.description} onClose={() => setToast(null)} /> : null}
     </>
   );
