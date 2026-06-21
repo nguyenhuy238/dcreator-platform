@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { env } from "@/lib/env";
 
 const TEMPORARY_PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
 
@@ -12,21 +13,14 @@ export function createTemporaryPassword(length = 12) {
 }
 
 export async function sendTemporaryPasswordEmail(input: { email: string; temporaryPassword: string; loginUrl: string }) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.PASSWORD_RESET_FROM_EMAIL ?? "dCreator <no-reply@dcreator.kocogi.vn>";
-
-  if (!apiKey) {
-    throw new Error("TEMPORARY_PASSWORD_EMAIL_NOT_CONFIGURED");
-  }
-
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
-      authorization: `Bearer ${apiKey}`,
+      authorization: `Bearer ${env.RESEND_API_KEY}`,
       "content-type": "application/json"
     },
     body: JSON.stringify({
-      from,
+      from: env.PASSWORD_RESET_FROM_EMAIL,
       to: input.email,
       subject: "Mật khẩu tạm dCreator",
       html: `
