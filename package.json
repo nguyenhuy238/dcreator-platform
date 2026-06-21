@@ -8,6 +8,7 @@
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
+    "vercel:env:resend": "vercel env add RESEND_API_KEY development && vercel env add PASSWORD_RESET_FROM_EMAIL development && vercel env add RESEND_API_KEY preview && vercel env add PASSWORD_RESET_FROM_EMAIL preview && vercel env add RESEND_API_KEY production && vercel env add PASSWORD_RESET_FROM_EMAIL production",
     "db:backup:deploy": "node scripts/backup-deploy-data.mjs",
     "db:reset:deploy": "npm run db:generate -w web && node scripts/run-reset-deploy-data.mjs",
     "db:seed:deploy": "npm run db:generate -w web && node scripts/seed-deploy-accounts.mjs && node scripts/seed-clean-production-data.mjs && node scripts/verify-deploy-seed.mjs",
