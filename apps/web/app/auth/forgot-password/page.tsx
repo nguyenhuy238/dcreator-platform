@@ -47,7 +47,7 @@ export default function ForgotPasswordPage() {
       return;
     }
 
-    setSuccess(payload.data?.message ?? "Nếu email tồn tại, hệ thống sẽ gửi mật khẩu tạm để bạn đăng nhập và đổi mật khẩu mới.");
+    setSuccess(payload.data?.message ?? "Đã gửi mật khẩu tạm tới email của bạn. Vui lòng kiểm tra hộp thư để đăng nhập và đổi mật khẩu mới.");
   }
 
   return (
