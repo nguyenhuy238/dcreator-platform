@@ -1,0 +1,1 @@
+ALTER TYPE "BrandCampaignRequestStatus" ADD VALUE IF NOT EXISTS 'CANCELLED';

@@ -7,8 +7,8 @@ import { ManagementActionMenu } from "@/app/admin/_components/ManagementActionMe
 import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { CampaignCoverImage } from "@/app/components/dcreator/ui/CampaignCoverImage";
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
-import { ClickableUrl, LinkifiedText } from "@/app/components/dcreator/ui/clickable-url";
-import { parseCampaignRequestContent, type CampaignRequestLink } from "./_lib/parseCampaignRequestContent";
+import { LinkifiedText } from "@/app/components/dcreator/ui/clickable-url";
+import { parseCampaignRequestContent } from "./_lib/parseCampaignRequestContent";
 
 type ApiResult<T> = { success: boolean; data: T; error?: string };
 type CampaignItem = { id: string; slug: string; title: string; brief: string; status: string; statusView?: string; budgetVnd: number; targetAmountVnd: number; fundedAmountVnd: number; brand: { displayName: string; ownerDisplayName?: string; email: string }; endsAt?: string | null };
@@ -19,17 +19,23 @@ type CampaignRequestItem = {
   brief: string;
   coverImageUrl?: string | null;
   contentFileUrl?: string | null;
-  status: "PENDING_REVIEW" | "NEEDS_REVISION" | "APPROVED" | "REJECTED";
+  status: "PENDING_REVIEW" | "NEEDS_REVISION" | "APPROVED" | "REJECTED" | "CANCELLED";
   setupSource: string;
   objective: string | null;
   priorityChannels: string | null;
   missionTypes: string | null;
+  creatorCommissionPercent: number;
+  userCommissionPercent: number;
+  bonusBudgetVnd: number;
+  budgetVnd: number;
+  targetAmountVnd: number;
   campaignType: string;
   category: string;
   startsAt: string | null;
   endsAt: string | null;
   adminNote: string | null;
   brandFeedback: string | null;
+  createdAt: string;
   updatedAt: string;
   brand: { id: string; name: string | null; ownerAccountId: string; contactEmail: string | null };
   createdCampaign: { id: string; slug: string; title: string; status: string } | null;
@@ -61,6 +67,8 @@ const requestStatusLabelMap: Record<string, string> = {
   processed: "Đã tạo campaign",
   CREATED: "Đã tạo campaign",
   created: "Đã tạo campaign",
+  CANCELLED: "Hủy",
+  cancelled: "Hủy",
   DRAFT: "Nháp",
   draft: "Nháp"
 };
@@ -71,9 +79,22 @@ function getRequestStatusLabel(status: string) {
 
 function getRequestStatusClass(status: string) {
   if (status === "APPROVED" || status === "PROCESSED" || status === "CREATED") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (status === "CANCELLED") return "border-zinc-300 bg-zinc-100 text-zinc-600";
   if (status === "REJECTED") return "border-red-200 bg-red-50 text-red-700";
   if (status === "NEEDS_REVISION") return "border-amber-200 bg-amber-50 text-amber-700";
   return "border-zinc-200 bg-zinc-50 text-zinc-700";
+}
+
+function isRequestEditable(request: CampaignRequestItem) {
+  return !request.createdCampaign && (request.status === "PENDING_REVIEW" || request.status === "NEEDS_REVISION");
+}
+
+function isRequestDeletable(request: CampaignRequestItem) {
+  return !request.createdCampaign;
+}
+
+function formatCurrencyVnd(value?: number | null) {
+  return `${Number(value ?? 0).toLocaleString("vi-VN")}đ`;
 }
 
 function formatDateTime(value?: string | null) {
@@ -81,20 +102,6 @@ function formatDateTime(value?: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Không hợp lệ";
   return date.toLocaleString("vi-VN");
-}
-
-function FileLinkCard({ link }: { link: CampaignRequestLink }) {
-  return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-semibold text-zinc-900">{link.label}</p>
-          <p className="mt-1 truncate text-xs text-zinc-500">{link.url}</p>
-        </div>
-        <ClickableUrl url={link.url} label={link.type === "file" ? "Mở file" : "Mở link"} className="dc-btn-secondary shrink-0" />
-      </div>
-    </div>
-  );
 }
 
 function CampaignRequestCover({ src, title }: { src?: string; title: string }) {
@@ -120,10 +127,12 @@ export default function AdminCampaignsPage() {
   const [requestError, setRequestError] = useState("");
   const [status, setStatus] = useState("PENDING_REVIEW");
   const [query, setQuery] = useState("");
+  const [requestStatus, setRequestStatus] = useState("");
+  const [requestQuery, setRequestQuery] = useState("");
   const [viewMode, setViewMode] = useState<"REQUESTS" | "CAMPAIGNS">("REQUESTS");
   const [toast, setToast] = useState("");
   const [acting, setActing] = useState(false);
-  const [requestAction, setRequestAction] = useState<{ id: string; decision: "APPROVED" | "REJECTED" | "CHANGES_REQUESTED" } | null>(null);
+  const [requestAction, setRequestAction] = useState<{ id: string; decision: "APPROVED" | "REJECTED" | "CHANGES_REQUESTED" | "CANCELLED" | "DELETE_REQUEST" } | null>(null);
   const [action, setAction] = useState<{ type: "pause" | "resume" | "audit" | "force-close" | "mark-completed" | "delete"; id: string } | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<CampaignRequestItem | null>(null);
 
@@ -149,7 +158,10 @@ export default function AdminCampaignsPage() {
     setLoadingRequests(true);
     setRequestError("");
     try {
-      const res = await fetch("/api/admin/dashboard/campaign-reviews", { cache: "no-store" });
+      const params = new URLSearchParams();
+      if (requestStatus) params.set("status", requestStatus);
+      if (requestQuery.trim()) params.set("query", requestQuery.trim());
+      const res = await fetch(`/api/admin/dashboard/campaign-reviews?${params.toString()}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResult<CampaignRequestItem[]>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Không tải được yêu cầu tạo campaign");
       setRequestItems(body.data);
@@ -158,7 +170,7 @@ export default function AdminCampaignsPage() {
     } finally {
       setLoadingRequests(false);
     }
-  }, []);
+  }, [requestQuery, requestStatus]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { void loadCampaignRequests(); }, [loadCampaignRequests]);
@@ -177,8 +189,10 @@ export default function AdminCampaignsPage() {
   const requestStats = useMemo(() => {
     const pending = requestItems.filter((item) => item.status === "PENDING_REVIEW").length;
     const revision = requestItems.filter((item) => item.status === "NEEDS_REVISION").length;
-    const done = requestItems.filter((item) => item.status === "APPROVED" || item.status === "REJECTED").length;
-    return { pending, revision, done };
+    const converted = requestItems.filter((item) => item.createdCampaign || item.status === "APPROVED").length;
+    const rejected = requestItems.filter((item) => item.status === "REJECTED").length;
+    const cancelled = requestItems.filter((item) => item.status === "CANCELLED").length;
+    return { pending, revision, done: converted + rejected + cancelled };
   }, [requestItems]);
 
   return (
@@ -226,6 +240,18 @@ export default function AdminCampaignsPage() {
             </div>
             <button className="dc-btn-secondary" onClick={() => void loadCampaignRequests()}>Làm mới yêu cầu</button>
           </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-[220px_1fr_auto]">
+            <select className="dc-input" value={requestStatus} onChange={(event) => setRequestStatus(event.target.value)}>
+              <option value="">Tất cả trạng thái</option>
+              <option value="PENDING_REVIEW">Chờ duyệt</option>
+              <option value="NEEDS_REVISION">Cần bổ sung</option>
+              <option value="APPROVED">Đã tạo campaign</option>
+              <option value="REJECTED">Từ chối</option>
+              <option value="CANCELLED">Hủy</option>
+            </select>
+            <input className="dc-input" placeholder="Tìm theo campaign, brand, slug, email" value={requestQuery} onChange={(event) => setRequestQuery(event.target.value)} />
+            <button className="dc-btn-primary" onClick={() => void loadCampaignRequests()}>Lọc</button>
+          </div>
           {loadingRequests ? <div className="mt-3"><LoadingSkeleton rows={2} /></div> : null}
           {requestError ? <div className="mt-3"><ErrorState title="Không tải được yêu cầu tạo campaign" description={requestError} onRetry={() => void loadCampaignRequests()} /></div> : null}
           {!loadingRequests && !requestError ? (
@@ -233,6 +259,8 @@ export default function AdminCampaignsPage() {
               <div className="mt-3 grid gap-4 xl:grid-cols-3">
                 {requestItems.map((request) => {
                   const parsed = parseCampaignRequestContent(request.brief);
+                  const editable = isRequestEditable(request);
+                  const deletable = isRequestDeletable(request);
                   return (
                     <article
                       key={request.id}
@@ -265,6 +293,10 @@ export default function AdminCampaignsPage() {
                             <StatusBadge status={request.setupSource} />
                           </div>
                         </div>
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-zinc-600">
+                          <p>Ngân sách: <span className="font-semibold text-zinc-900">{formatCurrencyVnd(request.budgetVnd)}</span></p>
+                          <p>Cập nhật: <span className="font-semibold text-zinc-900">{formatDateTime(request.updatedAt)}</span></p>
+                        </div>
                         {request.brandFeedback ? <p className="mt-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-700">Phản hồi Brand: {request.brandFeedback}</p> : null}
                         {request.createdCampaign ? (
                           <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
@@ -273,9 +305,14 @@ export default function AdminCampaignsPage() {
                           </div>
                         ) : null}
                         <div className="mt-4 flex flex-wrap gap-2">
-                          <Link className="dc-btn-primary" href={`/admin/campaigns/create?requestId=${request.id}`} onClick={(event) => event.stopPropagation()}>Mở form tạo campaign</Link>
-                          <button className="dc-btn-secondary" onClick={(event) => { event.stopPropagation(); setRequestAction({ id: request.id, decision: "CHANGES_REQUESTED" }); }}>Yêu cầu bổ sung</button>
-                          <button className="dc-btn-secondary" onClick={(event) => { event.stopPropagation(); setRequestAction({ id: request.id, decision: "REJECTED" }); }}>Từ chối</button>
+                          {request.createdCampaign ? (
+                            <Link className="dc-btn-primary" href={`/admin/campaigns/${request.createdCampaign.id}`} onClick={(event) => event.stopPropagation()}>Mở campaign</Link>
+                          ) : (
+                            <Link className={`dc-btn-primary ${!editable ? "pointer-events-none opacity-50" : ""}`} href={`/admin/campaigns/create?requestId=${request.id}`} onClick={(event) => { event.stopPropagation(); if (!editable) event.preventDefault(); }}>Mở form tạo campaign</Link>
+                          )}
+                          <button className="dc-btn-secondary disabled:cursor-not-allowed disabled:opacity-50" disabled={!editable || acting} onClick={(event) => { event.stopPropagation(); setRequestAction({ id: request.id, decision: "CHANGES_REQUESTED" }); }}>Yêu cầu bổ sung</button>
+                          <button className="dc-btn-secondary disabled:cursor-not-allowed disabled:opacity-50" disabled={!editable || acting} onClick={(event) => { event.stopPropagation(); setRequestAction({ id: request.id, decision: "REJECTED" }); }}>Từ chối</button>
+                          <button className="dc-btn-secondary text-red-700 disabled:cursor-not-allowed disabled:opacity-50" disabled={!deletable || acting} onClick={(event) => { event.stopPropagation(); setRequestAction({ id: request.id, decision: "DELETE_REQUEST" }); }}>Xóa request</button>
                         </div>
                       </div>
                     </article>
@@ -334,6 +371,8 @@ export default function AdminCampaignsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4" onClick={() => setSelectedRequest(null)}>
           {(() => {
             const parsed = parseCampaignRequestContent(selectedRequest.brief);
+            const editable = isRequestEditable(selectedRequest);
+            const deletable = isRequestDeletable(selectedRequest);
             return (
               <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
                 <div className="flex items-start justify-between gap-3 border-b border-zinc-100 pb-4">
@@ -362,6 +401,18 @@ export default function AdminCampaignsPage() {
                     <div className="mt-3 grid gap-3 text-sm text-zinc-700">
                       <p><span className="font-semibold">Ảnh campaign:</span> {selectedRequest.coverImageUrl ?? parsed.coverImageUrl ? <a href={selectedRequest.coverImageUrl ?? parsed.coverImageUrl ?? "#"} target="_blank" rel="noopener noreferrer" className="ml-2 inline-flex rounded-xl border border-sky-200 bg-sky-50 px-3 py-1.5 text-sm font-semibold text-sky-700 hover:bg-sky-100">Tải ảnh</a> : " Chưa có"}</p>
                       <p><span className="font-semibold">File nội dung campaign:</span> {selectedRequest.contentFileUrl ?? parsed.contentFileUrl ? <a href={selectedRequest.contentFileUrl ?? parsed.contentFileUrl ?? "#"} target="_blank" rel="noopener noreferrer" className="ml-2 inline-flex rounded-xl border border-sky-200 bg-sky-50 px-3 py-1.5 text-sm font-semibold text-sky-700 hover:bg-sky-100">Tải file</a> : " Chưa có"}</p>
+                      <p><span className="font-semibold">Loại / ngành:</span> {selectedRequest.campaignType} / {selectedRequest.category}</p>
+                      <p><span className="font-semibold">Ngân sách:</span> {formatCurrencyVnd(selectedRequest.budgetVnd)} • Mục tiêu: {formatCurrencyVnd(selectedRequest.targetAmountVnd)}</p>
+                      <p><span className="font-semibold">Hoa hồng:</span> Creator {selectedRequest.creatorCommissionPercent}% • User {selectedRequest.userCommissionPercent}% • Bonus {formatCurrencyVnd(selectedRequest.bonusBudgetVnd)}</p>
+                      <p><span className="font-semibold">Thời gian:</span> {formatDateTime(selectedRequest.startsAt)} → {formatDateTime(selectedRequest.endsAt)}</p>
+                      <p><span className="font-semibold">Tạo lúc:</span> {formatDateTime(selectedRequest.createdAt)} • Cập nhật: {formatDateTime(selectedRequest.updatedAt)}</p>
+                      <p><span className="font-semibold">Mục tiêu:</span> {selectedRequest.objective ?? "Chưa có"}</p>
+                      <p><span className="font-semibold">Kênh ưu tiên:</span> {selectedRequest.priorityChannels ?? "Chưa có"}</p>
+                      <p><span className="font-semibold">Mission:</span> {selectedRequest.missionTypes ?? "Chưa có"}</p>
+                      <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3">
+                        <p className="font-semibold text-zinc-900">Brief từ Brand</p>
+                        <LinkifiedText className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-700" text={selectedRequest.brief || "Chưa có brief"} />
+                      </div>
                     </div>
                   </section>
 
@@ -378,12 +429,15 @@ export default function AdminCampaignsPage() {
                   {selectedRequest.createdCampaign ? (
                     <Link className="dc-btn-primary" href={`/admin/campaigns/${selectedRequest.createdCampaign.id}`}>Mở campaign đã tạo</Link>
                   ) : null}
-                  {selectedRequest.status === "PENDING_REVIEW" || selectedRequest.status === "NEEDS_REVISION" ? (
+                  {editable ? (
                     <>
                       <Link className="dc-btn-primary" href={`/admin/campaigns/create?requestId=${selectedRequest.id}`}>Mở form tạo campaign</Link>
                       <button className="dc-btn-secondary" onClick={() => setRequestAction({ id: selectedRequest.id, decision: "CHANGES_REQUESTED" })}>Cần bổ sung</button>
                       <button className="dc-btn-secondary" onClick={() => setRequestAction({ id: selectedRequest.id, decision: "REJECTED" })}>Từ chối</button>
                     </>
+                  ) : null}
+                  {deletable ? (
+                    <button className="dc-btn-secondary text-red-700" onClick={() => setRequestAction({ id: selectedRequest.id, decision: "DELETE_REQUEST" })}>Xóa request</button>
                   ) : null}
                   <button className="dc-btn-secondary" onClick={() => setSelectedRequest(null)}>Đóng</button>
                 </div>
@@ -399,13 +453,22 @@ export default function AdminCampaignsPage() {
             ? "Xác nhận duyệt yêu cầu tạo campaign"
             : requestAction?.decision === "CHANGES_REQUESTED"
               ? "Xác nhận yêu cầu bổ sung"
-              : "Xác nhận từ chối yêu cầu"
+              : requestAction?.decision === "CANCELLED"
+                ? "Xác nhận hủy yêu cầu"
+                : requestAction?.decision === "DELETE_REQUEST"
+                  ? "Xác nhận xóa request"
+                  : "Xác nhận từ chối yêu cầu"
         }
         description={
           requestAction?.decision === "APPROVED"
             ? "Có thể nhập ghi chú nội bộ (không bắt buộc)."
-            : "Vui lòng nhập lý do để Brand cập nhật lại thông tin."
+            : requestAction?.decision === "CANCELLED"
+              ? "Yêu cầu sẽ được hủy mềm, không xóa dữ liệu đã ghi nhận."
+              : requestAction?.decision === "DELETE_REQUEST"
+                ? "Request sẽ bị xóa khỏi danh sách. Hệ thống chỉ cho xóa khi request chưa tạo campaign và sẽ lưu audit snapshot trước khi xóa."
+                : "Vui lòng nhập lý do để Brand cập nhật lại thông tin."
         }
+        confirmLabel={requestAction?.decision === "CANCELLED" ? "Hủy yêu cầu" : requestAction?.decision === "DELETE_REQUEST" ? "Xóa request" : "Xác nhận"}
         requireReason={requestAction?.decision !== "APPROVED"}
         submitting={acting}
         onCancel={() => !acting && setRequestAction(null)}
@@ -420,7 +483,13 @@ export default function AdminCampaignsPage() {
             });
             const body = await res.json();
             if (!res.ok || !body.success) throw new Error(body.error ?? "Thao tác thất bại");
-            setToast("Đã xử lý yêu cầu tạo campaign");
+            if (requestAction.decision === "DELETE_REQUEST") {
+              setRequestItems((current) => current.filter((item) => item.id !== requestAction.id));
+              setSelectedRequest((current) => current?.id === requestAction.id ? null : current);
+              setToast("Đã xóa request tạo campaign");
+            } else {
+              setToast("Đã xử lý yêu cầu tạo campaign");
+            }
             setTimeout(() => setToast(""), 2000);
             setRequestAction(null);
             await loadCampaignRequests();

@@ -480,9 +480,24 @@ export async function rejectRoleRequestByAdmin(actorId: string, requestId: strin
   return result;
 }
 
-export async function listPendingCampaignReviews() {
+type CampaignReviewStatusFilter = "PENDING_REVIEW" | "NEEDS_REVISION" | "APPROVED" | "REJECTED" | "CANCELLED";
+
+export async function listPendingCampaignReviews(input: { status?: CampaignReviewStatusFilter; query?: string } = {}) {
   const requests = await prisma.brandCampaignRequest.findMany({
-    where: { status: { in: ["PENDING_REVIEW", "NEEDS_REVISION"] } },
+    where: {
+      ...(input.status ? { status: input.status } : {}),
+      ...(input.query
+        ? {
+            OR: [
+              { title: { contains: input.query, mode: "insensitive" } },
+              { requestedSlug: { contains: input.query, mode: "insensitive" } },
+              { brief: { contains: input.query, mode: "insensitive" } },
+              { brand: { name: { contains: input.query, mode: "insensitive" } } },
+              { brand: { contactEmail: { contains: input.query, mode: "insensitive" } } }
+            ]
+          }
+        : {})
+    },
     select: {
       id: true,
       requestedSlug: true,
@@ -509,7 +524,7 @@ export async function listPendingCampaignReviews() {
       brand: { select: { id: true, name: true, ownerAccountId: true, contactEmail: true } },
       createdCampaign: { select: { id: true, slug: true, title: true, status: true } }
     },
-    orderBy: { updatedAt: "asc" }
+    orderBy: { updatedAt: "desc" }
   });
 
   return requests.map((request) => {
@@ -530,9 +545,31 @@ export async function decideCampaignReview(actorId: string, campaignId: string, 
 
   const request = await prisma.brandCampaignRequest.findUnique({ where: { id: campaignId }, include: { brand: true } });
   if (!request) throw new AppError("Campaign request not found", 404, "CAMPAIGN_REQUEST_NOT_FOUND");
+  if (request.createdCampaignId) {
+    return prisma.brandCampaignRequest.findUniqueOrThrow({
+      where: { id: request.id },
+      include: { createdCampaign: true, brand: true }
+    });
+  }
+  if (request.status === "REJECTED" || request.status === "CANCELLED") {
+    throw new AppError("Campaign request already closed", 409, "CAMPAIGN_REQUEST_CLOSED");
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     if (decision === "APPROVED") {
+      const current = await tx.brandCampaignRequest.findUnique({
+        where: { id: request.id },
+        select: { createdCampaignId: true, status: true }
+      });
+      if (current?.createdCampaignId) {
+        return tx.brandCampaignRequest.findUniqueOrThrow({
+          where: { id: request.id },
+          include: { createdCampaign: true, brand: true }
+        });
+      }
+      if (!current || current.status === "REJECTED" || current.status === "CANCELLED") {
+        throw new AppError("Campaign request already closed", 409, "CAMPAIGN_REQUEST_CLOSED");
+      }
       const { coverImageUrl, cleanBrief, requirements } = extractCoverImageMeta(request.brief);
       const campaign = await tx.campaign.create({
         data: {
@@ -606,6 +643,112 @@ export async function decideCampaignReview(actorId: string, campaignId: string, 
 
   await writeAuditLog({ actorId, action: `CAMPAIGN_REQUEST_${decision}`, targetType: "BrandCampaignRequest", targetId: campaignId, metadata: { reason: reason ?? null } });
   return updated;
+}
+
+export async function cancelCampaignRequestByAdmin(actorId: string, requestId: string, reason: string) {
+  if (!reason.trim()) throw new AppError("Cancel reason is required", 422, "CANCEL_REASON_REQUIRED");
+
+  const request = await prisma.brandCampaignRequest.findUnique({
+    where: { id: requestId },
+    select: {
+      id: true,
+      status: true,
+      createdCampaignId: true
+    }
+  });
+  if (!request) throw new AppError("Campaign request not found", 404, "CAMPAIGN_REQUEST_NOT_FOUND");
+  if (request.createdCampaignId) {
+    throw new AppError("Không thể hủy yêu cầu đã tạo campaign.", 409, "CAMPAIGN_REQUEST_ALREADY_CONVERTED");
+  }
+  if (request.status === "APPROVED" || request.status === "REJECTED" || request.status === "CANCELLED") {
+    if (request.status === "CANCELLED") return request;
+    throw new AppError("Campaign request already closed", 409, "CAMPAIGN_REQUEST_CLOSED");
+  }
+
+  const updated = await prisma.brandCampaignRequest.update({
+    where: { id: request.id },
+    data: {
+      status: "CANCELLED",
+      adminNote: reason,
+      reviewedById: actorId,
+      reviewedAt: new Date()
+    }
+  });
+
+  await writeAuditLog({
+    actorId,
+    action: "CAMPAIGN_REQUEST_CANCELLED",
+    targetType: "BrandCampaignRequest",
+    targetId: request.id,
+    oldStatus: request.status,
+    newStatus: updated.status,
+    reason,
+    metadata: { reason }
+  });
+
+  return updated;
+}
+
+export async function deleteCampaignRequestByAdmin(actorId: string, requestId: string, reason: string) {
+  if (!reason.trim()) throw new AppError("Delete reason is required", 422, "DELETE_REASON_REQUIRED");
+
+  return prisma.$transaction(async (tx) => {
+    const request = await tx.brandCampaignRequest.findUnique({
+      where: { id: requestId },
+      include: {
+        brand: { select: { id: true, name: true, ownerAccountId: true, contactEmail: true } },
+        createdCampaign: { select: { id: true, slug: true, title: true, status: true } }
+      }
+    });
+    if (!request) throw new AppError("Campaign request not found", 404, "CAMPAIGN_REQUEST_NOT_FOUND");
+    if (request.createdCampaignId || request.createdCampaign) {
+      throw new AppError("Không thể xóa request đã tạo campaign. Hãy xử lý ở campaign liên kết.", 409, "CAMPAIGN_REQUEST_ALREADY_CONVERTED");
+    }
+
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: "CAMPAIGN_REQUEST_DELETED",
+        targetType: "BrandCampaignRequest",
+        targetId: request.id,
+        oldStatus: request.status,
+        reason,
+        metadata: {
+          reason,
+          deletedRequest: {
+            id: request.id,
+            brandId: request.brandId,
+            brand: request.brand,
+            requestedSlug: request.requestedSlug,
+            title: request.title,
+            status: request.status,
+            setupSource: request.setupSource,
+            objective: request.objective,
+            priorityChannels: request.priorityChannels,
+            missionTypes: request.missionTypes,
+            creatorCommissionPercent: request.creatorCommissionPercent,
+            userCommissionPercent: request.userCommissionPercent,
+            bonusBudgetVnd: request.bonusBudgetVnd,
+            budgetVnd: request.budgetVnd,
+            targetAmountVnd: request.targetAmountVnd,
+            campaignType: request.campaignType,
+            category: request.category,
+            startsAt: request.startsAt?.toISOString() ?? null,
+            endsAt: request.endsAt?.toISOString() ?? null,
+            adminNote: request.adminNote,
+            brandFeedback: request.brandFeedback,
+            createdAt: request.createdAt.toISOString(),
+            updatedAt: request.updatedAt.toISOString(),
+            reviewedById: request.reviewedById,
+            reviewedAt: request.reviewedAt?.toISOString() ?? null
+          }
+        }
+      }
+    });
+
+    await tx.brandCampaignRequest.delete({ where: { id: request.id } });
+    return { id: request.id, deleted: true };
+  });
 }
 
 export async function listPendingProofs() {

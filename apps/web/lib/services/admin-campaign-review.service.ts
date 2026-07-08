@@ -436,7 +436,7 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
 
   const ownedBrand = await prisma.brand.findFirst({
     where: { ownerAccountId: brandAccount.id },
-    select: { id: true },
+    select: { id: true, status: true, isLocked: true },
     orderBy: { createdAt: "desc" }
   });
 
@@ -444,13 +444,33 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
     ? null
     : await prisma.brandMember.findFirst({
         where: { accountId: brandAccount.id },
-        include: { brand: { select: { id: true } } },
+        include: { brand: { select: { id: true, status: true, isLocked: true } } },
         orderBy: { createdAt: "desc" }
       });
 
   const brandProfile = ownedBrand ?? memberBrand?.brand ?? null;
   if (!brandProfile) {
     throw new AppError("Brand chua hoan tat onboarding", 409, "BRAND_PROFILE_NOT_FOUND");
+  }
+  if (brandProfile.status !== "ACTIVE" || brandProfile.isLocked) {
+    throw new AppError("Brand đang bị khóa hoặc chưa active.", 409, "BRAND_NOT_ELIGIBLE");
+  }
+
+  if (input.requestId) {
+    const existingLinkedRequest = await prisma.brandCampaignRequest.findFirst({
+      where: { id: input.requestId, brandId: brandProfile.id },
+      select: {
+        status: true,
+        createdCampaign: true
+      }
+    });
+    if (!existingLinkedRequest) {
+      throw new AppError("Campaign request not found or cannot be linked", 404, "CAMPAIGN_REQUEST_NOT_FOUND");
+    }
+    if (existingLinkedRequest.createdCampaign) return existingLinkedRequest.createdCampaign;
+    if (existingLinkedRequest.status === "REJECTED" || existingLinkedRequest.status === "CANCELLED" || existingLinkedRequest.status === "APPROVED") {
+      throw new AppError("Campaign request already closed", 409, "CAMPAIGN_REQUEST_CLOSED");
+    }
   }
 
   const ugcVideoQuota = input.ugcVideoQuota;
@@ -460,19 +480,26 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
   const requiredHashtags = normalizeRequiredHashtags(input.requiredHashtags);
   const campaign = await prisma.$transaction(async (tx) => {
     const linkedRequest = input.requestId
-      ? await tx.brandCampaignRequest.findFirst({
-          where: {
-            id: input.requestId,
-            brandId: brandProfile.id,
-            createdCampaignId: null,
-            status: { in: ["PENDING_REVIEW", "NEEDS_REVISION"] }
-          },
-          select: { id: true }
+      ? await tx.brandCampaignRequest.findUnique({
+          where: { id: input.requestId },
+          select: {
+            id: true,
+            brandId: true,
+            status: true,
+            createdCampaignId: true,
+            createdCampaign: true
+          }
         })
       : null;
 
-    if (input.requestId && !linkedRequest) {
-      throw new AppError("Campaign request not found or cannot be linked", 404, "CAMPAIGN_REQUEST_NOT_FOUND");
+    if (input.requestId) {
+      if (!linkedRequest || linkedRequest.brandId !== brandProfile.id) {
+        throw new AppError("Campaign request not found or cannot be linked", 404, "CAMPAIGN_REQUEST_NOT_FOUND");
+      }
+      if (linkedRequest.createdCampaign) return linkedRequest.createdCampaign;
+      if (linkedRequest.status === "REJECTED" || linkedRequest.status === "CANCELLED" || linkedRequest.status === "APPROVED") {
+        throw new AppError("Campaign request already closed", 409, "CAMPAIGN_REQUEST_CLOSED");
+      }
     }
 
     const createdCampaign = await tx.campaign.create({
