@@ -6,6 +6,8 @@ import {
   decideCreatorCampaignApplicationByAdmin,
   decideCreatorMissionWorkflowByAdmin,
   approveRoleRequestByAdmin,
+  cancelCampaignRequestByAdmin,
+  deleteCampaignRequestByAdmin,
   decideCampaignReview,
   decideProofByAdmin,
   getAdminOverview,
@@ -35,6 +37,7 @@ import {
 import {
   adminAuditQuerySchema,
   adminCampaignDecisionSchema,
+  adminCampaignReviewQuerySchema,
   adminCreatorCampaignApplicationQuerySchema,
   adminCreatorCampaignDecisionSchema,
   adminCreatorMissionDecisionSchema,
@@ -124,12 +127,22 @@ export async function POST_brand_verification_reject(request: NextRequest, reque
 
 export async function GET_campaign_reviews(request: NextRequest) {
   await requireAdminOps(request);
-  return ok(await listPendingCampaignReviews());
+  const parsed = adminCampaignReviewQuerySchema.parse({
+    status: optionalQueryParam(request, "status"),
+    query: optionalQueryParam(request, "query")
+  });
+  return ok(await listPendingCampaignReviews(parsed));
 }
 
 export async function POST_campaign_decision(request: NextRequest, campaignId: string) {
   const actor = await requireAdminOps(request);
   const payload = adminCampaignDecisionSchema.parse(await request.json());
+  if (payload.decision === "CANCELLED") {
+    return ok(await cancelCampaignRequestByAdmin(actor.id, campaignId, payload.reason ?? ""));
+  }
+  if (payload.decision === "DELETE_REQUEST") {
+    return ok(await deleteCampaignRequestByAdmin(actor.id, campaignId, payload.reason ?? ""));
+  }
   return ok(await decideCampaignReview(actor.id, campaignId, payload.decision, payload.reason));
 }
 

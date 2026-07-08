@@ -79,8 +79,15 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
               →
             </button>
           ) : null}
-          <Link href="/campaigns" className="text-sm font-semibold text-zinc-600">
-            Xem tất cả
+          <Link
+            href="/campaigns"
+            className="group inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-zinc-900 bg-zinc-900 px-5 py-2.5 text-sm font-bold !text-white shadow-sm shadow-zinc-900/10 transition-all duration-200 hover:-translate-y-0.5 hover:bg-zinc-800 hover:!text-white hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2 active:translate-y-0 active:scale-[0.98] sm:px-6"
+            aria-label="Xem tất cả chiến dịch"
+          >
+            <span className="!text-white">Xem tất cả</span>
+            <span className="text-base leading-none !text-white transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true">
+              →
+            </span>
           </Link>
         </div>
       </div>

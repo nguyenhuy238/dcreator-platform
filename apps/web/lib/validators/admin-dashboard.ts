@@ -10,12 +10,17 @@ export const adminRejectSchema = z.object({
 });
 
 export const adminCampaignDecisionSchema = z.object({
-  decision: z.enum(["APPROVED", "REJECTED", "CHANGES_REQUESTED"]),
+  decision: z.enum(["APPROVED", "REJECTED", "CHANGES_REQUESTED", "CANCELLED", "DELETE_REQUEST"]),
   reason: z.string().trim().max(500).optional()
 }).superRefine((value, ctx) => {
-  if ((value.decision === "REJECTED" || value.decision === "CHANGES_REQUESTED") && !value.reason) {
+  if ((value.decision === "REJECTED" || value.decision === "CHANGES_REQUESTED" || value.decision === "CANCELLED" || value.decision === "DELETE_REQUEST") && !value.reason) {
     ctx.addIssue({ code: "custom", path: ["reason"], message: "reason is required" });
   }
+});
+
+export const adminCampaignReviewQuerySchema = z.object({
+  status: z.enum(["PENDING_REVIEW", "NEEDS_REVISION", "APPROVED", "REJECTED", "CANCELLED"]).optional(),
+  query: z.string().trim().min(1).max(160).optional()
 });
 
 export const adminProofDecisionSchema = z.object({

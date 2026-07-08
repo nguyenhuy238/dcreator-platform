@@ -149,6 +149,7 @@ enum BrandCampaignRequestStatus {
   APPROVED
   REJECTED
   NEEDS_REVISION
+  CANCELLED
 }
 
 enum CampaignCategory {
