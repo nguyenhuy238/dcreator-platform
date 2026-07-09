@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatsCard, StatusBadge } from "@/app/components/dcreator/ui/base";
-import type { AdminAnalyticsOverview } from "@/lib/services/admin-analytics.service";
+import type { AdminAnalyticsFilterOptions, AdminAnalyticsOverview } from "@/lib/services/admin-analytics.service";
 
 type ApiResult<T> = { success: boolean; data?: T; error?: string; message?: string };
 
@@ -54,16 +54,47 @@ export function AdminAnalyticsClient() {
   const [campaignId, setCampaignId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [optionsLoading, setOptionsLoading] = useState(true);
+  const [optionsError, setOptionsError] = useState("");
+  const [filterOptions, setFilterOptions] = useState<AdminAnalyticsFilterOptions>({ brands: [], campaigns: [] });
   const [data, setData] = useState<AdminAnalyticsOverview | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  const buildAnalyticsParams = useCallback((includeType?: string) => {
     const params = new URLSearchParams();
+    if (includeType) params.set("type", includeType);
     if (from) params.set("from", toApiDate(from));
     if (to) params.set("to", toApiDate(to, true));
     if (brandId.trim()) params.set("brandId", brandId.trim());
     if (campaignId.trim()) params.set("campaignId", campaignId.trim());
+    return params;
+  }, [brandId, campaignId, from, to]);
+
+  const loadFilterOptions = useCallback(async () => {
+    setOptionsLoading(true);
+    setOptionsError("");
+    const params = new URLSearchParams();
+    if (from) params.set("from", toApiDate(from));
+    if (to) params.set("to", toApiDate(to, true));
+
+    try {
+      const response = await fetch(`/api/admin/dashboard/analytics/filter-options?${params.toString()}`, { cache: "no-store" });
+      const payload = (await response.json()) as ApiResult<AdminAnalyticsFilterOptions>;
+      if (!response.ok || !payload.success || !payload.data) {
+        throw new Error(payload.message ?? payload.error ?? "Không thể tải filter options");
+      }
+      setFilterOptions(payload.data);
+    } catch (requestError) {
+      setOptionsError(requestError instanceof Error ? requestError.message : "Không thể tải filter options");
+      setFilterOptions({ brands: [], campaigns: [] });
+    } finally {
+      setOptionsLoading(false);
+    }
+  }, [from, to]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    const params = buildAnalyticsParams();
 
     try {
       const response = await fetch(`/api/admin/dashboard/analytics?${params.toString()}`, { cache: "no-store" });
@@ -77,15 +108,31 @@ export function AdminAnalyticsClient() {
     } finally {
       setLoading(false);
     }
-  }, [brandId, campaignId, from, to]);
+  }, [buildAnalyticsParams]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    void loadFilterOptions();
+  }, [loadFilterOptions]);
+
   const totalPendingReviews = data
     ? data.pendingReview.pendingApplications + data.pendingReview.pendingProofs + data.pendingReview.pendingVideoReviews + data.pendingReview.pendingFinalReviews + data.pendingReview.pendingPayouts
     : 0;
+  const campaignOptions = brandId ? filterOptions.campaigns.filter((item) => item.brandId === brandId) : filterOptions.campaigns;
+
+  function resetFilters() {
+    setFrom(defaultFrom);
+    setTo(todayInputValue(new Date()));
+    setBrandId("");
+    setCampaignId("");
+  }
+
+  function exportCsv(type: "campaignPerformance" | "topCreators" | "funnel" | "pendingReview") {
+    window.location.href = `/api/admin/dashboard/analytics/export?${buildAnalyticsParams(type).toString()}`;
+  }
 
   return (
     <>
@@ -105,18 +152,53 @@ export function AdminAnalyticsClient() {
             Đến ngày
             <input className="dc-input" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
           </label>
-          <label className="grid gap-1.5 text-sm font-semibold text-zinc-700">
-            Brand ID
-            <input className="dc-input" value={brandId} onChange={(event) => setBrandId(event.target.value)} placeholder="Tất cả brand" />
-          </label>
-          <label className="grid gap-1.5 text-sm font-semibold text-zinc-700">
-            Campaign ID
-            <input className="dc-input" value={campaignId} onChange={(event) => setCampaignId(event.target.value)} placeholder="Tất cả campaign" />
-          </label>
-          <div className="flex items-end">
+          {optionsError ? (
+            <>
+              <label className="grid gap-1.5 text-sm font-semibold text-zinc-700">
+                Brand ID
+                <input className="dc-input" value={brandId} onChange={(event) => setBrandId(event.target.value)} placeholder="Tất cả brand" />
+              </label>
+              <label className="grid gap-1.5 text-sm font-semibold text-zinc-700">
+                Campaign ID
+                <input className="dc-input" value={campaignId} onChange={(event) => setCampaignId(event.target.value)} placeholder="Tất cả campaign" />
+              </label>
+            </>
+          ) : (
+            <>
+              <label className="grid gap-1.5 text-sm font-semibold text-zinc-700">
+                Brand
+                <select
+                  className="dc-input"
+                  value={brandId}
+                  disabled={optionsLoading}
+                  onChange={(event) => {
+                    setBrandId(event.target.value);
+                    setCampaignId("");
+                  }}
+                >
+                  <option value="">Tất cả brand</option>
+                  {filterOptions.brands.map((brand) => (
+                    <option key={brand.id} value={brand.id}>{brand.name} ({brand.campaignCount})</option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1.5 text-sm font-semibold text-zinc-700">
+                Campaign
+                <select className="dc-input" value={campaignId} disabled={optionsLoading} onChange={(event) => setCampaignId(event.target.value)}>
+                  <option value="">Tất cả campaign</option>
+                  {campaignOptions.map((campaign) => (
+                    <option key={campaign.id} value={campaign.id}>{campaign.title} · {campaign.status}</option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
+          <div className="flex flex-col gap-2 md:flex-row xl:flex-col xl:items-stretch xl:justify-end">
             <button className="dc-btn-primary w-full" onClick={() => void load()}>Áp dụng</button>
+            <button className="dc-btn-secondary w-full" onClick={resetFilters}>Reset</button>
           </div>
         </div>
+        {optionsError ? <p className="mt-3 text-sm text-amber-700">Không tải được dropdown filter: {optionsError}. Có thể nhập ID thủ công.</p> : null}
       </section>
 
       {loading ? <LoadingSkeleton rows={7} /> : null}
@@ -145,7 +227,11 @@ export function AdminAnalyticsClient() {
           </section>
 
           <section className="mt-8">
-            <SectionHeader title="Creator Mission Funnel" subtitle="Nguồn chính: CreatorMission. Không tính donation/backer/contribution legacy." />
+            <SectionHeader
+              title="Creator Mission Funnel"
+              subtitle="Nguồn chính: CreatorMission. Không tính donation/backer/contribution legacy."
+              action={<button className="dc-btn-secondary" onClick={() => exportCsv("funnel")}>Export Funnel CSV</button>}
+            />
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
               <MetricRow label="Applications" value={data.funnel.applications.toLocaleString("vi-VN")} />
               <MetricRow label="Approved applications" value={data.funnel.approvedApplications.toLocaleString("vi-VN")} hint={formatPercent(data.funnel.applicationApprovalRate)} />
@@ -156,7 +242,11 @@ export function AdminAnalyticsClient() {
           </section>
 
           <section className="mt-8">
-            <SectionHeader title="Pending Review" subtitle="Các queue Admin/OPS cần xử lý." />
+            <SectionHeader
+              title="Pending Review"
+              subtitle="Các queue Admin/OPS cần xử lý."
+              action={<button className="dc-btn-secondary" onClick={() => exportCsv("pendingReview")}>Export Pending CSV</button>}
+            />
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
               <MetricRow label="Pending applications" value={data.pendingReview.pendingApplications.toLocaleString("vi-VN")} />
               <MetricRow label="Pending proofs" value={data.pendingReview.pendingProofs.toLocaleString("vi-VN")} />
@@ -179,7 +269,11 @@ export function AdminAnalyticsClient() {
           </section>
 
           <section className="mt-8">
-            <SectionHeader title="Campaign Performance" subtitle="Hiệu suất mission/proof theo campaign." />
+            <SectionHeader
+              title="Campaign Performance"
+              subtitle="Hiệu suất mission/proof theo campaign."
+              action={<button className="dc-btn-secondary" onClick={() => exportCsv("campaignPerformance")}>Export Campaign CSV</button>}
+            />
             {data.campaignPerformance.length === 0 ? (
               <EmptyTable title="Chưa có dữ liệu campaign" description="Không có campaign phù hợp bộ lọc hiện tại." />
             ) : (
@@ -216,7 +310,11 @@ export function AdminAnalyticsClient() {
           </section>
 
           <section className="mt-8">
-            <SectionHeader title="Top Creators" subtitle="Xếp hạng theo proof được duyệt, mission được duyệt và commission credited." />
+            <SectionHeader
+              title="Top Creators"
+              subtitle="Xếp hạng theo proof được duyệt, mission được duyệt và commission credited."
+              action={<button className="dc-btn-secondary" onClick={() => exportCsv("topCreators")}>Export Creators CSV</button>}
+            />
             {data.topCreators.length === 0 ? (
               <EmptyTable title="Chưa có dữ liệu Creator" description="Không có creator mission phù hợp bộ lọc hiện tại." />
             ) : (

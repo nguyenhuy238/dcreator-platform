@@ -86,6 +86,21 @@ export type AdminAnalyticsOverview = {
   }>;
 };
 
+export type AdminAnalyticsFilterOptions = {
+  brands: Array<{
+    id: string;
+    name: string;
+    campaignCount: number;
+  }>;
+  campaigns: Array<{
+    id: string;
+    title: string;
+    status: string;
+    brandId: string | null;
+    brandName: string | null;
+  }>;
+};
+
 type DateRange = {
   from: Date | null;
   to: Date | null;
@@ -162,11 +177,69 @@ function resolveBrandName(campaign: {
   return ownedBrand?.legalName ?? ownedBrand?.name ?? campaign.brand.displayName;
 }
 
+function compactFilter(value?: string | null) {
+  return value?.trim() || null;
+}
+
+export async function getAdminAnalyticsFilterOptions(params: Pick<AdminAnalyticsQuery, "from" | "to"> = {}): Promise<AdminAnalyticsFilterOptions> {
+  const range = normalizeDateRange(params);
+  const createdAt = dateFilter(range);
+  const campaigns = await prisma.campaign.findMany({
+    where: {
+      ...(createdAt ? { createdAt } : {})
+    },
+    orderBy: [{ updatedAt: "desc" }],
+    take: 500,
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      brandId: true,
+      brand: {
+        select: {
+          displayName: true,
+          ownedBrands: {
+            select: { name: true, legalName: true },
+            orderBy: { updatedAt: "desc" },
+            take: 1
+          }
+        }
+      }
+    }
+  });
+
+  const brandMap = new Map<string, { id: string; name: string; campaignCount: number }>();
+  const campaignOptions = campaigns
+    .map((campaign) => {
+      const brandName = resolveBrandName(campaign);
+      const brand = brandMap.get(campaign.brandId) ?? { id: campaign.brandId, name: brandName, campaignCount: 0 };
+      brand.campaignCount += 1;
+      brandMap.set(campaign.brandId, brand);
+      return {
+        id: campaign.id,
+        title: campaign.title,
+        status: campaign.status,
+        brandId: campaign.brandId,
+        brandName
+      };
+    })
+    .sort((a, b) => {
+      if (a.status === CampaignStatus.ACTIVE && b.status !== CampaignStatus.ACTIVE) return -1;
+      if (a.status !== CampaignStatus.ACTIVE && b.status === CampaignStatus.ACTIVE) return 1;
+      return a.title.localeCompare(b.title, "vi");
+    });
+
+  return {
+    brands: Array.from(brandMap.values()).sort((a, b) => b.campaignCount - a.campaignCount || a.name.localeCompare(b.name, "vi")),
+    campaigns: campaignOptions
+  };
+}
+
 export async function getAdminAnalyticsOverview(params: AdminAnalyticsQuery = {}): Promise<AdminAnalyticsOverview> {
   const range = normalizeDateRange(params);
   const createdAt = dateFilter(range);
-  const brandId = params.brandId?.trim() || null;
-  const campaignId = params.campaignId?.trim() || null;
+  const brandId = compactFilter(params.brandId);
+  const campaignId = compactFilter(params.campaignId);
 
   const campaignWhere = {
     ...(campaignId ? { id: campaignId } : {}),
@@ -279,6 +352,8 @@ export async function getAdminAnalyticsOverview(params: AdminAnalyticsQuery = {}
       },
       select: { amountVnd: true, status: true }
     }),
+    // TODO(analytics): PaymentTransaction is not yet fully separated by intent.
+    // Keep this metric conservative until payment intent mapping is normalized.
     prisma.paymentTransaction.findMany({
       where: paymentCreatedAtWhere,
       select: { requestedAmountVnd: true, status: true }
