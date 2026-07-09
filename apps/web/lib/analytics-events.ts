@@ -65,3 +65,30 @@ export const AnalyticsEvents = {
 } as const;
 
 export type AnalyticsEventName = (typeof AnalyticsEvents)[keyof typeof AnalyticsEvents];
+
+export const DCREATOR_ANALYTICS_EVENTS = {
+  CAMPAIGN_REQUEST_CREATED: "campaign_request_created",
+  CAMPAIGN_REQUEST_APPROVED: "campaign_request_approved",
+  CAMPAIGN_CREATED: "campaign_created",
+  CAMPAIGN_PUBLISHED: "campaign_published",
+  CAMPAIGN_COMPLETED: "campaign_completed",
+  CREATOR_APPLICATION_SUBMITTED: "creator_application_submitted",
+  CREATOR_APPLICATION_APPROVED: "creator_application_approved",
+  CREATOR_APPLICATION_REJECTED: "creator_application_rejected",
+  CREATOR_MISSION_ASSIGNED: "creator_mission_assigned",
+  CREATOR_MISSION_ACCEPTED: "creator_mission_accepted",
+  CREATOR_MISSION_DECLINED: "creator_mission_declined",
+  CREATOR_PROOF_SUBMITTED: "creator_proof_submitted",
+  CREATOR_PROOF_APPROVED: "creator_proof_approved",
+  CREATOR_PROOF_REJECTED: "creator_proof_rejected",
+  CREATOR_REWARD_CREDITED: "creator_reward_credited",
+  CREATOR_PAYOUT_REQUESTED: "creator_payout_requested",
+  CREATOR_PAYOUT_PAID: "creator_payout_paid",
+  PAYMENT_SUCCEEDED: "payment_succeeded",
+  PAYMENT_FAILED: "payment_failed",
+  ANALYTICS_DASHBOARD_VIEWED: "analytics_dashboard_viewed",
+  ANALYTICS_CSV_EXPORTED: "analytics_csv_exported"
+} as const;
+
+export type DcreatorAnalyticsEventName =
+  (typeof DCREATOR_ANALYTICS_EVENTS)[keyof typeof DCREATOR_ANALYTICS_EVENTS];

@@ -1,8 +1,10 @@
 import { NextRequest } from "next/server";
 import { buildBrandAnalyticsCsv, type BrandAnalyticsExportType } from "@/lib/brand-analytics-csv";
+import { DCREATOR_ANALYTICS_EVENTS } from "@/lib/analytics-events";
 import { requireBrandActor } from "@/lib/auth/brand-guard";
 import { csvResponse } from "@/lib/csv";
 import { AppError, toErrorResponse } from "@/lib/errors";
+import { trackDcreatorEvent } from "@/lib/services/analytics-event.service";
 import { getBrandAnalyticsOverview } from "@/lib/services/brand-analytics.service";
 
 const exportTypes = new Set<BrandAnalyticsExportType>(["campaignPerformance", "creatorPerformance", "funnel", "pendingReview"]);
@@ -24,6 +26,15 @@ export async function GET(request: NextRequest) {
     });
     const csv = buildBrandAnalyticsCsv(type, data);
     const date = new Date().toISOString().slice(0, 10);
+    await trackDcreatorEvent({
+      eventName: DCREATOR_ANALYTICS_EVENTS.ANALYTICS_CSV_EXPORTED,
+      actorId: account.id,
+      accountId: account.id,
+      brandId: account.currentBrandId,
+      campaignId: searchParams.get("campaignId"),
+      exportType: type,
+      metadata: { scope: "brand", from: searchParams.get("from"), to: searchParams.get("to") }
+    });
 
     return csvResponse(csv, `dcreator-brand-analytics-${type}-${date}.csv`);
   } catch (error) {

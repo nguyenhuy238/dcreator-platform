@@ -1,9 +1,11 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import type { PaymentTransactionStatus, Prisma } from "@prisma/client";
 import type { z } from "zod";
+import { DCREATOR_ANALYTICS_EVENTS } from "@/lib/analytics-events";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { shouldProcessPaymentWebhook } from "@/lib/payments/idempotency";
+import { trackDcreatorEvent } from "@/lib/services/analytics-event.service";
 import { flagDuplicateWebhook, flagMultipleFailedPayments } from "@/lib/services/fraud-flag.service";
 import { calculateTopupPoints } from "@/lib/services/wallet.service";
 import {
@@ -158,13 +160,12 @@ async function finalizePaymentByIntent(tx: Prisma.TransactionClient, paymentId: 
   const payment = await tx.paymentTransaction.findUniqueOrThrow({ where: { id: paymentId } });
   const intent = parseIntent(payment);
 
-  await tx.analyticsEvent.create({
-    data: {
-      eventName: status === "SUCCESS" ? "payment_success" : "payment_failed",
-      userId: payment.accountId,
-      sessionId: `srv_${payment.accountId}`,
-      metadata: { intent, amountVnd: payment.requestedAmountVnd }
-    }
+  await trackDcreatorEvent({
+    eventName: status === "SUCCESS" ? DCREATOR_ANALYTICS_EVENTS.PAYMENT_SUCCEEDED : DCREATOR_ANALYTICS_EVENTS.PAYMENT_FAILED,
+    accountId: payment.accountId,
+    paymentId: payment.id,
+    client: tx,
+    metadata: { intent, amountVnd: payment.requestedAmountVnd, provider: payment.provider }
   });
 
   if (status !== "SUCCESS") {

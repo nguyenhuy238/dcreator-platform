@@ -1,8 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import type { z } from "zod";
+import { DCREATOR_ANALYTICS_EVENTS } from "@/lib/analytics-events";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
+import { trackDcreatorEvent } from "@/lib/services/analytics-event.service";
 import { topupConfirmSchema } from "@/lib/validators/wallet";
 
 const TOPUP_POINT_RATE = 1;
@@ -212,7 +214,7 @@ export async function createCreatorPayoutRequest(
   });
   if (existing) return existing;
 
-  return prisma.$transaction(async (tx) => {
+  const payoutRequest = await prisma.$transaction(async (tx) => {
     const currentWallet = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
     const nextPoints = currentWallet.pointsBalance - amountVnd;
     assertNonNegativeBalance(nextPoints, currentWallet.cashBalanceVnd);
@@ -284,6 +286,22 @@ export async function createCreatorPayoutRequest(
 
     return payoutRequest;
   });
+
+  await trackDcreatorEvent({
+    eventName: DCREATOR_ANALYTICS_EVENTS.CREATOR_PAYOUT_REQUESTED,
+    accountId,
+    creatorId: accountId,
+    campaignId: payoutRequest.campaignId,
+    creatorMissionId: payoutRequest.creatorMissionId,
+    payoutRequestId: payoutRequest.id,
+    metadata: {
+      amountVnd: payoutRequest.amountVnd,
+      referenceType: payoutRequest.referenceType,
+      source: "creator_payout_request"
+    }
+  });
+
+  return payoutRequest;
 }
 
 export async function spendPointsForSupport(
