@@ -21,6 +21,7 @@ export type CampaignCardData = {
   videoApproved?: number;
   videoTarget?: number;
   creatorJoined?: number;
+  registeredCreatorCount?: number;
   missionSlotsRemaining?: number;
   isMissionQuotaReached?: boolean;
   backers: number;
@@ -48,6 +49,7 @@ export function CampaignCard({
   const videoTarget = campaign.videoTarget ?? 0;
   const videoApproved = campaign.videoApproved ?? 0;
   const creatorJoined = campaign.creatorJoined ?? 0;
+  const registeredCreatorCount = campaign.registeredCreatorCount ?? campaign.creatorApplicants ?? 0;
   const videoProgressPercent = campaign.videoProgressPercent ?? 0;
   const detailHref = `${detailHrefBase}/${campaign.slug}`;
 
@@ -109,6 +111,7 @@ export function CampaignCard({
           <div className="grid gap-1">
             <h3 className="line-clamp-2 min-h-[4rem] text-2xl font-black leading-tight text-zinc-900">{campaign.title}</h3>
             <p className="truncate text-sm font-semibold leading-5 text-zinc-600">Brand: {campaign.brand}</p>
+            <p className="text-xs font-semibold text-zinc-600">Số Creator đăng kí: {registeredCreatorCount}</p>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -145,7 +148,11 @@ export function CampaignCard({
           <p className="mt-3 truncate text-sm font-semibold text-zinc-600">Brand: {campaign.brand}</p>
           <p className="mt-1 text-xs font-semibold text-zinc-600">Video hoàn thành: {videoApproved}/{videoTarget}</p>
 
-          <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+          <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+              <p className="text-zinc-500">Số Creator đăng kí</p>
+              <p className="font-black text-zinc-900">{registeredCreatorCount}</p>
+            </div>
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
               <p className="text-zinc-500">Creator đã tham gia</p>
               <p className="font-black text-zinc-900">{creatorJoined}</p>

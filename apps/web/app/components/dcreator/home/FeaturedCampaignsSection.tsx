@@ -22,6 +22,7 @@ type FeaturedCampaignItem = {
   videoApproved?: number;
   videoTarget?: number;
   creatorJoined?: number;
+  registeredCreatorCount?: number;
   creatorApplicants?: number;
 };
 
@@ -113,8 +114,11 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
 
       {visibleCampaigns.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {visibleCampaigns.map((campaign) => (
-            <article key={campaign.slug} className="dc-card overflow-hidden p-0">
+          {visibleCampaigns.map((campaign) => {
+            const registeredCreatorCount = campaign.registeredCreatorCount ?? campaign.creatorApplicants ?? 0;
+
+            return (
+              <article key={campaign.slug} className="dc-card overflow-hidden p-0">
               <div className="relative aspect-[16/9] w-full overflow-hidden bg-zinc-100">
                 <CampaignCoverImage
                   src={campaign.coverImageUrl}
@@ -136,7 +140,11 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
                   Video hoàn thành: {campaign.videoApproved ?? 0}/{campaign.videoTarget ?? 0}
                 </p>
 
-                <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+                <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
+                  <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+                    <p className="text-zinc-500">Số Creator đăng kí</p>
+                    <p className="font-black text-zinc-900">{registeredCreatorCount}</p>
+                  </div>
                   <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
                     <p className="text-zinc-500">Creator đã tham gia</p>
                     <p className="font-black text-zinc-900">{campaign.creatorJoined ?? 0}</p>
@@ -169,7 +177,8 @@ export function FeaturedCampaignsSection({ campaigns }: { campaigns: FeaturedCam
                 </div>
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="dc-card p-6 text-sm text-zinc-600">Chưa có chiến dịch phù hợp với bộ lọc này.</div>
