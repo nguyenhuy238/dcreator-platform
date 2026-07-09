@@ -1,4 +1,4 @@
-import { CampaignStatus, Prisma } from "@prisma/client";
+import { ApplicationStatus, CampaignStatus, Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { getCampaignBrandDisplay, getCreatorDisplay } from "../display-identity";
 import { resolveImageUrl } from "../images/resolve-image-url";
@@ -125,15 +125,16 @@ export async function listCampaigns(input: ListCampaignsInput) {
     rewardSums.map((row) => [row.campaignId, row._sum.stockRemaining ?? 0])
   );
 
-  const missionApplications =
+  const registeredCreatorPairs =
     campaignIds.length === 0
       ? []
-      : await prisma.missionApplication.groupBy({
-          by: ["campaignId"],
-          where: { campaignId: { in: campaignIds } },
-          _count: { _all: true }
+      : await prisma.creatorMission.groupBy({
+          by: ["campaignId", "accountId"],
+          where: {
+            campaignId: { in: campaignIds },
+            applicationStatus: { in: [ApplicationStatus.PENDING_REVIEW, ApplicationStatus.APPROVED] }
+          }
         });
-
   const approvedCreatorPairs =
     campaignIds.length === 0
       ? []
@@ -141,13 +142,16 @@ export async function listCampaigns(input: ListCampaignsInput) {
           by: ["campaignId", "accountId"],
           where: {
             campaignId: { in: campaignIds },
-            applicationStatus: "APPROVED"
+            applicationStatus: ApplicationStatus.APPROVED
           }
         });
 
-  const creatorApplicantsByCampaignId = new Map<string, number>();
-  for (const row of missionApplications) {
-    creatorApplicantsByCampaignId.set(row.campaignId, row._count._all);
+  const registeredCreatorCountByCampaignId = new Map<string, number>();
+  for (const row of registeredCreatorPairs) {
+    registeredCreatorCountByCampaignId.set(
+      row.campaignId,
+      (registeredCreatorCountByCampaignId.get(row.campaignId) ?? 0) + 1
+    );
   }
 
   const creatorJoinedByCampaignId = new Map<string, number>();
@@ -158,7 +162,7 @@ export async function listCampaigns(input: ListCampaignsInput) {
   return {
     items: campaigns.map((campaign) => {
       const rewardsLeft = rewardByCampaignId.get(campaign.id) ?? 0;
-      const creatorApplicants = creatorApplicantsByCampaignId.get(campaign.id) ?? 0;
+      const registeredCreatorCount = registeredCreatorCountByCampaignId.get(campaign.id) ?? 0;
       const approvedVideos = Math.max(0, campaign.ugcVideoApprovedCount ?? 0);
       const creatorJoined = creatorJoinedByCampaignId.get(campaign.id) ?? 0;
       const videoTarget = Math.max(0, campaign.ugcVideoQuota ?? 0);
@@ -201,7 +205,8 @@ export async function listCampaigns(input: ListCampaignsInput) {
         missionSlotsRemaining,
         isMissionQuotaReached: videoTarget > 0 && missionSlotsRemaining <= 0,
         backers: campaign.backerCount,
-        creatorApplicants,
+        registeredCreatorCount,
+        creatorApplicants: registeredCreatorCount,
         rewardsLeft,
         deadline: campaign.endsAt
       };
