@@ -87,27 +87,27 @@ const sampleAnalytics: BrandAnalyticsOverview = {
 test("buildBrandAnalyticsCsv exports campaign performance rows", () => {
   const csv = buildBrandAnalyticsCsv("campaignPerformance", sampleAnalytics);
 
-  assert.match(csv, /Campaign ID,Campaign Title,Status/);
+  assert.match(csv, /Mã chiến dịch,Tên chiến dịch,Trạng thái/);
   assert.match(csv, /campaign_1,"Launch, ""Creator""",ACTIVE/);
 });
 
 test("buildBrandAnalyticsCsv exports creator performance rows", () => {
   const csv = buildBrandAnalyticsCsv("creatorPerformance", sampleAnalytics);
 
-  assert.match(csv, /Creator ID,Account ID,Display Name/);
+  assert.match(csv, /Mã nhà sáng tạo,Mã tài khoản,Tên hiển thị/);
   assert.match(csv, /creator_1,creator_1,Creator A,1,1,1,1,0,100,250000/);
 });
 
 test("buildBrandAnalyticsCsv exports funnel rows", () => {
   const csv = buildBrandAnalyticsCsv("funnel", sampleAnalytics);
 
-  assert.match(csv, /Applications,2/);
-  assert.match(csv, /Mission Completion Rate,100/);
+  assert.match(csv, /Lượt ứng tuyển,2/);
+  assert.match(csv, /Tỷ lệ hoàn thành nhiệm vụ,100/);
 });
 
 test("buildBrandAnalyticsCsv exports pending review rows", () => {
   const csv = buildBrandAnalyticsCsv("pendingReview", sampleAnalytics);
 
-  assert.match(csv, /Pending Applications,1/);
-  assert.match(csv, /Pending Payouts,0/);
+  assert.match(csv, /Ứng tuyển chờ duyệt,1/);
+  assert.match(csv, /Rút tiền chờ xử lý,0/);
 });

@@ -19,16 +19,16 @@ export function buildBrandAnalyticsCsv(type: BrandAnalyticsExportType, data: Bra
   if (type === "campaignPerformance") {
     return rowsToCsv([
       [
-        "Campaign ID",
-        "Campaign Title",
-        "Status",
-        "Total Creator Missions",
-        "Approved Applications",
-        "Submitted Proofs",
-        "Approved Proofs",
-        "Rejected Proofs",
-        "Completion Rate",
-        "Commission Credited VND"
+        "Mã chiến dịch",
+        "Tên chiến dịch",
+        "Trạng thái",
+        "Tổng nhiệm vụ creator",
+        "Ứng tuyển đã duyệt",
+        "Minh chứng đã nộp",
+        "Minh chứng đã duyệt",
+        "Minh chứng bị từ chối",
+        "Tỷ lệ hoàn thành",
+        "Hoa hồng đã ghi nhận (VNĐ)"
       ],
       ...data.campaignPerformance.map((item) => [
         item.campaignId,
@@ -48,16 +48,16 @@ export function buildBrandAnalyticsCsv(type: BrandAnalyticsExportType, data: Bra
   if (type === "creatorPerformance") {
     return rowsToCsv([
       [
-        "Creator ID",
-        "Account ID",
-        "Display Name",
-        "Campaign Count",
-        "Approved Missions",
-        "Submitted Proofs",
-        "Approved Proofs",
-        "Rejected Proofs",
-        "Completion Rate",
-        "Commission Credited VND"
+        "Mã nhà sáng tạo",
+        "Mã tài khoản",
+        "Tên hiển thị",
+        "Số chiến dịch",
+        "Nhiệm vụ đã duyệt",
+        "Minh chứng đã nộp",
+        "Minh chứng đã duyệt",
+        "Minh chứng bị từ chối",
+        "Tỷ lệ hoàn thành",
+        "Hoa hồng đã ghi nhận (VNĐ)"
       ],
       ...data.creatorPerformance.map((item) => [
         item.creatorId,
@@ -76,27 +76,27 @@ export function buildBrandAnalyticsCsv(type: BrandAnalyticsExportType, data: Bra
 
   if (type === "funnel") {
     return rowsToCsv([
-      ["Metric", "Value"],
-      ["Applications", data.funnel.applications],
-      ["Approved Applications", data.funnel.approvedApplications],
-      ["Assigned Missions", data.funnel.assignedMissions],
-      ["Accepted Missions", data.funnel.acceptedMissions],
-      ["Proof Submitted", data.funnel.proofSubmitted],
-      ["Proof Approved", data.funnel.proofApproved],
-      ["Proof Rejected", data.funnel.proofRejected],
-      ["Reward Credited", data.funnel.rewardCredited],
-      ["Application Approval Rate", data.funnel.applicationApprovalRate],
-      ["Proof Approval Rate", data.funnel.proofApprovalRate],
-      ["Mission Completion Rate", data.funnel.missionCompletionRate]
+      ["Chỉ số", "Giá trị"],
+      ["Lượt ứng tuyển", data.funnel.applications],
+      ["Ứng tuyển đã duyệt", data.funnel.approvedApplications],
+      ["Nhiệm vụ đã giao", data.funnel.assignedMissions],
+      ["Nhiệm vụ đã nhận", data.funnel.acceptedMissions],
+      ["Minh chứng đã nộp", data.funnel.proofSubmitted],
+      ["Minh chứng đã duyệt", data.funnel.proofApproved],
+      ["Minh chứng bị từ chối", data.funnel.proofRejected],
+      ["Thưởng đã ghi nhận", data.funnel.rewardCredited],
+      ["Tỷ lệ duyệt ứng tuyển", data.funnel.applicationApprovalRate],
+      ["Tỷ lệ duyệt minh chứng", data.funnel.proofApprovalRate],
+      ["Tỷ lệ hoàn thành nhiệm vụ", data.funnel.missionCompletionRate]
     ]);
   }
 
   return rowsToCsv([
-    ["Queue", "Value"],
-    ["Pending Applications", data.pendingReview.pendingApplications],
-    ["Pending Proofs", data.pendingReview.pendingProofs],
-    ["Pending Video Reviews", data.pendingReview.pendingVideoReviews],
-    ["Pending Final Reviews", data.pendingReview.pendingFinalReviews],
-    ["Pending Payouts", data.pendingReview.pendingPayouts]
+    ["Hàng chờ", "Số lượng"],
+    ["Ứng tuyển chờ duyệt", data.pendingReview.pendingApplications],
+    ["Minh chứng chờ duyệt", data.pendingReview.pendingProofs],
+    ["Video chờ duyệt", data.pendingReview.pendingVideoReviews],
+    ["Duyệt cuối chờ xử lý", data.pendingReview.pendingFinalReviews],
+    ["Rút tiền chờ xử lý", data.pendingReview.pendingPayouts]
   ]);
 }

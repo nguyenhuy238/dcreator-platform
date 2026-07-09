@@ -15,6 +15,23 @@ function formatRate(value: number) {
   return `${value.toFixed(2)}%`;
 }
 
+function formatStatus(status: string | null | undefined) {
+  const labels: Record<string, string> = {
+    ACTIVE: "Đang chạy",
+    COMPLETED: "Hoàn tất",
+    DRAFT: "Bản nháp",
+    CANCELLED: "Đã hủy",
+    ARCHIVED: "Lưu trữ",
+    PAUSED: "Tạm dừng",
+    APPROVED: "Đã duyệt",
+    REJECTED: "Từ chối",
+    PENDING_REVIEW: "Chờ duyệt",
+    IN_PROGRESS: "Đang thực hiện",
+    DONE: "Hoàn tất"
+  };
+  return status ? labels[status] ?? status : "-";
+}
+
 export function BrandAnalyticsClient() {
   const [data, setData] = useState<BrandAnalyticsOverview | null>(null);
   const [filterOptions, setFilterOptions] = useState<BrandAnalyticsFilterOptions | null>(null);
@@ -96,90 +113,90 @@ export function BrandAnalyticsClient() {
 
   return (
     <>
-      <PageHeader title="Brand Analytics" subtitle="Theo dõi hiệu quả campaign, creator, proof và commission." />
+      <PageHeader title="Thống kê thương hiệu" subtitle="Theo dõi hiệu quả chiến dịch, nhà sáng tạo, minh chứng và hoa hồng." />
 
       <section className="dc-card mb-6 p-4">
         <div className="grid gap-3 md:grid-cols-4">
           <label className="grid gap-1 text-sm font-medium text-zinc-700">
-            Date from
+            Từ ngày
             <input className="rounded-xl border border-zinc-200 px-3 py-2 text-sm" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
           </label>
           <label className="grid gap-1 text-sm font-medium text-zinc-700">
-            Date to
+            Đến ngày
             <input className="rounded-xl border border-zinc-200 px-3 py-2 text-sm" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
           </label>
           <label className="grid gap-1 text-sm font-medium text-zinc-700 md:col-span-2">
-            Campaign
+            Chiến dịch
             {filterOptions ? (
               <select className="rounded-xl border border-zinc-200 px-3 py-2 text-sm" value={campaignId} onChange={(event) => setCampaignId(event.target.value)}>
-                <option value="">Tất cả campaign</option>
+                <option value="">Tất cả chiến dịch</option>
                 {filterOptions.campaigns.map((campaign) => (
                   <option key={campaign.id} value={campaign.id}>
-                    {campaign.title} ({campaign.status})
+                    {campaign.title} ({formatStatus(campaign.status)})
                   </option>
                 ))}
               </select>
             ) : (
               <input
                 className="rounded-xl border border-zinc-200 px-3 py-2 text-sm"
-                placeholder={optionsLoading ? "Đang tải campaign..." : "Campaign ID"}
+                placeholder={optionsLoading ? "Đang tải chiến dịch..." : "Mã chiến dịch"}
                 value={campaignId}
                 onChange={(event) => setCampaignId(event.target.value)}
               />
             )}
           </label>
         </div>
-        {optionsError ? <p className="mt-2 text-sm text-amber-600">Không tải được danh sách campaign. Có thể nhập Campaign ID để lọc.</p> : null}
+        {optionsError ? <p className="mt-2 text-sm text-amber-600">Không tải được danh sách chiến dịch. Có thể nhập mã chiến dịch để lọc.</p> : null}
         <div className="mt-4 flex flex-wrap gap-2">
           <button className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800" onClick={() => void load()}>
-            Apply filters
+            Áp dụng bộ lọc
           </button>
           <button className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50" onClick={resetFilters}>
-            Reset filters
+            Đặt lại
           </button>
           <button className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50" onClick={() => exportCsv("campaignPerformance")}>
-            Export Campaign CSV
+            Xuất CSV chiến dịch
           </button>
           <button className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50" onClick={() => exportCsv("creatorPerformance")}>
-            Export Creator CSV
+            Xuất CSV nhà sáng tạo
           </button>
           <button className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50" onClick={() => exportCsv("funnel")}>
-            Export Funnel CSV
+            Xuất CSV phễu
           </button>
           <button className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50" onClick={() => exportCsv("pendingReview")}>
-            Export Pending CSV
+            Xuất CSV chờ duyệt
           </button>
         </div>
       </section>
 
       {error ? <ErrorState title="Không thể tải dữ liệu thống kê" description={error} onRetry={() => void load()} /> : null}
       {loading ? <LoadingSkeleton rows={5} /> : null}
-      {!loading && data && !hasData ? <EmptyState title="Chưa có dữ liệu Brand Analytics" description="Dữ liệu sẽ xuất hiện khi brand có campaign, creator mission hoặc proof." /> : null}
+      {!loading && data && !hasData ? <EmptyState title="Chưa có dữ liệu thống kê thương hiệu" description="Dữ liệu sẽ xuất hiện khi thương hiệu có chiến dịch, nhiệm vụ nhà sáng tạo hoặc minh chứng." /> : null}
 
       {!loading && data && hasData ? (
         <>
           <section className="dc-grid-dashboard">
-            <StatsCard title="Total Campaigns" value={`${data.overview.totalCampaigns}`} />
-            <StatsCard title="Active Campaigns" value={`${data.overview.activeCampaigns}`} />
-            <StatsCard title="Total Applications" value={`${data.overview.totalApplications}`} />
-            <StatsCard title="Approved Applications" value={`${data.overview.approvedApplications}`} />
-            <StatsCard title="Proof Approved" value={`${data.overview.proofApproved}`} />
-            <StatsCard title="Pending Reviews" value={`${data.overview.pendingReviews}`} />
-            <StatsCard title="Commission Credited" value={formatVnd(data.payments.commissionCreditedVnd)} />
-            <StatsCard title="Pending Payout" value={formatVnd(data.payments.payoutPendingVnd)} />
+            <StatsCard title="Tổng chiến dịch" value={`${data.overview.totalCampaigns}`} />
+            <StatsCard title="Chiến dịch đang chạy" value={`${data.overview.activeCampaigns}`} />
+            <StatsCard title="Tổng lượt ứng tuyển" value={`${data.overview.totalApplications}`} />
+            <StatsCard title="Ứng tuyển đã duyệt" value={`${data.overview.approvedApplications}`} />
+            <StatsCard title="Minh chứng đã duyệt" value={`${data.overview.proofApproved}`} />
+            <StatsCard title="Chờ duyệt" value={`${data.overview.pendingReviews}`} />
+            <StatsCard title="Hoa hồng đã ghi nhận" value={formatVnd(data.payments.commissionCreditedVnd)} />
+            <StatsCard title="Rút tiền đang chờ" value={formatVnd(data.payments.payoutPendingVnd)} />
           </section>
 
           <section className="mt-6 grid gap-4 lg:grid-cols-3">
             <article className="dc-card p-4 lg:col-span-2">
-              <SectionHeader title="Campaign Funnel" subtitle="Ứng tuyển, mission, proof và reward trong phạm vi brand." />
+              <SectionHeader title="Phễu chuyển đổi chiến dịch" subtitle="Ứng tuyển, nhiệm vụ, minh chứng và thưởng trong phạm vi thương hiệu." />
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {[
-                  ["Applications", data.funnel.applications],
-                  ["Approved Applications", data.funnel.approvedApplications],
-                  ["Assigned Missions", data.funnel.assignedMissions],
-                  ["Proof Submitted", data.funnel.proofSubmitted],
-                  ["Proof Approved", data.funnel.proofApproved],
-                  ["Reward Credited", data.funnel.rewardCredited]
+                  ["Lượt ứng tuyển", data.funnel.applications],
+                  ["Ứng tuyển đã duyệt", data.funnel.approvedApplications],
+                  ["Nhiệm vụ đã giao", data.funnel.assignedMissions],
+                  ["Minh chứng đã nộp", data.funnel.proofSubmitted],
+                  ["Minh chứng đã duyệt", data.funnel.proofApproved],
+                  ["Thưởng đã ghi nhận", data.funnel.rewardCredited]
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-xl border border-zinc-100 bg-zinc-50 p-3">
                     <p className="text-xs font-medium text-zinc-500">{label}</p>
@@ -188,52 +205,52 @@ export function BrandAnalyticsClient() {
                 ))}
               </div>
               <div className="mt-4 grid gap-2 text-sm text-zinc-600 sm:grid-cols-3">
-                <p>Application approval rate: <span className="font-semibold text-zinc-900">{formatRate(data.funnel.applicationApprovalRate)}</span></p>
-                <p>Proof approval rate: <span className="font-semibold text-zinc-900">{formatRate(data.funnel.proofApprovalRate)}</span></p>
-                <p>Mission completion rate: <span className="font-semibold text-zinc-900">{formatRate(data.funnel.missionCompletionRate)}</span></p>
+                <p>Tỷ lệ duyệt ứng tuyển: <span className="font-semibold text-zinc-900">{formatRate(data.funnel.applicationApprovalRate)}</span></p>
+                <p>Tỷ lệ duyệt minh chứng: <span className="font-semibold text-zinc-900">{formatRate(data.funnel.proofApprovalRate)}</span></p>
+                <p>Tỷ lệ hoàn thành nhiệm vụ: <span className="font-semibold text-zinc-900">{formatRate(data.funnel.missionCompletionRate)}</span></p>
               </div>
             </article>
 
             <article className="dc-card p-4">
-              <SectionHeader title="Pending Review" />
+              <SectionHeader title="Chờ duyệt" />
               <div className="grid gap-2 text-sm text-zinc-600">
-                <p>Applications: <span className="font-semibold text-zinc-900">{data.pendingReview.pendingApplications}</span></p>
-                <p>Proofs: <span className="font-semibold text-zinc-900">{data.pendingReview.pendingProofs}</span></p>
-                <p>Video reviews: <span className="font-semibold text-zinc-900">{data.pendingReview.pendingVideoReviews}</span></p>
-                <p>Final reviews: <span className="font-semibold text-zinc-900">{data.pendingReview.pendingFinalReviews}</span></p>
-                <p>Payouts: <span className="font-semibold text-zinc-900">{data.pendingReview.pendingPayouts}</span></p>
+                <p>Ứng tuyển: <span className="font-semibold text-zinc-900">{data.pendingReview.pendingApplications}</span></p>
+                <p>Minh chứng: <span className="font-semibold text-zinc-900">{data.pendingReview.pendingProofs}</span></p>
+                <p>Video chờ duyệt: <span className="font-semibold text-zinc-900">{data.pendingReview.pendingVideoReviews}</span></p>
+                <p>Duyệt cuối: <span className="font-semibold text-zinc-900">{data.pendingReview.pendingFinalReviews}</span></p>
+                <p>Rút tiền: <span className="font-semibold text-zinc-900">{data.pendingReview.pendingPayouts}</span></p>
               </div>
             </article>
           </section>
 
           <section className="mt-6">
-            <SectionHeader title="Payment / Commission Summary" />
+            <SectionHeader title="Tổng quan thanh toán / hoa hồng" />
             <div className="grid gap-3 md:grid-cols-4">
-              <StatsCard title="Commission Credited" value={formatVnd(data.payments.commissionCreditedVnd)} />
-              <StatsCard title="Payout Requested" value={formatVnd(data.payments.payoutRequestedVnd)} />
-              <StatsCard title="Payout Paid" value={formatVnd(data.payments.payoutPaidVnd)} />
-              <StatsCard title="Payout Pending" value={formatVnd(data.payments.payoutPendingVnd)} />
+              <StatsCard title="Hoa hồng đã ghi nhận" value={formatVnd(data.payments.commissionCreditedVnd)} />
+              <StatsCard title="Rút tiền đã yêu cầu" value={formatVnd(data.payments.payoutRequestedVnd)} />
+              <StatsCard title="Rút tiền đã thanh toán" value={formatVnd(data.payments.payoutPaidVnd)} />
+              <StatsCard title="Rút tiền đang chờ" value={formatVnd(data.payments.payoutPendingVnd)} />
             </div>
           </section>
 
           <section className="mt-6">
-            <SectionHeader title="Campaign Performance" subtitle="Hiệu suất creator mission và proof theo campaign." />
+            <SectionHeader title="Hiệu quả chiến dịch" subtitle="Hiệu suất nhiệm vụ nhà sáng tạo và minh chứng theo chiến dịch." />
             {data.campaignPerformance.length === 0 ? (
-              <EmptyState title="Chưa có dữ liệu campaign" description="Campaign performance sẽ xuất hiện khi brand có campaign trong bộ lọc hiện tại." />
+              <EmptyState title="Chưa có dữ liệu chiến dịch" description="Hiệu quả chiến dịch sẽ xuất hiện khi thương hiệu có chiến dịch trong bộ lọc hiện tại." />
             ) : (
               <div className="grid gap-3">
                 {data.campaignPerformance.map((item) => (
                   <article key={item.campaignId} className="dc-card p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="font-semibold text-zinc-900">{item.title}</p>
-                      <p className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600">{item.status}</p>
+                      <p className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600">{formatStatus(item.status)}</p>
                     </div>
                     <div className="mt-3 grid gap-2 text-sm text-zinc-600 sm:grid-cols-2 lg:grid-cols-5">
-                      <p>Missions: <span className="font-semibold text-zinc-900">{item.totalCreatorMissions}</span></p>
-                      <p>Approved: <span className="font-semibold text-zinc-900">{item.approvedApplications}</span></p>
-                      <p>Proof: <span className="font-semibold text-zinc-900">{item.submittedProofs}/{item.approvedProofs}</span></p>
-                      <p>Completion: <span className="font-semibold text-zinc-900">{formatRate(item.completionRate)}</span></p>
-                      <p>Commission: <span className="font-semibold text-zinc-900">{formatVnd(item.commissionCreditedVnd)}</span></p>
+                      <p>Nhiệm vụ: <span className="font-semibold text-zinc-900">{item.totalCreatorMissions}</span></p>
+                      <p>Đã duyệt: <span className="font-semibold text-zinc-900">{item.approvedApplications}</span></p>
+                      <p>Minh chứng: <span className="font-semibold text-zinc-900">{item.submittedProofs}/{item.approvedProofs}</span></p>
+                      <p>Hoàn thành: <span className="font-semibold text-zinc-900">{formatRate(item.completionRate)}</span></p>
+                      <p>Hoa hồng: <span className="font-semibold text-zinc-900">{formatVnd(item.commissionCreditedVnd)}</span></p>
                     </div>
                   </article>
                 ))}
@@ -242,9 +259,9 @@ export function BrandAnalyticsClient() {
           </section>
 
           <section className="mt-6">
-            <SectionHeader title="Creator Performance" subtitle="Hiệu suất creator trong campaign của brand." />
+            <SectionHeader title="Hiệu quả nhà sáng tạo" subtitle="Hiệu suất nhà sáng tạo trong chiến dịch của thương hiệu." />
             {data.creatorPerformance.length === 0 ? (
-              <EmptyState title="Chưa có dữ liệu creator" description="Creator performance sẽ xuất hiện khi có creator mission trong phạm vi brand." />
+              <EmptyState title="Chưa có dữ liệu nhà sáng tạo" description="Hiệu quả nhà sáng tạo sẽ xuất hiện khi có nhiệm vụ trong phạm vi thương hiệu." />
             ) : (
               <div className="grid gap-3">
                 {data.creatorPerformance.map((item) => (
@@ -254,11 +271,11 @@ export function BrandAnalyticsClient() {
                       <p className="text-xs text-zinc-500">{item.creatorId}</p>
                     </div>
                     <div className="mt-3 grid gap-2 text-sm text-zinc-600 sm:grid-cols-2 lg:grid-cols-5">
-                      <p>Campaigns: <span className="font-semibold text-zinc-900">{item.campaignCount}</span></p>
-                      <p>Approved missions: <span className="font-semibold text-zinc-900">{item.approvedMissions}</span></p>
-                      <p>Proof: <span className="font-semibold text-zinc-900">{item.submittedProofs}/{item.approvedProofs}</span></p>
-                      <p>Completion: <span className="font-semibold text-zinc-900">{formatRate(item.completionRate)}</span></p>
-                      <p>Commission: <span className="font-semibold text-zinc-900">{formatVnd(item.commissionCreditedVnd)}</span></p>
+                      <p>Chiến dịch: <span className="font-semibold text-zinc-900">{item.campaignCount}</span></p>
+                      <p>Nhiệm vụ đã duyệt: <span className="font-semibold text-zinc-900">{item.approvedMissions}</span></p>
+                      <p>Minh chứng: <span className="font-semibold text-zinc-900">{item.submittedProofs}/{item.approvedProofs}</span></p>
+                      <p>Hoàn thành: <span className="font-semibold text-zinc-900">{formatRate(item.completionRate)}</span></p>
+                      <p>Hoa hồng: <span className="font-semibold text-zinc-900">{formatVnd(item.commissionCreditedVnd)}</span></p>
                     </div>
                   </article>
                 ))}

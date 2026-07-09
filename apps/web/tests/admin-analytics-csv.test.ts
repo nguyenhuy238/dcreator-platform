@@ -92,12 +92,12 @@ test("rowsToCsv joins rows with CRLF", () => {
 
 test("buildAdminAnalyticsCsv exports campaign performance rows", () => {
   const csv = buildAdminAnalyticsCsv("campaignPerformance", sampleAnalytics);
-  assert.match(csv, /Campaign ID,Campaign Title,Status/);
+  assert.match(csv, /Mã chiến dịch,Tên chiến dịch,Trạng thái/);
   assert.match(csv, /campaign_1,"Campaign, ""Alpha""",ACTIVE/);
 });
 
 test("buildAdminAnalyticsCsv exports top creators rows", () => {
   const csv = buildAdminAnalyticsCsv("topCreators", sampleAnalytics);
-  assert.match(csv, /Creator ID,Account ID,Display Name/);
+  assert.match(csv, /Mã nhà sáng tạo,Mã tài khoản,Tên hiển thị/);
   assert.match(csv, /creator_1,account_1,"Creator, ""One"""/);
 });

@@ -80,11 +80,11 @@ export function AdminAnalyticsClient() {
       const response = await fetch(`/api/admin/dashboard/analytics/filter-options?${params.toString()}`, { cache: "no-store" });
       const payload = (await response.json()) as ApiResult<AdminAnalyticsFilterOptions>;
       if (!response.ok || !payload.success || !payload.data) {
-        throw new Error(payload.message ?? payload.error ?? "Không thể tải filter options");
+        throw new Error(payload.message ?? payload.error ?? "Không thể tải danh sách bộ lọc");
       }
       setFilterOptions(payload.data);
     } catch (requestError) {
-      setOptionsError(requestError instanceof Error ? requestError.message : "Không thể tải filter options");
+      setOptionsError(requestError instanceof Error ? requestError.message : "Không thể tải danh sách bộ lọc");
       setFilterOptions({ brands: [], campaigns: [] });
     } finally {
       setOptionsLoading(false);
@@ -100,11 +100,11 @@ export function AdminAnalyticsClient() {
       const response = await fetch(`/api/admin/dashboard/analytics?${params.toString()}`, { cache: "no-store" });
       const payload = (await response.json()) as ApiResult<AdminAnalyticsOverview>;
       if (!response.ok || !payload.success || !payload.data) {
-        throw new Error(payload.message ?? payload.error ?? "Không thể tải Admin Analytics");
+        throw new Error(payload.message ?? payload.error ?? "Không thể tải thống kê quản trị");
       }
       setData(payload.data);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Không thể tải Admin Analytics");
+      setError(requestError instanceof Error ? requestError.message : "Không thể tải thống kê quản trị");
     } finally {
       setLoading(false);
     }
@@ -137,8 +137,8 @@ export function AdminAnalyticsClient() {
   return (
     <>
       <PageHeader
-        title="Admin Analytics"
-        subtitle="Tổng quan Campaign, Creator Mission funnel, review queue và commission theo dữ liệu thật."
+        title="Thống kê quản trị"
+        subtitle="Theo dõi toàn bộ chiến dịch, nhà sáng tạo, minh chứng và thanh toán trên hệ thống."
         action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>}
       />
 
@@ -155,18 +155,18 @@ export function AdminAnalyticsClient() {
           {optionsError ? (
             <>
               <label className="grid gap-1.5 text-sm font-semibold text-zinc-700">
-                Brand ID
-                <input className="dc-input" value={brandId} onChange={(event) => setBrandId(event.target.value)} placeholder="Tất cả brand" />
+                Mã thương hiệu
+                <input className="dc-input" value={brandId} onChange={(event) => setBrandId(event.target.value)} placeholder="Tất cả thương hiệu" />
               </label>
               <label className="grid gap-1.5 text-sm font-semibold text-zinc-700">
-                Campaign ID
-                <input className="dc-input" value={campaignId} onChange={(event) => setCampaignId(event.target.value)} placeholder="Tất cả campaign" />
+                Mã chiến dịch
+                <input className="dc-input" value={campaignId} onChange={(event) => setCampaignId(event.target.value)} placeholder="Tất cả chiến dịch" />
               </label>
             </>
           ) : (
             <>
               <label className="grid gap-1.5 text-sm font-semibold text-zinc-700">
-                Brand
+                Thương hiệu
                 <select
                   className="dc-input"
                   value={brandId}
@@ -176,16 +176,16 @@ export function AdminAnalyticsClient() {
                     setCampaignId("");
                   }}
                 >
-                  <option value="">Tất cả brand</option>
+                  <option value="">Tất cả thương hiệu</option>
                   {filterOptions.brands.map((brand) => (
                     <option key={brand.id} value={brand.id}>{brand.name} ({brand.campaignCount})</option>
                   ))}
                 </select>
               </label>
               <label className="grid gap-1.5 text-sm font-semibold text-zinc-700">
-                Campaign
+                Chiến dịch
                 <select className="dc-input" value={campaignId} disabled={optionsLoading} onChange={(event) => setCampaignId(event.target.value)}>
-                  <option value="">Tất cả campaign</option>
+                  <option value="">Tất cả chiến dịch</option>
                   {campaignOptions.map((campaign) => (
                     <option key={campaign.id} value={campaign.id}>{campaign.title} · {campaign.status}</option>
                   ))}
@@ -194,107 +194,107 @@ export function AdminAnalyticsClient() {
             </>
           )}
           <div className="flex flex-col gap-2 md:flex-row xl:flex-col xl:items-stretch xl:justify-end">
-            <button className="dc-btn-primary w-full" onClick={() => void load()}>Áp dụng</button>
-            <button className="dc-btn-secondary w-full" onClick={resetFilters}>Reset</button>
+            <button className="dc-btn-primary w-full" onClick={() => void load()}>Áp dụng bộ lọc</button>
+            <button className="dc-btn-secondary w-full" onClick={resetFilters}>Đặt lại</button>
           </div>
         </div>
-        {optionsError ? <p className="mt-3 text-sm text-amber-700">Không tải được dropdown filter: {optionsError}. Có thể nhập ID thủ công.</p> : null}
+        {optionsError ? <p className="mt-3 text-sm text-amber-700">Không thể tải danh sách bộ lọc: {optionsError}. Có thể nhập ID thủ công.</p> : null}
       </section>
 
       {loading ? <LoadingSkeleton rows={7} /> : null}
-      {error ? <ErrorState title="Không tải được Admin Analytics" description={error} onRetry={() => void load()} /> : null}
+      {error ? <ErrorState title="Không thể tải thống kê quản trị" description={error} onRetry={() => void load()} /> : null}
 
       {!loading && !error && data ? (
         <>
           <section className="dc-grid-dashboard">
-            <StatsCard title="Total Campaigns" value={data.overview.totalCampaigns.toLocaleString("vi-VN")} />
-            <StatsCard title="Active Campaigns" value={data.overview.activeCampaigns.toLocaleString("vi-VN")} />
-            <StatsCard title="Creator Applications" value={data.funnel.applications.toLocaleString("vi-VN")} />
-            <StatsCard title="Proof Approved" value={data.funnel.proofApproved.toLocaleString("vi-VN")} hint={formatPercent(data.funnel.proofApprovalRate)} />
-            <StatsCard title="Pending Reviews" value={totalPendingReviews.toLocaleString("vi-VN")} />
-            <StatsCard title="Payout Pending" value={formatVnd(data.payments.payoutPendingVnd)} />
+            <StatsCard title="Tổng chiến dịch" value={data.overview.totalCampaigns.toLocaleString("vi-VN")} />
+            <StatsCard title="Chiến dịch đang chạy" value={data.overview.activeCampaigns.toLocaleString("vi-VN")} />
+            <StatsCard title="Tổng lượt ứng tuyển" value={data.funnel.applications.toLocaleString("vi-VN")} />
+            <StatsCard title="Minh chứng đã duyệt" value={data.funnel.proofApproved.toLocaleString("vi-VN")} hint={formatPercent(data.funnel.proofApprovalRate)} />
+            <StatsCard title="Chờ duyệt" value={totalPendingReviews.toLocaleString("vi-VN")} />
+            <StatsCard title="Rút tiền đang chờ" value={formatVnd(data.payments.payoutPendingVnd)} />
           </section>
 
           <section className="mt-8">
-            <SectionHeader title="Campaign Overview" subtitle="Trạng thái campaign và yêu cầu tạo campaign từ Brand." />
+            <SectionHeader title="Tổng quan chiến dịch" subtitle="Trạng thái chiến dịch và yêu cầu tạo chiến dịch từ thương hiệu." />
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-              <MetricRow label="Completed" value={data.overview.completedCampaigns.toLocaleString("vi-VN")} />
-              <MetricRow label="Draft" value={data.overview.draftCampaigns.toLocaleString("vi-VN")} />
-              <MetricRow label="Cancelled / Archived" value={data.overview.cancelledCampaigns.toLocaleString("vi-VN")} />
-              <MetricRow label="Brand requests pending" value={data.overview.pendingBrandCampaignRequests.toLocaleString("vi-VN")} />
-              <MetricRow label="Brand requests approved" value={data.overview.approvedBrandCampaignRequests.toLocaleString("vi-VN")} />
+              <MetricRow label="Đã hoàn tất" value={data.overview.completedCampaigns.toLocaleString("vi-VN")} />
+              <MetricRow label="Bản nháp" value={data.overview.draftCampaigns.toLocaleString("vi-VN")} />
+              <MetricRow label="Đã hủy / lưu trữ" value={data.overview.cancelledCampaigns.toLocaleString("vi-VN")} />
+              <MetricRow label="Yêu cầu thương hiệu chờ duyệt" value={data.overview.pendingBrandCampaignRequests.toLocaleString("vi-VN")} />
+              <MetricRow label="Yêu cầu thương hiệu đã duyệt" value={data.overview.approvedBrandCampaignRequests.toLocaleString("vi-VN")} />
             </div>
           </section>
 
           <section className="mt-8">
             <SectionHeader
-              title="Creator Mission Funnel"
+              title="Phễu chuyển đổi nhiệm vụ"
               subtitle="Nguồn chính: CreatorMission. Không tính donation/backer/contribution legacy."
-              action={<button className="dc-btn-secondary" onClick={() => exportCsv("funnel")}>Export Funnel CSV</button>}
+              action={<button className="dc-btn-secondary" onClick={() => exportCsv("funnel")}>Xuất CSV phễu</button>}
             />
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-              <MetricRow label="Applications" value={data.funnel.applications.toLocaleString("vi-VN")} />
-              <MetricRow label="Approved applications" value={data.funnel.approvedApplications.toLocaleString("vi-VN")} hint={formatPercent(data.funnel.applicationApprovalRate)} />
-              <MetricRow label="Assigned missions" value={data.funnel.assignedMissions.toLocaleString("vi-VN")} />
-              <MetricRow label="Proof submitted" value={data.funnel.proofSubmitted.toLocaleString("vi-VN")} />
-              <MetricRow label="Reward credited" value={data.funnel.rewardCredited.toLocaleString("vi-VN")} hint={formatPercent(data.funnel.missionCompletionRate)} />
+              <MetricRow label="Lượt ứng tuyển" value={data.funnel.applications.toLocaleString("vi-VN")} />
+              <MetricRow label="Ứng tuyển đã duyệt" value={data.funnel.approvedApplications.toLocaleString("vi-VN")} hint={formatPercent(data.funnel.applicationApprovalRate)} />
+              <MetricRow label="Nhiệm vụ đã giao" value={data.funnel.assignedMissions.toLocaleString("vi-VN")} />
+              <MetricRow label="Minh chứng đã nộp" value={data.funnel.proofSubmitted.toLocaleString("vi-VN")} />
+              <MetricRow label="Thưởng đã ghi nhận" value={data.funnel.rewardCredited.toLocaleString("vi-VN")} hint={formatPercent(data.funnel.missionCompletionRate)} />
             </div>
           </section>
 
           <section className="mt-8">
             <SectionHeader
-              title="Pending Review"
-              subtitle="Các queue Admin/OPS cần xử lý."
-              action={<button className="dc-btn-secondary" onClick={() => exportCsv("pendingReview")}>Export Pending CSV</button>}
+              title="Chờ duyệt"
+              subtitle="Các hàng chờ Admin/OPS cần xử lý."
+              action={<button className="dc-btn-secondary" onClick={() => exportCsv("pendingReview")}>Xuất CSV chờ duyệt</button>}
             />
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-              <MetricRow label="Pending applications" value={data.pendingReview.pendingApplications.toLocaleString("vi-VN")} />
-              <MetricRow label="Pending proofs" value={data.pendingReview.pendingProofs.toLocaleString("vi-VN")} />
-              <MetricRow label="Pending video reviews" value={data.pendingReview.pendingVideoReviews.toLocaleString("vi-VN")} />
-              <MetricRow label="Pending final reviews" value={data.pendingReview.pendingFinalReviews.toLocaleString("vi-VN")} />
-              <MetricRow label="Pending payouts" value={data.pendingReview.pendingPayouts.toLocaleString("vi-VN")} />
+              <MetricRow label="Ứng tuyển chờ duyệt" value={data.pendingReview.pendingApplications.toLocaleString("vi-VN")} />
+              <MetricRow label="Minh chứng chờ duyệt" value={data.pendingReview.pendingProofs.toLocaleString("vi-VN")} />
+              <MetricRow label="Video chờ duyệt" value={data.pendingReview.pendingVideoReviews.toLocaleString("vi-VN")} />
+              <MetricRow label="Duyệt cuối chờ xử lý" value={data.pendingReview.pendingFinalReviews.toLocaleString("vi-VN")} />
+              <MetricRow label="Rút tiền chờ xử lý" value={data.pendingReview.pendingPayouts.toLocaleString("vi-VN")} />
             </div>
           </section>
 
           <section className="mt-8">
-            <SectionHeader title="Payment / Commission Summary" subtitle="Commission/payout đã qua mapping an toàn; payment intent chưa rõ được tách khỏi KPI chính." />
+            <SectionHeader title="Tổng quan thanh toán / hoa hồng" subtitle="Hoa hồng và rút tiền đã qua mapping an toàn; giao dịch chưa phân loại được tách khỏi KPI chính." />
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <MetricRow label="Commission credited" value={formatVnd(data.payments.commissionCreditedVnd)} />
-              <MetricRow label="Payout requested" value={formatVnd(data.payments.payoutRequestedVnd)} />
-              <MetricRow label="Payout paid" value={formatVnd(data.payments.payoutPaidVnd)} />
-              <MetricRow label="Payment success" value={formatVnd(data.payments.paymentTransactionsSucceededVnd)} />
-              <MetricRow label="Payment pending" value={formatVnd(data.payments.paymentTransactionsPendingVnd)} />
-              <MetricRow label="Payment failed" value={formatVnd(data.payments.paymentTransactionsFailedVnd)} />
-              <MetricRow label="Unknown payment intent" value={formatVnd(data.payments.unknownPaymentTransactionsVnd ?? 0)} />
+              <MetricRow label="Hoa hồng đã ghi nhận" value={formatVnd(data.payments.commissionCreditedVnd)} />
+              <MetricRow label="Rút tiền đã yêu cầu" value={formatVnd(data.payments.payoutRequestedVnd)} />
+              <MetricRow label="Rút tiền đã thanh toán" value={formatVnd(data.payments.payoutPaidVnd)} />
+              <MetricRow label="Thanh toán thành công" value={formatVnd(data.payments.paymentTransactionsSucceededVnd)} />
+              <MetricRow label="Thanh toán đang chờ" value={formatVnd(data.payments.paymentTransactionsPendingVnd)} />
+              <MetricRow label="Thanh toán thất bại" value={formatVnd(data.payments.paymentTransactionsFailedVnd)} />
+              <MetricRow label="Giao dịch chưa phân loại" value={formatVnd(data.payments.unknownPaymentTransactionsVnd ?? 0)} />
             </div>
           </section>
 
           <section className="mt-8">
             <SectionHeader
-              title="Campaign Performance"
-              subtitle="Hiệu suất mission/proof theo campaign."
-              action={<button className="dc-btn-secondary" onClick={() => exportCsv("campaignPerformance")}>Export Campaign CSV</button>}
+              title="Hiệu quả chiến dịch"
+              subtitle="Hiệu suất nhiệm vụ và minh chứng theo chiến dịch."
+              action={<button className="dc-btn-secondary" onClick={() => exportCsv("campaignPerformance")}>Xuất CSV chiến dịch</button>}
             />
             {data.campaignPerformance.length === 0 ? (
-              <EmptyTable title="Chưa có dữ liệu campaign" description="Không có campaign phù hợp bộ lọc hiện tại." />
+              <EmptyTable title="Chưa có dữ liệu chiến dịch" description="Không có chiến dịch phù hợp bộ lọc hiện tại." />
             ) : (
               <TableShell>
                 <div className="hidden grid-cols-[minmax(220px,1.4fr)_120px_repeat(5,minmax(96px,.7fr))_140px] gap-3 bg-zinc-50 px-4 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500 xl:grid">
-                  <span>Campaign</span>
-                  <span>Status</span>
-                  <span>Missions</span>
-                  <span>Approved</span>
-                  <span>Submitted</span>
-                  <span>Proof OK</span>
-                  <span>Completion</span>
-                  <span>Commission</span>
+                  <span>Chiến dịch</span>
+                  <span>Trạng thái</span>
+                  <span>Nhiệm vụ</span>
+                  <span>Đã duyệt</span>
+                  <span>Đã nộp</span>
+                  <span>Minh chứng OK</span>
+                  <span>Hoàn thành</span>
+                  <span>Hoa hồng</span>
                 </div>
                 <div className="divide-y divide-zinc-100">
                   {data.campaignPerformance.map((item) => (
                     <article key={item.campaignId} className="grid gap-3 p-4 xl:grid-cols-[minmax(220px,1.4fr)_120px_repeat(5,minmax(96px,.7fr))_140px] xl:items-center">
                       <div className="min-w-0">
                         <p className="truncate font-semibold text-zinc-900">{item.title}</p>
-                        <p className="truncate text-xs text-zinc-500">{item.brandName ?? item.brandId ?? "Không rõ brand"}</p>
+                        <p className="truncate text-xs text-zinc-500">{item.brandName ?? item.brandId ?? "Không rõ thương hiệu"}</p>
                       </div>
                       <StatusBadge status={item.status} />
                       <p className="text-sm font-semibold text-zinc-900">{item.totalCreatorMissions}</p>
@@ -312,22 +312,22 @@ export function AdminAnalyticsClient() {
 
           <section className="mt-8">
             <SectionHeader
-              title="Top Creators"
-              subtitle="Xếp hạng theo proof được duyệt, mission được duyệt và commission credited."
-              action={<button className="dc-btn-secondary" onClick={() => exportCsv("topCreators")}>Export Creators CSV</button>}
+              title="Nhà sáng tạo nổi bật"
+              subtitle="Xếp hạng theo minh chứng được duyệt, nhiệm vụ được duyệt và hoa hồng đã ghi nhận."
+              action={<button className="dc-btn-secondary" onClick={() => exportCsv("topCreators")}>Xuất CSV top nhà sáng tạo</button>}
             />
             {data.topCreators.length === 0 ? (
-              <EmptyTable title="Chưa có dữ liệu Creator" description="Không có creator mission phù hợp bộ lọc hiện tại." />
+              <EmptyTable title="Chưa có dữ liệu nhà sáng tạo" description="Không có nhiệm vụ nhà sáng tạo phù hợp bộ lọc hiện tại." />
             ) : (
               <TableShell>
                 <div className="hidden grid-cols-[minmax(220px,1.4fr)_repeat(5,minmax(96px,.7fr))_140px] gap-3 bg-zinc-50 px-4 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500 xl:grid">
-                  <span>Creator</span>
-                  <span>Approved</span>
-                  <span>Submitted</span>
-                  <span>Proof OK</span>
-                  <span>Rejected</span>
-                  <span>Completion</span>
-                  <span>Commission</span>
+                  <span>Nhà sáng tạo</span>
+                  <span>Đã duyệt</span>
+                  <span>Đã nộp</span>
+                  <span>Minh chứng OK</span>
+                  <span>Từ chối</span>
+                  <span>Hoàn thành</span>
+                  <span>Hoa hồng</span>
                 </div>
                 <div className="divide-y divide-zinc-100">
                   {data.topCreators.map((item) => (

@@ -67,18 +67,18 @@ export function buildAdminAnalyticsCsv(type: AdminAnalyticsExportType, data: Adm
   if (type === "campaignPerformance") {
     return toCsv([
       [
-        "Campaign ID",
-        "Campaign Title",
-        "Status",
-        "Brand ID",
-        "Brand Name",
-        "Total Creator Missions",
-        "Approved Applications",
-        "Submitted Proofs",
-        "Approved Proofs",
-        "Rejected Proofs",
-        "Completion Rate",
-        "Commission Credited VND"
+        "Mã chiến dịch",
+        "Tên chiến dịch",
+        "Trạng thái",
+        "Mã thương hiệu",
+        "Tên thương hiệu",
+        "Tổng nhiệm vụ creator",
+        "Ứng tuyển đã duyệt",
+        "Minh chứng đã nộp",
+        "Minh chứng đã duyệt",
+        "Minh chứng bị từ chối",
+        "Tỷ lệ hoàn thành",
+        "Hoa hồng đã ghi nhận (VNĐ)"
       ],
       ...data.campaignPerformance.map((item) => [
         item.campaignId,
@@ -100,15 +100,15 @@ export function buildAdminAnalyticsCsv(type: AdminAnalyticsExportType, data: Adm
   if (type === "topCreators") {
     return toCsv([
       [
-        "Creator ID",
-        "Account ID",
-        "Display Name",
-        "Approved Missions",
-        "Submitted Proofs",
-        "Approved Proofs",
-        "Rejected Proofs",
-        "Completion Rate",
-        "Commission Credited VND"
+        "Mã nhà sáng tạo",
+        "Mã tài khoản",
+        "Tên hiển thị",
+        "Nhiệm vụ đã duyệt",
+        "Minh chứng đã nộp",
+        "Minh chứng đã duyệt",
+        "Minh chứng bị từ chối",
+        "Tỷ lệ hoàn thành",
+        "Hoa hồng đã ghi nhận (VNĐ)"
       ],
       ...data.topCreators.map((item) => [
         item.creatorId,
@@ -126,29 +126,29 @@ export function buildAdminAnalyticsCsv(type: AdminAnalyticsExportType, data: Adm
 
   if (type === "funnel") {
     return toCsv([
-      ["Metric", "Value"],
-      ["Total Creator Missions", data.funnel.totalCreatorMissions],
-      ["Applications", data.funnel.applications],
-      ["Approved Applications", data.funnel.approvedApplications],
-      ["Rejected Applications", data.funnel.rejectedApplications],
-      ["Assigned Missions", data.funnel.assignedMissions],
-      ["Accepted Missions", data.funnel.acceptedMissions],
-      ["Proof Submitted", data.funnel.proofSubmitted],
-      ["Proof Approved", data.funnel.proofApproved],
-      ["Proof Rejected", data.funnel.proofRejected],
-      ["Reward Credited", data.funnel.rewardCredited],
-      ["Application Approval Rate", data.funnel.applicationApprovalRate],
-      ["Proof Approval Rate", data.funnel.proofApprovalRate],
-      ["Mission Completion Rate", data.funnel.missionCompletionRate]
+      ["Chỉ số", "Giá trị"],
+      ["Tổng nhiệm vụ creator", data.funnel.totalCreatorMissions],
+      ["Lượt ứng tuyển", data.funnel.applications],
+      ["Ứng tuyển đã duyệt", data.funnel.approvedApplications],
+      ["Ứng tuyển bị từ chối", data.funnel.rejectedApplications],
+      ["Nhiệm vụ đã giao", data.funnel.assignedMissions],
+      ["Nhiệm vụ đã nhận", data.funnel.acceptedMissions],
+      ["Minh chứng đã nộp", data.funnel.proofSubmitted],
+      ["Minh chứng đã duyệt", data.funnel.proofApproved],
+      ["Minh chứng bị từ chối", data.funnel.proofRejected],
+      ["Thưởng đã ghi nhận", data.funnel.rewardCredited],
+      ["Tỷ lệ duyệt ứng tuyển", data.funnel.applicationApprovalRate],
+      ["Tỷ lệ duyệt minh chứng", data.funnel.proofApprovalRate],
+      ["Tỷ lệ hoàn thành nhiệm vụ", data.funnel.missionCompletionRate]
     ]);
   }
 
   return toCsv([
-    ["Queue", "Value"],
-    ["Pending Applications", data.pendingReview.pendingApplications],
-    ["Pending Proofs", data.pendingReview.pendingProofs],
-    ["Pending Video Reviews", data.pendingReview.pendingVideoReviews],
-    ["Pending Final Reviews", data.pendingReview.pendingFinalReviews],
-    ["Pending Payouts", data.pendingReview.pendingPayouts]
+    ["Hàng chờ", "Số lượng"],
+    ["Ứng tuyển chờ duyệt", data.pendingReview.pendingApplications],
+    ["Minh chứng chờ duyệt", data.pendingReview.pendingProofs],
+    ["Video chờ duyệt", data.pendingReview.pendingVideoReviews],
+    ["Duyệt cuối chờ xử lý", data.pendingReview.pendingFinalReviews],
+    ["Rút tiền chờ xử lý", data.pendingReview.pendingPayouts]
   ]);
 }

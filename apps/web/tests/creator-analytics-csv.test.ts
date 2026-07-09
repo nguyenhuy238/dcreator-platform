@@ -73,20 +73,20 @@ const sampleAnalytics: CreatorAnalyticsOverview = {
 test("buildCreatorAnalyticsCsv exports campaign performance rows", () => {
   const csv = buildCreatorAnalyticsCsv("campaignPerformance", sampleAnalytics);
 
-  assert.match(csv, /Campaign ID,Campaign Title,Status/);
+  assert.match(csv, /Mã chiến dịch,Tên chiến dịch,Trạng thái/);
   assert.match(csv, /campaign_1,"Creator, ""Launch""",ACTIVE/);
 });
 
 test("buildCreatorAnalyticsCsv exports funnel rows", () => {
   const csv = buildCreatorAnalyticsCsv("funnel", sampleAnalytics);
 
-  assert.match(csv, /Applications,1/);
-  assert.match(csv, /Mission Completion Rate,100/);
+  assert.match(csv, /Lượt ứng tuyển,1/);
+  assert.match(csv, /Tỷ lệ hoàn thành nhiệm vụ,100/);
 });
 
 test("buildCreatorAnalyticsCsv exports pending action rows", () => {
   const csv = buildCreatorAnalyticsCsv("pendingActions", sampleAnalytics);
 
-  assert.match(csv, /Missions To Accept,0/);
-  assert.match(csv, /Pending Payouts,0/);
+  assert.match(csv, /Nhiệm vụ cần nhận,0/);
+  assert.match(csv, /Rút tiền chờ xử lý,0/);
 });
