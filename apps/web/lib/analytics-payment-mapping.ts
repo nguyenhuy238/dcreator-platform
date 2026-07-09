@@ -28,6 +28,8 @@ export type AnalyticsPaymentTransactionRecord = {
 export type AnalyticsPayoutRecord = {
   amountVnd: number;
   status: "PENDING" | "APPROVED" | "REJECTED" | "PAID";
+  creatorMissionId?: string | null;
+  campaignId?: string | null;
 };
 
 export function createEmptyAnalyticsPaymentSummary(notes: string[] = []): AnalyticsPaymentSummary {
@@ -59,6 +61,30 @@ export function addPlatformPayouts(summary: AnalyticsPaymentSummary, payouts: An
     payoutPaidVnd: payouts.filter((item) => item.status === "PAID").reduce((sum, item) => sum + item.amountVnd, 0),
     payoutPendingVnd: payouts.filter((item) => item.status === "PENDING" || item.status === "APPROVED").reduce((sum, item) => sum + item.amountVnd, 0),
     payoutPendingCount: payouts.filter((item) => item.status === "PENDING").length
+  };
+}
+
+export function addScopedPayouts(summary: AnalyticsPaymentSummary, payouts: AnalyticsPayoutRecord[], campaignIds: string[], creatorMissionCampaignMap: Map<string, string>) {
+  const campaignScope = new Set(campaignIds);
+  const scopedPayouts = payouts.filter((payout) => {
+    if (payout.campaignId) return campaignScope.has(payout.campaignId);
+    if (payout.creatorMissionId) {
+      const campaignId = creatorMissionCampaignMap.get(payout.creatorMissionId);
+      return campaignId ? campaignScope.has(campaignId) : false;
+    }
+    return false;
+  });
+
+  return {
+    ...summary,
+    payoutRequestedVnd: scopedPayouts.reduce((sum, item) => sum + item.amountVnd, 0),
+    payoutPaidVnd: scopedPayouts.filter((item) => item.status === "PAID").reduce((sum, item) => sum + item.amountVnd, 0),
+    payoutPendingVnd: scopedPayouts.filter((item) => item.status === "PENDING" || item.status === "APPROVED").reduce((sum, item) => sum + item.amountVnd, 0),
+    payoutPendingCount: scopedPayouts.filter((item) => item.status === "PENDING").length,
+    notes:
+      scopedPayouts.length === payouts.length
+        ? summary.notes
+        : [...summary.notes, "Scoped payout excludes legacy PayoutRequest rows without campaign/creatorMission reference."]
   };
 }
 

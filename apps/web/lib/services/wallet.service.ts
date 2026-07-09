@@ -114,8 +114,10 @@ export async function createTopupPayment(accountId: string, amountVnd: number, i
       orderCode: `TP${Date.now()}${Math.floor(Math.random() * 1000)}`,
       requestedAmountVnd: amountVnd,
       creditedPoints,
-      status: "PENDING"
-    }
+      intent: "TOPUP_NPOINTS",
+      status: "PENDING",
+      rawPayload: { metadata: { intent: "TOPUP_NPOINTS" } }
+    } as never
   });
 }
 
@@ -196,7 +198,8 @@ export async function createCreatorPayoutRequest(
   amountVnd: number,
   creatorBankAccountId: string,
   note: string | undefined,
-  idempotencyKey: string
+  idempotencyKey: string,
+  reference?: { creatorMissionId?: string | null; campaignId?: string | null }
 ) {
   const wallet = await ensureWalletByAccountId(accountId);
   const bankAccount = await ensureCreatorBankAccountOwned(accountId, creatorBankAccountId);
@@ -222,11 +225,20 @@ export async function createCreatorPayoutRequest(
       }
     });
 
+    const creatorMissionId = reference?.creatorMissionId?.trim() || null;
+    const campaignId = reference?.campaignId?.trim() || null;
+    const payoutReferenceType = creatorMissionId ? "CREATOR_MISSION" : campaignId ? "CAMPAIGN" : null;
+    const payoutReferenceId = creatorMissionId ?? campaignId;
+
     const payoutRequest = await tx.payoutRequest.create({
       data: {
         accountId,
         walletId: wallet.id,
         creatorBankAccountId: bankAccount.id,
+        creatorMissionId,
+        campaignId,
+        referenceType: payoutReferenceType,
+        referenceId: payoutReferenceId,
         amountVnd,
         note,
         bankName: bankAccount.bankName,
@@ -236,7 +248,7 @@ export async function createCreatorPayoutRequest(
         bankAccountNumber: bankAccount.accountNumber,
         idempotencyKey,
         status: "PENDING"
-      }
+      } as never
     });
 
     await tx.walletTransaction.create({

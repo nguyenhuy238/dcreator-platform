@@ -110,6 +110,7 @@ export async function createPayosPayment(account: { id: string; role: string }, 
         orderCode: generateOrderCode(input.intent),
         requestedAmountVnd: input.amountVnd,
         creditedPoints: input.intent === "TOPUP_NPOINTS" ? calculateTopupPoints(input.amountVnd) : 0,
+        intent: input.intent,
         status: "PENDING",
         rawPayload: {
           metadata: {
@@ -120,7 +121,7 @@ export async function createPayosPayment(account: { id: string; role: string }, 
             note: input.note ?? null
           }
         }
-      }
+      } as never
     });
 
     if (input.intent === "CONTRIBUTION") {

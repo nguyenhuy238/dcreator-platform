@@ -1,10 +1,40 @@
 import { WalletTransactionType } from "@prisma/client";
-import { createEmptyAnalyticsPaymentSummary, addPaymentTransactions, addPlatformPayouts, type AnalyticsPaymentScope, type AnalyticsPaymentSummary } from "@/lib/analytics-payment-mapping";
+import {
+  createEmptyAnalyticsPaymentSummary,
+  addPaymentTransactions,
+  addPlatformPayouts,
+  addScopedPayouts,
+  type AnalyticsPaymentScope,
+  type AnalyticsPaymentSummary
+} from "@/lib/analytics-payment-mapping";
 import { prisma } from "@/lib/db";
 
 type DateRange = {
   from: Date | null;
   to: Date | null;
+};
+
+type PayoutReferenceRow = {
+  amountVnd: number;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "PAID";
+  creatorMissionId: string | null;
+  campaignId: string | null;
+};
+
+type PaymentTransactionIntentRow = {
+  requestedAmountVnd: number;
+  status: "PENDING" | "SUCCESS" | "FAILED";
+  intent: string | null;
+  rawPayload: unknown;
+};
+
+type PrismaWithP1DFields = typeof prisma & {
+  payoutRequest: typeof prisma.payoutRequest & {
+    findMany(args: unknown): Promise<PayoutReferenceRow[]>;
+  };
+  paymentTransaction: typeof prisma.paymentTransaction & {
+    findMany(args: unknown): Promise<PaymentTransactionIntentRow[]>;
+  };
 };
 
 function parseDate(value?: string) {
@@ -59,6 +89,7 @@ function paymentMetadataBrandId(rawPayload: unknown) {
 }
 
 export async function getAnalyticsPaymentSummary(scope: AnalyticsPaymentScope = {}): Promise<AnalyticsPaymentSummary> {
+  const prismaP1D = prisma as PrismaWithP1DFields;
   const campaignIds = compactIds(scope.campaignIds);
   const creatorAccountIds = compactIds(scope.creatorAccountIds);
   const brandAccountIds = compactIds(scope.brandAccountIds);
@@ -104,20 +135,20 @@ export async function getAnalyticsPaymentSummary(scope: AnalyticsPaymentScope = 
       },
       select: { referenceId: true, cashDeltaVnd: true }
     }),
-    prisma.payoutRequest.findMany({
+    prismaP1D.payoutRequest.findMany({
       where: {
         ...(creatorAccountIds && !hasCampaignScope ? { accountId: { in: creatorAccountIds } } : {}),
         ...(createdAt ? { createdAt } : {})
       },
-      select: { amountVnd: true, status: true }
+      select: { amountVnd: true, status: true, creatorMissionId: true, campaignId: true }
     }),
-    prisma.paymentTransaction.findMany({
+    prismaP1D.paymentTransaction.findMany({
       where: {
         ...(creatorAccountIds ? { accountId: { in: creatorAccountIds } } : {}),
         ...(brandAccountIds ? { accountId: { in: brandAccountIds } } : {}),
         ...(createdAt ? { createdAt } : {})
       },
-      select: { requestedAmountVnd: true, status: true, rawPayload: true }
+      select: { requestedAmountVnd: true, status: true, intent: true, rawPayload: true }
     })
   ]);
 
@@ -146,7 +177,19 @@ export async function getAnalyticsPaymentSummary(scope: AnalyticsPaymentScope = 
   ]);
 
   const submissionCampaignMap = new Map(submissionCampaignMapRows.map((item) => [item.id, item.mission.campaignId]));
-  const creatorMissionCampaignMap = new Map(creatorMissionCampaignMapRows.map((item) => [item.id, item.campaignId]));
+  const payoutCreatorMissionIds = campaignIds
+    ? payouts.map((item) => item.creatorMissionId).filter((id): id is string => typeof id === "string")
+    : [];
+  const payoutCreatorMissionCampaignRows = payoutCreatorMissionIds.length
+    ? await prisma.creatorMission.findMany({
+        where: { id: { in: payoutCreatorMissionIds } },
+        select: { id: true, campaignId: true }
+      })
+    : [];
+  const creatorMissionCampaignMap = new Map([
+    ...creatorMissionCampaignMapRows.map((item) => [item.id, item.campaignId] as const),
+    ...payoutCreatorMissionCampaignRows.map((item) => [item.id, item.campaignId] as const)
+  ]);
   const campaignScope = campaignIds ? new Set(campaignIds) : null;
   const creatorMissionCommission = creatorMissions.reduce((sum, item) => sum + (item.mission?.rewardCommissionVnd ?? 0), 0);
   const submissionWalletCommission = submissionWalletTransactions
@@ -173,13 +216,15 @@ export async function getAnalyticsPaymentSummary(scope: AnalyticsPaymentScope = 
     .map((item) => ({
       requestedAmountVnd: item.requestedAmountVnd,
       status: item.status,
-      intent: paymentIntent(item.rawPayload)
+      intent: typeof item.intent === "string" ? item.intent : paymentIntent(item.rawPayload)
     }));
 
   const summary = addPaymentTransactions(
-    addPlatformPayouts(createEmptyAnalyticsPaymentSummary(), payouts, {
-      allowUnscopedPayouts: !hasCampaignScope
-    }),
+    campaignIds
+      ? addScopedPayouts(createEmptyAnalyticsPaymentSummary(), payouts, campaignIds, creatorMissionCampaignMap)
+      : addPlatformPayouts(createEmptyAnalyticsPaymentSummary(), payouts, {
+          allowUnscopedPayouts: true
+        }),
     filteredPaymentTransactions
   );
 
