@@ -257,7 +257,7 @@ export function AdminAnalyticsClient() {
           </section>
 
           <section className="mt-8">
-            <SectionHeader title="Payment / Commission Summary" subtitle="Commission từ WalletTransaction, payout từ PayoutRequest, payment từ PaymentTransaction." />
+            <SectionHeader title="Payment / Commission Summary" subtitle="Commission/payout đã qua mapping an toàn; payment intent chưa rõ được tách khỏi KPI chính." />
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               <MetricRow label="Commission credited" value={formatVnd(data.payments.commissionCreditedVnd)} />
               <MetricRow label="Payout requested" value={formatVnd(data.payments.payoutRequestedVnd)} />
@@ -265,6 +265,7 @@ export function AdminAnalyticsClient() {
               <MetricRow label="Payment success" value={formatVnd(data.payments.paymentTransactionsSucceededVnd)} />
               <MetricRow label="Payment pending" value={formatVnd(data.payments.paymentTransactionsPendingVnd)} />
               <MetricRow label="Payment failed" value={formatVnd(data.payments.paymentTransactionsFailedVnd)} />
+              <MetricRow label="Unknown payment intent" value={formatVnd(data.payments.unknownPaymentTransactionsVnd ?? 0)} />
             </div>
           </section>
 

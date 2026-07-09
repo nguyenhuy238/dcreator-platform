@@ -1,6 +1,7 @@
 import { ApplicationStatus, CampaignStatus, CreatorMissionPublishStatus, CreatorMissionVideoReviewStatus, MissionLifecycleStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
+import { getAnalyticsPaymentSummary } from "@/lib/services/analytics-payment-mapping.service";
 
 export type BrandAnalyticsQuery = {
   brandIds: string[];
@@ -454,17 +455,18 @@ export async function getBrandAnalyticsOverview(params: BrandAnalyticsQuery): Pr
     .sort((a, b) => b.approvedProofs - a.approvedProofs || b.approvedMissions - a.approvedMissions || b.commissionCreditedVnd - a.commissionCreditedVnd)
     .slice(0, 20);
 
-  const commissionCreditedVnd = creatorMissions.reduce((sum, item) => sum + missionCommission(item), 0);
+  const paymentSummary = await getAnalyticsPaymentSummary({
+    from: params.from,
+    to: params.to,
+    campaignIds
+  });
   const pendingProofs = creatorMissions.filter((item) => item.submissionLifecycleStatus === MissionLifecycleStatus.PENDING_REVIEW).length + pendingProofsFromMissionSubmissions;
   const pendingVideoReviews = creatorMissions.filter((item) => item.videoReviewStatus === CreatorMissionVideoReviewStatus.PENDING).length;
   const pendingFinalReviews = creatorMissions.filter((item) => item.publishStatus === CreatorMissionPublishStatus.PENDING).length;
 
   // TODO(analytics): Brand payment analytics needs normalized mission-to-payout mapping.
   // Keep this conservative until payment intent/reference mapping is standardized.
-  const payoutRequestedVnd = 0;
-  const payoutPaidVnd = 0;
-  const payoutPendingVnd = 0;
-  const pendingPayouts = 0;
+  const pendingPayouts = paymentSummary.payoutPendingCount;
 
   return {
     generatedAt: new Date().toISOString(),
@@ -511,10 +513,10 @@ export async function getBrandAnalyticsOverview(params: BrandAnalyticsQuery): Pr
       pendingPayouts
     },
     payments: {
-      commissionCreditedVnd,
-      payoutRequestedVnd,
-      payoutPaidVnd,
-      payoutPendingVnd
+      commissionCreditedVnd: paymentSummary.commissionCreditedVnd,
+      payoutRequestedVnd: paymentSummary.payoutRequestedVnd,
+      payoutPaidVnd: paymentSummary.payoutPaidVnd,
+      payoutPendingVnd: paymentSummary.payoutPendingVnd
     },
     campaignPerformance,
     creatorPerformance

@@ -1,5 +1,6 @@
-import { ApplicationStatus, CampaignStatus, CreatorMissionPublishStatus, CreatorMissionVideoReviewStatus, MissionLifecycleStatus, PaymentTransactionStatus, PayoutRequestStatus, WalletTransactionType } from "@prisma/client";
+import { ApplicationStatus, CampaignStatus, CreatorMissionPublishStatus, CreatorMissionVideoReviewStatus, MissionLifecycleStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { getAnalyticsPaymentSummary } from "@/lib/services/analytics-payment-mapping.service";
 
 export type AdminAnalyticsQuery = {
   from?: string;
@@ -57,6 +58,7 @@ export type AdminAnalyticsOverview = {
     paymentTransactionsSucceededVnd: number;
     paymentTransactionsPendingVnd: number;
     paymentTransactionsFailedVnd: number;
+    unknownPaymentTransactionsVnd?: number;
   };
   topCreators: Array<{
     creatorId: string;
@@ -259,17 +261,13 @@ export async function getAdminAnalyticsOverview(params: AdminAnalyticsQuery = {}
     ...(campaignId ? { createdCampaignId: campaignId } : {}),
     ...(createdAt ? { createdAt } : {})
   };
-  const paymentCreatedAtWhere = createdAt ? { createdAt } : {};
-
   const [
     campaigns,
     brandCampaignRequests,
     creatorMissions,
     pendingApplicationsFromMissionApplications,
     pendingProofsFromMissionSubmissions,
-    payoutRequests,
-    paymentTransactions,
-    commissionCredited
+    paymentSummary
   ] = await Promise.all([
     prisma.campaign.findMany({
       where: campaignWhere,
@@ -346,29 +344,22 @@ export async function getAdminAnalyticsOverview(params: AdminAnalyticsQuery = {}
         ...(createdAt ? { createdAt } : {})
       }
     }),
-    prisma.payoutRequest.findMany({
-      where: {
-        ...(createdAt ? { createdAt } : {})
-      },
-      select: { amountVnd: true, status: true }
-    }),
-    // TODO(analytics): PaymentTransaction is not yet fully separated by intent.
-    // Keep this metric conservative until payment intent mapping is normalized.
-    prisma.paymentTransaction.findMany({
-      where: paymentCreatedAtWhere,
-      select: { requestedAmountVnd: true, status: true }
-    }),
-    prisma.walletTransaction.aggregate({
-      _sum: { cashDeltaVnd: true },
-      where: {
-        type: WalletTransactionType.COMMISSION_CREDIT,
-        ...(createdAt ? { createdAt } : {})
-      }
+    getAnalyticsPaymentSummary({
+      from: params.from,
+      to: params.to
     })
   ]);
 
   const campaignIdsInScope = new Set(campaigns.map((campaign) => campaign.id));
   const scopedCreatorMissions = creatorMissions.filter((item) => campaignIdsInScope.size === 0 || campaignIdsInScope.has(item.campaignId));
+  const scopedPaymentSummary =
+    campaignId || brandId
+      ? await getAnalyticsPaymentSummary({
+          from: params.from,
+          to: params.to,
+          campaignIds: campaigns.map((campaign) => campaign.id)
+        })
+      : paymentSummary;
 
   const approvedApplications = scopedCreatorMissions.filter((item) => item.applicationStatus === ApplicationStatus.APPROVED).length;
   const rejectedApplications = scopedCreatorMissions.filter((item) => item.applicationStatus === ApplicationStatus.REJECTED).length;
@@ -537,16 +528,17 @@ export async function getAdminAnalyticsOverview(params: AdminAnalyticsQuery = {}
       pendingProofs: scopedCreatorMissions.filter((item) => item.submissionLifecycleStatus === MissionLifecycleStatus.PENDING_REVIEW).length + pendingProofsFromMissionSubmissions,
       pendingVideoReviews: scopedCreatorMissions.filter((item) => item.videoReviewStatus === CreatorMissionVideoReviewStatus.PENDING).length,
       pendingFinalReviews: scopedCreatorMissions.filter((item) => item.publishStatus === CreatorMissionPublishStatus.PENDING).length,
-      pendingPayouts: payoutRequests.filter((item) => item.status === PayoutRequestStatus.PENDING).length
+      pendingPayouts: scopedPaymentSummary.payoutPendingCount
     },
     payments: {
-      commissionCreditedVnd: commissionCredited._sum.cashDeltaVnd ?? 0,
-      payoutRequestedVnd: payoutRequests.reduce((sum, item) => sum + item.amountVnd, 0),
-      payoutPaidVnd: payoutRequests.filter((item) => item.status === PayoutRequestStatus.PAID).reduce((sum, item) => sum + item.amountVnd, 0),
-      payoutPendingVnd: payoutRequests.filter((item) => item.status === PayoutRequestStatus.PENDING || item.status === PayoutRequestStatus.APPROVED).reduce((sum, item) => sum + item.amountVnd, 0),
-      paymentTransactionsSucceededVnd: paymentTransactions.filter((item) => item.status === PaymentTransactionStatus.SUCCESS).reduce((sum, item) => sum + item.requestedAmountVnd, 0),
-      paymentTransactionsPendingVnd: paymentTransactions.filter((item) => item.status === PaymentTransactionStatus.PENDING).reduce((sum, item) => sum + item.requestedAmountVnd, 0),
-      paymentTransactionsFailedVnd: paymentTransactions.filter((item) => item.status === PaymentTransactionStatus.FAILED).reduce((sum, item) => sum + item.requestedAmountVnd, 0)
+      commissionCreditedVnd: scopedPaymentSummary.commissionCreditedVnd,
+      payoutRequestedVnd: scopedPaymentSummary.payoutRequestedVnd,
+      payoutPaidVnd: scopedPaymentSummary.payoutPaidVnd,
+      payoutPendingVnd: scopedPaymentSummary.payoutPendingVnd,
+      paymentTransactionsSucceededVnd: scopedPaymentSummary.paymentTransactionsSucceededVnd,
+      paymentTransactionsPendingVnd: scopedPaymentSummary.paymentTransactionsPendingVnd,
+      paymentTransactionsFailedVnd: scopedPaymentSummary.paymentTransactionsFailedVnd,
+      unknownPaymentTransactionsVnd: scopedPaymentSummary.unknownPaymentTransactionsVnd
     },
     topCreators,
     campaignPerformance
