@@ -615,7 +615,6 @@ export async function updateBrandOnboarding(accountId: string, input: BrandOnboa
       content: `${brand.name} đã gửi cập nhật KYB/BCC để Ops kiểm tra.`,
       metadata: { brandId: brand.id, ownerAccountId: brand.ownerAccountId },
       excludeAccountId: accountId
-  });
     });
   } else {
     await writeAuditLog({
