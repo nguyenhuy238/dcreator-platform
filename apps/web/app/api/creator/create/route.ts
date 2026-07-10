@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
 
     await createNotification({
       accountId: user.id,
-      event: NotificationEvent.CREATOR_APPLICATION_APPROVED,
+      event: NotificationEvent.CREATOR_PROFILE_CREATED,
       title: "Đã nâng cấp lên Creator",
       content: "Hồ sơ Creator của bạn đã được tạo. Hãy hoàn thiện thông tin và theo dõi các bước duyệt kênh.",
       metadata: { creatorProfileId: profile.id }

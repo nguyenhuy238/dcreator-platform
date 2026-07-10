@@ -5,7 +5,7 @@ import { AppError } from "@/lib/errors";
 import { normalizeRequiredHashtags } from "@/lib/hashtags";
 import { normalizeImageUrlInput } from "@/lib/images/resolve-image-url";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
-import { createNotification } from "@/lib/services/notification.service";
+import { createNotification, createNotificationForBrandMembers } from "@/lib/services/notification.service";
 import { assertStateTransition } from "@/lib/services/admin-transition.service";
 import type { z } from "zod";
 import type { adminCampaignCreateSchema } from "@/lib/validators/admin-campaign";
@@ -404,12 +404,32 @@ export async function decideCampaignByAdmin(input: {
 
   await createNotification({
     accountId: campaign.brandId,
-    event: input.decision === "APPROVE" ? NotificationEvent.CAMPAIGN_APPROVED : NotificationEvent.CAMPAIGN_REJECTED,
+    event:
+      input.decision === "APPROVE"
+        ? NotificationEvent.BRAND_CAMPAIGN_APPROVED
+        : input.decision === "REQUEST_CHANGES"
+          ? NotificationEvent.BRAND_CAMPAIGN_CHANGES_REQUIRED
+          : NotificationEvent.BRAND_CAMPAIGN_REJECTED,
     title: input.decision === "APPROVE" ? "Campaign đã được publish" : "Campaign cần xử lý",
     content:
       input.decision === "APPROVE"
         ? `Campaign "${campaign.title}" đã được kích hoạt.`
         : `Campaign "${campaign.title}" cần xử lý: ${input.reason ?? "Vui lòng kiểm tra lại."}`,
+    metadata: { campaignId: campaign.id, decision: input.decision }
+  });
+  await createNotificationForBrandMembers({
+    brandId: campaign.brandId,
+    event:
+      input.decision === "APPROVE"
+        ? NotificationEvent.BRAND_CAMPAIGN_APPROVED
+        : input.decision === "REQUEST_CHANGES"
+          ? NotificationEvent.BRAND_CAMPAIGN_CHANGES_REQUIRED
+          : NotificationEvent.BRAND_CAMPAIGN_REJECTED,
+    title: input.decision === "APPROVE" ? "Campaign Ä‘Ã£ Ä‘Æ°á»£c publish" : "Campaign cáº§n xá»­ lÃ½",
+    content:
+      input.decision === "APPROVE"
+        ? `Campaign "${campaign.title}" Ä‘Ã£ Ä‘Æ°á»£c kÃ­ch hoáº¡t.`
+        : `Campaign "${campaign.title}" cáº§n xá»­ lÃ½: ${input.reason ?? "Vui lÃ²ng kiá»ƒm tra láº¡i."}`,
     metadata: { campaignId: campaign.id, decision: input.decision }
   });
 
@@ -564,7 +584,7 @@ export async function createCampaignByAdmin(actorId: string, input: AdminCampaig
 
   await createNotification({
     accountId: brandAccount.id,
-    event: NotificationEvent.CAMPAIGN_APPROVED,
+    event: NotificationEvent.BRAND_CAMPAIGN_APPROVED,
     title: "Admin đã tạo và kích hoạt chiến dịch",
     content: `Chiến dịch "${campaign.title}" đã được tạo và active.`,
     metadata: { campaignId: campaign.id }

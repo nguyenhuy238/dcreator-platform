@@ -2,7 +2,7 @@ import { NotificationEvent, ProductReviewStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
-import { createNotification } from "@/lib/services/notification.service";
+import { createNotification, createNotificationForBrandMembers } from "@/lib/services/notification.service";
 import { assertStateTransition } from "@/lib/services/admin-transition.service";
 
 const productTransitionMap: Record<ProductReviewStatus, readonly ProductReviewStatus[]> = {
@@ -88,7 +88,7 @@ export async function decideProductSubmissionByAdmin(input: {
   const prismaAny = prisma as any;
   const current = await prismaAny.productSubmission.findUnique({
     where: { id: input.productId },
-    include: { brand: { select: { ownerAccountId: true, name: true } } }
+    include: { brand: { select: { id: true, ownerAccountId: true, name: true } } }
   });
   if (!current) throw new AppError("Product submission not found", 404, "PRODUCT_SUBMISSION_NOT_FOUND");
   assertStateTransition(current.reviewStatus, input.decision, productTransitionMap, { message: "Invalid status transition" });
@@ -131,12 +131,26 @@ export async function decideProductSubmissionByAdmin(input: {
 
   await createNotification({
     accountId: current.brand.ownerAccountId,
-    event: input.decision === "APPROVED" ? NotificationEvent.CAMPAIGN_APPROVED : NotificationEvent.CAMPAIGN_REJECTED,
+    event: input.decision === "APPROVED" ? NotificationEvent.BRAND_PRODUCT_APPROVED : NotificationEvent.BRAND_PRODUCT_CHANGES_REQUIRED,
     title: input.decision === "APPROVED" ? "Product đã được duyệt" : "Product cần cập nhật",
     content:
       input.decision === "APPROVED"
         ? `Sản phẩm "${current.name}" đã được duyệt để tiếp tục vận hành campaign.`
         : `Sản phẩm "${current.name}" cần cập nhật: ${input.reason ?? "Vui lòng kiểm tra lại thông tin."}`,
+    metadata: {
+      productSubmissionId: input.productId,
+      decision: input.decision
+    }
+  });
+
+  await createNotificationForBrandMembers({
+    brandId: current.brand.id,
+    event: input.decision === "APPROVED" ? NotificationEvent.BRAND_PRODUCT_APPROVED : NotificationEvent.BRAND_PRODUCT_CHANGES_REQUIRED,
+    title: input.decision === "APPROVED" ? "Product approved" : "Product needs changes",
+    content:
+      input.decision === "APPROVED"
+        ? `Product "${current.name}" was approved for campaign operations.`
+        : `Product "${current.name}" needs updates: ${input.reason ?? "Please review the latest feedback."}`,
     metadata: {
       productSubmissionId: input.productId,
       decision: input.decision

@@ -363,7 +363,7 @@ export async function updateCreatorProfile(accountId: string, input: CreatorProf
 
   await createNotification({
     accountId,
-    event: "CREATOR_APPLICATION_APPROVED",
+    event: "CREATOR_PROFILE_UPDATED",
     title: "Đã cập nhật hồ sơ Creator",
     content: "Thông tin hồ sơ Creator của bạn đã được lưu thành công.",
     metadata: { source: "creator-profile" }
@@ -455,7 +455,7 @@ export async function createCreatorChannel(accountId: string, input: CreatorChan
 
   await createNotification({
     accountId,
-    event: "PROOF_SUBMITTED",
+    event: "CREATOR_PROFILE_UPDATED",
     title: "Đã thêm kênh mạng xã hội",
     content: "Kênh mạng xã hội mới đã được thêm và có thể sử dụng.",
     metadata: { platform: input.platform, url: input.url }
@@ -509,7 +509,7 @@ export async function updateCreatorChannel(accountId: string, linkId: string, in
 
   await createNotification({
     accountId,
-    event: "PROOF_SUBMITTED",
+    event: "CREATOR_PROFILE_UPDATED",
     title: "Đã cập nhật kênh mạng xã hội",
     content: "Thông tin kênh đã được cập nhật và có thể sử dụng.",
     metadata: { linkId, platform: input.platform, url: input.url }

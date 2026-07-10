@@ -3,6 +3,7 @@ import { type Prisma, type Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/services/audit-log.service";
+import { createNotificationForAdminOps } from "@/lib/services/notification.service";
 
 function requireDangerReason(reason: string | undefined) {
   if (!reason || reason.trim().length < 5) {
@@ -351,6 +352,18 @@ export async function createRiskFlagByAdmin(actorId: string, actorRole: Role, in
   });
 
   await createAuditLog({ actorId, actorRole, action: "ADMIN_RISK_FLAG_CREATED", targetType: input.targetType, targetId: input.targetId, reason: finalReason, newStatus: "OPEN", metadata: { riskFlagId: created.id } });
+  await createNotificationForAdminOps({
+    event: "PROOF_SUBMITTED",
+    title: "Fraud/risk flag mới",
+    content: `Có risk flag mới cho ${input.targetType} ${input.targetId}.`,
+    metadata: {
+      riskFlagId: created.id,
+      targetType: input.targetType,
+      targetId: input.targetId,
+      severity: created.severity
+    },
+    excludeAccountId: actorId
+  });
   return created;
 }
 
@@ -370,6 +383,20 @@ export async function resolveRiskFlagByAdmin(actorId: string, actorRole: Role, r
   });
 
   await createAuditLog({ actorId, actorRole, action: input.action === "ESCALATED" ? "ADMIN_RISK_FLAG_ESCALATED" : "ADMIN_RISK_FLAG_RESOLVED", targetType: current.targetType, targetId: current.targetId, reason: finalReason, oldStatus: current.status, newStatus: updated.status, metadata: { riskFlagId } });
+  if (input.action === "ESCALATED") {
+    await createNotificationForAdminOps({
+      event: "PROOF_SUBMITTED",
+      title: "Fraud/risk escalation",
+      content: `Risk flag ${riskFlagId} đã được escalate để OPS/Admin xử lý.`,
+      metadata: {
+        riskFlagId,
+        targetType: current.targetType,
+        targetId: current.targetId,
+        status: updated.status
+      },
+      excludeAccountId: actorId
+    });
+  }
   return updated;
 }
 

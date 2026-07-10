@@ -9,7 +9,7 @@ import { approveProof, rejectProof } from "@/lib/services/mission.service";
 import { getBrandKpis } from "@/lib/services/analytics.service";
 import { ensureCreatorMissionFromApprovedApplication } from "@/lib/services/creator-mission.service";
 import { createTopupPayment, ensureWalletByAccountId, getWalletTransactions } from "@/lib/services/wallet.service";
-import { createNotification, createNotificationForAdminOps } from "@/lib/services/notification.service";
+import { createNotification, createNotificationForAdminOps, createNotificationForBrandMembers } from "@/lib/services/notification.service";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
 import type { z } from "zod";
 import type {
@@ -615,6 +615,7 @@ export async function updateBrandOnboarding(accountId: string, input: BrandOnboa
       content: `${brand.name} đã gửi cập nhật KYB/BCC để Ops kiểm tra.`,
       metadata: { brandId: brand.id, ownerAccountId: brand.ownerAccountId },
       excludeAccountId: accountId
+  });
     });
   } else {
     await writeAuditLog({
@@ -834,6 +835,21 @@ export async function createBrandCampaign(accountId: string, input: CampaignInpu
     excludeAccountId: accountId
   });
   await trySyncCampaignNewFields(campaign.id, input.benefits || null, input.participationRoadmap);
+  await createNotification({
+    accountId: ctx.brandOwnerAccountId,
+    event: "BRAND_CAMPAIGN_DRAFT_CREATED",
+    title: "C\u00F3 campaign draft m\u1EDBi \u0111\u01B0\u1EE3c t\u1EA1o",
+    content: `Campaign draft "${campaign.title}" \u0111\u00E3 \u0111\u01B0\u1EE3c t\u1EA1o.`,
+    metadata: { campaignId: campaign.id, brandId: ctx.brand.id }
+  });
+  await createNotificationForBrandMembers({
+    brandId: ctx.brand.id,
+    event: "BRAND_CAMPAIGN_DRAFT_CREATED",
+    title: "Campaign draft created",
+    content: `Campaign draft "${campaign.title}" was created.`,
+    metadata: { campaignId: campaign.id, brandId: ctx.brand.id }
+  });
+
 
   return campaign;
 }
@@ -907,6 +923,21 @@ export async function submitCampaignForAdminReview(accountId: string, campaignId
     content: `Campaign "${updated.title}" đã được brand submit để duyệt.`,
     metadata: { campaignId: updated.id, brandOwnerAccountId: ctx.brandOwnerAccountId },
     excludeAccountId: accountId
+  });
+
+  await createNotification({
+    accountId: ctx.brandOwnerAccountId,
+    event: "BRAND_CAMPAIGN_SUBMITTED",
+    title: "Campaign \u0111\u00E3 submit ch\u1EDD admin review",
+    content: `Campaign "${updated.title}" \u0111\u00E3 submit v\u00E0 \u0111ang ch\u1EDD admin review.`,
+    metadata: { campaignId: updated.id, brandId: ctx.brand.id }
+  });
+  await createNotificationForBrandMembers({
+    brandId: ctx.brand.id,
+    event: "BRAND_CAMPAIGN_SUBMITTED",
+    title: "Campaign submitted for review",
+    content: `Campaign "${updated.title}" was submitted and is waiting for admin review.`,
+    metadata: { campaignId: updated.id, brandId: ctx.brand.id }
   });
 
   return updated;
@@ -1545,10 +1576,25 @@ export async function decideCreatorApplication(accountId: string, input: Creator
       });
       await createNotification({
         accountId: submission.accountId,
-        event: "CREATOR_APPLICATION_APPROVED",
+        event: "CREATOR_CAMPAIGN_APPLICATION_APPROVED",
         title: "Đơn ứng tuyển được duyệt",
         content: `Brand đã duyệt đơn ứng tuyển của bạn cho mission "${submission.mission.title}".`,
         metadata: { submissionId: submission.id, missionId: submission.missionId }
+      });
+      await createNotification({
+        accountId,
+        event: "BRAND_CREATOR_APPLICATION_PREAPPROVED",
+        title: "Creator application \u0111\u01B0\u1EE3c admin duy\u1EC7t s\u01A1 b\u1ED9",
+        content: `B\u1EA1n \u0111\u00E3 duy\u1EC7t creator application cho mission "${submission.mission.title}".`,
+        metadata: { submissionId: submission.id, missionId: submission.missionId, campaignId: submission.mission.campaignId }
+      });
+      await createNotificationForBrandMembers({
+        brandId: ctx.brand.id,
+        event: "BRAND_CREATOR_APPLICATION_PREAPPROVED",
+        title: "Creator application approved",
+        content: `Creator application for mission "${submission.mission.title}" was approved.`,
+        metadata: { submissionId: submission.id, missionId: submission.missionId, campaignId: submission.mission.campaignId },
+        excludeAccountId: accountId
       });
       return updated;
     });
@@ -1568,10 +1614,27 @@ export async function decideCreatorApplication(accountId: string, input: Creator
   });
   await createNotification({
     accountId: submission.accountId,
-    event: "PROOF_REJECTED",
+    event: "CREATOR_CAMPAIGN_APPLICATION_REJECTED",
     title: "Đơn ứng tuyển bị từ chối",
     content: rejected.rejectReason ?? "Brand đã từ chối đơn ứng tuyển.",
     metadata: { submissionId: submission.id, missionId: submission.missionId }
+  });
+  await createNotification({
+    accountId,
+    event: "BRAND_CREATOR_APPLICATION_REJECTED",
+    title: "Creator application b\u1ECB t\u1EEB ch\u1ED1i",
+    content: rejected.rejectReason
+      ? `B\u1EA1n \u0111\u00E3 t\u1EEB ch\u1ED1i creator application cho mission "${submission.mission.title}": ${rejected.rejectReason}`
+      : `B\u1EA1n \u0111\u00E3 t\u1EEB ch\u1ED1i creator application cho mission "${submission.mission.title}".`,
+    metadata: { submissionId: submission.id, missionId: submission.missionId, campaignId: submission.mission.campaignId }
+  });
+  await createNotificationForBrandMembers({
+    brandId: ctx.brand.id,
+    event: "BRAND_CREATOR_APPLICATION_REJECTED",
+    title: "Creator application rejected",
+    content: `Creator application for mission "${submission.mission.title}" was rejected.`,
+    metadata: { submissionId: submission.id, missionId: submission.missionId, campaignId: submission.mission.campaignId },
+    excludeAccountId: accountId
   });
   return rejected;
 }
@@ -1855,10 +1918,17 @@ export async function inviteBrandMember(accountId: string, input: BrandMemberInv
   });
   await createNotification({
     accountId: account.id,
-    event: "CAMPAIGN_APPROVED",
-    title: "Bạn được thêm vào Nhãn hàng",
-    content: `Bạn vừa được thêm vào nhãn hàng "${ctx.brand.name}" với vai trò ${input.role}.`,
+    event: "BRAND_MEMBER_ADDED",
+    title: "B\u1EA1n \u0111\u01B0\u1EE3c th\u00EAm v\u00E0o brand",
+    content: `B\u1EA1n v\u1EEBa \u0111\u01B0\u1EE3c th\u00EAm v\u00E0o nh\u00E3n h\u00E0ng "${ctx.brand.name}" v\u1EDBi vai tr\u00F2 ${input.role}.`,
     metadata: { brandId: ctx.brand.id, role: input.role }
+  });
+  await createNotification({
+    accountId: ctx.brandOwnerAccountId,
+    event: "BRAND_MEMBER_INVITED",
+    title: "Brand member \u0111\u01B0\u1EE3c m\u1EDDi",
+    content: `${account.displayName || account.email} \u0111\u00E3 \u0111\u01B0\u1EE3c th\u00EAm v\u00E0o nh\u00E3n h\u00E0ng "${ctx.brand.name}" v\u1EDBi vai tr\u00F2 ${input.role}.`,
+    metadata: { brandId: ctx.brand.id, invitedAccountId: account.id, role: input.role }
   });
 
   return membership;
