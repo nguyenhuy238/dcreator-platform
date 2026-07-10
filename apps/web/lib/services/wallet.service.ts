@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import type { z } from "zod";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
+import { createNotification, createNotificationForAdminOps } from "@/lib/services/notification.service";
 import { topupConfirmSchema } from "@/lib/validators/wallet";
 
 const TOPUP_POINT_RATE = 1;
@@ -209,7 +210,7 @@ export async function createCreatorPayoutRequest(
   });
   if (existing) return existing;
 
-  return prisma.$transaction(async (tx) => {
+  const payoutRequest = await prisma.$transaction(async (tx) => {
     const currentWallet = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
     const nextPoints = currentWallet.pointsBalance - amountVnd;
     assertNonNegativeBalance(nextPoints, currentWallet.cashBalanceVnd);
@@ -272,6 +273,24 @@ export async function createCreatorPayoutRequest(
 
     return payoutRequest;
   });
+
+  await createNotification({
+    accountId,
+    event: "PAYOUT_REQUESTED",
+    title: "Đã gửi yêu cầu payout",
+    content: `Yêu cầu payout ${amountVnd.toLocaleString("vi-VN")} VND của bạn đã được ghi nhận.`,
+    metadata: { payoutId: payoutRequest.id }
+  });
+
+  await createNotificationForAdminOps({
+    event: "PAYOUT_REQUESTED",
+    title: "Có yêu cầu payout mới",
+    content: `Creator vừa gửi yêu cầu payout ${amountVnd.toLocaleString("vi-VN")} VND.`,
+    metadata: { payoutId: payoutRequest.id, accountId },
+    excludeAccountId: accountId
+  });
+
+  return payoutRequest;
 }
 
 export async function spendPointsForSupport(

@@ -12,7 +12,7 @@ import {
 import { prisma } from "@/lib/db";
 import { cleanDisplayUrl, getBrandDisplayName } from "@/lib/display-identity";
 import { AppError } from "@/lib/errors";
-import { createNotification } from "@/lib/services/notification.service";
+import { createNotification, createNotificationForAdminOps, createNotificationForBrandMembers } from "@/lib/services/notification.service";
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 type Sort = "newest" | "oldest";
@@ -426,6 +426,37 @@ async function notifyCreator(accountId: string, event: NotificationEvent, title:
   await createNotification({ accountId, event, title, content, metadata });
 }
 
+async function notifyBrandStaffForMissionReview(
+  brandId: string | null | undefined,
+  title: string,
+  content: string,
+  metadata: Record<string, unknown>
+) {
+  if (!brandId) return;
+  await createNotificationForBrandMembers({
+    brandId,
+    event: NotificationEvent.CREATOR_PROOF_SUBMITTED,
+    title,
+    content,
+    metadata
+  });
+}
+
+async function notifyAdminOpsForMissionReview(
+  accountId: string,
+  title: string,
+  content: string,
+  metadata: Record<string, unknown>
+) {
+  await createNotificationForAdminOps({
+    event: NotificationEvent.CREATOR_PROOF_SUBMITTED,
+    title,
+    content,
+    metadata,
+    excludeAccountId: accountId
+  });
+}
+
 async function reserveCampaignUgcVideoQuota(tx: Prisma.TransactionClient, campaignId: string) {
   try {
     const rows = await tx.$queryRaw<Array<{ ugcVideoQuota: number | null }>>`
@@ -828,7 +859,7 @@ export async function confirmDepositPaid(creatorMissionId: string, accountId: st
     if (updated.depositStatus === "HELD") {
       await notifyCreator(
         accountId,
-        "PROOF_SUBMITTED",
+        "CREATOR_FULFILLMENT_UPDATED",
         "Đã đặt cọc bằng N-Points",
         "Hệ thống đã giữ N-Points đặt cọc. Brand/Admin có thể gửi hàng theo thông tin nhận hàng của bạn.",
         { creatorMissionId }
@@ -836,7 +867,7 @@ export async function confirmDepositPaid(creatorMissionId: string, accountId: st
     } else {
       await notifyCreator(
         accountId,
-        "PROOF_SUBMITTED",
+        "CREATOR_FULFILLMENT_UPDATED",
         "Đang chờ xác nhận cọc",
         "Số dư N-Points chưa đủ. Vui lòng chuyển khoản theo hướng dẫn và chờ Admin xác nhận.",
         { creatorMissionId }
@@ -854,7 +885,19 @@ export async function confirmDepositPaid(creatorMissionId: string, accountId: st
     },
     include: creatorMissionInclude
   });
-  await notifyCreator(accountId, "PROOF_SUBMITTED", "Đã gửi xác nhận mua sản phẩm", "Bước xác nhận mua sản phẩm của bạn đã được ghi nhận.", { creatorMissionId });
+  await notifyCreator(accountId, "CREATOR_PROOF_SUBMITTED", "Đã gửi xác nhận mua sản phẩm", "Bước xác nhận mua sản phẩm của bạn đã được ghi nhận.", { creatorMissionId });
+  await notifyBrandStaffForMissionReview(
+    current.campaign.brandId,
+    "Creator submitted purchase proof",
+    `Creator submitted purchase proof for campaign "${current.campaign.title}".`,
+    { creatorMissionId, campaignId: current.campaign.id }
+  );
+  await notifyAdminOpsForMissionReview(
+    accountId,
+    "Creator nộp proof mua hàng",
+    `Creator vừa nộp proof mua hàng cho campaign "${current.campaign.title}".`,
+    { creatorMissionId, campaignId: current.campaign.id }
+  );
   return mapMission(updated);
 }
 
@@ -888,7 +931,19 @@ export async function submitPurchaseProof(creatorMissionId: string, accountId: s
   });
   const updated = await getMissionById(creatorMissionId);
   if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  await notifyCreator(accountId, "PROOF_SUBMITTED", "Đã gửi xác nhận mua sản phẩm", "Bước xác nhận mua sản phẩm của bạn đã được ghi nhận.", { creatorMissionId });
+  await notifyCreator(accountId, "CREATOR_PROOF_SUBMITTED", "Đã gửi xác nhận mua sản phẩm", "Bước xác nhận mua sản phẩm của bạn đã được ghi nhận.", { creatorMissionId });
+  await notifyBrandStaffForMissionReview(
+    updated.campaign.brandId,
+    "Creator submitted purchase proof",
+    `Creator submitted purchase proof for campaign "${updated.campaign.title}".`,
+    { creatorMissionId, campaignId: updated.campaign.id }
+  );
+  await notifyAdminOpsForMissionReview(
+    accountId,
+    "Creator nộp proof mua hàng",
+    `Creator vừa nộp proof mua hàng cho campaign "${updated.campaign.title}".`,
+    { creatorMissionId, campaignId: updated.campaign.id }
+  );
   return mapMission(updated);
 }
 
@@ -938,7 +993,19 @@ export async function submitDraft(creatorMissionId: string, accountId: string, p
   });
   const updated = await getMissionById(creatorMissionId);
   if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  await notifyCreator(accountId, "PROOF_SUBMITTED", "Đã gửi video review", "Video review của bạn đã được gửi để Brand/Admin duyệt.", { creatorMissionId });
+  await notifyCreator(accountId, "CREATOR_PROOF_SUBMITTED", "Đã gửi video review", "Video review của bạn đã được gửi để Brand/Admin duyệt.", { creatorMissionId });
+  await notifyBrandStaffForMissionReview(
+    updated.campaign.brandId,
+    "Creator submitted video review",
+    `A video review was submitted for campaign "${updated.campaign.title}".`,
+    { creatorMissionId, campaignId: updated.campaign.id }
+  );
+  await notifyAdminOpsForMissionReview(
+    accountId,
+    "Creator nộp video review",
+    `Creator vừa nộp video review cho campaign "${updated.campaign.title}".`,
+    { creatorMissionId, campaignId: updated.campaign.id }
+  );
   return { creatorMission: mapMission(updated), submissionId: updated.submissionId, submissionLifecycleStatus: updated.submissionLifecycleStatus };
 }
 
@@ -969,7 +1036,7 @@ export async function confirmDepositAndProductReceivedByAdmin(actorId: string, c
       include: creatorMissionInclude
     });
   });
-  await notifyCreator(updated.accountId, "MISSION_APPLICATION_APPROVED", "Đã xác nhận cọc", "Admin đã xác nhận tiền cọc. Brand/Admin có thể gửi hàng theo thông tin nhận hàng của bạn.", { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_FULFILLMENT_UPDATED", "Đã xác nhận cọc", "Admin đã xác nhận tiền cọc. Brand/Admin có thể gửi hàng theo thông tin nhận hàng của bạn.", { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -986,7 +1053,7 @@ export async function markSampleShippedByAdmin(actorId: string, creatorMissionId
     },
     include: creatorMissionInclude
   });
-  await notifyCreator(updated.accountId, "MISSION_APPLICATION_APPROVED", "Brand/Admin đã gửi hàng", "Hàng review đã được đánh dấu là đã gửi theo thông tin nhận hàng của bạn.", { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_FULFILLMENT_UPDATED", "Brand/Admin đã gửi hàng", "Hàng review đã được đánh dấu là đã gửi theo thông tin nhận hàng của bạn.", { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -1006,7 +1073,7 @@ export async function approvePurchaseProofByAdmin(actorId: string, creatorMissio
     },
     include: creatorMissionInclude
   });
-  await notifyCreator(updated.accountId, "MISSION_APPLICATION_APPROVED", "Đã duyệt bằng chứng mua hàng", "Bạn có thể tiếp tục nộp video review.", { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_FULFILLMENT_UPDATED", "Đã duyệt bằng chứng mua hàng", "Bạn có thể tiếp tục nộp video review.", { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -1026,7 +1093,7 @@ export async function rejectPurchaseProofByAdmin(actorId: string, creatorMission
     },
     include: creatorMissionInclude
   });
-  await notifyCreator(updated.accountId, "MISSION_APPLICATION_REJECTED", "Bằng chứng mua hàng bị từ chối", feedback, { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_FULFILLMENT_UPDATED", "Bằng chứng mua hàng bị từ chối", feedback, { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -1114,7 +1181,19 @@ export async function submitPublishReport(
   });
   const updated = await getMissionById(creatorMissionId);
   if (!updated) throw new AppError("Creator mission not found", 404, "CREATOR_MISSION_NOT_FOUND");
-  await notifyCreator(accountId, "PROOF_SUBMITTED", "Đã gửi link social public", "Link social public của bạn đã được gửi để Brand/Admin duyệt.", { creatorMissionId });
+  await notifyCreator(accountId, "CREATOR_PROOF_SUBMITTED", "Đã gửi link social public", "Link social public của bạn đã được gửi để Brand/Admin duyệt.", { creatorMissionId });
+  await notifyBrandStaffForMissionReview(
+    updated.campaign.brandId,
+    "Creator submitted public link",
+    `A public link was submitted for campaign "${updated.campaign.title}".`,
+    { creatorMissionId, campaignId: updated.campaign.id }
+  );
+  await notifyAdminOpsForMissionReview(
+    accountId,
+    "Creator nộp link public",
+    `Creator vừa nộp link public cho campaign "${updated.campaign.title}".`,
+    { creatorMissionId, campaignId: updated.campaign.id }
+  );
   return mapMission(updated);
 }
 
@@ -1150,7 +1229,7 @@ export async function approveVideoReviewByAdmin(actorId: string, creatorMissionI
       include: creatorMissionInclude
     });
   });
-  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_APPROVED", "Video đã được duyệt", "Bạn có thể tiếp tục nộp link social public.", { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_VIDEO_APPROVED", "Video đã được duyệt", "Bạn có thể tiếp tục nộp link social public.", { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -1190,7 +1269,7 @@ export async function rejectVideoReviewByAdmin(actorId: string, creatorMissionId
       include: creatorMissionInclude
     });
   });
-  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_REJECTED", "Video bị từ chối", feedback, { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_VIDEO_REJECTED", "Video bị từ chối", feedback, { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -1257,7 +1336,7 @@ export async function approvePublishReportByAdmin(actorId: string, creatorMissio
       include: creatorMissionInclude
     });
   });
-  await notifyCreator(updated.accountId, "CREATOR_MISSION_FINAL_APPROVED", "Campaign đã hoàn thành", "Campaign của bạn đã được duyệt hoàn thành và hoàn N-Points mua sản phẩm.", { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_FINAL_SUBMISSION_APPROVED", "Final submission được duyệt", "Campaign của bạn đã được duyệt hoàn thành và hoàn N-Points mua sản phẩm.", { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -1303,7 +1382,7 @@ export async function approvePublishReportByBrand(actorId: string, creatorMissio
 
   await notifyCreator(
     updated.accountId,
-    "CREATOR_MISSION_FINAL_APPROVED",
+    "CREATOR_FINAL_SUBMISSION_APPROVED",
     "Link public đã được Brand duyệt",
     "Bài public của bạn đã được Brand duyệt. Admin sẽ kiểm tra bill mua hàng và ảnh đánh giá 5 sao để xử lý hoàn N-Points.",
     { creatorMissionId, actorId }
@@ -1339,7 +1418,7 @@ export async function rejectPublishReportByAdmin(actorId: string, creatorMission
       include: creatorMissionInclude
     });
   });
-  await notifyCreator(updated.accountId, "CREATOR_MISSION_FINAL_REJECTED", "Bước hoàn thành bị từ chối", feedback, { creatorMissionId, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_FINAL_SUBMISSION_REJECTED", "Final submission bị từ chối", feedback, { creatorMissionId, actorId });
   return mapMission(updated);
 }
 
@@ -1469,7 +1548,19 @@ export async function submitCreatorMissionTranscript(accountId: string, creatorM
     });
   });
 
-  await notifyCreator(accountId, "PROOF_SUBMITTED", "Đã gửi kịch bản", "Kịch bản của bạn đã được gửi để Brand/Admin duyệt.", { creatorMissionId });
+  await notifyCreator(accountId, "CREATOR_PROOF_SUBMITTED", "Đã gửi kịch bản", "Kịch bản của bạn đã được gửi để Brand/Admin duyệt.", { creatorMissionId });
+  await notifyBrandStaffForMissionReview(
+    updated.campaign.brandId,
+    "Creator submitted script",
+    `A script was submitted for campaign "${updated.campaign.title}".`,
+    { creatorMissionId, campaignId: updated.campaign.id }
+  );
+  await notifyAdminOpsForMissionReview(
+    accountId,
+    "Creator nộp kịch bản",
+    `Creator vừa nộp kịch bản cho campaign "${updated.campaign.title}".`,
+    { creatorMissionId, campaignId: updated.campaign.id }
+  );
   return mapMission(updated);
 }
 
@@ -1965,7 +2056,7 @@ export async function approveMissionApplicationByAdmin(actorId: string, id: stri
     });
     return mapMission(next);
   });
-  await notifyCreator(current.accountId, "MISSION_APPLICATION_APPROVED", "Đơn tham gia campaign được duyệt", `Bạn đã được duyệt tham gia campaign "${current.campaign.title}".`, { creatorMissionId: id });
+  await notifyCreator(current.accountId, "CREATOR_CAMPAIGN_APPLICATION_APPROVED", "Đơn tham gia campaign được duyệt", `Bạn đã được duyệt tham gia campaign "${current.campaign.title}".`, { creatorMissionId: id });
   return updated;
 }
 
@@ -1979,7 +2070,7 @@ export async function rejectMissionApplicationByAdmin(actorId: string, id: strin
     data: { applicationStatus: "REJECTED", applicationRejectReason: reason, applicationReviewedById: actorId, applicationReviewedAt: now() },
     include: creatorMissionInclude
   });
-  await notifyCreator(current.accountId, "MISSION_APPLICATION_REJECTED", "Đơn xin nhiệm vụ bị từ chối", reason, { creatorMissionId: id });
+  await notifyCreator(current.accountId, "CREATOR_CAMPAIGN_APPLICATION_REJECTED", "Đơn ứng tuyển campaign bị từ chối", reason, { creatorMissionId: id });
   return mapMission(updated);
 }
 
@@ -2194,7 +2285,7 @@ export async function approveMissionTranscriptReviewByAdmin(actorId: string, id:
     });
   });
 
-  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_APPROVED", "Kịch bản được duyệt", "Bạn có thể tiếp tục nộp video review.", { creatorMissionId: id, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_VIDEO_APPROVED", "Kịch bản được duyệt", "Bạn có thể tiếp tục nộp video review.", { creatorMissionId: id, actorId });
   return mapMission(updated);
 }
 
@@ -2237,7 +2328,7 @@ export async function rejectMissionTranscriptReviewByAdmin(actorId: string, id: 
     });
   });
 
-  await notifyCreator(updated.accountId, "CREATOR_MISSION_VIDEO_REJECTED", "Kịch bản bị từ chối", reason, { creatorMissionId: id, actorId });
+  await notifyCreator(updated.accountId, "CREATOR_VIDEO_REJECTED", "Kịch bản bị từ chối", reason, { creatorMissionId: id, actorId });
   return mapMission(updated);
 }
 

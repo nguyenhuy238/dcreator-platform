@@ -291,7 +291,7 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
 
     await createNotification({
       accountId,
-      event: "MISSION_ACCEPTED",
+      event: "CAMPAIGN_REGISTRATION_SUCCESS",
       title: "Đã gửi đăng ký campaign",
       content: "Bạn đã đăng ký lại campaign này và đang chờ Brand/Admin duyệt.",
       metadata: { campaignId: campaign.id, creatorMissionId: reapplied.id }
@@ -345,7 +345,7 @@ export async function submitCreatorCampaignApplication(slug: string, accountId: 
 
   await createNotification({
     accountId,
-    event: "MISSION_ACCEPTED",
+    event: "CAMPAIGN_REGISTRATION_SUCCESS",
     title: "Đăng ký campaign thành công",
     content: "Đơn đăng ký của bạn đã được ghi nhận. Hệ thống sẽ thông báo khi Brand/Admin duyệt.",
     metadata: { campaignId: campaign.id, creatorMissionId: application.id }

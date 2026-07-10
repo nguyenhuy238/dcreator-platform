@@ -319,8 +319,8 @@ export async function applyCreator(accountId: string, input: CreatorApplicationI
   });
   await createNotification({
     accountId,
-    event: NotificationEvent.CREATOR_APPLICATION_APPROVED,
-    title: "Hồ sơ Creator đã được tạo",
+    event: NotificationEvent.CREATOR_PROFILE_CREATED,
+    title: "Hồ sơ Creator đã tạo",
     content: "Bạn có thể bắt đầu thiết lập Creator Dashboard. Bổ sung xác minh để mở khóa payout nâng cao.",
     metadata: { creatorApplicationId: created.id }
   });
@@ -404,8 +404,8 @@ export async function updateCreatorApplication(accountId: string, applicationId:
   });
   await createNotification({
     accountId,
-    event: NotificationEvent.CREATOR_APPLICATION_APPROVED,
-    title: "Hồ sơ Creator đã được cập nhật",
+    event: NotificationEvent.CREATOR_PROFILE_UPDATED,
+    title: "Hồ sơ Creator đã cập nhật",
     content: "Bạn có thể tiếp tục sử dụng Creator Dashboard.",
     metadata: { creatorApplicationId: updated.id }
   });
@@ -413,7 +413,7 @@ export async function updateCreatorApplication(accountId: string, applicationId:
 }
 
 export async function applyBrand(accountId: string, input: BrandApplicationInput) {
-  return prisma.$transaction(async (tx) => {
+  const created = await prisma.$transaction(async (tx) => {
     const app = await tx.brandApplication.create({
       data: {
         accountId,
@@ -456,6 +456,16 @@ export async function applyBrand(accountId: string, input: BrandApplicationInput
     const brand = await syncBrandAccessFromApplication(tx, app);
     return { application: app, brand: { id: brand.id, name: brand.name, status: brand.status } };
   });
+
+  await createNotification({
+    accountId,
+    event: NotificationEvent.BRAND_PROFILE_CREATED,
+    title: "H\u1ED3 s\u01A1 Brand \u0111\u00E3 t\u1EA1o / c\u1EADp nh\u1EADt",
+    content: `H\u1ED3 s\u01A1 Brand "${created.brand.name}" \u0111\u00E3 \u0111\u01B0\u1EE3c t\u1EA1o.`,
+    metadata: { brandId: created.brand.id, applicationId: created.application.id }
+  });
+
+  return created;
 }
 
 export async function updateBrandApplication(accountId: string, applicationId: string, input: BrandApplicationInput) {
@@ -463,7 +473,7 @@ export async function updateBrandApplication(accountId: string, applicationId: s
   if (!current || current.accountId !== accountId) throw new AppError("Application not found", 404, "APPLICATION_NOT_FOUND");
   ensureCanEdit(current.status);
 
-  return prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
     const app = await tx.brandApplication.update({
       where: { id: applicationId },
       data: {
@@ -509,6 +519,16 @@ export async function updateBrandApplication(accountId: string, applicationId: s
     await syncBrandAccessFromApplication(tx, app);
     return app;
   });
+
+  await createNotification({
+    accountId,
+    event: NotificationEvent.BRAND_PROFILE_UPDATED,
+    title: "H\u1ED3 s\u01A1 Brand \u0111\u00E3 t\u1EA1o / c\u1EADp nh\u1EADt",
+    content: `H\u1ED3 s\u01A1 Brand "${updated.brandName}" \u0111\u00E3 \u0111\u01B0\u1EE3c c\u1EADp nh\u1EADt.`,
+    metadata: { applicationId: updated.id }
+  });
+
+  return updated;
 }
 
 type ListCreatorApplicationsOptions = {
@@ -763,9 +783,24 @@ export async function reviewCreatorApplication(actorId: string, applicationId: s
   });
   await createNotification({
     accountId: updated.accountId,
-    event: status === "APPROVED" ? NotificationEvent.CREATOR_APPLICATION_APPROVED : NotificationEvent.CAMPAIGN_REJECTED,
-    title: status === "APPROVED" ? "Yêu cầu Creator đã được duyệt" : "Yêu cầu Creator đã cập nhật",
-    content: status === "APPROVED" ? "Yêu cầu Creator của bạn đã được duyệt." : `Yêu cầu Creator đã chuyển sang trạng thái ${status}.`,
+    event:
+      status === "APPROVED"
+        ? NotificationEvent.CREATOR_REQUEST_APPROVED
+        : status === "NEEDS_REVISION"
+          ? NotificationEvent.CREATOR_REQUEST_CHANGES_REQUIRED
+          : NotificationEvent.CREATOR_REQUEST_REJECTED,
+    title:
+      status === "APPROVED"
+        ? "Yêu cầu Creator được duyệt"
+        : status === "NEEDS_REVISION"
+          ? "Yêu cầu Creator bị yêu cầu sửa"
+          : "Yêu cầu Creator bị từ chối",
+    content:
+      status === "APPROVED"
+        ? "Yêu cầu Creator của bạn đã được duyệt."
+        : status === "NEEDS_REVISION"
+          ? reviewNote?.trim() || "Admin yêu cầu bạn cập nhật lại hồ sơ Creator."
+          : rejectReason?.trim() || "Yêu cầu Creator của bạn đã bị từ chối.",
     metadata: { status, rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null }
   });
   return updated;
@@ -882,9 +917,24 @@ export async function reviewBrandApplication(actorId: string, applicationId: str
   });
   await createNotification({
     accountId: updated.accountId,
-    event: status === "APPROVED" ? NotificationEvent.BRAND_APPLICATION_APPROVED : NotificationEvent.CAMPAIGN_REJECTED,
-    title: status === "APPROVED" ? "Yêu cầu Brand đã được duyệt" : "Yêu cầu Brand đã cập nhật",
-    content: status === "APPROVED" ? "Yêu cầu Brand của bạn đã được duyệt." : `Yêu cầu Brand đã chuyển sang trạng thái ${status}.`,
+    event:
+      status === "APPROVED"
+        ? NotificationEvent.BRAND_REQUEST_APPROVED
+        : status === "NEEDS_REVISION"
+          ? NotificationEvent.BRAND_REQUEST_CHANGES_REQUIRED
+          : NotificationEvent.BRAND_REQUEST_REJECTED,
+    title:
+      status === "APPROVED"
+        ? "Y\u00EAu c\u1EA7u Brand \u0111\u01B0\u1EE3c duy\u1EC7t"
+        : status === "NEEDS_REVISION"
+          ? "Y\u00EAu c\u1EA7u Brand c\u1EA7n c\u1EADp nh\u1EADt"
+          : "Y\u00EAu c\u1EA7u Brand b\u1ECB t\u1EEB ch\u1ED1i",
+    content:
+      status === "APPROVED"
+        ? "Y\u00EAu c\u1EA7u Brand c\u1EE7a b\u1EA1n \u0111\u00E3 \u0111\u01B0\u1EE3c duy\u1EC7t."
+        : status === "NEEDS_REVISION"
+          ? "Y\u00EAu c\u1EA7u Brand c\u1EE7a b\u1EA1n c\u1EA7n c\u1EADp nh\u1EADt" + (reviewNote ? `: ${reviewNote}` : "") + "."
+          : "Y\u00EAu c\u1EA7u Brand c\u1EE7a b\u1EA1n b\u1ECB t\u1EEB ch\u1ED1i" + (rejectReason ? `: ${rejectReason}` : "") + ".",
     metadata: { status, rejectReason: rejectReason ?? null, reviewNote: reviewNote ?? null }
   });
   return updated;

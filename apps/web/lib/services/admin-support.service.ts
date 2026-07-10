@@ -2,7 +2,7 @@ import { NotificationEvent } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
-import { createNotification } from "@/lib/services/notification.service";
+import { createNotification, createNotificationForAdminOps } from "@/lib/services/notification.service";
 
 export async function listSupportTicketsForAdmin(input: {
   status?: "OPEN" | "IN_PROGRESS" | "WAITING_USER" | "RESOLVED" | "CLOSED";
@@ -104,6 +104,25 @@ export async function updateSupportTicketByAdmin(input: {
     });
   }
 
+  if (
+    input.priority === "URGENT" ||
+    input.assigneeAccountId !== undefined ||
+    input.internalNote
+  ) {
+    await createNotificationForAdminOps({
+      event: NotificationEvent.PROOF_SUBMITTED,
+      title: "Support ticket escalation",
+      content: `Ticket "${current.title}" cần theo dõi vận hành với trạng thái ${updated.status}.`,
+      metadata: {
+        ticketId: current.id,
+        status: updated.status,
+        priority: updated.priority,
+        assigneeAccountId: updated.assigneeAccountId
+      },
+      excludeAccountId: input.actorId
+    });
+  }
+
   return updated;
 }
 
@@ -140,6 +159,16 @@ export async function addSupportTicketReplyByAdmin(input: {
       title: "Có phản hồi support ticket",
       content: `Ticket "${current.title}" có phản hồi mới từ admin.`,
       metadata: { ticketId: current.id }
+    });
+  }
+
+  if (input.isInternal) {
+    await createNotificationForAdminOps({
+      event: NotificationEvent.PROOF_SUBMITTED,
+      title: "Support ticket internal update",
+      content: `Ticket "${current.title}" có ghi chú nội bộ mới.`,
+      metadata: { ticketId: current.id, commentId: comment.id },
+      excludeAccountId: input.actorId
     });
   }
 

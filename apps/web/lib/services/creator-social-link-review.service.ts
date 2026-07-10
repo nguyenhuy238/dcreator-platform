@@ -163,7 +163,7 @@ export async function reviewCreatorSocialLinkRequest(
 
   await createNotification({
     accountId: current.creatorProfile.accountId,
-    event: status === "APPROVED" ? "CREATOR_APPLICATION_APPROVED" : "PROOF_REJECTED",
+    event: status === "APPROVED" ? "CREATOR_SOCIAL_LINK_APPROVED" : "CREATOR_SOCIAL_LINK_REJECTED",
     title: status === "APPROVED" ? "Kênh mạng xã hội đã được duyệt" : "Kênh mạng xã hội bị từ chối",
     content:
       status === "APPROVED"
