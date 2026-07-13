@@ -40,7 +40,6 @@ export async function GET(request: NextRequest) {
         _count: { select: { socialLinks: true } }
       },
       orderBy: { createdAt: "desc" },
-      take: 100
     });
 
     return ok(

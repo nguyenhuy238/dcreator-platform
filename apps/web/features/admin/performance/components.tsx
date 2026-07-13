@@ -11,10 +11,10 @@ type SummaryCard = {
 };
 
 const statusLabels: Record<PerformanceStatus, string> = {
-  excellent: "Excellent",
-  good: "Good",
-  average: "Average",
-  risky: "Risky"
+  excellent: "Xuất sắc",
+  good: "Tốt",
+  average: "Trung bình",
+  risky: "Rủi ro"
 };
 
 const statusClassNames: Record<PerformanceStatus, string> = {
@@ -80,10 +80,10 @@ export function PerformanceFilters({
       </select>
       <select className="dc-input" value={status} onChange={(event) => onStatusChange(event.target.value)}>
         <option value="all">Tất cả trạng thái</option>
-        <option value="excellent">Excellent</option>
-        <option value="good">Good</option>
-        <option value="average">Average</option>
-        <option value="risky">Risky</option>
+        <option value="excellent">Xuất sắc</option>
+        <option value="good">Tốt</option>
+        <option value="average">Trung bình</option>
+        <option value="risky">Rủi ro</option>
       </select>
       <select className="dc-input" value={sort} onChange={(event) => onSortChange(event.target.value)}>
         {sortOptions.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
@@ -128,18 +128,18 @@ function CompactActionLink({ href, tone, children }: { href: string; tone: "prim
 }
 
 export function CreatorPerformanceTable({ items }: { items: CreatorPerformance[] }) {
-  if (items.length === 0) return <EmptyState title="Không có dữ liệu Performance" description="Không có Creator phù hợp bộ lọc performance." />;
+  if (items.length === 0) return <EmptyState title="Không có dữ liệu hiệu suất" description="Không có nhà sáng tạo phù hợp bộ lọc hiệu suất." />;
 
   return (
     <TableShell>
       <div className="hidden grid-cols-[48px_minmax(170px,1.3fr)_minmax(92px,.7fr)_minmax(92px,.7fr)_minmax(120px,.9fr)_minmax(96px,.7fr)_minmax(108px,.7fr)] gap-3 rounded-t-2xl bg-zinc-50 px-4 py-3 text-xs uppercase tracking-wider text-zinc-500 lg:grid">
-        <span>Rank</span>
-        <span>Creator</span>
-        <span>Campaigns</span>
-        <span>Missions</span>
-        <span>Money</span>
-        <span>Score</span>
-        <span>Actions</span>
+        <span>Hạng</span>
+        <span>Nhà sáng tạo</span>
+        <span>Chiến dịch</span>
+        <span>Nhiệm vụ</span>
+        <span>Tài chính</span>
+        <span>Điểm</span>
+        <span>Thao tác</span>
       </div>
       <div className="divide-y divide-zinc-100">
         {items.map((item) => (
@@ -149,17 +149,17 @@ export function CreatorPerformanceTable({ items }: { items: CreatorPerformance[]
               <p className="truncate font-semibold text-zinc-900">{item.name}</p>
               <p className="mt-1 truncate text-xs text-zinc-500">{item.contact}</p>
               <p className="mt-1 truncate text-xs text-zinc-400">{item.socialHandle}</p>
-              <p className="mt-1 text-xs text-zinc-400 lg:hidden">Last activity: {formatDate(item.lastActivityDate)}</p>
+              <p className="mt-1 text-xs text-zinc-400 lg:hidden">Hoạt động gần nhất: {formatDate(item.lastActivityDate)}</p>
             </div>
-            <CompactMetric label="Campaigns" value={`${item.completedCampaigns} / ${item.totalCampaignsJoined}`} />
-            <CompactMetric label="Missions" value={`${item.missionApproved} / ${item.missionSubmitted} (${item.approvalRate}%)`} />
+            <CompactMetric label="Chiến dịch" value={`${item.completedCampaigns} / ${item.totalCampaignsJoined}`} />
+            <CompactMetric label="Nhiệm vụ" value={`${item.missionApproved} / ${item.missionSubmitted} (${item.approvalRate}%)`} />
             <div className="min-w-0">
-              <ColumnLabel>Money</ColumnLabel>
-              <p className="mt-1 truncate text-sm font-semibold text-zinc-900">{formatCurrency(item.totalRevenueGenerated)} VND</p>
-              <p className="mt-1 truncate text-xs text-zinc-500">Payout {formatCurrency(item.totalPayout)} VND</p>
+              <ColumnLabel>Tài chính</ColumnLabel>
+              <p className="mt-1 truncate text-sm font-semibold text-zinc-900">{formatCurrency(item.totalRevenueGenerated)} VNĐ</p>
+              <p className="mt-1 truncate text-xs text-zinc-500">Đã chi trả {formatCurrency(item.totalPayout)} VNĐ</p>
             </div>
             <div className="min-w-0">
-              <ColumnLabel>Score</ColumnLabel>
+              <ColumnLabel>Điểm</ColumnLabel>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <span className="font-bold text-zinc-900">{item.score}</span>
                 <PerformanceStatusBadge status={item.status} />
@@ -178,18 +178,18 @@ export function CreatorPerformanceTable({ items }: { items: CreatorPerformance[]
 }
 
 export function BrandPerformanceTable({ items }: { items: BrandPerformance[] }) {
-  if (items.length === 0) return <EmptyState title="Không có dữ liệu Performance" description="Không có Brand phù hợp bộ lọc performance." />;
+  if (items.length === 0) return <EmptyState title="Không có dữ liệu hiệu suất" description="Không có nhãn hàng phù hợp bộ lọc hiệu suất." />;
 
   return (
     <TableShell>
       <div className="hidden grid-cols-[48px_minmax(170px,1.3fr)_minmax(110px,.8fr)_minmax(104px,.7fr)_minmax(128px,.9fr)_minmax(96px,.7fr)_minmax(108px,.7fr)] gap-3 rounded-t-2xl bg-zinc-50 px-4 py-3 text-xs uppercase tracking-wider text-zinc-500 lg:grid">
-        <span>Rank</span>
-        <span>Brand</span>
-        <span>Campaigns</span>
-        <span>Ops</span>
-        <span>Money</span>
-        <span>Score</span>
-        <span>Actions</span>
+        <span>Hạng</span>
+        <span>Nhãn hàng</span>
+        <span>Chiến dịch</span>
+        <span>Vận hành</span>
+        <span>Tài chính</span>
+        <span>Điểm</span>
+        <span>Thao tác</span>
       </div>
       <div className="divide-y divide-zinc-100">
         {items.map((item) => (
@@ -198,26 +198,26 @@ export function BrandPerformanceTable({ items }: { items: BrandPerformance[] }) 
             <div className="min-w-0">
               <p className="truncate font-semibold text-zinc-900">{item.name}</p>
               <p className="mt-1 truncate text-xs text-zinc-500">{item.ownerEmail}</p>
-              <p className="mt-1 text-xs text-zinc-400">Last activity: {formatDate(item.lastActivityDate)}</p>
+              <p className="mt-1 text-xs text-zinc-400">Hoạt động gần nhất: {formatDate(item.lastActivityDate)}</p>
             </div>
             <div className="min-w-0">
-              <ColumnLabel>Campaigns</ColumnLabel>
+              <ColumnLabel>Chiến dịch</ColumnLabel>
               <p className="mt-1 text-sm font-semibold text-zinc-900">{item.completedCampaigns} / {item.totalCampaignsCreated}</p>
-              <p className="mt-1 text-xs text-zinc-500">Active {item.activeCampaigns}</p>
+              <p className="mt-1 text-xs text-zinc-500">Đang chạy {item.activeCampaigns}</p>
             </div>
             <div className="grid grid-cols-2 gap-3 lg:block">
-              <CompactMetric label="Products" value={item.totalProducts} />
+              <CompactMetric label="Sản phẩm" value={item.totalProducts} />
               <div className="mt-0 lg:mt-3">
-                <CompactMetric label="Transactions" value={item.totalTransactions} />
+                <CompactMetric label="Giao dịch" value={item.totalTransactions} />
               </div>
             </div>
             <div className="min-w-0">
-              <ColumnLabel>Money</ColumnLabel>
-              <p className="mt-1 truncate text-sm font-semibold text-zinc-900">{formatCurrency(item.totalRevenue)} VND</p>
-              <p className="mt-1 truncate text-xs text-zinc-500">Credit {formatCurrency(item.creditBalance)} VND</p>
+              <ColumnLabel>Tài chính</ColumnLabel>
+              <p className="mt-1 truncate text-sm font-semibold text-zinc-900">{formatCurrency(item.totalRevenue)} VNĐ</p>
+              <p className="mt-1 truncate text-xs text-zinc-500">Hạn mức {formatCurrency(item.creditBalance)} VNĐ</p>
             </div>
             <div className="min-w-0">
-              <ColumnLabel>Score</ColumnLabel>
+              <ColumnLabel>Điểm</ColumnLabel>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <span className="font-bold text-zinc-900">{item.score}</span>
                 <PerformanceStatusBadge status={item.status} />
@@ -235,15 +235,15 @@ export function BrandPerformanceTable({ items }: { items: BrandPerformance[] }) 
 }
 
 export const creatorPerformanceSortOptions: { key: CreatorPerformanceSortKey; label: string }[] = [
-  { key: "score-desc", label: "Score cao nhất" },
-  { key: "revenue-desc", label: "Revenue cao nhất" },
-  { key: "completed-campaigns-desc", label: "Completed campaigns" },
-  { key: "approval-rate-desc", label: "Approval rate" }
+  { key: "score-desc", label: "Điểm cao nhất" },
+  { key: "revenue-desc", label: "Doanh thu cao nhất" },
+  { key: "completed-campaigns-desc", label: "Chiến dịch hoàn thành nhiều nhất" },
+  { key: "approval-rate-desc", label: "Tỷ lệ duyệt cao nhất" }
 ];
 
 export const brandPerformanceSortOptions: { key: BrandPerformanceSortKey; label: string }[] = [
-  { key: "score-desc", label: "Score cao nhất" },
-  { key: "revenue-desc", label: "Revenue cao nhất" },
-  { key: "campaigns-desc", label: "Campaigns nhiều nhất" },
-  { key: "credit-balance-desc", label: "Credit balance cao nhất" }
+  { key: "score-desc", label: "Điểm cao nhất" },
+  { key: "revenue-desc", label: "Doanh thu cao nhất" },
+  { key: "campaigns-desc", label: "Chiến dịch nhiều nhất" },
+  { key: "credit-balance-desc", label: "Hạn mức cao nhất" }
 ];
