@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { getDateRangeByFilter, isInCurrentMonth, isWithinDateRange, timeFilterOptions, type TimeFilter } from "@/app/admin/_lib/timeFilters";
 import { AdminTabs } from "@/app/admin/_components/AdminTabs";
 import { AdminDeleteDialog } from "@/app/admin/_components/AdminDeleteDialog";
+import { AdminPagination } from "@/app/admin/_components/AdminPagination";
 import { ManagementActionMenu } from "@/app/admin/_components/ManagementActionMenu";
 import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
@@ -45,15 +46,16 @@ type ApiResult<T> = { success: boolean; data: T; error?: string };
 
 const tabs = [
   { key: "", label: "Tất cả" },
-  { key: "ACTIVE", label: "Active" },
+  { key: "ACTIVE", label: "Đang hoạt động" },
   { key: "LOCKED", label: "Bị khóa" },
   { key: "RISK", label: "Có rủi ro" }
 ];
 
 const newestLimit = 5;
+const pageLimit = 20;
 const viewTabs = [
-  { key: "directory", label: "Danh sách Brand" },
-  { key: "performance", label: "Brand Performance" }
+  { key: "directory", label: "Danh sách nhãn hàng" },
+  { key: "performance", label: "Hiệu suất nhãn hàng" }
 ];
 
 function matchesBrandSearch(item: Item, query: string) {
@@ -86,6 +88,7 @@ export default function AdminBrandsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const [page, setPage] = useState(1);
   const [view, setView] = useState("directory");
   const [query, setQuery] = useState("");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("ALL");
@@ -104,10 +107,10 @@ export default function AdminBrandsPage() {
     try {
       const res = await fetch("/api/admin/brands", { cache: "no-store" });
       const body = (await res.json()) as ApiResult<Item[]>;
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải danh sách Brand thất bại");
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Tải danh sách nhãn hàng thất bại");
       setItems(body.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Tải danh sách Brand thất bại");
+      setError(e instanceof Error ? e.message : "Tải danh sách nhãn hàng thất bại");
     } finally {
       setLoading(false);
     }
@@ -134,6 +137,21 @@ export default function AdminBrandsPage() {
     () => searchAndTimeFiltered.filter((item) => matchesBrandStatus(item, status)),
     [searchAndTimeFiltered, status]
   );
+
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(filtered.length / pageLimit)), [filtered.length]);
+
+  const paginatedFiltered = useMemo(
+    () => filtered.slice((page - 1) * pageLimit, page * pageLimit),
+    [filtered, page]
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, status, timeFilter]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   const stats = useMemo(() => {
     const activeCount = searchAndTimeFiltered.filter((item) => item.status === "active").length;
@@ -167,20 +185,20 @@ export default function AdminBrandsPage() {
     const topBrand = performanceRows[0]?.name ?? "-";
 
     return [
-      { title: "Top Brand", value: topBrand, hint: performanceRows[0] ? `Score ${performanceRows[0].score}` : "Chưa có dữ liệu" },
-      { title: "Average Score", value: String(averageScore), hint: `${performanceRows.length} brand trong bộ lọc` },
-      { title: "Total Brand Revenue", value: `${totalRevenue.toLocaleString("vi-VN")} VND` },
-      { title: "Risky Brands", value: String(riskyBrands), hint: "Cần theo dõi credit/risk" }
+      { title: "Nhãn hàng nổi bật", value: topBrand, hint: performanceRows[0] ? `Điểm ${performanceRows[0].score}` : "Chưa có dữ liệu" },
+      { title: "Điểm trung bình", value: String(averageScore), hint: `${performanceRows.length} nhãn hàng trong bộ lọc` },
+      { title: "Tổng doanh thu nhãn hàng", value: `${totalRevenue.toLocaleString("vi-VN")} VNĐ` },
+      { title: "Nhãn hàng rủi ro", value: String(riskyBrands), hint: "Cần theo dõi hạn mức/rủi ro" }
     ];
   }, [performanceRows]);
 
   return (
     <>
-      <PageHeader title="Quản lý Brand" subtitle="Giám sát KYB/rủi ro, credit balance và trạng thái vận hành Brand (không dùng để duyệt onboarding ban đầu)." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
+      <PageHeader title="Quản lý nhãn hàng" subtitle="Giám sát KYB/rủi ro, hạn mức tín dụng và trạng thái vận hành nhãn hàng (không dùng để duyệt onboarding ban đầu)." action={<button className="dc-btn-secondary" onClick={() => void load()}>Làm mới</button>} />
       <section className="dc-card p-4 grid gap-3">
         <AdminTabs items={tabs} value={status} onChange={setStatus} />
         <div className="grid gap-2 md:grid-cols-[1fr_220px_auto]">
-          <input className="dc-input" placeholder="Tìm brand/email/industry" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input className="dc-input" placeholder="Tìm theo nhãn hàng, email hoặc ngành hàng" value={query} onChange={(e) => setQuery(e.target.value)} />
           <select className="dc-input" value={timeFilter} onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}>
             {timeFilterOptions.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
           </select>
@@ -189,15 +207,15 @@ export default function AdminBrandsPage() {
       </section>
       <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <article className="dc-card p-4">
-          <p className="text-xs uppercase tracking-wider text-zinc-500">Tổng Brand</p>
+          <p className="text-xs uppercase tracking-wider text-zinc-500">Tổng nhãn hàng</p>
           <p className="mt-2 text-2xl font-black text-zinc-900">{stats.total}</p>
         </article>
         <article className="dc-card p-4">
-          <p className="text-xs uppercase tracking-wider text-zinc-500">Active</p>
+          <p className="text-xs uppercase tracking-wider text-zinc-500">Đang hoạt động</p>
           <p className="mt-2 text-2xl font-black text-zinc-900">{stats.activeCount}</p>
         </article>
         <article className="dc-card p-4">
-          <p className="text-xs uppercase tracking-wider text-zinc-500">Verified / Unverified</p>
+          <p className="text-xs uppercase tracking-wider text-zinc-500">Đã xác minh / Chưa xác minh</p>
           <p className="mt-2 text-2xl font-black text-zinc-900">{stats.verifiedCount} / {stats.unverifiedCount}</p>
         </article>
         <article className="dc-card p-4">
@@ -206,7 +224,7 @@ export default function AdminBrandsPage() {
         </article>
       </section>
       {loading ? <div className="mt-4"><LoadingSkeleton rows={4} /></div> : null}
-      {error ? <div className="mt-4"><ErrorState title="Không tải được Brand" description={error} onRetry={() => void load()} /></div> : null}
+      {error ? <div className="mt-4"><ErrorState title="Không tải được nhãn hàng" description={error} onRetry={() => void load()} /></div> : null}
       {!loading && !error ? (
         <>
           <section className="mt-6 dc-card p-4">
@@ -214,11 +232,11 @@ export default function AdminBrandsPage() {
           </section>
           {view === "performance" ? (
             <section className="mt-6 grid gap-4">
-              <SectionHeader title="Brand Performance" subtitle="Ranking hiệu quả Brand dựa trên campaign, product, revenue, credit balance và risk flag." />
+              <SectionHeader title="Hiệu suất nhãn hàng" subtitle="Xếp hạng hiệu quả dựa trên chiến dịch, sản phẩm, doanh thu, hạn mức tín dụng và cờ rủi ro." />
               <PerformanceSummaryCards cards={performanceSummary} />
               <PerformanceFilters
                 search={performanceQuery}
-                searchPlaceholder="Tìm brand/email"
+                searchPlaceholder="Tìm nhãn hàng hoặc email"
                 sort={performanceSort}
                 sortOptions={brandPerformanceSortOptions}
                 status={performanceStatus}
@@ -233,8 +251,8 @@ export default function AdminBrandsPage() {
           ) : (
             <>
               <section className="mt-6">
-                <SectionHeader title="Brand mới tham gia" subtitle="Các brand được tạo gần đây trong hệ thống" />
-                {newestBrands.length === 0 ? <EmptyState title="Chưa có Brand mới" description="Hệ thống chưa ghi nhận brand mới tham gia." /> : (
+                <SectionHeader title="Nhãn hàng mới tham gia" subtitle="Các nhãn hàng được tạo gần đây trong hệ thống" />
+                {newestBrands.length === 0 ? <EmptyState title="Chưa có nhãn hàng mới" description="Hệ thống chưa ghi nhận nhãn hàng mới tham gia." /> : (
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                     {newestBrands.map((item) => (
                       <article key={item.id} className="dc-card p-4">
@@ -253,47 +271,50 @@ export default function AdminBrandsPage() {
                 )}
               </section>
               <section className="mt-6">
-                <SectionHeader title="Tất cả Brand" />
-                {filtered.length === 0 ? <EmptyState title="Không có dữ liệu" description="Không có Brand phù hợp bộ lọc." /> : (
-                  <div className="grid gap-3">
-                    {filtered.map((item) => (
-                      <article key={item.id} className="dc-card p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div>
-                            <p className="font-semibold">{item.brandName}</p>
-                            <p className="text-xs text-zinc-500">{item.industry ?? "-"} • {item.contactEmail}</p>
-                            <p className="mt-1 text-xs text-zinc-500">
-                              Campaigns: {item.campaignCount} • Members: {item.memberCount} • Products: {item.productCount} • Transactions: {item.transactionTotal.toLocaleString("vi-VN")} VND • Tham gia: {formatJoinedDate(item.createdAt)}
-                            </p>
+                <SectionHeader title="Tất cả nhãn hàng" subtitle={`Tổng ${filtered.length} nhãn hàng`} />
+                {filtered.length === 0 ? <EmptyState title="Không có dữ liệu" description="Không có nhãn hàng phù hợp bộ lọc." /> : (
+                  <>
+                    <div className="grid gap-3">
+                      {paginatedFiltered.map((item) => (
+                        <article key={item.id} className="dc-card p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="font-semibold">{item.brandName}</p>
+                              <p className="text-xs text-zinc-500">{item.industry ?? "-"} • {item.contactEmail}</p>
+                              <p className="mt-1 text-xs text-zinc-500">
+                                Chiến dịch: {item.campaignCount} • Thành viên: {item.memberCount} • Sản phẩm: {item.productCount} • Giao dịch: {item.transactionTotal.toLocaleString("vi-VN")} VNĐ • Tham gia: {formatJoinedDate(item.createdAt)}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <StatusBadge status={item.status} />
+                              <StatusBadge status={item.verificationStatus} />
+                              {item.riskFlag ? <StatusBadge status="risk" /> : null}
+                            </div>
                           </div>
-                          <div className="flex flex-wrap justify-end gap-2">
-                            <StatusBadge status={item.status} />
-                            <StatusBadge status={item.verificationStatus} />
-                            {item.riskFlag ? <StatusBadge status="risk" /> : null}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Link className="dc-btn-primary" href={`/admin/brands/${item.id}`}>Chi tiết</Link>
+                            <Link className="dc-btn-secondary" href={`/admin/brands/${item.id}`}>Chỉnh sửa</Link>
+                            <button className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700" onClick={() => setDeleteTarget(item)}>Xóa</button>
+                            <ManagementActionMenu
+                              items={[
+                                { key: "pause", label: "Tạm dừng chiến dịch" },
+                                { key: "finance", label: "Điều chỉnh hạn mức" },
+                                { key: "lock", label: "Khóa nhãn hàng", danger: true },
+                                { key: "unlock", label: "Mở khóa nhãn hàng" }
+                              ]}
+                              onSelect={(key) => {
+                                if (key === "finance") window.location.href = "/admin/finance";
+                                if (key === "pause") setAction({ type: "pause-campaigns", id: item.id });
+                                if (key === "lock") setAction({ type: "lock", id: item.id });
+                                if (key === "unlock") setAction({ type: "unlock", id: item.id });
+                              }}
+                            />
                           </div>
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <Link className="dc-btn-primary" href={`/admin/brands/${item.id}`}>Chi tiết</Link>
-                          <Link className="dc-btn-secondary" href={`/admin/brands/${item.id}`}>Chỉnh sửa</Link>
-                          <button className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700" onClick={() => setDeleteTarget(item)}>Xóa</button>
-                          <ManagementActionMenu
-                            items={[
-                              { key: "pause", label: "Tạm dừng campaigns" },
-                              { key: "finance", label: "Điều chỉnh credit" },
-                              { key: "lock", label: "Khóa Brand", danger: true },
-                              { key: "unlock", label: "Mở khóa Brand" }
-                            ]}
-                            onSelect={(key) => {
-                              if (key === "finance") window.location.href = "/admin/finance";
-                              if (key === "pause") setAction({ type: "pause-campaigns", id: item.id });
-                              if (key === "lock") setAction({ type: "lock", id: item.id });
-                              if (key === "unlock") setAction({ type: "unlock", id: item.id });
-                            }}
-                          />
-                        </div>
-                      </article>
-                    ))}
-                  </div>
+                        </article>
+                      ))}
+                    </div>
+                    <AdminPagination page={page} totalPages={totalPages} total={filtered.length} limit={pageLimit} onPageChange={setPage} />
+                  </>
                 )}
               </section>
             </>
@@ -303,8 +324,8 @@ export default function AdminBrandsPage() {
       {toast ? <ActionToast message={toast} /> : null}
       <AdminDeleteDialog
         open={Boolean(deleteTarget)}
-        title={`Xóa Brand ${deleteTarget?.brandName ?? ""}`}
-        confirmationLabel="tên Brand"
+        title={`Xóa nhãn hàng ${deleteTarget?.brandName ?? ""}`}
+        confirmationLabel="tên nhãn hàng"
         expectedConfirmation={deleteTarget?.brandName ?? ""}
         impactUrl={`/api/admin/brands/${deleteTarget?.id ?? ""}?intent=delete-impact`}
         deleteUrl={`/api/admin/brands/${deleteTarget?.id ?? ""}`}
@@ -318,7 +339,7 @@ export default function AdminBrandsPage() {
       />
       <ReviewActionDialog
         open={Boolean(action)}
-        title={action?.type === "lock" ? "Lock Brand" : action?.type === "unlock" ? "Unlock Brand" : "Pause all campaigns"}
+        title={action?.type === "lock" ? "Khóa nhãn hàng" : action?.type === "unlock" ? "Mở khóa nhãn hàng" : "Tạm dừng toàn bộ chiến dịch"}
         description="Bắt buộc nhập lý do để ghi audit log."
         requireReason
         submitting={acting}
@@ -336,7 +357,7 @@ export default function AdminBrandsPage() {
             });
             const body = await res.json();
             if (!res.ok || !body.success) throw new Error(body.error ?? "Thao tác thất bại");
-            setToast("Đã cập nhật trạng thái Brand");
+            setToast("Đã cập nhật trạng thái nhãn hàng");
             setTimeout(() => setToast(""), 2000);
             setAction(null);
             await load();
