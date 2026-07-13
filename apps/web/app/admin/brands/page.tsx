@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getDateRangeByFilter, isInCurrentMonth, isWithinDateRange, timeFilterOptions, type TimeFilter } from "@/app/admin/_lib/timeFilters";
 import { AdminTabs } from "@/app/admin/_components/AdminTabs";
+import { AdminDeleteDialog } from "@/app/admin/_components/AdminDeleteDialog";
 import { ManagementActionMenu } from "@/app/admin/_components/ManagementActionMenu";
 import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
@@ -95,6 +96,7 @@ export default function AdminBrandsPage() {
   const [toast, setToast] = useState("");
   const [acting, setActing] = useState(false);
   const [action, setAction] = useState<{ type: "lock" | "unlock" | "pause-campaigns"; id: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Item | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -272,6 +274,8 @@ export default function AdminBrandsPage() {
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <Link className="dc-btn-primary" href={`/admin/brands/${item.id}`}>Chi tiết</Link>
+                          <Link className="dc-btn-secondary" href={`/admin/brands/${item.id}`}>Chỉnh sửa</Link>
+                          <button className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700" onClick={() => setDeleteTarget(item)}>Xóa</button>
                           <ManagementActionMenu
                             items={[
                               { key: "pause", label: "Tạm dừng campaigns" },
@@ -297,6 +301,21 @@ export default function AdminBrandsPage() {
         </>
       ) : null}
       {toast ? <ActionToast message={toast} /> : null}
+      <AdminDeleteDialog
+        open={Boolean(deleteTarget)}
+        title={`Xóa Brand ${deleteTarget?.brandName ?? ""}`}
+        confirmationLabel="tên Brand"
+        expectedConfirmation={deleteTarget?.brandName ?? ""}
+        impactUrl={`/api/admin/brands/${deleteTarget?.id ?? ""}?intent=delete-impact`}
+        deleteUrl={`/api/admin/brands/${deleteTarget?.id ?? ""}`}
+        onCancel={() => setDeleteTarget(null)}
+        onDeleted={(message) => {
+          setDeleteTarget(null);
+          setToast(message);
+          setTimeout(() => setToast(""), 2000);
+          void load();
+        }}
+      />
       <ReviewActionDialog
         open={Boolean(action)}
         title={action?.type === "lock" ? "Lock Brand" : action?.type === "unlock" ? "Unlock Brand" : "Pause all campaigns"}

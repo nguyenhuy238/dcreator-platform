@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getDateRangeByFilter, isInCurrentMonth, isWithinDateRange, timeFilterOptions, type TimeFilter } from "@/app/admin/_lib/timeFilters";
 import { AdminTabs } from "@/app/admin/_components/AdminTabs";
+import { AdminDeleteDialog } from "@/app/admin/_components/AdminDeleteDialog";
 import { ManagementActionMenu } from "@/app/admin/_components/ManagementActionMenu";
 import { ActionToast, EmptyState, ErrorState, LoadingSkeleton, PageHeader, SectionHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
@@ -95,6 +96,7 @@ export default function AdminCreatorsPage() {
   const [toast, setToast] = useState("");
   const [acting, setActing] = useState(false);
   const [action, setAction] = useState<{ type: "suspend" | "unsuspend"; id: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Item | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -272,6 +274,8 @@ export default function AdminCreatorsPage() {
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <Link className="dc-btn-primary" href={`/admin/creators/${item.id}`}>Chi tiết</Link>
+                          <Link className="dc-btn-secondary" href={`/admin/creators/${item.id}`}>Chỉnh sửa</Link>
+                          <button className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700" onClick={() => setDeleteTarget(item)}>Xóa</button>
                           <ManagementActionMenu
                             items={[
                               { key: "campaigns", label: "Xem campaigns" },
@@ -297,6 +301,26 @@ export default function AdminCreatorsPage() {
         </>
       ) : null}
       {toast ? <ActionToast message={toast} /> : null}
+      <AdminDeleteDialog
+        open={Boolean(deleteTarget)}
+        title={`Xóa Creator ${deleteTarget?.displayName ?? ""}`}
+        confirmationLabel="tên Creator"
+        expectedConfirmation={deleteTarget?.displayName ?? ""}
+        impactUrl={`/api/admin/creators/${deleteTarget?.id ?? ""}?intent=delete-impact`}
+        deleteUrl={`/api/admin/creators/${deleteTarget?.id ?? ""}`}
+        modeOptions={[
+          { value: "DELETE_ENTITY_ONLY", label: "Xóa hồ sơ Creator, giữ tài khoản User" },
+          { value: "DELETE_WITH_ACCOUNT", label: "Xóa Creator và tài khoản User" },
+          { value: "ANONYMIZE_RETAIN", label: "Anonymize và giữ lịch sử nghiệp vụ" }
+        ]}
+        onCancel={() => setDeleteTarget(null)}
+        onDeleted={(message) => {
+          setDeleteTarget(null);
+          setToast(message);
+          setTimeout(() => setToast(""), 2000);
+          void load();
+        }}
+      />
       <ReviewActionDialog
         open={Boolean(action)}
         title={action?.type === "suspend" ? "Suspend creator" : "Unsuspend creator"}

@@ -2,7 +2,9 @@ import { z } from "zod";
 import { paginationSchema } from "@/lib/validators/common";
 
 export const adminUserQuerySchema = paginationSchema.extend({
-  query: z.string().trim().min(1).max(120).optional()
+  query: z.string().trim().min(1).max(120).optional(),
+  role: z.enum(["USER", "CREATOR", "BRAND_OWNER", "BRAND_STAFF", "ADMIN", "OPS"]).optional(),
+  status: z.enum(["active", "locked"]).optional()
 });
 
 export const adminRejectSchema = z.object({
