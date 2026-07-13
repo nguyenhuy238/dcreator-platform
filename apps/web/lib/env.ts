@@ -7,6 +7,10 @@ function requiredEnv(name: "RESEND_API_KEY" | "PASSWORD_RESET_FROM_EMAIL") {
 }
 
 export const env = {
-  RESEND_API_KEY: requiredEnv("RESEND_API_KEY"),
-  PASSWORD_RESET_FROM_EMAIL: requiredEnv("PASSWORD_RESET_FROM_EMAIL")
+  get RESEND_API_KEY() {
+    return requiredEnv("RESEND_API_KEY");
+  },
+  get PASSWORD_RESET_FROM_EMAIL() {
+    return requiredEnv("PASSWORD_RESET_FROM_EMAIL");
+  }
 };
