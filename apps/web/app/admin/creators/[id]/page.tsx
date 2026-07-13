@@ -1,8 +1,9 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { AdminAvatar } from "@/app/admin/_components/AdminAvatar";
+import { AdminDeleteDialog } from "@/app/admin/_components/AdminDeleteDialog";
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
 import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 import { ClickableUrl } from "@/app/components/dcreator/ui/clickable-url";
@@ -65,6 +66,19 @@ export default function AdminCreatorDetailPage() {
   const [item, setItem] = useState<CreatorApplicationDetail | null>(null);
   const [acting, setActing] = useState(false);
   const [dialogAction, setDialogAction] = useState<null | "verify" | "risk" | "restrict">(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [edit, setEdit] = useState({
+    displayName: "",
+    bio: "",
+    contentCategory: "",
+    location: "",
+    handle: "",
+    socialUrl: "",
+    expectedRate: "",
+    maxJobsPerMonth: "",
+    isSuspended: false,
+    reason: ""
+  });
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -75,6 +89,18 @@ export default function AdminCreatorDetailPage() {
       const body = (await res.json()) as ApiResult<CreatorApplicationDetail>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Tải chi tiết thất bại");
       setItem(body.data);
+      setEdit({
+        displayName: body.data.displayName,
+        bio: body.data.bio ?? "",
+        contentCategory: body.data.contentCategory ?? "",
+        location: body.data.location ?? "",
+        handle: body.data.handle ?? "",
+        socialUrl: body.data.socialUrl ?? "",
+        expectedRate: body.data.expectedRate?.toString() ?? "",
+        maxJobsPerMonth: body.data.maxJobsPerMonth?.toString() ?? "",
+        isSuspended: body.data.status === "suspended",
+        reason: ""
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Tải chi tiết thất bại");
     } finally {
@@ -102,6 +128,41 @@ export default function AdminCreatorDetailPage() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Thao tác thất bại");
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function saveCreator(e: FormEvent) {
+    e.preventDefault();
+    if (!item) return;
+    setActing(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/creators/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName: edit.displayName,
+          bio: edit.bio || null,
+          contentCategory: edit.contentCategory || null,
+          location: edit.location || null,
+          handle: edit.handle || null,
+          socialUrl: edit.socialUrl || null,
+          expectedRate: edit.expectedRate ? Number(edit.expectedRate) : null,
+          maxJobsPerMonth: edit.maxJobsPerMonth ? Number(edit.maxJobsPerMonth) : null,
+          isSuspended: edit.isSuspended,
+          suspendedReason: edit.isSuspended ? edit.reason || item.rejectReason || "Admin update" : null,
+          reason: edit.reason || "Admin update"
+        })
+      });
+      const body = (await res.json()) as ApiResult<unknown>;
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Cập nhật thất bại");
+      setToast("Đã cập nhật Creator");
+      setTimeout(() => setToast(""), 2000);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Cập nhật thất bại");
     } finally {
       setActing(false);
     }
@@ -191,6 +252,25 @@ export default function AdminCreatorDetailPage() {
       </section>
 
       <section className="mt-4 dc-card p-4">
+        <p className="font-semibold">Chỉnh sửa Creator</p>
+        <form className="mt-3 grid gap-3 md:grid-cols-2" onSubmit={saveCreator}>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">Tên hiển thị<input className="dc-input" value={edit.displayName} onChange={(e) => setEdit({ ...edit, displayName: e.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">Category<input className="dc-input" value={edit.contentCategory} onChange={(e) => setEdit({ ...edit, contentCategory: e.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">Location<input className="dc-input" value={edit.location} onChange={(e) => setEdit({ ...edit, location: e.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">Handle<input className="dc-input" value={edit.handle} onChange={(e) => setEdit({ ...edit, handle: e.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700 md:col-span-2">Social URL<input className="dc-input" value={edit.socialUrl} onChange={(e) => setEdit({ ...edit, socialUrl: e.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">Expected rate<input className="dc-input" type="number" min="0" value={edit.expectedRate} onChange={(e) => setEdit({ ...edit, expectedRate: e.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">Max jobs/month<input className="dc-input" type="number" min="0" value={edit.maxJobsPerMonth} onChange={(e) => setEdit({ ...edit, maxJobsPerMonth: e.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700 md:col-span-2">Bio<textarea className="dc-input min-h-24" value={edit.bio} onChange={(e) => setEdit({ ...edit, bio: e.target.value })} /></label>
+          <label className="flex items-center gap-2 text-sm font-medium text-zinc-700"><input type="checkbox" checked={edit.isSuspended} onChange={(e) => setEdit({ ...edit, isSuspended: e.target.checked })} /> Suspend Creator</label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">Lý do<input className="dc-input" value={edit.reason} onChange={(e) => setEdit({ ...edit, reason: e.target.value })} /></label>
+          <div className="md:col-span-2 flex justify-end">
+            <button className="dc-btn-primary" disabled={acting} type="submit">{acting ? "Đang lưu..." : "Lưu Creator"}</button>
+          </div>
+        </form>
+      </section>
+
+      <section className="mt-4 dc-card p-4">
         <p className="font-semibold">Risk Decision</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button className="dc-btn-primary" disabled={acting} onClick={() => setDialogAction("verify")}>
@@ -202,10 +282,32 @@ export default function AdminCreatorDetailPage() {
           <button className="dc-btn-secondary" disabled={acting} onClick={() => setDialogAction("restrict")}>
             Yêu cầu bổ sung
           </button>
+          <button className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700" disabled={acting} onClick={() => setDeleteOpen(true)}>
+            Xóa Creator
+          </button>
         </div>
       </section>
 
       {toast ? <ActionToast message={toast} /> : null}
+      <AdminDeleteDialog
+        open={deleteOpen}
+        title={`Xóa Creator ${item.displayName}`}
+        confirmationLabel="tên Creator"
+        expectedConfirmation={item.displayName}
+        impactUrl={`/api/admin/creators/${item.id}?intent=delete-impact`}
+        deleteUrl={`/api/admin/creators/${item.id}`}
+        modeOptions={[
+          { value: "DELETE_ENTITY_ONLY", label: "Xóa hồ sơ Creator, giữ tài khoản User" },
+          { value: "DELETE_WITH_ACCOUNT", label: "Xóa Creator và tài khoản User" },
+          { value: "ANONYMIZE_RETAIN", label: "Anonymize và giữ lịch sử nghiệp vụ" }
+        ]}
+        onCancel={() => setDeleteOpen(false)}
+        onDeleted={(message) => {
+          setToast(message);
+          setTimeout(() => setToast(""), 2000);
+          router.push("/admin/creators");
+        }}
+      />
       <ReviewActionDialog
         open={dialogAction === "verify"}
         title="Xác nhận hồ sơ an toàn cơ bản"

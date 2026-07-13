@@ -1,8 +1,9 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { AdminAvatar } from "@/app/admin/_components/AdminAvatar";
+import { AdminDeleteDialog } from "@/app/admin/_components/AdminDeleteDialog";
 import { ReviewActionDialog } from "@/app/admin/_components/ReviewActionDialog";
 import { ActionToast, ErrorState, LoadingSkeleton, PageHeader, StatusBadge } from "@/app/components/dcreator/ui/base";
 
@@ -44,6 +45,21 @@ export default function AdminBrandDetailPage() {
   const [item, setItem] = useState<BrandApplicationDetail | null>(null);
   const [acting, setActing] = useState(false);
   const [dialogAction, setDialogAction] = useState<null | "verify" | "risk" | "restrict">(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [edit, setEdit] = useState({
+    name: "",
+    legalName: "",
+    industry: "",
+    website: "",
+    contactName: "",
+    contactPhone: "",
+    contactEmail: "",
+    taxCode: "",
+    productCategories: "",
+    inventoryDescription: "",
+    isLocked: false,
+    reason: ""
+  });
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -54,6 +70,20 @@ export default function AdminBrandDetailPage() {
       const body = (await res.json()) as ApiResult<BrandApplicationDetail>;
       if (!res.ok || !body.success) throw new Error(body.error ?? "Tải chi tiết thất bại");
       setItem(body.data);
+      setEdit({
+        name: body.data.brandName,
+        legalName: body.data.legalName ?? "",
+        industry: body.data.industry ?? "",
+        website: body.data.website ?? "",
+        contactName: body.data.contactName,
+        contactPhone: body.data.contactPhone,
+        contactEmail: body.data.contactEmail,
+        taxCode: body.data.taxCode ?? "",
+        productCategories: body.data.productCategories ?? "",
+        inventoryDescription: body.data.inventoryDescription ?? "",
+        isLocked: body.data.status === "locked",
+        reason: ""
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Tải chi tiết thất bại");
     } finally {
@@ -81,6 +111,43 @@ export default function AdminBrandDetailPage() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Thao tác thất bại");
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function saveBrand(e: FormEvent) {
+    e.preventDefault();
+    if (!item) return;
+    setActing(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/brands/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: edit.name,
+          legalName: edit.legalName || null,
+          industry: edit.industry || null,
+          website: edit.website || null,
+          contactName: edit.contactName,
+          contactPhone: edit.contactPhone,
+          contactEmail: edit.contactEmail,
+          taxCode: edit.taxCode || null,
+          productCategories: edit.productCategories || null,
+          inventoryDescription: edit.inventoryDescription || null,
+          isLocked: edit.isLocked,
+          lockReason: edit.isLocked ? edit.reason || item.rejectReason || "Admin update" : null,
+          reason: edit.reason || "Admin update"
+        })
+      });
+      const body = (await res.json()) as ApiResult<unknown>;
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Cập nhật thất bại");
+      setToast("Đã cập nhật Brand");
+      setTimeout(() => setToast(""), 2000);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Cập nhật thất bại");
     } finally {
       setActing(false);
     }
@@ -129,6 +196,27 @@ export default function AdminBrandDetailPage() {
       </section>
 
       <section className="mt-4 dc-card p-4">
+        <p className="font-semibold">Chỉnh sửa Brand</p>
+        <form className="mt-3 grid gap-3 md:grid-cols-2" onSubmit={saveBrand}>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">Tên Brand<input className="dc-input" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">Tên pháp lý<input className="dc-input" value={edit.legalName} onChange={(e) => setEdit({ ...edit, legalName: e.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">Industry<input className="dc-input" value={edit.industry} onChange={(e) => setEdit({ ...edit, industry: e.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">Website<input className="dc-input" value={edit.website} onChange={(e) => setEdit({ ...edit, website: e.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">Contact name<input className="dc-input" value={edit.contactName} onChange={(e) => setEdit({ ...edit, contactName: e.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">Contact phone<input className="dc-input" value={edit.contactPhone} onChange={(e) => setEdit({ ...edit, contactPhone: e.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">Contact email<input className="dc-input" value={edit.contactEmail} onChange={(e) => setEdit({ ...edit, contactEmail: e.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">Tax code<input className="dc-input" value={edit.taxCode} onChange={(e) => setEdit({ ...edit, taxCode: e.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700 md:col-span-2">Product categories<input className="dc-input" value={edit.productCategories} onChange={(e) => setEdit({ ...edit, productCategories: e.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700 md:col-span-2">Inventory<textarea className="dc-input min-h-24" value={edit.inventoryDescription} onChange={(e) => setEdit({ ...edit, inventoryDescription: e.target.value })} /></label>
+          <label className="flex items-center gap-2 text-sm font-medium text-zinc-700"><input type="checkbox" checked={edit.isLocked} onChange={(e) => setEdit({ ...edit, isLocked: e.target.checked })} /> Khóa Brand</label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">Lý do<input className="dc-input" value={edit.reason} onChange={(e) => setEdit({ ...edit, reason: e.target.value })} /></label>
+          <div className="md:col-span-2 flex justify-end">
+            <button className="dc-btn-primary" disabled={acting} type="submit">{acting ? "Đang lưu..." : "Lưu Brand"}</button>
+          </div>
+        </form>
+      </section>
+
+      <section className="mt-4 dc-card p-4">
         <p className="font-semibold">Risk Decision</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button className="dc-btn-primary" disabled={acting} onClick={() => setDialogAction("verify")}>
@@ -140,10 +228,27 @@ export default function AdminBrandDetailPage() {
           <button className="dc-btn-secondary" disabled={acting} onClick={() => setDialogAction("restrict")}>
             Yêu cầu bổ sung
           </button>
+          <button className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700" disabled={acting} onClick={() => setDeleteOpen(true)}>
+            Xóa Brand
+          </button>
         </div>
       </section>
 
       {toast ? <ActionToast message={toast} /> : null}
+      <AdminDeleteDialog
+        open={deleteOpen}
+        title={`Xóa Brand ${item.brandName}`}
+        confirmationLabel="tên Brand"
+        expectedConfirmation={item.brandName}
+        impactUrl={`/api/admin/brands/${item.id}?intent=delete-impact`}
+        deleteUrl={`/api/admin/brands/${item.id}`}
+        onCancel={() => setDeleteOpen(false)}
+        onDeleted={(message) => {
+          setToast(message);
+          setTimeout(() => setToast(""), 2000);
+          router.push("/admin/brands");
+        }}
+      />
       <ReviewActionDialog
         open={dialogAction === "verify"}
         title="Xác nhận hồ sơ an toàn cơ bản"

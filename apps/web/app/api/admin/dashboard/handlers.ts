@@ -77,6 +77,8 @@ export async function GET_users(request: NextRequest) {
   await requireAdminOps(request);
   const parsed = adminUserQuerySchema.parse({
     query: optionalQueryParam(request, "query"),
+    role: optionalQueryParam(request, "role"),
+    status: optionalQueryParam(request, "status"),
     page: request.nextUrl.searchParams.get("page") ?? undefined,
     limit: request.nextUrl.searchParams.get("limit") ?? undefined
   });

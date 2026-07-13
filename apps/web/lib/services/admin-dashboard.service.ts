@@ -297,15 +297,24 @@ export async function getFulfillmentSnapshot(input: { page: number; limit: numbe
   };
 }
 
-export async function listUsersForAdmin(input: { query?: string; page: number; limit: number }) {
-  const where = input.query
-    ? {
-        OR: [
-          { displayName: { contains: input.query, mode: "insensitive" as const } },
-          { email: { contains: input.query, mode: "insensitive" as const } }
-        ]
-      }
-    : {};
+export async function listUsersForAdmin(input: { query?: string; role?: Role; status?: "active" | "locked"; page: number; limit: number }) {
+  const where: Prisma.AccountWhereInput = {
+    ...(input.role ? { OR: [{ role: input.role }, { roleAssignments: { some: { role: input.role } } }] } : {}),
+    ...(input.status ? { isActive: input.status === "active" } : {}),
+    ...(input.query
+      ? {
+          AND: [
+            {
+              OR: [
+                { displayName: { contains: input.query, mode: "insensitive" as const } },
+                { email: { contains: input.query, mode: "insensitive" as const } },
+                { profile: { phone: { contains: input.query, mode: "insensitive" as const } } }
+              ]
+            }
+          ]
+        }
+      : {})
+  };
 
   const [total, users] = await prisma.$transaction([
     prisma.account.count({ where }),
@@ -320,6 +329,7 @@ export async function listUsersForAdmin(input: { query?: string; page: number; l
         displayName: true,
         role: true,
         isActive: true,
+        profile: { select: { phone: true } },
         wallet: { select: { pointsBalance: true, cashBalanceVnd: true } }
       }
     })
