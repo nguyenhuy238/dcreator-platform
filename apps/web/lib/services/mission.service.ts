@@ -1,6 +1,8 @@
 import type { MissionAudience, Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { DCREATOR_ANALYTICS_EVENTS } from "@/lib/analytics-events";
 import { AppError } from "@/lib/errors";
+import { trackDcreatorEvent } from "@/lib/services/analytics-event.service";
 import { flagDuplicateProofUrl, flagProofSpam } from "@/lib/services/fraud-flag.service";
 import { ensureWalletByAccountId } from "@/lib/services/wallet.service";
 
@@ -121,28 +123,27 @@ export async function acceptMission(missionId: string, accountId: string, roles:
     }
   });
 
-  await prisma.analyticsEvent.create({
-    data: {
-      eventName: "mission_accept",
-      userId: accountId,
-      sessionId: `srv_${accountId}`,
-      campaignId: mission.campaignId,
-      brandId: mission.campaign.brandId,
-      creatorId: mission.audience === "CREATOR" ? accountId : null,
-      metadata: { audience: mission.audience }
-    }
+  await trackDcreatorEvent({
+    eventName: DCREATOR_ANALYTICS_EVENTS.CREATOR_MISSION_ACCEPTED,
+    accountId,
+    campaignId: mission.campaignId,
+    brandId: mission.campaign.brandId,
+    creatorId: mission.audience === "CREATOR" ? accountId : null,
+    missionId,
+    proofId: submission.id,
+    metadata: { audience: mission.audience, source: "mission_service" }
   });
 
   if (mission.audience === "CREATOR") {
-    await prisma.analyticsEvent.create({
-      data: {
-        eventName: "creator_apply_job",
-        userId: accountId,
-        sessionId: `srv_${accountId}`,
-        campaignId: mission.campaignId,
-        brandId: mission.campaign.brandId,
-        creatorId: accountId
-      }
+    await trackDcreatorEvent({
+      eventName: DCREATOR_ANALYTICS_EVENTS.CREATOR_APPLICATION_SUBMITTED,
+      accountId,
+      campaignId: mission.campaignId,
+      brandId: mission.campaign.brandId,
+      creatorId: accountId,
+      missionId,
+      proofId: submission.id,
+      metadata: { source: "mission_service" }
     });
   }
 
@@ -193,15 +194,15 @@ export async function submitMissionProof(
     }
   });
 
-  await prisma.analyticsEvent.create({
-    data: {
-      eventName: "mission_submit",
-      userId: accountId,
-      sessionId: `srv_${accountId}`,
-      campaignId: submission.mission.campaignId,
-      brandId: submission.mission.campaign.brandId,
-      creatorId: accountId
-    }
+  await trackDcreatorEvent({
+    eventName: DCREATOR_ANALYTICS_EVENTS.CREATOR_PROOF_SUBMITTED,
+    accountId,
+    campaignId: submission.mission.campaignId,
+    brandId: submission.mission.campaign.brandId,
+    creatorId: accountId,
+    missionId: submission.missionId,
+    proofId: updated.id,
+    metadata: { source: "mission_service" }
   });
 
   const proofUrls = [payload.videoUrl, payload.socialPostUrl, payload.imageUrl].filter(Boolean) as string[];
@@ -281,15 +282,17 @@ export async function approveProof(submissionId: string, reviewerId: string, rev
       }
     });
 
-    await tx.analyticsEvent.create({
-      data: {
-        eventName: "proof_approved",
-        userId: submission.accountId,
-        sessionId: `srv_${submission.accountId}`,
-        campaignId: submission.mission.campaignId,
-        brandId: submission.mission.campaign.brandId,
-        creatorId: submission.accountId
-      }
+    await trackDcreatorEvent({
+      eventName: DCREATOR_ANALYTICS_EVENTS.CREATOR_PROOF_APPROVED,
+      accountId: submission.accountId,
+      actorId: reviewerId,
+      campaignId: submission.mission.campaignId,
+      brandId: submission.mission.campaign.brandId,
+      creatorId: submission.accountId,
+      missionId: submission.missionId,
+      proofId: submission.id,
+      client: tx,
+      metadata: { reviewerRole, rewardHold: submission.rewardHold, source: "mission_service" }
     });
 
     return updated;
@@ -351,16 +354,17 @@ export async function rejectProof(
       }
     });
 
-    await tx.analyticsEvent.create({
-      data: {
-        eventName: "proof_rejected",
-        userId: submission.accountId,
-        sessionId: `srv_${submission.accountId}`,
-        campaignId: submission.mission.campaignId,
-        brandId: submission.mission.campaign.brandId,
-        creatorId: submission.accountId,
-        metadata: { rejectReason }
-      }
+    await trackDcreatorEvent({
+      eventName: DCREATOR_ANALYTICS_EVENTS.CREATOR_PROOF_REJECTED,
+      accountId: submission.accountId,
+      actorId: reviewerId,
+      campaignId: submission.mission.campaignId,
+      brandId: submission.mission.campaign.brandId,
+      creatorId: submission.accountId,
+      missionId: submission.missionId,
+      proofId: submission.id,
+      client: tx,
+      metadata: { reviewerRole, rejectReason, source: "mission_service" }
     });
 
     return updated;

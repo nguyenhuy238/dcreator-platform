@@ -286,8 +286,10 @@ export async function createCampaignContribution(
         orderCode: `SP${Date.now()}${Math.floor(Math.random() * 1000)}`,
         requestedAmountVnd: input.amount,
         creditedPoints: 0,
-        status: "PENDING"
-      }
+        intent: "CONTRIBUTION",
+        status: "PENDING",
+        rawPayload: { metadata: { intent: "CONTRIBUTION", campaignId: campaign.id, rewardId: input.rewardId } }
+      } as never
     });
 
     const contribution = await tx.contribution.create({

@@ -1,9 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import type { z } from "zod";
+import { DCREATOR_ANALYTICS_EVENTS } from "@/lib/analytics-events";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
-import { createNotification, createNotificationForAdminOps } from "@/lib/services/notification.service";
+import { trackDcreatorEvent } from "@/lib/services/analytics-event.service";
 import { topupConfirmSchema } from "@/lib/validators/wallet";
 
 const TOPUP_POINT_RATE = 1;
@@ -115,8 +116,10 @@ export async function createTopupPayment(accountId: string, amountVnd: number, i
       orderCode: `TP${Date.now()}${Math.floor(Math.random() * 1000)}`,
       requestedAmountVnd: amountVnd,
       creditedPoints,
-      status: "PENDING"
-    }
+      intent: "TOPUP_NPOINTS",
+      status: "PENDING",
+      rawPayload: { metadata: { intent: "TOPUP_NPOINTS" } }
+    } as never
   });
 }
 
@@ -197,7 +200,8 @@ export async function createCreatorPayoutRequest(
   amountVnd: number,
   creatorBankAccountId: string,
   note: string | undefined,
-  idempotencyKey: string
+  idempotencyKey: string,
+  reference?: { creatorMissionId?: string | null; campaignId?: string | null }
 ) {
   const wallet = await ensureWalletByAccountId(accountId);
   const bankAccount = await ensureCreatorBankAccountOwned(accountId, creatorBankAccountId);
@@ -223,11 +227,20 @@ export async function createCreatorPayoutRequest(
       }
     });
 
+    const creatorMissionId = reference?.creatorMissionId?.trim() || null;
+    const campaignId = reference?.campaignId?.trim() || null;
+    const payoutReferenceType = creatorMissionId ? "CREATOR_MISSION" : campaignId ? "CAMPAIGN" : null;
+    const payoutReferenceId = creatorMissionId ?? campaignId;
+
     const payoutRequest = await tx.payoutRequest.create({
       data: {
         accountId,
         walletId: wallet.id,
         creatorBankAccountId: bankAccount.id,
+        creatorMissionId,
+        campaignId,
+        referenceType: payoutReferenceType,
+        referenceId: payoutReferenceId,
         amountVnd,
         note,
         bankName: bankAccount.bankName,
@@ -237,7 +250,7 @@ export async function createCreatorPayoutRequest(
         bankAccountNumber: bankAccount.accountNumber,
         idempotencyKey,
         status: "PENDING"
-      }
+      } as never
     });
 
     await tx.walletTransaction.create({
@@ -274,20 +287,18 @@ export async function createCreatorPayoutRequest(
     return payoutRequest;
   });
 
-  await createNotification({
+  await trackDcreatorEvent({
+    eventName: DCREATOR_ANALYTICS_EVENTS.CREATOR_PAYOUT_REQUESTED,
     accountId,
-    event: "PAYOUT_REQUESTED",
-    title: "Đã gửi yêu cầu payout",
-    content: `Yêu cầu payout ${amountVnd.toLocaleString("vi-VN")} VND của bạn đã được ghi nhận.`,
-    metadata: { payoutId: payoutRequest.id }
-  });
-
-  await createNotificationForAdminOps({
-    event: "PAYOUT_REQUESTED",
-    title: "Có yêu cầu payout mới",
-    content: `Creator vừa gửi yêu cầu payout ${amountVnd.toLocaleString("vi-VN")} VND.`,
-    metadata: { payoutId: payoutRequest.id, accountId },
-    excludeAccountId: accountId
+    creatorId: accountId,
+    campaignId: payoutRequest.campaignId,
+    creatorMissionId: payoutRequest.creatorMissionId,
+    payoutRequestId: payoutRequest.id,
+    metadata: {
+      amountVnd: payoutRequest.amountVnd,
+      referenceType: payoutRequest.referenceType,
+      source: "creator_payout_request"
+    }
   });
 
   return payoutRequest;

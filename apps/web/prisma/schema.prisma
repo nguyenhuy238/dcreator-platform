@@ -1017,6 +1017,7 @@ model Campaign {
   productSubmissions  ProductSubmission[]
   creatorMissions     CreatorMission[]
   missionApplications MissionApplication[]
+  payoutRequests      PayoutRequest[]        @relation("PayoutCampaign")
 
   @@index([isPublic, status, updatedAt])
   @@index([isPublic, status, createdAt])
@@ -1271,6 +1272,7 @@ model CreatorMission {
   account            Account             @relation(fields: [accountId], references: [id], onDelete: Restrict)
   submission         MissionSubmission?  @relation(fields: [submissionId], references: [id], onDelete: SetNull)
   missionApplication MissionApplication? @relation(fields: [missionApplicationId], references: [id], onDelete: SetNull)
+  payoutRequests     PayoutRequest[]     @relation("PayoutCreatorMission")
 
   @@unique([missionId, accountId])
   @@index([applicationStatus, appliedAt])
@@ -1464,6 +1466,7 @@ model PaymentTransaction {
   orderCode            String                   @unique
   requestedAmountVnd   Int
   creditedPoints       Int
+  intent               String?
   gatewayTransactionId String?
   status               PaymentTransactionStatus @default(PENDING)
   rawPayload           Json?
@@ -1476,6 +1479,7 @@ model PaymentTransaction {
 
   @@unique([accountId, idempotencyKey])
   @@index([walletId, status, createdAt])
+  @@index([intent])
 }
 
 model PayoutRequest {
@@ -1483,6 +1487,10 @@ model PayoutRequest {
   accountId            String
   walletId             String
   creatorBankAccountId String
+  creatorMissionId     String?
+  campaignId           String?
+  referenceType        String?
+  referenceId          String?
   amountVnd            Int
   status               PayoutRequestStatus @default(PENDING)
   note                 String?
@@ -1501,10 +1509,15 @@ model PayoutRequest {
   account            Account            @relation(fields: [accountId], references: [id])
   wallet             Wallet             @relation(fields: [walletId], references: [id])
   creatorBankAccount CreatorBankAccount @relation(fields: [creatorBankAccountId], references: [id])
+  creatorMission     CreatorMission?    @relation("PayoutCreatorMission", fields: [creatorMissionId], references: [id], onDelete: SetNull)
+  campaign           Campaign?          @relation("PayoutCampaign", fields: [campaignId], references: [id], onDelete: SetNull)
 
   @@unique([accountId, idempotencyKey])
   @@index([accountId, status, createdAt])
   @@index([creatorBankAccountId, createdAt])
+  @@index([creatorMissionId])
+  @@index([campaignId])
+  @@index([referenceType, referenceId])
 }
 
 model WalletLedger {

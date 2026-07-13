@@ -1,7 +1,9 @@
 import { NotificationEvent, PayoutRequestStatus } from "@prisma/client";
+import { DCREATOR_ANALYTICS_EVENTS } from "@/lib/analytics-events";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
+import { trackDcreatorEvent } from "@/lib/services/analytics-event.service";
 import { createNotification, createNotificationForAdminOps } from "@/lib/services/notification.service";
 import { assertStateTransition } from "@/lib/services/admin-transition.service";
 
@@ -248,6 +250,21 @@ export async function markPayoutAsPaidByAdmin(actorId: string, payoutId: string)
     title: "Payout đã thanh toán",
     content: `Khoản rút ${payout.amountVnd.toLocaleString("vi-VN")} N-Point đã được chuyển khoản.`,
     metadata: { payoutId }
+  });
+
+  await trackDcreatorEvent({
+    eventName: DCREATOR_ANALYTICS_EVENTS.CREATOR_PAYOUT_PAID,
+    actorId,
+    accountId: payout.accountId,
+    creatorId: payout.accountId,
+    campaignId: payout.campaignId,
+    creatorMissionId: payout.creatorMissionId,
+    payoutRequestId: payout.id,
+    metadata: {
+      amountVnd: payout.amountVnd,
+      previousStatus: payout.status,
+      source: "admin_payout"
+    }
   });
 
   return updated;

@@ -9,10 +9,16 @@ import {
   ProductStatus,
   ReimbursementStatus
 } from "@prisma/client";
+import { DCREATOR_ANALYTICS_EVENTS } from "@/lib/analytics-events";
 import { prisma } from "@/lib/db";
 import { cleanDisplayUrl, getBrandDisplayName } from "@/lib/display-identity";
 import { AppError } from "@/lib/errors";
-import { createNotification, createNotificationForAdminOps, createNotificationForBrandMembers } from "@/lib/services/notification.service";
+import { trackDcreatorEvent } from "@/lib/services/analytics-event.service";
+import {
+  createNotification,
+  createNotificationForAdminOps,
+  createNotificationForBrandMembers
+} from "@/lib/services/notification.service";
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 type Sort = "newest" | "oldest";
@@ -1685,6 +1691,20 @@ export async function createMissionApplicationForCreator(accountId: string, payl
     }
   });
 
+  await trackDcreatorEvent({
+    eventName: DCREATOR_ANALYTICS_EVENTS.CREATOR_APPLICATION_SUBMITTED,
+    accountId,
+    campaignId: created.campaignId,
+    creatorId: accountId,
+    missionId: created.missionId,
+    creatorMissionId: created.id,
+    metadata: {
+      source: "creator_dashboard",
+      isReapply: Boolean(existing),
+      reapplyCount: existing ? resubmissionCount + 1 : 0
+    }
+  });
+
   return prisma.creatorMission.findUniqueOrThrow({
     where: { id: created.id },
     select: {
@@ -2056,7 +2076,29 @@ export async function approveMissionApplicationByAdmin(actorId: string, id: stri
     });
     return mapMission(next);
   });
-  await notifyCreator(current.accountId, "CREATOR_CAMPAIGN_APPLICATION_APPROVED", "Đơn tham gia campaign được duyệt", `Bạn đã được duyệt tham gia campaign "${current.campaign.title}".`, { creatorMissionId: id });
+  await notifyCreator(current.accountId, "MISSION_APPLICATION_APPROVED", "Đơn tham gia campaign được duyệt", `Bạn đã được duyệt tham gia campaign "${current.campaign.title}".`, { creatorMissionId: id });
+  await trackDcreatorEvent({
+    eventName: DCREATOR_ANALYTICS_EVENTS.CREATOR_APPLICATION_APPROVED,
+    actorId,
+    accountId: current.accountId,
+    campaignId: current.campaignId,
+    brandId: current.campaign.brand.id,
+    creatorId: current.accountId,
+    missionId: current.mission.id,
+    creatorMissionId: id,
+    metadata: { source: "creator_mission_service" }
+  });
+  await trackDcreatorEvent({
+    eventName: DCREATOR_ANALYTICS_EVENTS.CREATOR_MISSION_ASSIGNED,
+    actorId,
+    accountId: current.accountId,
+    campaignId: current.campaignId,
+    brandId: current.campaign.brand.id,
+    creatorId: current.accountId,
+    missionId: current.mission.id,
+    creatorMissionId: id,
+    metadata: { source: "creator_mission_service", missionStatus: approvedStatus }
+  });
   return updated;
 }
 
@@ -2070,7 +2112,18 @@ export async function rejectMissionApplicationByAdmin(actorId: string, id: strin
     data: { applicationStatus: "REJECTED", applicationRejectReason: reason, applicationReviewedById: actorId, applicationReviewedAt: now() },
     include: creatorMissionInclude
   });
-  await notifyCreator(current.accountId, "CREATOR_CAMPAIGN_APPLICATION_REJECTED", "Đơn ứng tuyển campaign bị từ chối", reason, { creatorMissionId: id });
+  await notifyCreator(current.accountId, "MISSION_APPLICATION_REJECTED", "Đơn xin nhiệm vụ bị từ chối", reason, { creatorMissionId: id });
+  await trackDcreatorEvent({
+    eventName: DCREATOR_ANALYTICS_EVENTS.CREATOR_APPLICATION_REJECTED,
+    actorId,
+    accountId: current.accountId,
+    campaignId: current.campaignId,
+    brandId: current.campaign.brand.id,
+    creatorId: current.accountId,
+    missionId: current.mission.id,
+    creatorMissionId: id,
+    metadata: { source: "creator_mission_service", rejectReason: reason }
+  });
   return mapMission(updated);
 }
 

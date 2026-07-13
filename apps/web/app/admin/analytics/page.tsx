@@ -1,6 +1,5 @@
-import { AdminReportsClient } from "@/app/admin/_components/AdminReportsClient";
+import { AdminAnalyticsClient } from "@/app/admin/_components/AdminAnalyticsClient";
 
 export default function AdminAnalyticsPage() {
-  return <AdminReportsClient source="analytics" />;
+  return <AdminAnalyticsClient />;
 }
-
