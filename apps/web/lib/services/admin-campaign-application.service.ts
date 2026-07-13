@@ -5,7 +5,7 @@ import { getBrandDisplayName } from "@/lib/display-identity";
 import { AppError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
 import { ensureCreatorMissionFromApprovedApplication } from "@/lib/services/creator-mission.service";
-import { createNotification } from "@/lib/services/notification.service";
+import { createNotification, createNotificationForBrandMembers } from "@/lib/services/notification.service";
 
 function ensureReviewable(status: MissionLifecycleStatus) {
   if (status === "REJECTED" || status === "DONE" || status === "CANCELLED" || status === "EXPIRED") {
@@ -249,16 +249,23 @@ export async function adminApproveCampaignApplication(actorId: string, applicati
   await Promise.all([
     createNotification({
       accountId: current.account.id,
-      event: NotificationEvent.CAMPAIGN_APPROVED,
+      event: NotificationEvent.CREATOR_CAMPAIGN_APPLICATION_APPROVED,
       title: "Application được duyệt sơ bộ",
       content: `Bạn đã được admin duyệt sơ bộ cho campaign "${current.mission.campaign.title}".`,
       metadata: { applicationId, campaignId: current.mission.campaign.id }
     }),
     createNotification({
       accountId: current.mission.campaign.brandId,
-      event: NotificationEvent.CAMPAIGN_APPROVED,
+      event: NotificationEvent.BRAND_CREATOR_APPLICATION_PREAPPROVED,
       title: "Creator application đã được admin duyệt",
       content: `Creator ${current.account.displayName} đã qua bước duyệt sơ bộ cho campaign "${current.mission.campaign.title}".`,
+      metadata: { applicationId, creatorId: current.account.id, campaignId: current.mission.campaign.id }
+    }),
+    createNotificationForBrandMembers({
+      brandId: current.mission.campaign.brandId,
+      event: NotificationEvent.BRAND_CREATOR_APPLICATION_PREAPPROVED,
+      title: "Creator application preapproved",
+      content: `Creator ${current.account.displayName} passed admin preapproval for campaign "${current.mission.campaign.title}".`,
       metadata: { applicationId, creatorId: current.account.id, campaignId: current.mission.campaign.id }
     })
   ]);
@@ -295,16 +302,23 @@ export async function adminRejectCampaignApplication(actorId: string, applicatio
   await Promise.all([
     createNotification({
       accountId: current.account.id,
-      event: NotificationEvent.CAMPAIGN_REJECTED,
+      event: NotificationEvent.CREATOR_CAMPAIGN_APPLICATION_REJECTED,
       title: "Application bị từ chối",
       content: `Application của bạn cho campaign "${current.mission.campaign.title}" đã bị từ chối: ${reason}`,
       metadata: { applicationId, campaignId: current.mission.campaign.id, reason }
     }),
     createNotification({
       accountId: current.mission.campaign.brandId,
-      event: NotificationEvent.CAMPAIGN_REJECTED,
+      event: NotificationEvent.BRAND_CREATOR_APPLICATION_REJECTED,
       title: "Creator application bị từ chối",
       content: `Creator ${current.account.displayName} bị từ chối ở bước admin cho campaign "${current.mission.campaign.title}".`,
+      metadata: { applicationId, creatorId: current.account.id, campaignId: current.mission.campaign.id, reason }
+    }),
+    createNotificationForBrandMembers({
+      brandId: current.mission.campaign.brandId,
+      event: NotificationEvent.BRAND_CREATOR_APPLICATION_REJECTED,
+      title: "Creator application rejected",
+      content: `Creator ${current.account.displayName} was rejected at admin review for campaign "${current.mission.campaign.title}".`,
       metadata: { applicationId, creatorId: current.account.id, campaignId: current.mission.campaign.id, reason }
     })
   ]);
@@ -324,6 +338,13 @@ export async function adminSendToBrandReview(actorId: string, applicationId: str
       note: buildAdminNote(current.note, `[SENT_TO_BRAND_REVIEW] ${new Date().toISOString()}`)
     }
   });
+  await createNotificationForBrandMembers({
+    brandId: current.mission.campaign.brandId,
+    event: NotificationEvent.BRAND_CREATOR_APPLICATION_REVIEW_REQUIRED,
+    title: "Application needs brand review",
+    content: `Creator application from ${current.account.displayName} is waiting for brand review in campaign "${current.mission.campaign.title}".`,
+    metadata: { applicationId, creatorId: current.account.id, campaignId: current.mission.campaign.id }
+  });
 
   await writeAuditLog({
     actorId,
@@ -334,7 +355,7 @@ export async function adminSendToBrandReview(actorId: string, applicationId: str
 
   await createNotification({
     accountId: current.mission.campaign.brandId,
-    event: NotificationEvent.CAMPAIGN_APPROVED,
+    event: NotificationEvent.BRAND_CREATOR_APPLICATION_REVIEW_REQUIRED,
     title: "Có application cần Brand review",
     content: `Application của Creator ${current.account.displayName} đang chờ Brand review cho campaign "${current.mission.campaign.title}".`,
     metadata: { applicationId, creatorId: current.account.id, campaignId: current.mission.campaign.id }
@@ -378,16 +399,23 @@ export async function adminAssignTask(actorId: string, applicationId: string) {
   await Promise.all([
     createNotification({
       accountId: current.account.id,
-      event: NotificationEvent.MISSION_ACCEPTED,
+      event: NotificationEvent.CREATOR_TASK_ASSIGNED,
       title: "Task đã được assign",
       content: `Bạn đã được assign task cho campaign "${current.mission.campaign.title}".`,
       metadata: { applicationId, campaignId: current.mission.campaign.id }
     }),
     createNotification({
       accountId: current.mission.campaign.brandId,
-      event: NotificationEvent.CAMPAIGN_APPROVED,
+      event: NotificationEvent.BRAND_CREATOR_TASK_ASSIGNED,
       title: "Creator task đã được assign",
       content: `Creator ${current.account.displayName} đã được assign task cho campaign "${current.mission.campaign.title}".`,
+      metadata: { applicationId, creatorId: current.account.id, campaignId: current.mission.campaign.id }
+    }),
+    createNotificationForBrandMembers({
+      brandId: current.mission.campaign.brandId,
+      event: NotificationEvent.BRAND_CREATOR_TASK_ASSIGNED,
+      title: "Creator task assigned",
+      content: `Creator ${current.account.displayName} was assigned to campaign "${current.mission.campaign.title}".`,
       metadata: { applicationId, creatorId: current.account.id, campaignId: current.mission.campaign.id }
     })
   ]);

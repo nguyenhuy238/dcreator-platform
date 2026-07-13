@@ -79,11 +79,19 @@ export async function createBrandNPointTopupRequest(accountId: string, input: Cr
   });
 
   await createNotificationForAdminOps({
-    event: "PAYMENT_SUCCESS",
+    event: "BRAND_NPOINT_TOPUP_REQUESTED",
     title: "Có yêu cầu nạp N-Point mới",
     content: `Brand ${brand.name} vừa gửi yêu cầu nạp ${requestedPoints.toLocaleString("vi-VN")} N-Point.`,
     metadata: { requestId: request.id, brandId: brand.id }
   });
+
+  await notifyBrandRequestActors(
+    { requesterAccountId: request.requesterAccountId, brand: { ownerAccountId: brand.ownerAccountId } },
+    "C\u00F3 y\u00EAu c\u1EA7u n\u1EA1p N-Point m\u1EDBi",
+    `Y\u00EAu c\u1EA7u n\u1EA1p ${requestedPoints.toLocaleString("vi-VN")} N-Point \u0111\u00E3 \u0111\u01B0\u1EE3c t\u1EA1o v\u00E0 \u0111ang ch\u1EDD admin duy\u1EC7t.`,
+    { requestId: request.id, brandId: brand.id, status: request.status },
+    "BRAND_NPOINT_TOPUP_REQUESTED"
+  );
 
   return request;
 }
@@ -150,7 +158,11 @@ async function notifyBrandRequestActors(
   title: string,
   content: string,
   metadata: Record<string, unknown>,
-  event: "PAYMENT_SUCCESS" | "PAYMENT_FAILED" = "PAYMENT_SUCCESS"
+  event:
+    | "BRAND_NPOINT_TOPUP_REQUESTED"
+    | "BRAND_NPOINT_TOPUP_APPROVED"
+    | "BRAND_NPOINT_TOPUP_REJECTED"
+    | "BRAND_NPOINT_TOPUP_REFUNDED" = "BRAND_NPOINT_TOPUP_REQUESTED"
 ) {
   const targets = new Set([request.requesterAccountId, request.brand.ownerAccountId]);
   await Promise.all(
@@ -231,7 +243,8 @@ export async function approveAdminNPointTopupRequest(actorId: string, requestId:
     { requesterAccountId: result.request.requesterAccountId, brand: { ownerAccountId: result.request.brand.ownerAccountId } },
     "Yêu cầu nạp N-Point đã được duyệt",
     `Yêu cầu nạp ${result.request.requestedPoints.toLocaleString("vi-VN")} N-Point đã được duyệt và cộng điểm vào ví Brand.`,
-    { requestId: result.request.id, status: result.request.status }
+    { requestId: result.request.id, status: result.request.status },
+    "BRAND_NPOINT_TOPUP_APPROVED"
   );
 
   return result.request;
@@ -273,7 +286,7 @@ export async function rejectAdminNPointTopupRequest(actorId: string, requestId: 
     "Yêu cầu nạp N-Point bị từ chối",
     `Yêu cầu nạp N-Point bị từ chối với lý do: ${reason}. Vui lòng gửi thông tin tài khoản để hoàn tiền.`,
     { requestId: request.id, status: request.status, reason },
-    "PAYMENT_FAILED"
+    "BRAND_NPOINT_TOPUP_REJECTED"
   );
 
   return request;
@@ -313,7 +326,8 @@ export async function completeAdminNPointRefund(actorId: string, requestId: stri
     { requesterAccountId: request.requesterAccountId, brand: { ownerAccountId: request.brand.ownerAccountId } },
     "Yêu cầu hoàn tiền đã xử lý",
     "Admin đã xử lý hoàn tiền và gửi kèm ảnh biên lai hoàn tiền cho yêu cầu của bạn.",
-    { requestId: request.id, status: request.status, refundProofUrl: request.refundProofUrl }
+    { requestId: request.id, status: request.status, refundProofUrl: request.refundProofUrl },
+    "BRAND_NPOINT_TOPUP_REFUNDED"
   );
 
   return request;

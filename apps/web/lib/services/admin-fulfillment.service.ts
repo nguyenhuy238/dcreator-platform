@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { getBrandDisplayName } from "@/lib/display-identity";
 import { AppError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/services/audit-log.service";
-import { createNotification, createNotificationForAdminOps } from "@/lib/services/notification.service";
+import { createNotification, createNotificationForAdminOps, createNotificationForBrandMembers } from "@/lib/services/notification.service";
 
 type OpsStatus = "pending" | "preparing" | "shipped" | "delivered" | "failed" | "cancelled";
 type FulfillmentMethod = "CREATOR_SELF_BUY_REFUND" | "CREATOR_DEPOSIT" | "BRAND_WAREHOUSE_SHIP";
@@ -205,9 +205,25 @@ export async function updateFulfillmentByAdmin(input: {
   if (current.creatorAccountId) {
     await createNotification({
       accountId: current.creatorAccountId,
-      event: NotificationEvent.CAMPAIGN_APPROVED,
+      event: NotificationEvent.CREATOR_FULFILLMENT_UPDATED,
       title: "Cập nhật đơn hàng sản phẩm",
       content: `Đơn fulfillment cho campaign "${current.campaign?.title ?? "N/A"}" đã cập nhật trạng thái: ${input.status}.`,
+      metadata: { fulfillmentOrderId: current.id, status: input.status, trackingCode: input.trackingCode ?? null }
+    });
+  }
+  if (current.campaign?.brandId) {
+    await createNotification({
+      accountId: current.campaign.brandId,
+      event: input.status === "failed" || input.status === "cancelled" ? NotificationEvent.BRAND_FULFILLMENT_ISSUE : NotificationEvent.BRAND_FULFILLMENT_UPDATED,
+      title: input.status === "failed" || input.status === "cancelled" ? "Fulfillment issue" : "Fulfillment được cập nhật",
+      content: `Fulfillment cho campaign "${current.campaign?.title ?? "N/A"}" đã cập nhật trạng thái: ${input.status}.`,
+      metadata: { fulfillmentOrderId: current.id, status: input.status, trackingCode: input.trackingCode ?? null }
+    });
+    await createNotificationForBrandMembers({
+      brandId: current.campaign.brandId,
+      event: input.status === "failed" || input.status === "cancelled" ? NotificationEvent.BRAND_FULFILLMENT_ISSUE : NotificationEvent.BRAND_FULFILLMENT_UPDATED,
+      title: input.status === "failed" || input.status === "cancelled" ? "Fulfillment issue" : "Fulfillment updated",
+      content: `Fulfillment for campaign "${current.campaign?.title ?? "N/A"}" was updated to status: ${input.status}.`,
       metadata: { fulfillmentOrderId: current.id, status: input.status, trackingCode: input.trackingCode ?? null }
     });
   }
@@ -301,11 +317,29 @@ export async function createFulfillmentExportRequest(input: {
 
   await createNotification({
     accountId: input.creatorAccountId,
-    event: NotificationEvent.MISSION_ACCEPTED,
+    event: NotificationEvent.CREATOR_FULFILLMENT_UPDATED,
     title: "Đã tạo yêu cầu điều phối sản phẩm",
     content: `Admin/Ops đã tạo yêu cầu điều phối sản phẩm cho campaign "${campaign.title}".`,
     metadata: { fulfillmentOrderId: created.id, campaignId: input.campaignId }
   });
+
+  const brandCampaign = await prisma.campaign.findUnique({ where: { id: input.campaignId }, select: { brandId: true } });
+  if (brandCampaign?.brandId) {
+    await createNotification({
+      accountId: brandCampaign.brandId,
+      event: NotificationEvent.BRAND_FULFILLMENT_UPDATED,
+      title: "Fulfillment được cập nhật",
+      content: `Đã tạo yêu cầu điều phối sản phẩm cho campaign "${campaign.title}".`,
+      metadata: { fulfillmentOrderId: created.id, campaignId: input.campaignId }
+    });
+    await createNotificationForBrandMembers({
+      brandId: brandCampaign.brandId,
+      event: NotificationEvent.BRAND_FULFILLMENT_UPDATED,
+      title: "Fulfillment updated",
+      content: `A fulfillment request was created for campaign "${campaign.title}".`,
+      metadata: { fulfillmentOrderId: created.id, campaignId: input.campaignId }
+    });
+  }
 
   return created;
 }

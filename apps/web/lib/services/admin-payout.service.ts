@@ -246,7 +246,7 @@ export async function markPayoutAsPaidByAdmin(actorId: string, payoutId: string)
 
   await createNotification({
     accountId: payout.accountId,
-    event: NotificationEvent.PAYOUT_APPROVED,
+    event: NotificationEvent.PAYOUT_PAID,
     title: "Payout đã thanh toán",
     content: `Khoản rút ${payout.amountVnd.toLocaleString("vi-VN")} N-Point đã được chuyển khoản.`,
     metadata: { payoutId }

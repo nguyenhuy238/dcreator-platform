@@ -119,7 +119,7 @@ export async function registerCreatorDirect(input: CreatorRegistrationInput) {
 
   await createNotification({
     accountId: result.account.id,
-    event: NotificationEvent.CREATOR_APPLICATION_APPROVED,
+    event: NotificationEvent.CREATOR_PROFILE_CREATED,
     title: "Tạo tài khoản Creator thành công",
     content: "Bạn có thể vào Creator Dashboard và tiếp tục bổ sung xác minh khi cần payout.",
     metadata: { creatorProfileId: result.creatorProfile.id }
@@ -198,7 +198,7 @@ export async function registerBrandDirect(input: BrandRegistrationInput) {
 
   await createNotification({
     accountId: result.account.id,
-    event: NotificationEvent.BRAND_APPLICATION_APPROVED,
+    event: NotificationEvent.BRAND_PROFILE_CREATED,
     title: "Tạo tài khoản Brand thành công",
     content: "Bạn có thể vào Brand Dashboard để quản lý sản phẩm, campaign và làm việc với Creator.",
     metadata: { brandId: result.brand.id }

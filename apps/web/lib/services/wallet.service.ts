@@ -215,6 +215,7 @@ export async function createCreatorPayoutRequest(
   if (existing) return existing;
 
   const payoutRequest = await prisma.$transaction(async (tx) => {
+  const payoutRequest = await prisma.$transaction(async (tx) => {
     const currentWallet = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
     const nextPoints = currentWallet.pointsBalance - amountVnd;
     assertNonNegativeBalance(nextPoints, currentWallet.cashBalanceVnd);
