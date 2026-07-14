@@ -3,6 +3,7 @@ import { ok } from "@/lib/api-response";
 import { requireAdminOps } from "@/lib/auth/admin-guard";
 import { prisma } from "@/lib/db";
 import { toErrorResponse } from "@/lib/errors";
+import { activeBrandWhere } from "@/lib/services/admin-brand-status";
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
     const status = request.nextUrl.searchParams.get("status")?.trim() ?? "";
     const brands = await prisma.brand.findMany({
       where: {
-        ...(status === "LOCKED" ? { isLocked: true } : status === "ACTIVE" ? { isLocked: false, status: "ACTIVE" } : {}),
+        ...(status === "LOCKED" ? { isLocked: true } : status === "ACTIVE" ? activeBrandWhere : {}),
         ...(query
           ? {
               OR: [
