@@ -1,5 +1,6 @@
 import { BrandStatus, CampaignStatus, CreatorChannelVerificationStatus, CreatorSocialLinkStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { activeBrandWhere } from "@/lib/services/admin-brand-status";
 
 function startByPeriod(period: "7d" | "30d" | "month") {
   const now = new Date();
@@ -39,7 +40,7 @@ export async function getAdminReportsSummary(period: "7d" | "30d" | "month") {
     prisma.campaign.count({ where: { status: CampaignStatus.ACTIVE } }),
     prisma.campaign.count({ where: { status: { in: [CampaignStatus.DRAFT, CampaignStatus.PAUSED] } } }),
     prisma.brand.count(),
-    prisma.brand.count({ where: { status: "ACTIVE" } }),
+    prisma.brand.count({ where: activeBrandWhere }),
     prisma.creatorProfile.count(),
     prisma.creatorProfile.count({ where: { isSuspended: false, account: { isActive: true } } }),
     prisma.brand.count({

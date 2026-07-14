@@ -2,6 +2,7 @@ import { BrandMemberRole, BrandMemberStatus, BrandStatus, CampaignStatus, Creato
 import { extractCampaignRequestMeta } from "@/lib/campaign-request-meta";
 import { prisma } from "@/lib/db";
 import { AppError } from "@/lib/errors";
+import { activeBrandWhere } from "@/lib/services/admin-brand-status";
 import { approveProof, rejectProof } from "@/lib/services/mission.service";
 import {
   approvePublishReportByAdmin,
@@ -136,7 +137,7 @@ export async function getAdminOverview() {
     }),
     prisma.missionSubmission.count({ where: { lifecycleStatus: "PENDING_REVIEW" } }),
     prisma.payoutRequest.count({ where: { status: "PENDING" } }),
-    prisma.brand.count({ where: { status: "ACTIVE" } }),
+    prisma.brand.count({ where: activeBrandWhere }),
     prisma.creatorProfile.count({ where: { isSuspended: false, account: { isActive: true } } }),
     prismaAny.productSubmission.count({
       where: { reviewStatus: { in: ["PENDING_REVIEW", "CHANGES_REQUESTED"] } }
