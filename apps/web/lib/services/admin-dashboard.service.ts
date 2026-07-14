@@ -136,7 +136,7 @@ export async function getAdminOverview() {
     }),
     prisma.missionSubmission.count({ where: { lifecycleStatus: "PENDING_REVIEW" } }),
     prisma.payoutRequest.count({ where: { status: "PENDING" } }),
-    prisma.brand.count({ where: { status: "ACTIVE" } }),
+    prisma.brand.count({ where: { isLocked: false, status: BrandStatus.ACTIVE } }),
     prisma.creatorProfile.count({ where: { isSuspended: false, account: { isActive: true } } }),
     prismaAny.productSubmission.count({
       where: { reviewStatus: { in: ["PENDING_REVIEW", "CHANGES_REQUESTED"] } }
